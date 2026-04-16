@@ -6,7 +6,7 @@ const ContactPage = () => (
       </h1>
       <p className="mt-3 max-w-lg text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
         A contact form and direct channels will appear here. For now, use the
-        marketing site navigation to explore listings and account options.
+        navigation above to explore listings and account options.
       </p>
     </div>
   </main>

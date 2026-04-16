@@ -1,7 +1,7 @@
 import { Footer } from "@/components/landing/footer";
 import { Header } from "@/components/landing/header";
 
-const MarketingLayout = ({
+const LandingLayout = ({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -13,4 +13,4 @@ const MarketingLayout = ({
   </div>
 )
 
-export default MarketingLayout
+export default LandingLayout

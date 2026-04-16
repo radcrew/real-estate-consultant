@@ -11,4 +11,5 @@ const HomePage = () => (
     <ContactUs />
   </main>
 )
+
 export default HomePage
