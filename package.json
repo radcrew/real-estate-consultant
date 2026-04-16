@@ -1,0 +1,10 @@
+{
+  "name": "real-estate-consultant",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter radestate dev",
+    "build": "pnpm --filter radestate build",
+    "start": "pnpm --filter radestate start",
+    "lint": "pnpm --filter radestate lint"
+  }
+}
