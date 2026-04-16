@@ -97,3 +97,56 @@ export const FEATURED_LISTINGS: FeaturedListing[] = [
     imageAlt: "Modern flex office and warehouse",
   },
 ]
+
+export type CreProfessionalFeatureId =
+  | "ai-fit-scoring"
+  | "saved-search-profiles"
+  | "shortlist-status"
+  | "ai-outreach-drafts"
+  | "market-intelligence"
+  | "clear-height-transparency"
+
+export type CreProfessionalFeature = {
+  id: CreProfessionalFeatureId
+  title: string
+  description: string
+}
+
+export const CRE_PROFESSIONAL_FEATURES: CreProfessionalFeature[] = [
+  {
+    id: "ai-fit-scoring",
+    title: "AI Fit Scoring",
+    description:
+      "Every property ranked 0-100 against your specific requirements. No more manual filtering.",
+  },
+  {
+    id: "saved-search-profiles",
+    title: "Saved Search Profiles",
+    description:
+      "Save your criteria and re-run ranked searches instantly. Track new inventory automatically.",
+  },
+  {
+    id: "shortlist-status",
+    title: "Shortlist with Status",
+    description:
+      "Track properties through your pipeline — reviewing, touring, LOI, passed.",
+  },
+  {
+    id: "ai-outreach-drafts",
+    title: "AI Outreach Drafts",
+    description:
+      "Generate broker outreach emails in seconds. Edit before sending — you stay in control.",
+  },
+  {
+    id: "market-intelligence",
+    title: "Market Intelligence",
+    description:
+      "Dashboard analytics on inventory, pricing, and market trends across submarkets.",
+  },
+  {
+    id: "clear-height-transparency",
+    title: "Clear Height Transparency",
+    description:
+      "We flag when clear height is inferred vs. explicitly confirmed. No surprises on tour.",
+  },
+]
