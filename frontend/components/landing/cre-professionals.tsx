@@ -30,7 +30,8 @@ const ICON_WRAP =
 
 const CARD_TITLE = "text-lg font-bold text-foreground";
 
-const CARD_BODY = "mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base";
+const CARD_BODY =
+  "mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base";
 
 const ICON_MAP: Record<CreProfessionalFeatureId, LucideIcon> = {
   "ai-fit-scoring": Zap,

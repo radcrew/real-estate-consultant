@@ -1,3 +1,4 @@
+import { ContactUs } from "@/components/landing/contact-us";
 import { CreProfessionals } from "@/components/landing/cre-professionals";
 import { FeaturedListings } from "@/components/landing/featured-listings";
 import { Hero } from "@/components/landing/hero";
@@ -7,7 +8,7 @@ const HomePage = () => (
     <Hero />
     <FeaturedListings />
     <CreProfessionals />
+    <ContactUs />
   </main>
 )
-
 export default HomePage

@@ -1,3 +1,4 @@
+import { Footer } from "@/components/landing/footer";
 import { Header } from "@/components/landing/header";
 
 const MarketingLayout = ({
@@ -8,6 +9,7 @@ const MarketingLayout = ({
   <div className="flex min-h-screen flex-col">
     <Header />
     {children}
+    <Footer />
   </div>
 )
 
