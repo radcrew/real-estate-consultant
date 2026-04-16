@@ -19,17 +19,17 @@ export const metadata: Metadata = {
   description: "RadEstate real estate consultant platform",
 };
 
-export default function RootLayout({
+const RootLayout = ({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>) {
-  return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="flex min-h-full flex-col font-sans">{children}</body>
-    </html>
-  );
-}
+}>) => (
+  <html
+    lang="en"
+    className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
+  >
+    <body className="flex min-h-full flex-col font-sans">{children}</body>
+  </html>
+)
+
+export default RootLayout
