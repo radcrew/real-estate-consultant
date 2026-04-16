@@ -6,7 +6,7 @@ import { HERO_STATS } from "@/constants";
 import { cn } from "@/lib/utils";
 
 const HERO_SECTION =
-  "relative border-b border-border/60 bg-gradient-to-br from-amber-200/25 via-background to-background px-4 py-16 sm:py-20";
+  "relative border-b border-border/60 bg-gradient-to-br from-amber-200/25 via-background to-background px-4 pt-16 pb-10 sm:py-16";
 
 const HERO_INNER =
   "mx-auto flex max-w-3xl flex-col items-center text-center";
@@ -28,9 +28,13 @@ const HERO_OUTLINE_CTA_EXTRA =
   "h-11 min-h-11 border-border bg-background px-7 text-base font-semibold shadow-none";
 
 const HERO_STATS_SECTION =
-  "mt-14 w-full max-w-3xl border-t border-border/60 pt-10";
+  "mx-auto mt-14 flex w-full max-w-3xl flex-col items-center justify-center border-t border-border/60 px-4 pt-10";
 
-const HERO_STATS_GRID = "grid grid-cols-2 gap-8 sm:grid-cols-4 sm:gap-6";
+const HERO_STATS_GRID =
+  "grid w-full grid-cols-2 place-items-center gap-x-14 gap-y-16 text-center sm:grid-cols-4 sm:gap-x-16 sm:gap-y-14";
+
+const HERO_STAT_CELL =
+  "flex flex-col items-center justify-center gap-1 text-center";
 
 const HERO_STAT_VALUE =
   "text-2xl font-bold tabular-nums text-primary sm:text-3xl";
@@ -70,15 +74,15 @@ export const Hero = () => (
         </Link>
       </div>
 
-      <div className={HERO_STATS_SECTION}>
-        <div className={HERO_STATS_GRID}>
-          {HERO_STATS.map(({ label, value }) => (
-            <div key={label} className="flex flex-col gap-1">
-              <p className={HERO_STAT_VALUE}>{value}</p>
-              <p className={HERO_STAT_LABEL}>{label}</p>
-            </div>
-          ))}
-        </div>
+    </div>
+    <div className={HERO_STATS_SECTION}>
+      <div className={HERO_STATS_GRID}>
+        {HERO_STATS.map(({ label, value }) => (
+          <div key={label} className={HERO_STAT_CELL}>
+            <p className={HERO_STAT_VALUE}>{value}</p>
+            <p className={HERO_STAT_LABEL}>{label}</p>
+          </div>
+        ))}
       </div>
     </div>
   </section>
