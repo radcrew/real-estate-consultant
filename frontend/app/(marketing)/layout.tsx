@@ -1,4 +1,4 @@
-import { SiteHeader } from "@/components/landing/site-header";
+import { Header } from "@/components/landing/header";
 
 const MarketingLayout = ({
   children,
@@ -6,7 +6,7 @@ const MarketingLayout = ({
   children: React.ReactNode;
 }>) => (
   <div className="flex min-h-screen flex-col">
-    <SiteHeader />
+    <Header />
     {children}
   </div>
 )
