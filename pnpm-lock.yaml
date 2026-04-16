@@ -6,7 +6,9 @@ settings:
 
 importers:
 
-  .:
+  .: {}
+
+  frontend:
     dependencies:
       '@base-ui/react':
         specifier: ^1.4.0

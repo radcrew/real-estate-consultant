@@ -1,0 +1,15 @@
+node_modules
+.pnpm-store
+
+# Next.js (frontend)
+frontend/.next
+frontend/out
+
+# Env
+.env
+.env*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
