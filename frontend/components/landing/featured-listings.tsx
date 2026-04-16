@@ -1,9 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
+import { Search } from "lucide-react";
 
 import type { FeaturedListing } from "@/constants";
 import { FEATURED_LISTINGS } from "@/constants";
-
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 const SECTION =
   "border-b border-border/60 bg-muted/30 px-4 py-14 sm:py-16";
 
@@ -14,6 +16,11 @@ const TITLE =
 
 const GRID =
   "mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8";
+
+const BROWSE_ROW = "mt-10 flex justify-center sm:mt-12";
+
+const BROWSE_BUTTON =
+  "inline-flex items-center gap-2 px-6 font-semibold shadow-none";
 
 const ListingCard = ({ listing }: { listing: FeaturedListing }) => (
   <Link
@@ -70,6 +77,19 @@ export const FeaturedListings = () => (
         {FEATURED_LISTINGS.map((listing) => (
           <ListingCard key={listing.id} listing={listing} />
         ))}
+      </div>
+
+      <div className={BROWSE_ROW}>
+        <Link
+          href="/listings"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "lg" }),
+            BROWSE_BUTTON
+          )}
+        >
+          <Search className="size-5 shrink-0" aria-hidden />
+          Browse All Properties
+        </Link>
       </div>
     </div>
   </section>
