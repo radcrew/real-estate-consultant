@@ -1,6 +1,6 @@
 # MVP scope
 
-Structured breakdown of the first release. Aligned with the [product spec](../spec.md).
+Structured breakdown of the first release. Aligned with the [product spec](spec.md).
 
 ---
 

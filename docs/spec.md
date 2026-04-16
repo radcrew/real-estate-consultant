@@ -4,6 +4,8 @@
 
 **North star:** A system that behaves like a capable virtual CRE agent: qualify the search, gather listings from lawful sources, normalize and reason over properties, rank by fit, support saved workflows, and draft broker outreach for human approval.
 
+**Implementation stack:** [Next.js](https://nextjs.org/) (web app), [FastAPI](https://fastapi.tiangolo.com/) (API and ingestion services), [Supabase](https://supabase.com/) (Postgres, auth, and related platform features), [OpenRouter](https://openrouter.ai/) (LLM access). See [README stack](../README.md#stack) for the canonical list.
+
 ---
 
 ## Table of contents
@@ -39,7 +41,7 @@ Help users find **industrial, flex, and retail** properties **for sale or lease*
 | Modular ingestion for growth | Scraping prohibited or private sources |
 | Code structure that can grow toward multi-tenant SaaS | Full CRM, billing, enterprise RBAC |
 
-See [docs/out-of-scope.md](docs/out-of-scope.md) for a full exclusion list.
+See [out-of-scope.md](out-of-scope.md) for a full exclusion list.
 
 ---
 
@@ -128,18 +130,22 @@ Produce a **prioritized shortlist** with clear rationale, weighted toward:
 
 - **Single admin user** for MVP; structure code and data so **multi-user SaaS** is a natural next step.  
 - **Modular, readable** codebase; document boundaries between intake, ingestion, normalization, ranking, and outreach.  
-- Stack is a **project decision**: prefer practical, maintainable, cost-conscious choices.
+- **Next.js** for the product UI and BFF-style routes where appropriate; **FastAPI** for heavy I/O, ingestion connectors, and service APIs that benefit from an async Python stack; **Supabase** as the system of record (Postgres) and for auth and platform primitives; **OpenRouter** for model calls used in understanding, ranking copy, and outreach drafts.
 
 ---
 
 ## Stack guidance
 
-Illustrative options (not prescriptive):
+**Chosen stack (MVP):**
 
-- **Frontend:** React / Next.js  
-- **Data:** Supabase or Postgres  
-- **Acquisition:** Apify or similar where appropriate  
-- **AI:** OpenAI, OpenRouter, or comparable LLM APIs  
+| Layer | Technology | Role |
+|-------|------------|------|
+| Web application | **Next.js** | UI, intake and results flows, server components / route handlers as needed |
+| Backend API & jobs | **FastAPI** | REST (or RPC) APIs, modular ingestion, normalization pipelines, LLM orchestration calling OpenRouter |
+| Data & auth | **Supabase** | Postgres, Row Level Security where used, Auth, Storage or Realtime if needed |
+| LLM | **OpenRouter** | Unified access to models for extraction, summarization, scoring narrative, and draft outreach |
+
+**Additional tooling (non-core):** listing acquisition may use **Apify** or similar where terms and architecture allow; keep connectors swappable behind FastAPI.
 
 ---
 
@@ -158,8 +164,8 @@ Reasonable defaults for an internal MVP repo:
 
 | Document | Contents |
 |----------|----------|
-| [docs/mvp-scope.md](docs/mvp-scope.md) | Structured MVP scope (intake through technical setup) |
-| [docs/out-of-scope.md](docs/out-of-scope.md) | Explicit MVP exclusions to prevent scope creep |
+| [mvp-scope.md](mvp-scope.md) | Structured MVP scope (intake through technical setup) |
+| [out-of-scope.md](out-of-scope.md) | Explicit MVP exclusions to prevent scope creep |
 
 ---
 
