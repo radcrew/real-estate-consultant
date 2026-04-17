@@ -3,7 +3,6 @@
 
 create table if not exists public.properties (
     id uuid primary key default gen_random_uuid(),
-    source_property_id text not null,
     address text,
     city text,
     state text,
@@ -18,8 +17,7 @@ create table if not exists public.properties (
     clear_height numeric,
     loading_docks integer,
     created_at timestamptz not null default now(),
-    updated_at timestamptz not null default now(),
-    constraint properties_source_property_id_key unique (source_property_id)
+    updated_at timestamptz not null default now()
 );
 
 create index if not exists properties_city_state_idx on public.properties (city, state);
@@ -43,3 +41,5 @@ execute function public.properties_set_updated_at();
 alter table public.properties enable row level security;
 
 -- Adjust policies for your app; service role bypasses RLS for server-side seeding.
+
+notify pgrst, 'reload schema';

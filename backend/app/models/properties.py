@@ -10,9 +10,6 @@ class Properties(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    # Stable external id (e.g. LoopNet `propertyId`) for upserts into Supabase
-    source_property_id: str | None = None
-
     # Identity
     address: str | None = None
     city: str | None = None

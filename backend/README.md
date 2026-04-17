@@ -70,6 +70,14 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 | [http://127.0.0.1:8000/api/v1/ping](http://127.0.0.1:8000/api/v1/ping) | Sample versioned route |
 | [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json) | OpenAPI schema |
 
+### `POST /seed` troubleshooting
+
+- The route exists only when **`IS_DEV_MODE=true`** (restart the server after changing `.env`). Otherwise you get **404**.
+- Call **`POST`**, not GET (opening the URL in a browser alone will not seed).
+- **`SUPABASE_URL`** and **`SUPABASE_SERVICE_ROLE_KEY`** must be valid; bad URL or DNS issues return **502** with a short explanation (including `httpx` connection errors, which are not PostgREST `APIError`s).
+- Apply the SQL migrations under `supabase/migrations/` so **`public.properties`** exists with the columns in `app/models/properties.py`. If you had an older `source_property_id` column, run **`20260418120000_properties_drop_source_property_id.sql`** then **`NOTIFY pgrst, 'reload schema';`** ([docs](https://supabase.com/docs/guides/troubleshooting/refresh-postgrest-schema)). PostgREST **`PGRST204`** usually means the schema cache is stale after DDL—run the same `NOTIFY`, then retry **`POST /seed`**.
+- **`POST /seed`** uses **INSERT** (each run adds rows). For a clean re-seed in dev, run **`truncate table public.properties;`** (or delete rows) before calling the endpoint again.
+
 ## Linting
 
 With dev dependencies installed:

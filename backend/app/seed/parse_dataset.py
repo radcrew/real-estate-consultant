@@ -242,18 +242,9 @@ def _round_num(value: float | None, places: int = 6) -> float | None:
     return round(value, places)
 
 
-def _source_property_id(raw: dict[str, Any]) -> str | None:
-    pid = raw.get("propertyId")
-    if pid is None:
-        return None
-    text = str(pid).strip()
-    return text if text else None
-
-
 def raw_to_properties(raw: dict[str, Any]) -> Properties:
     """Map one LoopNet-style listing object to a `Properties` row."""
     return Properties(
-        source_property_id=_source_property_id(raw),
         address=_blank_to_none(raw.get("address")),
         city=_blank_to_none(raw.get("city")),
         state=_blank_to_none(raw.get("state")),
