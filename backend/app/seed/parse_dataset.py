@@ -1,4 +1,4 @@
-"""Load and validate LoopNet-style listing JSON from the backend dataset folder."""
+"""Parse and validate listing dataset JSON from the backend dataset folder."""
 
 from __future__ import annotations
 

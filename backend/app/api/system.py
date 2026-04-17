@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.core.config import settings
 from app.schemas.seed import SeedDatasetResponse
-from app.seed.loopnet_raw import load_listings
+from app.seed.parse_dataset import load_listings
 
 router = APIRouter(tags=["system"])
 
