@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { SignUpForm } from "@/components/auth/forms/sign-up";
+
 export const metadata: Metadata = {
   title: "Create account",
   description: "Create a RadEstate account",
@@ -13,10 +15,10 @@ const SignUpPage = () => (
         Create account
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Get started with RadEstate. Registration form and server integration
-        will be added in a later step.
+        Sign up with your work email. You can sign in on the next screen.
       </p>
     </div>
+    <SignUpForm />
     <p className="text-center text-sm text-muted-foreground">
       Already have an account?{" "}
       <Link
