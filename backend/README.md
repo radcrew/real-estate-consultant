@@ -31,12 +31,22 @@ Environment values are loaded from `backend/.env` by path, so loading does not d
 
 ## Run the server
 
-With the virtual environment activated and the working directory set to `backend/`:
+With the virtual environment activated.
+
+**Working directory must be `backend/`** (where this `pyproject.toml` lives). If you run `fastapi dev` from the repository root, the CLI shows *Could not find a default file to run* because it does not see `[tool.fastapi]` or the `app` package.
+
+From `backend/`:
 
 **Development** (reload on `127.0.0.1:8000`, uses `[tool.fastapi]` entrypoint in `pyproject.toml`):
 
 ```powershell
 fastapi dev
+```
+
+From the **repository root** (path to `main.py` so the CLI can resolve `app` under `backend/`):
+
+```powershell
+fastapi dev backend/app/main.py
 ```
 
 **Production-style** (no reload, listens on `0.0.0.0`):

@@ -31,6 +31,17 @@ Start with the product spec, then drill into scope boundaries.
 
 ---
 
+## Local backend (FastAPI)
+
+The Python project and `pyproject.toml` live under **`backend/`**. After `pip install -e ".[dev]"` from `backend/`, start the API either:
+
+- from **`backend/`**: `fastapi dev`, or  
+- from **this repo root**: `fastapi dev backend/app/main.py`
+
+Running `fastapi dev` with no path from the repo root fails because the CLI does not pick up `backend/pyproject.toml` by default.
+
+---
+
 ## Repository status
 
 Specification and planning docs are in place; application source is not added yet. When the app exists, this README should gain **local setup**, **environment variables**, and **deployment** sections (as outlined under “Project artifacts” in [docs/spec.md](docs/spec.md)).
