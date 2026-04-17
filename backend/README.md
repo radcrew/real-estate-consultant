@@ -33,6 +33,20 @@ Environment values are loaded from `backend/.env` by path, so loading does not d
 
 With the virtual environment activated and the working directory set to `backend/`:
 
+**Development** (reload on `127.0.0.1:8000`, uses `[tool.fastapi]` entrypoint in `pyproject.toml`):
+
+```powershell
+fastapi dev
+```
+
+**Production-style** (no reload, listens on `0.0.0.0`):
+
+```powershell
+fastapi run
+```
+
+Equivalent with Uvicorn directly:
+
 ```powershell
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
