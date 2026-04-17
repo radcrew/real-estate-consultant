@@ -5,7 +5,7 @@ from app.core.config import settings
 from app.core.deps import SupabaseSdkDep
 from app.schemas.auth import SignUpRequest, SignUpResponse
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter()
 
 
 @router.post("/sign-up", status_code=status.HTTP_201_CREATED)
