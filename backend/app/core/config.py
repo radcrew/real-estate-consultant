@@ -16,5 +16,7 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     debug: bool = False
 
+    database_url: str
+
 
 settings = Settings()
