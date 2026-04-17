@@ -25,7 +25,7 @@ Copy `.env.example` to `.env` in this same directory and adjust values as needed
 | Variable   | Purpose |
 |------------|---------|
 | `APP_NAME` | Title shown in the OpenAPI metadata |
-| `DEBUG`    | When `true`, enables `/docs` and `/redoc`; when `false`, they are hidden |
+| `IS_DEV_MODE` | When `true`, enables `/docs` and `/redoc` and other dev-only routes; `DEBUG` is accepted as an alias |
 
 Environment values are loaded from `backend/.env` by path, so loading does not depend on the shell’s current working directory.
 

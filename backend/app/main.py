@@ -19,8 +19,8 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         version=settings.version,
-        docs_url="/docs" if settings.debug else None,
-        redoc_url="/redoc" if settings.debug else None,
+        docs_url="/docs" if settings.is_dev_mode else None,
+        redoc_url="/redoc" if settings.is_dev_mode else None,
         lifespan=lifespan,
     )
     app.include_router(system_router)
