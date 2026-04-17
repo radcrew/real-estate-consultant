@@ -56,6 +56,7 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 | URL | Description |
 |-----|-------------|
 | [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) | Liveness-style check |
+| `POST` [http://127.0.0.1:8000/seed](http://127.0.0.1:8000/seed) | Dev dataset seed (only when `IS_DEV_MODE=true`) |
 | [http://127.0.0.1:8000/api/v1/ping](http://127.0.0.1:8000/api/v1/ping) | Sample versioned route |
 | [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json) | OpenAPI schema |
 
