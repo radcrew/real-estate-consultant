@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { SignUpNotice } from "@components/auth/sign-up-notice";
 import { SignInForm } from "@components/auth/forms/sign-in";
+import { OAuthErrorNotice } from "@components/auth/oauth-error-notice";
+import { SignUpNotice } from "@components/auth/sign-up-notice";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -17,10 +18,11 @@ const SignInPage = () => (
         Sign in
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Use the email and password for your RadEstate account.
+        Sign in with Google or the email and password for your RadEstate account.
       </p>
     </div>
     <Suspense fallback={null}>
+      <OAuthErrorNotice />
       <SignUpNotice />
     </Suspense>
     <SignInForm />
