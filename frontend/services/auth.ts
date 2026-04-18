@@ -1,3 +1,5 @@
+import type { AxiosInstance } from "axios";
+
 import { apiClient } from "@lib/api-client";
 
 export type SignInBody = {
@@ -25,13 +27,18 @@ export type SignUpResponse = {
 };
 
 export class AuthService {
-  static async signIn(body: SignInBody): Promise<SignInResponse> {
-    const { data } = await apiClient.post<SignInResponse>("/auth/sign-in", body);
+  constructor(private readonly http: AxiosInstance) {}
+
+  async signIn(body: SignInBody): Promise<SignInResponse> {
+    const { data } = await this.http.post<SignInResponse>("/auth/sign-in", body);
     return data;
   }
 
-  static async signUp(body: SignUpBody): Promise<SignUpResponse> {
-    const { data } = await apiClient.post<SignUpResponse>("/auth/sign-up", body);
+  async signUp(body: SignUpBody): Promise<SignUpResponse> {
+    const { data } = await this.http.post<SignUpResponse>("/auth/sign-up", body);
     return data;
   }
 }
+
+/** Default app wiring; pass a custom `AxiosInstance` in tests via `new AuthService(mockHttp)`. */
+export const authService = new AuthService(apiClient);

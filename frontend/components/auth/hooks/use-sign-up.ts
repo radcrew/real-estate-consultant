@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 
 import { getApiErrorMessage } from "@lib/api-errors";
-import { AuthService } from "@services/auth";
+import { authService } from "@services/auth";
 
 export type SignUpCredentials = {
   email: string;
@@ -19,7 +19,7 @@ export const useSignUp = (onSuccess: () => void) => {
     setPending(true);
 
     try {
-      await AuthService.signUp({
+      await authService.signUp({
         email: email.trim(),
         password,
       });

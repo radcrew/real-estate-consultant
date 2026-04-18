@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 
 import { getApiErrorMessage } from "@lib/api-errors";
 import { saveSession } from "@lib/auth-session";
-import { AuthService } from "@services/auth";
+import { authService } from "@services/auth";
 
 export type SignInCredentials = {
   email: string;
@@ -26,7 +26,7 @@ export const useSignIn = (onSuccess: () => void) => {
         expires_in: expiresIn,
         token_type: tokenType,
         user,
-      } = await AuthService.signIn({
+      } = await authService.signIn({
         email: email.trim(),
         password,
       });
