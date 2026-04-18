@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.models.properties import Properties
-from app.models.property_seed import PropertySeedBundle
+from app.models.property_images import PropertyImages
 from app.utils.values import clean_str_or_none, first_valid, round_or_none
 
 # Stable UUID namespace for deterministic ``properties.id`` from source ``propertyId`` (seeding / FKs).
@@ -270,23 +270,32 @@ def _properties_from_listing(listing: dict[str, Any], row_id: uuid.UUID | None) 
     )
 
 
-def listing_to_seed_bundle(listing: dict[str, Any]) -> PropertySeedBundle:
+def listing_to_property_and_images(
+    listing: dict[str, Any],
+) -> tuple[Properties, list[PropertyImages]]:
     prop_id_key = clean_str_or_none(listing.get("propertyId"))
     row_id = _deterministic_property_id(prop_id_key) if prop_id_key else None
-    return PropertySeedBundle(
-        property=_properties_from_listing(listing, row_id),
-        kv_image_urls=_kv_image_urls_from_listing(listing),
-    )
+    prop = _properties_from_listing(listing, row_id)
+    images: list[PropertyImages] = []
+    if row_id is not None:
+        images = [
+            PropertyImages(property_id=row_id, url=u)
+            for u in _kv_image_urls_from_listing(listing)
+        ]
+    return prop, images
 
 
 def normalize_listing_to_property(listing: dict[str, Any]) -> Properties:
-    return listing_to_seed_bundle(listing).property
+    prop, _ = listing_to_property_and_images(listing)
+    return prop
 
 
-def load_property_dataset(path: Path | None = None) -> list[PropertySeedBundle]:
-    """Load the dataset file and return seed bundles (property row + ``KVImages`` URLs)."""
+def load_property_dataset(
+    path: Path | None = None,
+) -> list[tuple[Properties, list[PropertyImages]]]:
+    """Load the dataset file: each item is ``(property, image_seed_rows)``."""
     try:
-        return [listing_to_seed_bundle(row) for row in parse_json_file(path)]
+        return [listing_to_property_and_images(row) for row in parse_json_file(path)]
     except FileNotFoundError as exc:
         logger.warning("Seed: dataset file missing (%s)", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc

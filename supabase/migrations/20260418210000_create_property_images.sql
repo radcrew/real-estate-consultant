@@ -4,7 +4,6 @@ create table if not exists public.property_images (
     id uuid primary key default gen_random_uuid(),
     property_id uuid not null references public.properties (id) on delete cascade,
     url text not null,
-    "position" integer,
     created_at timestamptz not null default now()
 );
 

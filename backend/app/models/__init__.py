@@ -1,4 +1,4 @@
 from app.models.properties import Properties
-from app.models.property_seed import PropertySeedBundle
+from app.models.property_images import PropertyImages
 
-__all__ = ["Properties", "PropertySeedBundle"]
+__all__ = ["Properties", "PropertyImages"]
