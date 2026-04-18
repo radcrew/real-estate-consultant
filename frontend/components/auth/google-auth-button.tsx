@@ -4,6 +4,8 @@ import Image from "next/image";
 
 import { Button } from "@components/ui/button";
 
+import { useGoogleSignIn } from "./hooks/use-google-sign-in";
+
 type GoogleAuthButtonProps = {
   label?: string;
   /** When the email/password form is submitting, disable Google to avoid overlapping requests. */
@@ -14,12 +16,20 @@ export const GoogleAuthButton = ({
   label = "Continue with Google",
   formPending = false,
 }: GoogleAuthButtonProps) => {
+  const { signInWithGoogle, error, pending } = useGoogleSignIn();
+
   return (
     <div className="flex flex-col gap-2">
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
       <Button
         type="button"
         variant="outline"
         className="w-full"
+        disabled={pending || formPending}
         onClick={signInWithGoogle}
       >
         <Image
