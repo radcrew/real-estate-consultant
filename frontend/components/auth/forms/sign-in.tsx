@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { useSignIn } from "../hooks/use-sign-in";
+import { useSignInForm } from "../hooks/use-sign-in-form";
 
 export const SignInForm = () => {
   const {
@@ -14,7 +14,7 @@ export const SignInForm = () => {
     error,
     pending,
     handleSubmit,
-  } = useSignIn();
+  } = useSignInForm();
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">

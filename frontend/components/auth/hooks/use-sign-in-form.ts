@@ -7,7 +7,7 @@ import { getApiErrorMessage } from "@/lib/api-errors";
 import { saveSession } from "@/lib/auth-session";
 import { AuthService } from "@/services/auth";
 
-export const useSignIn = () => {
+export const useSignInForm = () => {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,12 +20,12 @@ export const useSignIn = () => {
     setPending(true);
 
     try {
-      const { 
+      const {
         access_token: accessToken,
         refresh_token: refreshToken,
         expires_in: expiresIn,
         token_type: tokenType,
-        user
+        user,
       } = await AuthService.signIn({
         email: email.trim(),
         password,
