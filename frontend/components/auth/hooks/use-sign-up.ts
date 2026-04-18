@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import { apiClient } from "@/lib/api-client";
 import { getApiErrorMessage } from "@/lib/api-errors";
+import { AuthService } from "@/services/auth";
 
 export const useSignUp = () => {
   const router = useRouter();
@@ -24,7 +24,7 @@ export const useSignUp = () => {
 
     setPending(true);
     try {
-      await apiClient.post("/auth/sign-up", {
+      await AuthService.signUp({
         email: email.trim(),
         password,
       });

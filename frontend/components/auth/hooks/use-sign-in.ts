@@ -3,17 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import { apiClient } from "@/lib/api-client";
 import { getApiErrorMessage } from "@/lib/api-errors";
 import { saveSession } from "@/lib/auth-session";
-
-type SignInJson = {
-  access_token: string;
-  refresh_token: string;
-  expires_in: number;
-  token_type: string;
-  user: { id: string; email: string | null };
-};
+import { AuthService } from "@/services/auth";
 
 export const useSignIn = () => {
   const router = useRouter();
@@ -28,17 +20,23 @@ export const useSignIn = () => {
     setPending(true);
 
     try {
-      const { data } = await apiClient.post<SignInJson>("/auth/sign-in", {
+      const { 
+        access_token: accessToken, 
+        refresh_token: refreshToken, 
+        expires_in: expiresIn, 
+        token_type: tokenType, 
+        user 
+      } = await AuthService.signIn({
         email: email.trim(),
         password,
       });
 
       saveSession({
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
-        expiresIn: data.expires_in,
-        tokenType: data.token_type,
-        user: data.user,
+        accessToken,
+        refreshToken,
+        expiresIn,
+        tokenType,
+        user,
       });
 
       router.push("/");
