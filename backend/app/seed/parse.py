@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import json
 import logging
+import uuid
 from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
 
 from app.models.properties import Properties
+from app.models.property_seed import PropertySeedBundle
 from app.utils.values import clean_str_or_none, first_valid, round_or_none
+
+# Stable UUID namespace for deterministic ``properties.id`` from source ``propertyId`` (seeding / FKs).
+_PROPERTY_ID_NAMESPACE = uuid.UUID("018f3b2e-9c1a-7b3c-8f2d-6a5e4d3c2b1a")
 
 logger = logging.getLogger(__name__)
 
@@ -228,8 +233,26 @@ def _best_property_type(listing: dict[str, Any]) -> str | None:
     return None
 
 
-def normalize_listing_to_property(listing: dict[str, Any]) -> Properties:
+def _deterministic_property_id(property_id_key: str) -> uuid.UUID:
+    return uuid.uuid5(_PROPERTY_ID_NAMESPACE, f"loopnet:property:{property_id_key.strip()}")
+
+
+def _kv_image_urls_from_listing(listing: dict[str, Any]) -> list[str]:
+    raw = listing.get("KVImages")
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for item in raw:
+        if isinstance(item, str):
+            u = item.strip()
+            if u:
+                out.append(u)
+    return out
+
+
+def _properties_from_listing(listing: dict[str, Any], row_id: uuid.UUID | None) -> Properties:
     return Properties(
+        id=row_id,
         address=clean_str_or_none(listing.get("address")),
         city=clean_str_or_none(listing.get("city")),
         state=clean_str_or_none(listing.get("state")),
@@ -247,10 +270,23 @@ def normalize_listing_to_property(listing: dict[str, Any]) -> Properties:
     )
 
 
-def load_property_dataset(path: Path | None = None) -> list[Properties]:
-    """Load the property dataset file and return normalized `Properties` rows."""
+def listing_to_seed_bundle(listing: dict[str, Any]) -> PropertySeedBundle:
+    prop_id_key = clean_str_or_none(listing.get("propertyId"))
+    row_id = _deterministic_property_id(prop_id_key) if prop_id_key else None
+    return PropertySeedBundle(
+        property=_properties_from_listing(listing, row_id),
+        kv_image_urls=_kv_image_urls_from_listing(listing),
+    )
+
+
+def normalize_listing_to_property(listing: dict[str, Any]) -> Properties:
+    return listing_to_seed_bundle(listing).property
+
+
+def load_property_dataset(path: Path | None = None) -> list[PropertySeedBundle]:
+    """Load the dataset file and return seed bundles (property row + ``KVImages`` URLs)."""
     try:
-        return [normalize_listing_to_property(row) for row in parse_json_file(path)]
+        return [listing_to_seed_bundle(row) for row in parse_json_file(path)]
     except FileNotFoundError as exc:
         logger.warning("Seed: dataset file missing (%s)", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc

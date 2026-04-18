@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -10,7 +12,8 @@ class Properties(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    # Identity
+    # Identity (optional deterministic id for seeding / FKs, e.g. from ``propertyId``)
+    id: UUID | None = None
     address: str | None = None
     city: str | None = None
     state: str | None = None
