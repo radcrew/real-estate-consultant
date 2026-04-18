@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import HTTPException
 
 from app.models.properties import Properties
+from app.utils.values import clean_str_or_none, first_valid, round_or_none
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +36,6 @@ def parse_json_file(path: Path | None = None) -> list[dict[str, Any]]:
             raise ValueError(msg)
 
     return data
-
-
-def _blank_to_none(value: Any) -> str | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        stripped = value.strip()
-        return stripped if stripped else None
-    text = str(value).strip()
-    return text if text else None
 
 
 def _parse_simple_float(text: str) -> float | None:
@@ -170,12 +161,12 @@ def _to_float(value: Any) -> float | None:
     return None
 
 
-def _best_size_sqft(raw: dict[str, Any]) -> float | None:
-    sq = raw.get("squareFootage")
+def _best_size_sqft(listing: dict[str, Any]) -> float | None:
+    sq = listing.get("squareFootage")
     if isinstance(sq, (int, float)):
         return float(sq)
 
-    pf = raw.get("propertyFacts")
+    pf = listing.get("propertyFacts")
     if isinstance(pf, dict):
         for key in ("TotalBuildingSize", "TotalLotSize"):
             v = pf.get(key)
@@ -184,7 +175,7 @@ def _best_size_sqft(raw: dict[str, Any]) -> float | None:
                 if got is not None:
                     return got
 
-    summary = raw.get("summary")
+    summary = listing.get("summary")
     if isinstance(summary, dict):
         for key in ("buildingSize", "grossLeasableArea", "lotSize", "floorSize"):
             v = summary.get(key)
@@ -193,25 +184,25 @@ def _best_size_sqft(raw: dict[str, Any]) -> float | None:
                 if got is not None:
                     return got
 
-    bs = raw.get("buildingSize")
+    bs = listing.get("buildingSize")
     if isinstance(bs, str):
         return _parse_size_sqft(bs)
 
     return None
 
 
-def _best_price(raw: dict[str, Any]) -> float | None:
-    pn = raw.get("priceNumeric")
+def _best_price(listing: dict[str, Any]) -> float | None:
+    pn = listing.get("priceNumeric")
     if isinstance(pn, (int, float)):
         return float(pn)
 
-    p = raw.get("price")
+    p = listing.get("price")
     if isinstance(p, str):
         got = _parse_money_string(p)
         if got is not None:
             return got
 
-    pf = raw.get("propertyFacts")
+    pf = listing.get("propertyFacts")
     if isinstance(pf, dict):
         pp = pf.get("Price")
         if isinstance(pp, str):
@@ -220,43 +211,35 @@ def _best_price(raw: dict[str, Any]) -> float | None:
     return None
 
 
-def _best_property_type(raw: dict[str, Any]) -> str | None:
-    for key in ("propertyType", "propertyTypeDetailed"):
-        got = _blank_to_none(raw.get(key))
-        if got:
-            return got
-    summary = raw.get("summary")
+def _best_property_type(listing: dict[str, Any]) -> str | None:
+    result = first_valid([listing.get(k) for k in ("propertyType", "propertyTypeDetailed")])
+    if result:
+        return result
+    summary = listing.get("summary")
     if isinstance(summary, dict):
-        got = _blank_to_none(summary.get("propertyType"))
+        got = clean_str_or_none(summary.get("propertyType"))
         if got:
             return got
-    pf = raw.get("propertyFacts")
+    pf = listing.get("propertyFacts")
     if isinstance(pf, dict):
-        for key in ("PropertyType", "PropertySubtype"):
-            got = _blank_to_none(pf.get(key))
-            if got:
-                return got
+        got = first_valid([pf.get(k) for k in ("PropertyType", "PropertySubtype")])
+        if got:
+            return got
     return None
-
-
-def _round_num(value: float | None, places: int = 6) -> float | None:
-    if value is None:
-        return None
-    return round(value, places)
 
 
 def normalize_listing_to_property(listing: dict[str, Any]) -> Properties:
     return Properties(
-        address=_blank_to_none(listing.get("address")),
-        city=_blank_to_none(listing.get("city")),
-        state=_blank_to_none(listing.get("state")),
-        country=_blank_to_none(listing.get("country")),
-        latitude=_round_num(_to_float(listing.get("latitude")), 8),
-        longitude=_round_num(_to_float(listing.get("longitude")), 8),
+        address=clean_str_or_none(listing.get("address")),
+        city=clean_str_or_none(listing.get("city")),
+        state=clean_str_or_none(listing.get("state")),
+        country=clean_str_or_none(listing.get("country")),
+        latitude=round_or_none(_to_float(listing.get("latitude")), 8),
+        longitude=round_or_none(_to_float(listing.get("longitude")), 8),
         property_type=_best_property_type(listing),
-        listing_type=_blank_to_none(listing.get("listingType")),
-        size_sqft=_round_num(_best_size_sqft(listing)),
-        price=_round_num(_best_price(listing), 2),
+        listing_type=clean_str_or_none(listing.get("listingType")),
+        size_sqft=round_or_none(_best_size_sqft(listing)),
+        price=round_or_none(_best_price(listing), 2),
         rent=None,
         clear_height=None,
         loading_docks=None,
