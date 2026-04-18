@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
+from fastapi import HTTPException
+
 from app.models.properties import Properties
+
+logger = logging.getLogger(__name__)
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RAW_DATA_PATH = _BACKEND_ROOT / "dataset" / "raw-data.json"
@@ -263,4 +268,11 @@ def raw_to_properties(raw: dict[str, Any]) -> Properties:
 
 def load_properties(path: Path | None = None) -> list[Properties]:
     """Load the dataset file and return normalized `Properties` rows."""
-    return [raw_to_properties(row) for row in load_listings(path)]
+    try:
+        return [raw_to_properties(row) for row in load_listings(path)]
+    except FileNotFoundError as exc:
+        logger.warning("Seed: dataset file missing (%s)", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ValueError as exc:
+        logger.warning("Seed: invalid dataset (%s)", exc)
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
