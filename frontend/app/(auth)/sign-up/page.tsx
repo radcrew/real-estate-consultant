@@ -15,7 +15,7 @@ const SignUpPage = () => (
         Create account
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Sign up with your work email. You can sign in on the next screen.
+        Create an account with Google or your work email. You can sign in on the next screen.
       </p>
     </div>
     <SignUpForm />
