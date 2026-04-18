@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import { parseErrorPayload } from "@/lib/api-errors";
+import { apiClient } from "@/lib/api-client";
+import { getApiErrorMessage } from "@/lib/api-errors";
 
 export const useSignUp = () => {
   const router = useRouter();
@@ -13,7 +14,7 @@ export const useSignUp = () => {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     if (password !== confirmPassword) {
@@ -23,19 +24,15 @@ export const useSignUp = () => {
 
     setPending(true);
     try {
-      const res = await fetch("/api/auth/sign-up", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
+      await apiClient.post("/auth/sign-up", {
+        email: email.trim(),
+        password,
       });
 
-      if (!res.ok) {
-        setError(await parseErrorPayload(res));
-        return;
-      }
-      
       router.push("/sign-in?registered=1");
       router.refresh();
+    } catch (err) {
+      setError(getApiErrorMessage(err));
     } finally {
       setPending(false);
     }
@@ -50,6 +47,6 @@ export const useSignUp = () => {
     setConfirmPassword,
     error,
     pending,
-    onSubmit,
+    handleSubmit,
   };
 };

@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import { parseErrorPayload } from "@/lib/api-errors";
+import { apiClient } from "@/lib/api-client";
+import { getApiErrorMessage } from "@/lib/api-errors";
 import { saveSession } from "@/lib/auth-session";
 
 type SignInJson = {
@@ -21,24 +22,17 @@ export const useSignIn = () => {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
     setPending(true);
 
     try {
-      const res = await fetch("/api/auth/sign-in", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), password }),
+      const { data } = await apiClient.post<SignInJson>("/auth/sign-in", {
+        email: email.trim(),
+        password,
       });
 
-      if (!res.ok) {
-        setError(await parseErrorPayload(res));
-        return;
-      }
-
-      const data = (await res.json()) as SignInJson;
       saveSession({
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
@@ -46,9 +40,11 @@ export const useSignIn = () => {
         tokenType: data.token_type,
         user: data.user,
       });
-      
+
       router.push("/");
       router.refresh();
+    } catch (err) {
+      setError(getApiErrorMessage(err));
     } finally {
       setPending(false);
     }
@@ -61,6 +57,6 @@ export const useSignIn = () => {
     setPassword,
     error,
     pending,
-    onSubmit,
+    handleSubmit,
   };
 };

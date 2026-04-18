@@ -13,11 +13,11 @@ export const SignInForm = () => {
     setPassword,
     error,
     pending,
-    onSubmit,
+    handleSubmit,
   } = useSignIn();
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}

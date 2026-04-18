@@ -1,11 +1,14 @@
-export const parseErrorPayload = async (res: Response): Promise<string> => {
-  try {
-    const data = (await res.json()) as { detail?: string };
-    if (typeof data.detail === "string" && data.detail.trim()) {
-      return data.detail.trim();
-    }
-  } catch {
+import { isAxiosError } from "axios";
 
+export const getApiErrorMessage = (error: unknown): string => {
+  if (!isAxiosError(error)) {
+    return "Request failed.";
   }
-  return res.statusText || "Request failed.";
+
+  const detail = (error.response?.data as { detail?: unknown } | undefined)?.detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return detail.trim();
+  }
+  
+  return "Request failed.";
 };

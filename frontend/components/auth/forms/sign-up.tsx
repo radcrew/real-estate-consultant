@@ -15,11 +15,11 @@ export const SignUpForm = () => {
     setConfirmPassword,
     error,
     pending,
-    onSubmit,
+    handleSubmit,
   } = useSignUp();
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}
