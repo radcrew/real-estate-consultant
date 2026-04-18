@@ -238,6 +238,7 @@ def normalize_listing_to_property(listing: dict[str, Any]) -> Properties:
         longitude=round_or_none(_to_float(listing.get("longitude")), 8),
         property_type=_best_property_type(listing),
         listing_type=clean_str_or_none(listing.get("listingType")),
+        description=clean_str_or_none(listing.get("description")),
         size_sqft=round_or_none(_best_size_sqft(listing)),
         price=round_or_none(_best_price(listing), 2),
         rent=None,

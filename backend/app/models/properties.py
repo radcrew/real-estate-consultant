@@ -21,6 +21,7 @@ class Properties(BaseModel):
     # Commercial
     property_type: str | None = None
     listing_type: str | None = None
+    description: str | None = None
     size_sqft: float | None = None
     price: float | None = None
     rent: float | None = None
