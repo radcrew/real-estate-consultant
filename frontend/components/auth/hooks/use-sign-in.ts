@@ -21,11 +21,11 @@ export const useSignIn = () => {
 
     try {
       const { 
-        access_token: accessToken, 
-        refresh_token: refreshToken, 
-        expires_in: expiresIn, 
-        token_type: tokenType, 
-        user 
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expires_in: expiresIn,
+        token_type: tokenType,
+        user
       } = await AuthService.signIn({
         email: email.trim(),
         password,

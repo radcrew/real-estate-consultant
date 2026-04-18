@@ -1,6 +1,8 @@
-/**
- * Base URL of the FastAPI backend for the browser and shared axios client.
- * Set `NEXT_PUBLIC_BACKEND_API_URL` in `.env`.
- */
-export const PUBLIC_BACKEND_BASE_URL =
+export const BACKEND_BASE_URL =
   process.env.NEXT_PUBLIC_BACKEND_API_URL?.trim() || "http://localhost:8000";
+
+export const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
+
+export const SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? "";
