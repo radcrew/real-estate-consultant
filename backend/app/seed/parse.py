@@ -1,5 +1,3 @@
-"""Parse listing dataset JSON into `Properties` rows."""
-
 from __future__ import annotations
 
 import json
@@ -19,8 +17,8 @@ DEFAULT_RAW_DATA_PATH = _BACKEND_ROOT / "dataset" / "raw-data.json"
 _ACRE_TO_SQFT = 43_560.0
 
 
-def load_listings(path: Path | None = None) -> list[dict[str, Any]]:
-    """Parse the default (or given) raw JSON file: root must be an array of objects."""
+def parse_json_file(path: Path | None = None) -> list[dict[str, Any]]:
+    """Read and parse the default (or given) JSON file; root must be a JSON array of objects."""
     resolved = DEFAULT_RAW_DATA_PATH if path is None else path
     if not resolved.is_file():
         msg = f"Dataset file not found: {resolved}"
@@ -247,29 +245,28 @@ def _round_num(value: float | None, places: int = 6) -> float | None:
     return round(value, places)
 
 
-def raw_to_properties(raw: dict[str, Any]) -> Properties:
-    """Map one LoopNet-style listing object to a `Properties` row."""
+def normalize_listing_to_property(listing: dict[str, Any]) -> Properties:
     return Properties(
-        address=_blank_to_none(raw.get("address")),
-        city=_blank_to_none(raw.get("city")),
-        state=_blank_to_none(raw.get("state")),
-        country=_blank_to_none(raw.get("country")),
-        latitude=_round_num(_to_float(raw.get("latitude")), 8),
-        longitude=_round_num(_to_float(raw.get("longitude")), 8),
-        property_type=_best_property_type(raw),
-        listing_type=_blank_to_none(raw.get("listingType")),
-        size_sqft=_round_num(_best_size_sqft(raw)),
-        price=_round_num(_best_price(raw), 2),
+        address=_blank_to_none(listing.get("address")),
+        city=_blank_to_none(listing.get("city")),
+        state=_blank_to_none(listing.get("state")),
+        country=_blank_to_none(listing.get("country")),
+        latitude=_round_num(_to_float(listing.get("latitude")), 8),
+        longitude=_round_num(_to_float(listing.get("longitude")), 8),
+        property_type=_best_property_type(listing),
+        listing_type=_blank_to_none(listing.get("listingType")),
+        size_sqft=_round_num(_best_size_sqft(listing)),
+        price=_round_num(_best_price(listing), 2),
         rent=None,
         clear_height=None,
         loading_docks=None,
     )
 
 
-def load_properties(path: Path | None = None) -> list[Properties]:
-    """Load the dataset file and return normalized `Properties` rows."""
+def load_property_dataset(path: Path | None = None) -> list[Properties]:
+    """Load the property dataset file and return normalized `Properties` rows."""
     try:
-        return [raw_to_properties(row) for row in load_listings(path)]
+        return [normalize_listing_to_property(row) for row in parse_json_file(path)]
     except FileNotFoundError as exc:
         logger.warning("Seed: dataset file missing (%s)", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc

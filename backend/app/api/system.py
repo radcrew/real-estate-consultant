@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from app.core.config import settings
 from app.core.deps import SupabaseSdkDep
 from app.schemas.seed import SeedDatasetResponse
-from app.seed.parse_dataset import load_properties
+from app.seed.parse import load_property_dataset
 from app.seed.insert import insert_properties
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ if settings.is_dev_mode:
     async def seed_dataset(client: SupabaseSdkDep) -> SeedDatasetResponse:
         logger.info("Seed: started (load dataset + insert into public.properties)")
 
-        rows = load_properties()
+        rows = load_property_dataset()
 
         logger.info("Seed: parsed %d property row(s)", len(rows))
 
