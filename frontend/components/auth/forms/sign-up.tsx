@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { useSignUp } from "../hooks/use-sign-up";
+import { useSignUpForm } from "../hooks/use-sign-up-form";
 
 export const SignUpForm = () => {
   const {
@@ -16,7 +16,7 @@ export const SignUpForm = () => {
     error,
     pending,
     handleSubmit,
-  } = useSignUp();
+  } = useSignUpForm();
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">

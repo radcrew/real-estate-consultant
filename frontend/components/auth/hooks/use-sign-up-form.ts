@@ -6,7 +6,7 @@ import { useState, type FormEvent } from "react";
 import { getApiErrorMessage } from "@/lib/api-errors";
 import { AuthService } from "@/services/auth";
 
-export const useSignUp = () => {
+export const useSignUpForm = () => {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
