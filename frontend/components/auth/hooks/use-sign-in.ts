@@ -1,21 +1,21 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useCallback, useState } from "react";
 
 import { getApiErrorMessage } from "@/lib/api-errors";
 import { saveSession } from "@/lib/auth-session";
 import { AuthService } from "@/services/auth";
 
-export const useSignInForm = () => {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+export type SignInCredentials = {
+  email: string;
+  password: string;
+};
+
+export const useSignIn = (onSuccess: () => void) => {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const signIn = useCallback(async ({ email, password }: SignInCredentials) => {
     setError(null);
     setPending(true);
 
@@ -39,22 +39,13 @@ export const useSignInForm = () => {
         user,
       });
 
-      router.push("/");
-      router.refresh();
+      onSuccess();
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
       setPending(false);
     }
-  };
+  }, [onSuccess]);
 
-  return {
-    email,
-    setEmail,
-    password,
-    setPassword,
-    error,
-    pending,
-    handleSubmit,
-  };
+  return { signIn, error, pending };
 };

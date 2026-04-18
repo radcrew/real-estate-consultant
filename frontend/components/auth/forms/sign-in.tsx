@@ -1,20 +1,29 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { type FormEvent, useCallback, useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { useSignInForm } from "../hooks/use-sign-in-form";
+import { useSignIn } from "../hooks/use-sign-in";
 
 export const SignInForm = () => {
-  const {
-    email,
-    setEmail,
-    password,
-    setPassword,
-    error,
-    pending,
-    handleSubmit,
-  } = useSignInForm();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleSuccess = useCallback(() => {
+    router.push("/");
+    router.refresh();
+  }, [router]);
+
+  const { signIn, error, pending } = useSignIn(handleSuccess);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await signIn({ email, password });
+  };
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">

@@ -1,28 +1,46 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { type FormEvent, useCallback, useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-import { useSignUpForm } from "../hooks/use-sign-up-form";
+import { useSignUp } from "../hooks/use-sign-up";
 
 export const SignUpForm = () => {
-  const {
-    email,
-    setEmail,
-    password,
-    setPassword,
-    confirmPassword,
-    setConfirmPassword,
-    error,
-    pending,
-    handleSubmit,
-  } = useSignUpForm();
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const handleSuccess = useCallback(() => {
+    router.push("/sign-in?registered=1");
+    router.refresh();
+  }, [router]);
+
+  const { signUp, error: requestError, pending } = useSignUp(handleSuccess);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setValidationError(null);
+
+    if (password !== confirmPassword) {
+      setValidationError("Passwords do not match.");
+      return;
+    }
+
+    await signUp({ email, password });
+  };
+
+  const displayError = validationError ?? requestError;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      {error ? (
+      {displayError ? (
         <p role="alert" className="text-sm text-destructive">
-          {error}
+          {displayError}
         </p>
       ) : null}
       <div className="flex flex-col gap-2">
