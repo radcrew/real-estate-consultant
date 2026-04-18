@@ -8,8 +8,8 @@ import {
   Zap,
 } from "lucide-react";
 
-import type { CreProfessionalFeatureId } from "@/constants";
-import { CRE_PROFESSIONAL_FEATURES } from "@/constants";
+import type { CreProfessionalFeatureId } from "@constants";
+import { CRE_PROFESSIONAL_FEATURES } from "@constants";
 
 const SECTION =
   "border-b border-border/60 bg-muted/30 px-4 py-14 sm:py-16";

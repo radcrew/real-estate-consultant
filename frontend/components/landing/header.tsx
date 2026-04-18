@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Building2 } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { buttonVariants } from "@components/ui/button";
+import { cn } from "@lib/utils";
 
 export const Header = () => (
   <header className="sticky top-0 z-40 border-b border-border bg-background">

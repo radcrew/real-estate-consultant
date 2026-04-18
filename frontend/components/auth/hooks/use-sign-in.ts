@@ -2,9 +2,9 @@
 
 import { useCallback, useState } from "react";
 
-import { getApiErrorMessage } from "@/lib/api-errors";
-import { saveSession } from "@/lib/auth-session";
-import { AuthService } from "@/services/auth";
+import { getApiErrorMessage } from "@lib/api-errors";
+import { saveSession } from "@lib/auth-session";
+import { AuthService } from "@services/auth";
 
 export type SignInCredentials = {
   email: string;

@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import { apiClient } from "@lib/api-client";
 
 export type SignInBody = {
   email: string;

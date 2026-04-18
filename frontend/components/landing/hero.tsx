@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button";
-import { HERO_STATS } from "@/constants";
-import { cn } from "@/lib/utils";
+import { buttonVariants } from "@components/ui/button";
+import { HERO_STATS } from "@constants";
+import { cn } from "@lib/utils";
 
 const HERO_SECTION =
   "relative border-b border-border/60 bg-gradient-to-br from-amber-200/25 via-background to-background px-4 pt-16 pb-10 sm:py-16";

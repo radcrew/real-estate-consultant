@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { SignUpNotice } from "@/components/auth/sign-up-notice";
-import { SignInForm } from "@/components/auth/forms/sign-in";
+import { SignUpNotice } from "@components/auth/sign-up-notice";
+import { SignInForm } from "@components/auth/forms/sign-in";
 
 export const metadata: Metadata = {
   title: "Sign in",
