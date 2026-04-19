@@ -16,3 +16,11 @@ class CreateIntakeSessionRequest(BaseModel):
     status: str = Field(default="in_progress")
     search_profile_id: UUID | None = None
     criteria: Any | None = None
+
+
+class PatchIntakeSessionStatusRequest(BaseModel):
+    """Request body for ``PATCH /api/v1/intake-sessions/{session_id}`` (status only)."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    status: str

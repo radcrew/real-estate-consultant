@@ -2,36 +2,29 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.core.db_safe import execute_db_safe
 from app.core.deps import SupabaseSdkDep
 from app.models.intake_sessions import IntakeSession
-from app.schemas.intake_sessions import CreateIntakeSessionRequest
+from app.schemas.intake_sessions import CreateIntakeSessionRequest, PatchIntakeSessionStatusRequest
 
 router = APIRouter(tags=["intake-sessions"])
 
 
-def _single_row_from_insert(raw: object) -> dict:
+def _expect_one_row(raw: object, *, detail: str) -> dict:
     if isinstance(raw, list):
         if len(raw) != 1:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Unexpected response from Supabase when creating intake session.",
-            )
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
         row = raw[0]
     elif isinstance(raw, dict):
         row = raw
     else:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unexpected response from Supabase when creating intake session.",
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
     if not isinstance(row, dict):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unexpected response from Supabase when creating intake session.",
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
     return row
 
 
@@ -46,5 +39,36 @@ async def create_intake_session(
 ) -> IntakeSession:
     payload = body.model_dump(mode="json", exclude_none=True)
     result = await execute_db_safe(client.table("intake_sessions").insert(payload).execute())
-    row = _single_row_from_insert(result.data)
+    row = _expect_one_row(
+        result.data,
+        detail="Unexpected response from Supabase when creating intake session.",
+    )
+    return IntakeSession.model_validate(row)
+
+
+@router.patch(
+    "/intake-sessions/{session_id}",
+    response_model=IntakeSession,
+)
+async def patch_intake_session_status(
+    session_id: UUID,
+    body: PatchIntakeSessionStatusRequest,
+    client: SupabaseSdkDep,
+) -> IntakeSession:
+    result = await execute_db_safe(
+        client.table("intake_sessions")
+        .update({"status": body.status})
+        .eq("id", str(session_id))
+        .execute(),
+    )
+    raw = result.data
+    if isinstance(raw, list) and len(raw) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Intake session not found.",
+        )
+    row = _expect_one_row(
+        raw,
+        detail="Unexpected response from Supabase when updating intake session.",
+    )
     return IntakeSession.model_validate(row)
