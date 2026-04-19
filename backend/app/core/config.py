@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     is_dev_mode: bool = Field(
         default=False,
         validation_alias=AliasChoices("IS_DEV_MODE", "DEBUG"),
+        description="Reserved for future dev-only behavior (not used by the API today).",
     )
 
     database_url: str

@@ -16,8 +16,8 @@ async def lifespan(_app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    # OpenAPI UI is enabled regardless of ``is_dev_mode`` (that flag only gates dev-only routes
-    # like ``POST /seed``). Set ``docs_url=None`` here only if you intentionally ship without UI.
+    # OpenAPI UI is enabled by default. Set ``docs_url=None`` here only if you intentionally ship
+    # without UI.
     app = FastAPI(
         title=settings.app_name,
         version=settings.version,

@@ -6,13 +6,11 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import HTTPException
-
 from app.models.properties import Properties
 from app.models.property_images import PropertyImages
 from app.utils.values import clean_str_or_none, first_valid, round_or_none
 
-# Stable UUID namespace for deterministic ``properties.id`` from source ``propertyId`` (seeding / FKs).
+# Stable UUID namespace: deterministic ``properties.id`` from source ``propertyId`` (seeding, FKs).
 _PROPERTY_ID_NAMESPACE = uuid.UUID("018f3b2e-9c1a-7b3c-8f2d-6a5e4d3c2b1a")
 
 logger = logging.getLogger(__name__)
@@ -292,7 +290,7 @@ def _parse_property(listing: dict[str, Any], row_id: uuid.UUID | None) -> Proper
     )
 
 
-def parse_listing_models(
+def listing_to_models(
     listing: dict[str, Any],
 ) -> tuple[Properties, list[PropertyImages]]:
     prop_id_key = clean_str_or_none(listing.get("propertyId"))
@@ -311,10 +309,10 @@ def load_property_dataset(
     path: Path | None = None,
 ) -> list[tuple[Properties, list[PropertyImages]]]:
     try:
-        return [parse_listing_models(row) for row in parse_json_file(path)]
+        return [listing_to_models(row) for row in parse_json_file(path)]
     except FileNotFoundError as exc:
         logger.warning("Seed: dataset file missing (%s)", exc)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise
     except ValueError as exc:
         logger.warning("Seed: invalid dataset (%s)", exc)
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise
