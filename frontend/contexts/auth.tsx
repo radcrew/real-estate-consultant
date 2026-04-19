@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -20,6 +21,8 @@ import {
 
 export type AuthContextValue = {
   session: StoredSession | null;
+  /** True after the client has read `sessionStorage` at least once (avoids a false signed-out flash). */
+  ready: boolean;
   refresh: () => void;
   signOut: () => void;
 };
@@ -33,13 +36,15 @@ type AuthProviderProps = {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const pathname = usePathname();
   const [session, setSession] = useState<StoredSession | null>(null);
+  const [ready, setReady] = useState(false);
 
   const refresh = useCallback(() => {
     setSession(readSession());
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     refresh();
+    setReady(true);
   }, [pathname, refresh]);
 
   useEffect(() => {
@@ -54,10 +59,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
+      ready,
       refresh,
       signOut,
     }),
-    [session, refresh, signOut],
+    [session, ready, refresh, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

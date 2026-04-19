@@ -61,7 +61,7 @@ export const SignedInNav = () => {
         <DropdownMenuSeparator />
 
         <DropdownMenuGroup>
-          <DropdownMenuItem onClick={() => signOut()}>
+          <DropdownMenuItem onClick={signOut}>
             <LogOut className="size-4" />
             Sign out
           </DropdownMenuItem>
