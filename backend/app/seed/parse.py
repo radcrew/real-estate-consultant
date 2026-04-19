@@ -24,7 +24,6 @@ _ACRE_TO_SQFT = 43_560.0
 
 
 def parse_json_file(path: Path | None = None) -> list[dict[str, Any]]:
-    """Read and parse the default (or given) JSON file; root must be a JSON array of objects."""
     resolved = DEFAULT_RAW_DATA_PATH if path is None else path
     if not resolved.is_file():
         msg = f"Dataset file not found: {resolved}"
@@ -44,7 +43,6 @@ def parse_json_file(path: Path | None = None) -> list[dict[str, Any]]:
 
 
 def _parse_simple_float(text: str) -> float | None:
-    """Parse a float: digits, optional commas, one ``.``, optional leading ``-``."""
     t = text.strip()
     if not t:
         return None
@@ -90,7 +88,6 @@ def _parse_money_string(s: str) -> float | None:
 
 
 def _take_leading_number(s: str) -> tuple[float | None, str]:
-    """Leading number after optional ±/space; returns ``(value, rest_of_string)``."""
     i = 0
     while i < len(s) and s[i] in "± \t\n\r":
         i += 1
@@ -140,7 +137,6 @@ def _tail_means_sqft(tail: str) -> bool:
 
 
 def _parse_size_sqft(s: str) -> float | None:
-    """Parse size strings such as ``194,006 SF``, ``3.23 AC``, ``21,780-square-foot``."""
     if not s.strip():
         return None
     value, tail = _take_leading_number(s)
@@ -233,11 +229,33 @@ def _best_property_type(listing: dict[str, Any]) -> str | None:
     return None
 
 
-def _deterministic_property_id(property_id_key: str) -> uuid.UUID:
+def _implied_monthly_rent_from_price(price: float | None) -> float | None:
+    """Rough placeholder: assume ~5% annual gross on price, shown as monthly."""
+    if price is None:
+        return None
+    return (price * 0.05) / 12.0
+
+
+def _implied_clear_height_ft(size_sqft: float | None) -> float | None:
+    """Larger footprints imply slightly higher typical clear height (simple curve)."""
+    if size_sqft is None or size_sqft <= 0:
+        return None
+    # 14 ft at small bay scale → up to ~22 ft for large bulk buildings
+    h = 14.0 + min(8.0, size_sqft / 22_000.0)
+    return min(22.0, max(14.0, h))
+
+
+def _implied_loading_docks(size_sqft: float | None) -> int:
+    """Seed placeholder: most listings are 1–2 docks; scale lightly with size."""
+    sq = 0.0 if size_sqft is None else float(size_sqft)
+    return 2 if sq >= 35_000.0 else 1
+
+
+def _property_id_from_key(property_id_key: str) -> uuid.UUID:
     return uuid.uuid5(_PROPERTY_ID_NAMESPACE, f"loopnet:property:{property_id_key.strip()}")
 
 
-def _kv_image_urls_from_listing(listing: dict[str, Any]) -> list[str]:
+def _parse_images(listing: dict[str, Any]) -> list[str]:
     raw = listing.get("KVImages")
     if not isinstance(raw, list):
         return []
@@ -250,7 +268,11 @@ def _kv_image_urls_from_listing(listing: dict[str, Any]) -> list[str]:
     return out
 
 
-def _properties_from_listing(listing: dict[str, Any], row_id: uuid.UUID | None) -> Properties:
+def _parse_property(listing: dict[str, Any], row_id: uuid.UUID | None) -> Properties:
+    size_sqft_v = _best_size_sqft(listing)
+    price_v = _best_price(listing)
+    size_r = round_or_none(size_sqft_v)
+    price_r = round_or_none(price_v, 2)
     return Properties(
         id=row_id,
         address=clean_str_or_none(listing.get("address")),
@@ -262,40 +284,34 @@ def _properties_from_listing(listing: dict[str, Any], row_id: uuid.UUID | None) 
         property_type=_best_property_type(listing),
         listing_type=clean_str_or_none(listing.get("listingType")),
         description=clean_str_or_none(listing.get("description")),
-        size_sqft=round_or_none(_best_size_sqft(listing)),
-        price=round_or_none(_best_price(listing), 2),
-        rent=None,
-        clear_height=None,
-        loading_docks=None,
+        size_sqft=size_r,
+        price=price_r,
+        rent=round_or_none(_implied_monthly_rent_from_price(price_r), 2),
+        clear_height=round_or_none(_implied_clear_height_ft(size_sqft_v), 2),
+        loading_docks=_implied_loading_docks(size_sqft_v),
     )
 
 
-def listing_to_property_and_images(
+def parse_listing_models(
     listing: dict[str, Any],
 ) -> tuple[Properties, list[PropertyImages]]:
     prop_id_key = clean_str_or_none(listing.get("propertyId"))
-    row_id = _deterministic_property_id(prop_id_key) if prop_id_key else None
-    prop = _properties_from_listing(listing, row_id)
+    row_id = _property_id_from_key(prop_id_key) if prop_id_key else None
+    prop = _parse_property(listing, row_id)
     images: list[PropertyImages] = []
     if row_id is not None:
         images = [
             PropertyImages(property_id=row_id, url=u)
-            for u in _kv_image_urls_from_listing(listing)
+            for u in _parse_images(listing)
         ]
     return prop, images
-
-
-def normalize_listing_to_property(listing: dict[str, Any]) -> Properties:
-    prop, _ = listing_to_property_and_images(listing)
-    return prop
 
 
 def load_property_dataset(
     path: Path | None = None,
 ) -> list[tuple[Properties, list[PropertyImages]]]:
-    """Load the dataset file: each item is ``(property, image_seed_rows)``."""
     try:
-        return [listing_to_property_and_images(row) for row in parse_json_file(path)]
+        return [parse_listing_models(row) for row in parse_json_file(path)]
     except FileNotFoundError as exc:
         logger.warning("Seed: dataset file missing (%s)", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
