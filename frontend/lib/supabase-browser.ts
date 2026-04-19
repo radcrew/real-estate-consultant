@@ -20,7 +20,12 @@ export const getSupabaseBrowserClient = (): SupabaseClient => {
   }
 
   if (!browserClient) {
-    browserClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    browserClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        flowType: "pkce",
+        detectSessionInUrl: true,
+      },
+    });
   }
 
   return browserClient;
