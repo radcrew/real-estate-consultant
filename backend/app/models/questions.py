@@ -14,10 +14,10 @@ class Question(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, populate_by_name=True)
 
     id: UUID | None = None
-    question_text: str = Field(alias="text")
-    question_type: str = Field(default="text", alias="type")
+    key: str
+    text: str = Field(alias="text")
+    type: str = Field(default="text", alias="type")
     order_index: int
     created_at: AwareDatetime | None = None
     required: bool = False
     options: Any | None = None
-    key: str
