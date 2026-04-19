@@ -20,11 +20,12 @@ export const GoogleAuthButton = ({
 
   return (
     <div className="flex flex-col gap-2">
-      {error ? (
+      {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
-      ) : null}
+      )}
+
       <Button
         type="button"
         variant="outline"
