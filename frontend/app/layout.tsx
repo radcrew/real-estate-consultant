@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
+
+import { AuthProvider } from "@contexts/auth";
+
 import "./globals.css";
 
 const inter = Inter({
@@ -28,7 +31,9 @@ const RootLayout = ({
     lang="en"
     className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
   >
-    <body className="flex min-h-full flex-col font-sans">{children}</body>
+    <body className="flex min-h-full flex-col font-sans">
+      <AuthProvider>{children}</AuthProvider>
+    </body>
   </html>
 )
 

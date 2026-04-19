@@ -25,7 +25,8 @@
       "@app/*": ["./app/*"],
       "@constants": ["./constants/index.ts"],
       "@constants/*": ["./constants/*"],
-      "@hooks/*": ["./hooks/*"]
+      "@hooks/*": ["./hooks/*"],
+      "@contexts/*": ["./contexts/*"]
     }
   },
   "include": [
