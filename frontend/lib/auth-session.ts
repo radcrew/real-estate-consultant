@@ -15,7 +15,11 @@ export type StoredSession = {
   refreshToken: string;
   expiresIn: number;
   tokenType: string;
-  user: { id: string; email: string | null };
+  user: {
+    id: string;
+    email: string | null;
+    avatarUrl?: string | null;
+  };
 };
 
 export const saveSession = (session: StoredSession): void => {
