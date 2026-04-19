@@ -37,66 +37,82 @@ export const SignUpForm = () => {
 
   const displayError = validationError ?? requestError;
 
+  const fieldInputClass =
+    "h-8 min-h-8 px-2.5 py-0 text-sm leading-normal shadow-none";
+
   return (
-    <div className="flex flex-col gap-4">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        {displayError ? (
-          <p role="alert" className="text-sm text-destructive">
+    <div className="flex flex-col gap-5">
+      <form onSubmit={handleSubmit} className="flex flex-col">
+
+        {displayError && (
+          <p role="alert" className="mb-4 text-sm text-destructive">
             {displayError}
           </p>
-        ) : null}
-        <div className="flex flex-col gap-2">
-          <label htmlFor="sign-up-email" className="text-sm font-medium">
-            Email
-          </label>
-          <Input
-            id="sign-up-email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+        )}
+
+        <div className="flex flex-col gap-5">
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="sign-up-email" className="text-sm font-medium">
+              Email
+            </label>
+            <Input
+              id="sign-up-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={fieldInputClass}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="sign-up-password" className="text-sm font-medium">
+              Password
+            </label>
+            <Input
+              id="sign-up-password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              maxLength={72}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={fieldInputClass}
+            />
+            <p className="text-xs leading-snug text-muted-foreground">
+              Use at least 8 characters (max 72).
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="sign-up-confirm" className="text-sm font-medium">
+              Confirm password
+            </label>
+            <Input
+              id="sign-up-confirm"
+              name="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              maxLength={72}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className={fieldInputClass}
+            />
+          </div>
+
         </div>
-        <div className="flex flex-col gap-2">
-          <label htmlFor="sign-up-password" className="text-sm font-medium">
-            Password
-          </label>
-          <Input
-            id="sign-up-password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            maxLength={72}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Use at least 8 characters (max 72).
-          </p>
-        </div>
-        <div className="flex flex-col gap-2">
-          <label htmlFor="sign-up-confirm" className="text-sm font-medium">
-            Confirm password
-          </label>
-          <Input
-            id="sign-up-confirm"
-            name="confirmPassword"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            maxLength={72}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
-        </div>
-        <Button type="submit" disabled={pending} className="w-full">
+
+        <Button type="submit" disabled={pending} className="mt-6 w-full">
           {pending ? "Creating account…" : "Create account"}
         </Button>
+
       </form>
 
       <div className="relative">
