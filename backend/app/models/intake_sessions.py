@@ -1,4 +1,4 @@
-"""Row shape for the ``public.questionnaire_sessions`` table."""
+"""Row shape for the ``public.intake_sessions`` table."""
 
 from __future__ import annotations
 
@@ -8,8 +8,8 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
 
-class QuestionnaireSession(BaseModel):
-    """Questionnaire run tied to a search profile (matches ``public.questionnaire_sessions``)."""
+class IntakeSession(BaseModel):
+    """Intake flow session tied to a search profile (matches ``public.intake_sessions``)."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
