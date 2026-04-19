@@ -66,6 +66,7 @@ export const SignedInNav = () => {
             Sign out
           </DropdownMenuItem>
         </DropdownMenuGroup>
+
       </DropdownMenuContent>
 
     </DropdownMenu>
