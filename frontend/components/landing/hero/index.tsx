@@ -45,7 +45,6 @@ export const Hero = () => (
       </p>
 
       <HeroActions />
-
     </div>
     <div className={HERO_STATS_SECTION}>
       <div className={HERO_STATS_GRID}>
@@ -58,4 +57,4 @@ export const Hero = () => (
       </div>
     </div>
   </section>
-)
+);
