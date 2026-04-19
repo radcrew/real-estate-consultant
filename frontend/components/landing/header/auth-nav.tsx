@@ -8,5 +8,5 @@ import { SignedOutNav } from "./signed-out-nav";
 export const AuthNav = () => {
   const { session } = useAuth();
 
-  return session ? <SignedInNav session={session} /> : <SignedOutNav />;
+  return session ? <SignedInNav /> : <SignedOutNav />;
 };
