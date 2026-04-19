@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -14,7 +15,11 @@ class Settings(BaseSettings):
 
     app_name: str = "Real Estate Consultant API"
     version: str = "0.1.0"
-    debug: bool = False
+    is_dev_mode: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("IS_DEV_MODE", "DEBUG"),
+        description="Reserved for future dev-only behavior (not used by the API today).",
+    )
 
     database_url: str
 
