@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
+import { AuthPageFooter } from "@components/auth/auth-page-footer";
+import { AuthPageTitle } from "@components/auth/auth-page-title";
 import { SignUpForm } from "@components/auth/forms/sign-up";
 
 export const metadata: Metadata = {
@@ -10,24 +11,16 @@ export const metadata: Metadata = {
 
 const SignUpPage = () => (
   <div className="flex flex-col gap-6">
-    <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-        Create account
-      </h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Create an account with Google or your work email. You can sign in on the next screen.
-      </p>
-    </div>
+    <AuthPageTitle
+      title="Create account"
+      description="Create an account with Google or your work email. You can sign in on the next screen."
+    />
     <SignUpForm />
-    <p className="text-center text-sm text-muted-foreground">
-      Already have an account?{" "}
-      <Link
-        href="/sign-in"
-        className="font-semibold text-primary underline-offset-4 hover:underline"
-      >
-        Sign in
-      </Link>
-    </p>
+    <AuthPageFooter
+      prompt="Already have an account?"
+      linkHref="/sign-in"
+      linkLabel="Sign in"
+    />
   </div>
 );
 
