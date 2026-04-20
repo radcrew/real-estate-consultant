@@ -8,10 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class CreateIntakeSessionRequest(BaseModel):
-    """Request body for ``POST /api/v1/intake-sessions``.
+    """Request body for ``POST /api/v1/intake-sessions/start``.
 
-    A new ``search_profiles`` row is always created for the authenticated user and linked
-    to this session (clients do not send a profile id on first start).
+    Initializes a ``search_profiles`` row for the authenticated user and a linked
+    ``intake_sessions`` row.
     """
 
     model_config = ConfigDict(str_strip_whitespace=True)

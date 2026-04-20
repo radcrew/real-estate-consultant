@@ -5,6 +5,8 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
+from supabase import AsyncClient
+from supabase_auth.types import User
 
 from app.core.db_safe import execute_db_safe
 from app.core.deps import CurrentUser, SupabaseSdkDep
@@ -46,15 +48,10 @@ def _expect_one_row(raw: object, *, detail: str) -> dict:
     return row
 
 
-@router.post(
-    "/intake-sessions",
-    status_code=status.HTTP_201_CREATED,
-    response_model=IntakeSession,
-)
-async def create_intake_session(
+async def _insert_intake_session_with_new_profile(
     body: CreateIntakeSessionRequest,
-    client: SupabaseSdkDep,
-    current_user: CurrentUser,
+    client: AsyncClient,
+    current_user: User,
 ) -> IntakeSession:
     profile_result = await execute_db_safe(
         client.table("search_profiles")
@@ -84,6 +81,20 @@ async def create_intake_session(
         detail="Unexpected response from Supabase when creating intake session.",
     )
     return IntakeSession.model_validate(row)
+
+
+@router.post(
+    "/intake-sessions/start",
+    status_code=status.HTTP_201_CREATED,
+    response_model=IntakeSession,
+)
+async def start_intake_session(
+    body: CreateIntakeSessionRequest,
+    client: SupabaseSdkDep,
+    current_user: CurrentUser,
+) -> IntakeSession:
+    """Create ``search_profiles`` + ``intake_sessions`` for beginning the questionnaire flow."""
+    return await _insert_intake_session_with_new_profile(body, client, current_user)
 
 
 @router.get(
