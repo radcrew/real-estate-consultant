@@ -5,7 +5,7 @@ import { getSupabaseBrowserClient } from "@lib/supabase-browser";
  * Reads Supabase session after OAuth redirect, persists app session, then runs callbacks.
  * Call only from the client (e.g. auth callback route).
  */
-export const completeOAuthCallback = async (
+export const handleOAuthCallback = async (
   onAuthenticated: () => void,
   onAuthFailed: (message: string) => void,
   isCancelled: () => boolean,

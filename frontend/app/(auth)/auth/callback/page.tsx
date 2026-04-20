@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { completeOAuthCallback } from "@lib/oauth-callback";
+import { handleOAuthCallback } from "@lib/oauth-callback";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -22,7 +22,7 @@ export default function AuthCallbackPage() {
     let cancelled = false;
     const isCancelled = () => cancelled;
 
-    completeOAuthCallback(
+    handleOAuthCallback(
       handleAuthenticated,
       handleAuthFailed,
       isCancelled,
