@@ -5,10 +5,11 @@ import { type FormEvent, useCallback, useState } from "react";
 
 import { Button } from "@components/ui/button";
 
+import { useAuth } from "@contexts/auth";
+
 import { EmailField } from "../fields/email";
 import { PasswordField } from "../fields/password";
 import { GoogleAuthButton } from "../google-auth-button";
-import { useSignIn } from "../hooks/use-sign-in";
 
 export const SignInForm = () => {
   const router = useRouter();
@@ -20,11 +21,11 @@ export const SignInForm = () => {
     router.refresh();
   }, [router]);
 
-  const { signIn, error, isSigningIn } = useSignIn(handleSuccess);
+  const { signIn, error, isSubmitting } = useAuth();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    await signIn({ email, password });
+    await signIn({ email, password }, handleSuccess);
   };
 
   return (
@@ -41,19 +42,19 @@ export const SignInForm = () => {
             id="sign-in-email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={isSigningIn}
+            disabled={isSubmitting}
           />
           <PasswordField
             id="sign-in-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
-            disabled={isSigningIn}
+            disabled={isSubmitting}
           />
         </div>
 
-        <Button type="submit" disabled={isSigningIn} className="mt-6 w-full">
-          {isSigningIn ? "Signing in…" : "Sign in"}
+        <Button type="submit" disabled={isSubmitting} className="mt-6 w-full">
+          {isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
       </form>
 
@@ -66,7 +67,7 @@ export const SignInForm = () => {
         </div>
       </div>
 
-      <GoogleAuthButton isFormSubmitting={isSigningIn} />
+      <GoogleAuthButton />
     </div>
   );
 };

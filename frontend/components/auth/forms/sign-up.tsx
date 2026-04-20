@@ -4,11 +4,11 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useState } from "react";
 
 import { Button } from "@components/ui/button";
+import { useAuth } from "@contexts/auth";
 
 import { EmailField } from "../fields/email";
 import { PasswordField } from "../fields/password";
 import { GoogleAuthButton } from "../google-auth-button";
-import { useSignUp } from "../hooks/use-sign-up";
 
 export const SignUpForm = () => {
   const router = useRouter();
@@ -22,7 +22,7 @@ export const SignUpForm = () => {
     router.refresh();
   }, [router]);
 
-  const { signUp, error: requestError, isSigningUp } = useSignUp(handleSuccess);
+  const { signUp, error: requestError, isSubmitting } = useAuth();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -33,7 +33,7 @@ export const SignUpForm = () => {
       return;
     }
 
-    await signUp({ email, password });
+    await signUp({ email, password }, handleSuccess);
   };
 
   const displayError = validationError ?? requestError;
@@ -52,14 +52,14 @@ export const SignUpForm = () => {
             id="sign-up-email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={isSigningUp}
+            disabled={isSubmitting}
           />
           <PasswordField
             id="sign-up-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
-            disabled={isSigningUp}
+            disabled={isSubmitting}
           >
             <p className="text-xs leading-snug text-muted-foreground">
               Use at least 8 characters (max 72).
@@ -72,12 +72,12 @@ export const SignUpForm = () => {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
-            disabled={isSigningUp}
+            disabled={isSubmitting}
           />
         </div>
 
-        <Button type="submit" disabled={isSigningUp} className="mt-6 w-full">
-          {isSigningUp ? "Creating account…" : "Create account"}
+        <Button type="submit" disabled={isSubmitting} className="mt-6 w-full">
+          {isSubmitting ? "Creating account…" : "Create account"}
         </Button>
       </form>
 
@@ -90,7 +90,7 @@ export const SignUpForm = () => {
         </div>
       </div>
 
-      <GoogleAuthButton isFormSubmitting={isSigningUp} label="Sign up with Google" />
+      <GoogleAuthButton label="Sign up with Google" />
     </div>
   );
 };
