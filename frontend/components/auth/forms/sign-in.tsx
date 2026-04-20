@@ -7,6 +7,7 @@ import { Button } from "@components/ui/button";
 
 import { useAuth } from "@contexts/auth";
 
+import { AuthFormError } from "../auth-form-error";
 import { AuthFormDivider } from "../auth-form-divider";
 import { EmailField } from "../fields/email";
 import { PasswordField } from "../fields/password";
@@ -17,12 +18,12 @@ export const SignInForm = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const { signIn, error, isSubmitting } = useAuth();
+
   const handleSuccess = useCallback(() => {
     router.push("/");
     router.refresh();
   }, [router]);
-
-  const { signIn, error, isSubmitting } = useAuth();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -32,11 +33,7 @@ export const SignInForm = () => {
   return (
     <div className="flex flex-col gap-5">
       <form onSubmit={handleSubmit} className="flex flex-col">
-        {error && (
-          <p role="alert" className="mb-4 text-sm text-destructive">
-            {error}
-          </p>
-        )}
+        <AuthFormError message={error} />
 
         <div className="flex flex-col gap-5">
           <EmailField

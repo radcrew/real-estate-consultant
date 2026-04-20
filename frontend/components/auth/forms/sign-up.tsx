@@ -6,6 +6,7 @@ import { type FormEvent, useCallback, useState } from "react";
 import { Button } from "@components/ui/button";
 import { useAuth } from "@contexts/auth";
 
+import { AuthFormError } from "../auth-form-error";
 import { AuthFormDivider } from "../auth-form-divider";
 import { EmailField } from "../fields/email";
 import { PasswordField } from "../fields/password";
@@ -18,12 +19,12 @@ export const SignUpForm = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  const { signUp, error: requestError, isSubmitting } = useAuth();
+
   const handleSuccess = useCallback(() => {
     router.push("/sign-in?registered=1");
     router.refresh();
   }, [router]);
-
-  const { signUp, error: requestError, isSubmitting } = useAuth();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -37,16 +38,10 @@ export const SignUpForm = () => {
     await signUp({ email, password }, handleSuccess);
   };
 
-  const displayError = validationError ?? requestError;
-
   return (
     <div className="flex flex-col gap-5">
       <form onSubmit={handleSubmit} className="flex flex-col">
-        {displayError && (
-          <p role="alert" className="mb-4 text-sm text-destructive">
-            {displayError}
-          </p>
-        )}
+        <AuthFormError message={validationError ?? requestError} />
 
         <div className="flex flex-col gap-5">
           <EmailField
