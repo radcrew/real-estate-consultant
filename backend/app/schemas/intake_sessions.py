@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Any
-from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -11,14 +10,13 @@ from pydantic import BaseModel, ConfigDict, Field
 class CreateIntakeSessionRequest(BaseModel):
     """Request body for ``POST /api/v1/intake-sessions``.
 
-    If ``search_profile_id`` is omitted, a new ``search_profiles`` row is created for the
-    authenticated user and linked to this session.
+    A new ``search_profiles`` row is always created for the authenticated user and linked
+    to this session (clients do not send a profile id on first start).
     """
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     status: str = Field(default="in_progress")
-    search_profile_id: UUID | None = None
     criteria: Any | None = None
 
 
