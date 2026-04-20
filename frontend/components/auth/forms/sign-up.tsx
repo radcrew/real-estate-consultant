@@ -22,7 +22,7 @@ export const SignUpForm = () => {
     router.refresh();
   }, [router]);
 
-  const { signUp, error: requestError, pending } = useSignUp(handleSuccess);
+  const { signUp, error: requestError, isSigningUp } = useSignUp(handleSuccess);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -52,14 +52,14 @@ export const SignUpForm = () => {
             id="sign-up-email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={pending}
+            disabled={isSigningUp}
           />
           <PasswordField
             id="sign-up-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
-            disabled={pending}
+            disabled={isSigningUp}
           >
             <p className="text-xs leading-snug text-muted-foreground">
               Use at least 8 characters (max 72).
@@ -72,12 +72,12 @@ export const SignUpForm = () => {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
-            disabled={pending}
+            disabled={isSigningUp}
           />
         </div>
 
-        <Button type="submit" disabled={pending} className="mt-6 w-full">
-          {pending ? "Creating account…" : "Create account"}
+        <Button type="submit" disabled={isSigningUp} className="mt-6 w-full">
+          {isSigningUp ? "Creating account…" : "Create account"}
         </Button>
       </form>
 
@@ -90,7 +90,7 @@ export const SignUpForm = () => {
         </div>
       </div>
 
-      <GoogleAuthButton formPending={pending} label="Sign up with Google" />
+      <GoogleAuthButton formPending={isSigningUp} label="Sign up with Google" />
     </div>
   );
 };

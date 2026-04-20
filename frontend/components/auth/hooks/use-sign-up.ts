@@ -12,11 +12,11 @@ export type SignUpCredentials = {
 
 export const useSignUp = (onSuccess: () => void) => {
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [isSigningUp, setSigningUp] = useState(false);
 
   const signUp = useCallback(async ({ email, password }: SignUpCredentials) => {
     setError(null);
-    setPending(true);
+    setSigningUp(true);
 
     try {
       await authService.signUp({
@@ -28,9 +28,9 @@ export const useSignUp = (onSuccess: () => void) => {
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
-      setPending(false);
+      setSigningUp(false);
     }
   }, [onSuccess]);
 
-  return { signUp, error, pending };
+  return { signUp, error, isSigningUp };
 };

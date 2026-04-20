@@ -20,7 +20,7 @@ export const SignInForm = () => {
     router.refresh();
   }, [router]);
 
-  const { signIn, error, pending } = useSignIn(handleSuccess);
+  const { signIn, error, isSigningIn } = useSignIn(handleSuccess);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -41,19 +41,19 @@ export const SignInForm = () => {
             id="sign-in-email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={pending}
+            disabled={isSigningIn}
           />
           <PasswordField
             id="sign-in-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
-            disabled={pending}
+            disabled={isSigningIn}
           />
         </div>
 
-        <Button type="submit" disabled={pending} className="mt-6 w-full">
-          {pending ? "Signing in…" : "Sign in"}
+        <Button type="submit" disabled={isSigningIn} className="mt-6 w-full">
+          {isSigningIn ? "Signing in…" : "Sign in"}
         </Button>
       </form>
 
@@ -66,7 +66,7 @@ export const SignInForm = () => {
         </div>
       </div>
 
-      <GoogleAuthButton formPending={pending} />
+      <GoogleAuthButton formPending={isSigningIn} />
     </div>
   );
 };

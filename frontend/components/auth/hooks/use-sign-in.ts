@@ -13,11 +13,11 @@ export type SignInCredentials = {
 
 export const useSignIn = (onSuccess: () => void) => {
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [isSigningIn, setSigningIn] = useState(false);
 
   const signIn = useCallback(async ({ email, password }: SignInCredentials) => {
     setError(null);
-    setPending(true);
+    setSigningIn(true);
 
     try {
       const {
@@ -43,9 +43,9 @@ export const useSignIn = (onSuccess: () => void) => {
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
-      setPending(false);
+      setSigningIn(false);
     }
   }, [onSuccess]);
 
-  return { signIn, error, pending };
+  return { signIn, error, isSigningIn };
 };
