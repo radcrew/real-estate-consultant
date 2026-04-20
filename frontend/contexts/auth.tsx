@@ -34,9 +34,9 @@ export type AuthContextValue = {
   ready: boolean;
   refresh: () => void;
   signOut: () => void;
-  signIn: (credentials: AuthCredentials, onSuccess?: () => void) => Promise<void>;
+  signIn: (credentials: AuthCredentials, onSuccess: () => void) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  signUp: (credentials: AuthCredentials, onSuccess?: () => void) => Promise<void>;
+  signUp: (credentials: AuthCredentials, onSuccess: () => void) => Promise<void>;
   error: string | null;
   isSubmitting: boolean;
 };
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const signIn = useCallback(
-    async ({ email, password }: AuthCredentials, onSuccess?: () => void) => {
+    async ({ email, password }: AuthCredentials, onSuccess: () => void) => {
       setError(null);
       setSubmitting(true);
 
@@ -98,7 +98,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           user,
         });
 
-        onSuccess?.();
+        onSuccess();
       } catch (err) {
         setError(getApiErrorMessage(err));
       } finally {
@@ -109,7 +109,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   );
 
   const signUp = useCallback(
-    async ({ email, password }: AuthCredentials, onSuccess?: () => void) => {
+    async ({ email, password }: AuthCredentials, onSuccess: () => void) => {
       setError(null);
       setSubmitting(true);
 
@@ -119,7 +119,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           password,
         });
 
-        onSuccess?.();
+        onSuccess();
       } catch (err) {
         setError(getApiErrorMessage(err));
       } finally {
