@@ -9,7 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class CreateIntakeSessionRequest(BaseModel):
-    """Request body for ``POST /api/v1/intake-sessions``."""
+    """Request body for ``POST /api/v1/intake-sessions``.
+
+    If ``search_profile_id`` is omitted, a new ``search_profiles`` row is created for the
+    authenticated user and linked to this session.
+    """
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
