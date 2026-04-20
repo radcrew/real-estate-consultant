@@ -2,8 +2,8 @@
 
 import { useAuth } from "@contexts/auth";
 
-import { SignedInNav } from "./signed-in-nav";
-import { SignedOutNav } from "./signed-out-nav";
+import { NavAuthButtons } from "./nav-auth-buttons";
+import { ProfileDropdown } from "./profile-dropdown";
 
 const AuthNavSkeleton = () => (
   <div
@@ -23,5 +23,5 @@ export const AuthNav = () => {
     return <AuthNavSkeleton />;
   }
 
-  return session ? <SignedInNav /> : <SignedOutNav />;
+  return session ? <ProfileDropdown /> : <NavAuthButtons />;
 };

@@ -22,7 +22,7 @@ const triggerClassName = cn(
   "outline-none focus-visible:outline-none",
 );
 
-export const SignedInNav = () => {
+export const ProfileDropdown = () => {
   const { session, signOut } = useAuth();
   if (!session) {
     return null;

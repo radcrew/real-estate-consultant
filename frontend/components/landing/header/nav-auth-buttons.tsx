@@ -3,7 +3,7 @@ import Link from "next/link";
 import { buttonVariants } from "@components/ui/button";
 import { cn } from "@lib/utils";
 
-export const SignedOutNav = () => (
+export const NavAuthButtons = () => (
   <>
     <Link
       href="/sign-in"
