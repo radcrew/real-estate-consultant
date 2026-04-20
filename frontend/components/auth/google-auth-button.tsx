@@ -9,14 +9,14 @@ import { useGoogleSignIn } from "./hooks/use-google-sign-in";
 type GoogleAuthButtonProps = {
   label?: string;
   /** When the email/password form is submitting, disable Google to avoid overlapping requests. */
-  formPending?: boolean;
+  isFormSubmitting?: boolean;
 };
 
 export const GoogleAuthButton = ({
   label = "Continue with Google",
-  formPending = false,
+  isFormSubmitting = false,
 }: GoogleAuthButtonProps) => {
-  const { signInWithGoogle, error, pending } = useGoogleSignIn();
+  const { signInWithGoogle, error, isSigningIn } = useGoogleSignIn();
 
   return (
     <div className="flex flex-col gap-2">
@@ -30,7 +30,7 @@ export const GoogleAuthButton = ({
         type="button"
         variant="outline"
         className="w-full"
-        disabled={pending || formPending}
+        disabled={isSigningIn || isFormSubmitting}
         onClick={signInWithGoogle}
       >
         <Image

@@ -7,11 +7,11 @@ import { getSupabaseBrowserClient } from "@lib/supabase-browser";
 
 export const useGoogleSignIn = () => {
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
+  const [isSigningIn, setSigningIn] = useState(false);
 
   const signInWithGoogle = useCallback(async () => {
     setError(null);
-    setPending(true);
+    setSigningIn(true);
 
     try {
       const supabase = getSupabaseBrowserClient();
@@ -22,7 +22,7 @@ export const useGoogleSignIn = () => {
 
       if (oauthError) {
         setError(oauthError.message);
-        setPending(false);
+        setSigningIn(false);
         return;
       }
 
@@ -32,12 +32,12 @@ export const useGoogleSignIn = () => {
       }
 
       setError("Could not start Google sign-in.");
-      setPending(false);
+      setSigningIn(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
-      setPending(false);
+      setSigningIn(false);
     }
   }, []);
 
-  return { signInWithGoogle, error, pending };
+  return { signInWithGoogle, error, isSigningIn };
 };

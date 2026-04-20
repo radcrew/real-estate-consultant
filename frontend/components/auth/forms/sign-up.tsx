@@ -90,7 +90,7 @@ export const SignUpForm = () => {
         </div>
       </div>
 
-      <GoogleAuthButton formPending={isSigningUp} label="Sign up with Google" />
+      <GoogleAuthButton isFormSubmitting={isSigningUp} label="Sign up with Google" />
     </div>
   );
 };
