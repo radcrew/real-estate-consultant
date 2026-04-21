@@ -20,7 +20,7 @@ from app.utils.intake_questions import (
     max_answered_order_for_keys,
     merge_intake_criteria_dict,
     next_question_row_after_order,
-    order_for_question_id,
+    order_for_question_key,
 )
 from app.utils.intake_rows import strip_intake_session_row
 from app.utils.supabase_response import as_row_list, require_single_row
@@ -52,7 +52,7 @@ async def create_intake_session(
         (
             await execute_db_safe(
                 client.table("questions")
-                .select("id, text, type")
+                .select("key, text, type")
                 .order("order_index")
                 .limit(1)
                 .execute()
@@ -110,10 +110,10 @@ async def submit_intake_session_answers(
     body: SubmitIntakeSessionAnswersRequest,
     client: SupabaseSdkDep,
 ) -> SubmitIntakeSessionAnswersResponse:
-    if body.question_id is None and not isinstance(body.answers, dict):
+    if not body.key and not isinstance(body.answers, dict):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Provide question_id or send answers as an object keyed by question key.",
+            detail="Provide key or send answers as an object keyed by question key.",
         )
 
     session_result = await execute_db_safe(
@@ -131,7 +131,7 @@ async def submit_intake_session_answers(
 
     questions_result = await execute_db_safe(
         client.table("questions")
-        .select("id, text, type, key, order_index")
+        .select("key, text, type, order_index")
         .order("order_index")
         .execute(),
     )
@@ -144,12 +144,12 @@ async def submit_intake_session_answers(
 
     merged_criteria = merge_intake_criteria_dict(session_row.get("criteria"), body.answers)
 
-    if body.question_id is not None:
-        answered_order = order_for_question_id(questions, body.question_id)
+    if body.key:
+        answered_order = order_for_question_key(questions, body.key)
         if answered_order is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unknown question_id for this questionnaire.",
+                detail="Unknown question key for this questionnaire.",
             )
         after_order = answered_order
     else:

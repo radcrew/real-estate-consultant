@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Any
-from uuid import UUID
 
 from fastapi import HTTPException, status
 
@@ -13,13 +12,14 @@ from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
     """Map a PostgREST ``questions`` row into ``IntakeSessionFirstQuestion``."""
     try:
-        qid = question.get("id")
+        qkey = question.get("key")
         qtext = question.get("text")
         qtype = question.get("type")
-        qid_uuid = qid if isinstance(qid, UUID) else UUID(str(qid))
+        if not isinstance(qkey, str) or not qkey.strip():
+            raise ValueError("Invalid question key")
         if not isinstance(qtext, str) or not isinstance(qtype, str):
             raise ValueError("Invalid question fields")
-        return IntakeSessionFirstQuestion(id=qid_uuid, text=qtext, type=qtype)
+        return IntakeSessionFirstQuestion(key=qkey.strip(), text=qtext, type=qtype)
     except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -64,11 +64,11 @@ def max_answered_order_for_keys(questions: list[dict], criteria: dict[str, Any])
     return best
 
 
-def order_for_question_id(questions: list[dict], question_id: UUID) -> int | None:
-    sid = str(question_id)
+def order_for_question_key(questions: list[dict], key: str) -> int | None:
+    """Return ``order_index`` for the question row with this ``key``, if any."""
     for q in questions:
-        qid = q.get("id")
-        if qid is not None and str(qid) == sid:
+        k = q.get("key")
+        if isinstance(k, str) and k == key:
             try:
                 return int(q["order_index"])
             except (TypeError, ValueError):

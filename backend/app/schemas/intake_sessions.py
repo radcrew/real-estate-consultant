@@ -13,7 +13,7 @@ from app.models.intake_sessions import IntakeSession
 class IntakeSessionFirstQuestion(BaseModel):
     """Minimal first-question payload returned when starting intake."""
 
-    id: UUID
+    key: str
     text: str
     type: str
 
@@ -45,9 +45,9 @@ class SubmitIntakeSessionAnswersRequest(BaseModel):
         ...,
         description="Answer fields keyed by question ``key``, shallow-merged into session ``criteria``.",
     )
-    question_id: UUID | None = Field(
+    key: str | None = Field(
         default=None,
-        description="Question row this step answers; used with ``order_index`` to choose the next question.",
+        description="Question ``key`` for this step; used with ``order_index`` to choose the next question.",
     )
 
 
