@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.intake_sessions import IntakeSession
+
 
 class IntakeSessionFirstQuestion(BaseModel):
     """Minimal first-question payload returned when starting intake."""
@@ -39,5 +41,20 @@ class SubmitIntakeSessionAnswersRequest(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    answers: Any
-    status: str = Field(default="completed")
+    answers: Any = Field(
+        ...,
+        description="Answer fields keyed by question ``key``, shallow-merged into session ``criteria``.",
+    )
+    question_id: UUID | None = Field(
+        default=None,
+        description="Question row this step answers; used with ``order_index`` to choose the next question.",
+    )
+
+
+class SubmitIntakeSessionAnswersResponse(BaseModel):
+    """Response for ``PATCH /api/v1/intake-sessions/{session_id}/answers``."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    session: IntakeSession
+    next_question: IntakeSessionFirstQuestion | None = None

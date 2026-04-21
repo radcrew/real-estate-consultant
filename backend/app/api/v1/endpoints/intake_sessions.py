@@ -13,12 +13,38 @@ from app.schemas.intake_sessions import (
     CreateIntakeSessionResponse,
     IntakeSessionFirstQuestion,
     SubmitIntakeSessionAnswersRequest,
+    SubmitIntakeSessionAnswersResponse,
 )
 from app.utils.intake_criteria import normalize_intake_criteria
+from app.utils.intake_questions import (
+    max_answered_order_for_keys,
+    merge_intake_criteria_dict,
+    next_question_row_after_order,
+    order_for_question_id,
+)
 from app.utils.intake_rows import strip_intake_session_row
 from app.utils.supabase_response import as_row_list, require_single_row
 
 router = APIRouter(tags=["intake-sessions"])
+
+
+def _question_snippet_from_row(row: dict) -> IntakeSessionFirstQuestion:
+    qid, qtext, qtype = row.get("id"), row.get("text"), row.get("type")
+    if isinstance(qid, UUID):
+        qid_uuid = qid
+    elif isinstance(qid, str):
+        qid_uuid = UUID(qid)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unexpected response from Supabase when loading question definition.",
+        )
+    if not isinstance(qtext, str) or not isinstance(qtype, str):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unexpected response from Supabase when loading question definition.",
+        )
+    return IntakeSessionFirstQuestion(id=qid_uuid, text=qtext, type=qtype)
 
 
 @router.post(
@@ -53,18 +79,7 @@ async def create_intake_session(
         ).data,
         detail="No question is configured for intake flow.",
     )
-
-    qid, qtext, qtype = (
-        question.get("id"),
-        question.get("text"),
-        question.get("type"),
-    )
-
-    if not isinstance(qid, str) or not isinstance(qtext, str) or not isinstance(qtype, str):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unexpected response from Supabase when loading first question.",
-        )
+    first_q = _question_snippet_from_row(question)
 
     if session.id is None:
         raise HTTPException(
@@ -75,7 +90,7 @@ async def create_intake_session(
     return CreateIntakeSessionResponse(
         session_id=session.id,
         status=session.status,
-        first_question=IntakeSessionFirstQuestion(id=UUID(qid), text=qtext, type=qtype),
+        first_question=first_q,
     )
 
 
@@ -129,30 +144,75 @@ async def get_intake_session(
 
 @router.patch(
     "/intake-sessions/{session_id}/answers",
-    response_model=IntakeSession,
+    response_model=SubmitIntakeSessionAnswersResponse,
 )
 async def submit_intake_session_answers(
     session_id: UUID,
     body: SubmitIntakeSessionAnswersRequest,
     client: SupabaseSdkDep,
-) -> IntakeSession:
-    result = await execute_db_safe(
-        client.table("intake_sessions")
-        .update({"criteria": body.answers, "status": body.status})
-        .eq("id", str(session_id))
-        .execute(),
+) -> SubmitIntakeSessionAnswersResponse:
+    if body.question_id is None and not isinstance(body.answers, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide question_id or send answers as an object keyed by question key.",
+        )
+
+    session_result = await execute_db_safe(
+        client.table("intake_sessions").select("*").eq("id", str(session_id)).limit(1).execute(),
     )
-    raw = result.data
-    if isinstance(raw, list) and len(raw) == 0:
+    if not as_row_list(session_result.data):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Intake session not found.",
         )
+    session_row = require_single_row(
+        session_result.data,
+        detail="Unexpected response from Supabase when loading intake session.",
+    )
+
+    questions_result = await execute_db_safe(
+        client.table("questions")
+        .select("id, text, type, key, order_index")
+        .order("order_index")
+        .execute(),
+    )
+    questions = as_row_list(questions_result.data)
+    if not questions:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No question is configured for intake flow.",
+        )
+
+    merged_criteria = merge_intake_criteria_dict(session_row.get("criteria"), body.answers)
+
+    if body.question_id is not None:
+        answered_order = order_for_question_id(questions, body.question_id)
+        if answered_order is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unknown question_id for this questionnaire.",
+            )
+        after_order = answered_order
+    else:
+        after_order = max_answered_order_for_keys(questions, merged_criteria)
+
+    next_row = next_question_row_after_order(questions, after_order=after_order)
+    next_question = _question_snippet_from_row(next_row) if next_row is not None else None
+
+    result = await execute_db_safe(
+        client.table("intake_sessions")
+        .update({"criteria": merged_criteria, "status": "in_progress"})
+        .eq("id", str(session_id))
+        .execute(),
+    )
     row = require_single_row(
-        raw,
+        result.data,
         detail="Unexpected response from Supabase when submitting intake session answers.",
     )
-    return IntakeSession.model_validate(row)
+    return SubmitIntakeSessionAnswersResponse(
+        session=IntakeSession.model_validate(row),
+        next_question=next_question,
+    )
 
 
 @router.post(
