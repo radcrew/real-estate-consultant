@@ -41,16 +41,26 @@ async def create_intake_session(
     )
     session = IntakeSession.model_validate(row)
 
-    question_result = await execute_db_safe(
-        client.table("questions").select("id, text").order("order_index").limit(1).execute(),
-    )
-    question_row = require_single_row(
-        question_result.data,
+    question = require_single_row(
+        (
+            await execute_db_safe(
+                client.table("questions")
+                .select("id, text, type")
+                .order("order_index")
+                .limit(1)
+                .execute()
+            )
+        ).data,
         detail="No question is configured for intake flow.",
     )
-    qid = question_row.get("id")
-    qtext = question_row.get("text")
-    if not isinstance(qid, str) or not isinstance(qtext, str):
+
+    qid, qtext, qtype = (
+        question.get("id"),
+        question.get("text"),
+        question.get("type"),
+    )
+
+    if not isinstance(qid, str) or not isinstance(qtext, str) or not isinstance(qtype, str):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Unexpected response from Supabase when loading first question.",
@@ -65,7 +75,7 @@ async def create_intake_session(
     return CreateIntakeSessionResponse(
         session_id=session.id,
         status=session.status,
-        first_question=IntakeSessionFirstQuestion(id=UUID(qid), text=qtext),
+        first_question=IntakeSessionFirstQuestion(id=UUID(qid), text=qtext, type=qtype),
     )
 
 

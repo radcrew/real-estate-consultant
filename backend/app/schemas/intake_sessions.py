@@ -13,6 +13,7 @@ class IntakeSessionFirstQuestion(BaseModel):
 
     id: UUID
     text: str
+    type: str
 
 
 class CreateIntakeSessionResponse(BaseModel):
