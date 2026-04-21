@@ -9,7 +9,10 @@ from fastapi import APIRouter, HTTPException, status
 from app.core.db_safe import execute_db_safe
 from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.models.intake_sessions import IntakeSession
-from app.schemas.intake_sessions import CreateIntakeSessionRequest, PatchIntakeSessionStatusRequest
+from app.schemas.intake_sessions import (
+    CreateIntakeSessionRequest,
+    SubmitIntakeSessionAnswersRequest,
+)
 
 router = APIRouter(tags=["intake-sessions"])
 
@@ -115,17 +118,17 @@ async def get_intake_session(
 
 
 @router.patch(
-    "/intake-sessions/{session_id}",
+    "/intake-sessions/{session_id}/answers",
     response_model=IntakeSession,
 )
-async def patch_intake_session_status(
+async def submit_intake_session_answers(
     session_id: UUID,
-    body: PatchIntakeSessionStatusRequest,
+    body: SubmitIntakeSessionAnswersRequest,
     client: SupabaseSdkDep,
 ) -> IntakeSession:
     result = await execute_db_safe(
         client.table("intake_sessions")
-        .update({"status": body.status})
+        .update({"criteria": body.answers, "status": body.status})
         .eq("id", str(session_id))
         .execute(),
     )
@@ -137,6 +140,8 @@ async def patch_intake_session_status(
         )
     row = _expect_one_row(
         raw,
-        detail="Unexpected response from Supabase when updating intake session.",
+        detail="Unexpected response from Supabase when submitting intake session answers.",
     )
     return IntakeSession.model_validate(row)
+
+

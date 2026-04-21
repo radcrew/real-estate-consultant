@@ -22,3 +22,12 @@ class PatchIntakeSessionStatusRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     status: str
+
+
+class SubmitIntakeSessionAnswersRequest(BaseModel):
+    """Request body for ``PATCH /api/v1/intake-sessions/{session_id}/answers``."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    answers: Any
+    status: str = Field(default="completed")
