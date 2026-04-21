@@ -124,7 +124,11 @@ async def create_intake_session(
     client: SupabaseSdkDep,
 ) -> CreateIntakeSessionResponse:
     """Create an intake session and return first question."""
-    result = await execute_db_safe(client.table("intake_sessions").insert({}).execute())
+    # Force nullable FK to null on creation. Some environments may still have an
+    # old DB default (gen_random_uuid) that would violate FK to search_profiles.
+    result = await execute_db_safe(
+        client.table("intake_sessions").insert({"search_profile_id": None}).execute(),
+    )
     row = _expect_one_row(
         result.data,
         detail="Unexpected response from Supabase when creating intake session.",
