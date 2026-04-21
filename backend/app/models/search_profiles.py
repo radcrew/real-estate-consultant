@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, NaiveDatetime
@@ -15,4 +16,5 @@ class SearchProfile(BaseModel):
     id: UUID | None = None
     user_id: UUID | None = None
     name: str | None = None
+    filters: Any | None = None
     created_at: NaiveDatetime | None = None

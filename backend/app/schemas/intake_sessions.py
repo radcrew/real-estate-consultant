@@ -3,17 +3,26 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class CreateIntakeSessionRequest(BaseModel):
-    """Request body for ``POST /api/v1/intake-sessions``."""
+class IntakeSessionFirstQuestion(BaseModel):
+    """Minimal first-question payload returned when starting intake."""
+
+    id: UUID
+    text: str
+
+
+class CreateIntakeSessionResponse(BaseModel):
+    """Response body for ``POST /api/v1/intake-sessions``."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    status: str = Field(default="in_progress")
-    criteria: Any | None = None
+    session_id: UUID
+    status: str
+    first_question: IntakeSessionFirstQuestion
 
 
 class PatchIntakeSessionStatusRequest(BaseModel):

@@ -33,10 +33,8 @@ async def create_question(body: CreateQuestionRequest, client: SupabaseSdkDep) -
     elif isinstance(raw, dict):
         row = raw
     else:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unexpected response from Supabase when creating question.",
-        )
+        row = None
+
     if not isinstance(row, dict):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
