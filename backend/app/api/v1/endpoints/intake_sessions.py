@@ -5,8 +5,6 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
-from supabase import AsyncClient
-from supabase_auth.types import User
 
 from app.core.db_safe import execute_db_safe
 from app.core.deps import CurrentUser, SupabaseSdkDep
@@ -48,53 +46,23 @@ def _expect_one_row(raw: object, *, detail: str) -> dict:
     return row
 
 
-async def _insert_intake_session_with_new_profile(
+@router.post(
+    "/intake-sessions",
+    status_code=status.HTTP_201_CREATED,
+    response_model=IntakeSession,
+)
+async def create_intake_session(
     body: CreateIntakeSessionRequest,
-    client: AsyncClient,
-    current_user: User,
+    client: SupabaseSdkDep,
 ) -> IntakeSession:
-    profile_result = await execute_db_safe(
-        client.table("search_profiles")
-        .insert({"user_id": str(current_user.id)})
-        .execute(),
-    )
-    profile_row = _expect_one_row(
-        profile_result.data,
-        detail="Unexpected response from Supabase when creating search profile for intake.",
-    )
-    sid = profile_row.get("id")
-    if isinstance(sid, str):
-        search_profile_id = UUID(sid)
-    elif isinstance(sid, UUID):
-        search_profile_id = sid
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unexpected response from Supabase when creating search profile for intake.",
-        )
-
+    """Create an intake session row only (without creating a search profile)."""
     payload = body.model_dump(mode="json", exclude_none=True)
-    payload["search_profile_id"] = str(search_profile_id)
     result = await execute_db_safe(client.table("intake_sessions").insert(payload).execute())
     row = _expect_one_row(
         result.data,
         detail="Unexpected response from Supabase when creating intake session.",
     )
     return IntakeSession.model_validate(row)
-
-
-@router.post(
-    "/intake-sessions/start",
-    status_code=status.HTTP_201_CREATED,
-    response_model=IntakeSession,
-)
-async def start_intake_session(
-    body: CreateIntakeSessionRequest,
-    client: SupabaseSdkDep,
-    current_user: CurrentUser,
-) -> IntakeSession:
-    """Create ``search_profiles`` + ``intake_sessions`` for beginning the questionnaire flow."""
-    return await _insert_intake_session_with_new_profile(body, client, current_user)
 
 
 @router.get(
