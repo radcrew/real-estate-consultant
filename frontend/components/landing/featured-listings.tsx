@@ -2,10 +2,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { Search } from "lucide-react";
 
-import type { FeaturedListing } from "@/constants";
-import { FEATURED_LISTINGS } from "@/constants";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import type { FeaturedListing } from "@constants";
+import { FEATURED_LISTINGS } from "@constants";
+import { buttonVariants } from "@components/ui/button";
+import { cn } from "@lib/utils";
 const SECTION =
   "border-b border-border/60 bg-muted/30 px-4 py-14 sm:py-16";
 

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.api.system import router as system_router
@@ -41,6 +42,17 @@ def create_app() -> FastAPI:
 
     app.include_router(system_router)
     app.include_router(api_router, prefix="/api")
+
+    cors_origins = [settings.frontend_origin]
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
     return app
 
 

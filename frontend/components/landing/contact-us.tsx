@@ -1,8 +1,8 @@
 import { Mail } from "lucide-react";
 import Link from "next/link";
 
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { buttonVariants } from "@components/ui/button";
+import { cn } from "@lib/utils";
 
 const SECTION =
   "border-b border-border/60 bg-background px-4 py-14 sm:py-16";
