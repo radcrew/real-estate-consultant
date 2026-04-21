@@ -1,9 +1,6 @@
-import Link from "next/link";
-import { Search } from "lucide-react";
+import { HERO_STATS } from "@constants";
 
-import { buttonVariants } from "@/components/ui/button";
-import { HERO_STATS } from "@/constants";
-import { cn } from "@/lib/utils";
+import { HeroActions } from "./hero-actions";
 
 const HERO_SECTION =
   "relative border-b border-border/60 bg-gradient-to-br from-amber-200/25 via-background to-background px-4 pt-16 pb-10 sm:py-16";
@@ -18,14 +15,6 @@ const HERO_HEADLINE_STRIP =
 
 const HERO_SUBCOPY =
   "mt-6 max-w-xl text-pretty text-base text-muted-foreground sm:text-lg";
-
-const HERO_CTA_ROW = "mt-8 flex flex-wrap items-center justify-center gap-3";
-
-const HERO_PRIMARY_CTA_EXTRA =
-  "inline-flex h-11 min-h-11 items-center gap-2.5 px-7 text-base font-semibold shadow-none";
-
-const HERO_OUTLINE_CTA_EXTRA =
-  "h-11 min-h-11 border-border bg-background px-7 text-base font-semibold shadow-none";
 
 const HERO_STATS_SECTION =
   "mx-auto mt-14 flex w-full max-w-3xl flex-col items-center justify-center border-t border-border/60 px-4 pt-10";
@@ -55,25 +44,7 @@ export const Hero = () => (
         search, and outreach draft generation.
       </p>
 
-      <div className={HERO_CTA_ROW}>
-        <Link
-          href="/sign-up"
-          className={cn(buttonVariants({ size: "lg" }), HERO_PRIMARY_CTA_EXTRA)}
-        >
-          <Search className="size-5 shrink-0" aria-hidden />
-          Start Searching
-        </Link>
-        <Link
-          href="/sign-in"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "lg" }),
-            HERO_OUTLINE_CTA_EXTRA
-          )}
-        >
-          Sign In
-        </Link>
-      </div>
-
+      <HeroActions />
     </div>
     <div className={HERO_STATS_SECTION}>
       <div className={HERO_STATS_GRID}>
@@ -86,4 +57,4 @@ export const Hero = () => (
       </div>
     </div>
   </section>
-)
+);

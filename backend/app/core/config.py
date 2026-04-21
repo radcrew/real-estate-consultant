@@ -27,5 +27,8 @@ class Settings(BaseSettings):
     supabase_service_role_key: str
     signup_email_confirm: bool = True
 
+    # Comma-separated browser origins allowed to call the API directly (e.g. Next.js dev or production web URL).
+    frontend_origin: str = "http://localhost:3000"
+
 
 settings = Settings()
