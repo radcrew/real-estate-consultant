@@ -41,16 +41,13 @@ class SubmitIntakeSessionAnswersRequest(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    key: str = Field(
+        ...,
+        description="Criteria field name for this step (e.g. ``location``, ``property_type``).",
+    )
     answers: Any = Field(
         ...,
-        description=(
-            "Partial criteria object (e.g. ``location``, ``property_type``, ``min_size_sqft``), "
-            "shallow-merged into session ``criteria``."
-        ),
-    )
-    key: str | None = Field(
-        default=None,
-        description="Question ``key`` for this step (should match a criteria field name such as ``location``).",
+        description="Value stored at ``criteria[key]`` (string, number, or structured object).",
     )
 
 

@@ -16,9 +16,8 @@ from app.schemas.intake_sessions import (
 )
 from app.utils.intake_criteria import normalize_intake_criteria
 from app.utils.intake_questions import (
+    append_intake_criteria_answer,
     map_question_to_model,
-    max_answered_order_for_keys,
-    merge_intake_criteria_dict,
     next_question_row_after_order,
     order_for_question_key,
 )
@@ -112,11 +111,7 @@ async def submit_intake_session_answers(
     body: SubmitIntakeSessionAnswersRequest,
     client: SupabaseSdkDep,
 ) -> SubmitIntakeSessionAnswersResponse:
-    if not body.key and not isinstance(body.answers, dict):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Provide key or send answers as an object keyed by question key.",
-        )
+    answer_key = body.key.strip()
 
     session_result = await execute_db_safe(
         client.table("intake_sessions").select("*").eq("id", str(session_id)).limit(1).execute(),
@@ -144,18 +139,19 @@ async def submit_intake_session_answers(
             detail="No question is configured for intake flow.",
         )
 
-    merged_criteria = merge_intake_criteria_dict(session_row.get("criteria"), body.answers)
+    merged_criteria = append_intake_criteria_answer(
+        session_row.get("criteria"),
+        answer_key,
+        body.answers,
+    )
 
-    if body.key:
-        answered_order = order_for_question_key(questions, body.key)
-        if answered_order is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unknown question key for this questionnaire.",
-            )
-        after_order = answered_order
-    else:
-        after_order = max_answered_order_for_keys(questions, merged_criteria)
+    answered_order = order_for_question_key(questions, answer_key)
+    if answered_order is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unknown question key for this questionnaire.",
+        )
+    after_order = answered_order
 
     next_row = next_question_row_after_order(questions, after_order=after_order)
     next_question = map_question_to_model(next_row) if next_row is not None else None
