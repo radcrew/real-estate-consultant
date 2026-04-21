@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
@@ -15,104 +14,11 @@ from app.schemas.intake_sessions import (
     IntakeSessionFirstQuestion,
     SubmitIntakeSessionAnswersRequest,
 )
+from app.utils.intake_criteria import normalize_intake_criteria
+from app.utils.intake_rows import strip_intake_session_row
+from app.utils.supabase_response import as_row_list, require_single_row
 
 router = APIRouter(tags=["intake-sessions"])
-
-
-def _as_row_list(raw: object) -> list[dict]:
-    if isinstance(raw, list):
-        return [r for r in raw if isinstance(r, dict)]
-    if isinstance(raw, dict):
-        return [raw]
-    return []
-
-
-_INTAKE_SESSION_SELECT = (
-    "id, status, created_at, search_profile_id, criteria, search_profiles!inner(user_id)"
-)
-
-
-def _intake_session_row_for_response(row: dict) -> dict:
-    """Drop embedded join payload; only ``intake_sessions`` columns are exposed."""
-    return {k: v for k, v in row.items() if k != "search_profiles"}
-
-
-def _expect_one_row(raw: object, *, detail: str) -> dict:
-    if isinstance(raw, list):
-        if len(raw) != 1:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
-        row = raw[0]
-    elif isinstance(raw, dict):
-        row = raw
-    else:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
-    if not isinstance(row, dict):
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
-    return row
-
-
-def _as_str_list(value: object) -> list[str]:
-    if isinstance(value, list):
-        return [str(v).strip() for v in value if str(v).strip()]
-    if isinstance(value, str) and value.strip():
-        return [value.strip()]
-    return []
-
-
-def _as_float(value: object) -> float | None:
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
-        try:
-            return float(value.strip())
-        except ValueError:
-            return None
-    return None
-
-
-def _normalize_criteria(criteria: object) -> dict[str, Any]:
-    """Convert flexible intake criteria into a stable filter payload."""
-    if not isinstance(criteria, dict):
-        return {"raw_criteria": criteria}
-
-    property_types = _as_str_list(
-        criteria.get("property_types") or criteria.get("propertyType") or criteria.get("type"),
-    )
-    geography = _as_str_list(
-        criteria.get("markets") or criteria.get("geography") or criteria.get("location"),
-    )
-
-    sale_or_lease = criteria.get("sale_or_lease") or criteria.get("deal_type")
-    if isinstance(sale_or_lease, str):
-        deal_type = sale_or_lease.strip().lower()
-    else:
-        deal_type = None
-
-    min_size = (
-        _as_float(criteria.get("min_building_size_sf"))
-        or _as_float(criteria.get("min_size_sf"))
-        or _as_float(criteria.get("min_size"))
-    )
-    min_clear_height = (
-        _as_float(criteria.get("min_clear_height_ft")) or _as_float(criteria.get("clear_height_ft"))
-    )
-    price_min = _as_float(criteria.get("price_min"))
-    price_max = _as_float(criteria.get("price_max"))
-
-    normalized: dict[str, Any] = {
-        "property_types": property_types,
-        "geography": geography,
-        "deal_type": deal_type,
-        "min_building_size_sf": min_size,
-        "min_clear_height_ft": min_clear_height,
-        "price_min": price_min,
-        "price_max": price_max,
-        "special_requirements": criteria.get("special_requirements")
-        or criteria.get("requirements")
-        or criteria.get("notes"),
-        "raw_criteria": criteria,
-    }
-    return {k: v for k, v in normalized.items() if v is not None}
 
 
 @router.post(
@@ -129,7 +35,7 @@ async def create_intake_session(
     result = await execute_db_safe(
         client.table("intake_sessions").insert({"search_profile_id": None}).execute(),
     )
-    row = _expect_one_row(
+    row = require_single_row(
         result.data,
         detail="Unexpected response from Supabase when creating intake session.",
     )
@@ -138,7 +44,7 @@ async def create_intake_session(
     question_result = await execute_db_safe(
         client.table("questions").select("id, text").order("order_index").limit(1).execute(),
     )
-    question_row = _expect_one_row(
+    question_row = require_single_row(
         question_result.data,
         detail="No question is configured for intake flow.",
     )
@@ -171,17 +77,17 @@ async def list_intake_sessions(
     client: SupabaseSdkDep,
     current_user: CurrentUser,
 ) -> list[IntakeSession]:
-    """Return intake sessions whose linked search profile belongs to the caller only."""
+    """Return intake sessions whose linked search profile belongs to the caller."""
     sessions = await execute_db_safe(
         client.table("intake_sessions")
-        .select(_INTAKE_SESSION_SELECT)
+        .select("id, status, created_at, search_profile_id, criteria")
         .eq("search_profiles.user_id", str(current_user.id))
         .order("created_at", desc=True)
         .execute(),
     )
     return [
-        IntakeSession.model_validate(_intake_session_row_for_response(r))
-        for r in _as_row_list(sessions.data)
+        IntakeSession.model_validate(strip_intake_session_row(r))
+        for r in as_row_list(sessions.data)
     ]
 
 
@@ -197,19 +103,18 @@ async def get_intake_session(
     """Return one session only if its linked search profile belongs to the caller."""
     result = await execute_db_safe(
         client.table("intake_sessions")
-        .select(_INTAKE_SESSION_SELECT)
+        .select("id, status, created_at, search_profile_id, criteria")
         .eq("id", str(session_id))
-        .eq("search_profiles.user_id", str(current_user.id))
         .limit(1)
         .execute(),
     )
-    rows = _as_row_list(result.data)
+    rows = as_row_list(result.data)
     if not rows:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Intake session not found.",
         )
-    return IntakeSession.model_validate(_intake_session_row_for_response(rows[0]))
+    return IntakeSession.model_validate(strip_intake_session_row(rows[0]))
 
 
 @router.patch(
@@ -233,7 +138,7 @@ async def submit_intake_session_answers(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Intake session not found.",
         )
-    row = _expect_one_row(
+    row = require_single_row(
         raw,
         detail="Unexpected response from Supabase when submitting intake session answers.",
     )
@@ -252,12 +157,12 @@ async def complete_intake_session(
     session_result = await execute_db_safe(
         client.table("intake_sessions").select("*").eq("id", str(session_id)).limit(1).execute(),
     )
-    session_row = _expect_one_row(
+    session_row = require_single_row(
         session_result.data,
         detail="Unexpected response from Supabase when loading intake session.",
     )
 
-    normalized_filters = _normalize_criteria(session_row.get("criteria"))
+    normalized_filters = normalize_intake_criteria(session_row.get("criteria"))
     existing_profile_id = session_row.get("search_profile_id")
     if existing_profile_id is not None:
         owned_profile = await execute_db_safe(
@@ -268,7 +173,7 @@ async def complete_intake_session(
             .limit(1)
             .execute(),
         )
-        if not _as_row_list(owned_profile.data):
+        if not as_row_list(owned_profile.data):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Intake session not found.",
@@ -286,7 +191,7 @@ async def complete_intake_session(
             .insert({"user_id": str(current_user.id), "filters": normalized_filters})
             .execute(),
         )
-        profile_row = _expect_one_row(
+        profile_row = require_single_row(
             profile_result.data,
             detail="Unexpected response from Supabase when creating search profile.",
         )
@@ -304,7 +209,7 @@ async def complete_intake_session(
         .eq("id", str(session_id))
         .execute(),
     )
-    updated_row = _expect_one_row(
+    updated_row = require_single_row(
         session_update.data,
         detail="Unexpected response from Supabase when completing intake session.",
     )
