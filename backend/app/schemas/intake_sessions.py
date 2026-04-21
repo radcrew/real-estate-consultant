@@ -43,11 +43,14 @@ class SubmitIntakeSessionAnswersRequest(BaseModel):
 
     answers: Any = Field(
         ...,
-        description="Answer fields keyed by question ``key``, shallow-merged into session ``criteria``.",
+        description=(
+            "Partial criteria object (e.g. ``location``, ``property_type``, ``min_size_sqft``), "
+            "shallow-merged into session ``criteria``."
+        ),
     )
     key: str | None = Field(
         default=None,
-        description="Question ``key`` for this step; used with ``order_index`` to choose the next question.",
+        description="Question ``key`` for this step (should match a criteria field name such as ``location``).",
     )
 
 

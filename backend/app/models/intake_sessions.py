@@ -17,4 +17,10 @@ class IntakeSession(BaseModel):
     status: str = Field(default="in_progress")
     created_at: AwareDatetime | None = None
     search_profile_id: UUID | None = None
-    criteria: Any | None = None
+    criteria: Any | None = Field(
+        default=None,
+        description=(
+            "Flat search criteria, e.g. location, property_type, min_size_sqft, max_price, "
+            "min_clear_height, min_loading_docks."
+        ),
+    )

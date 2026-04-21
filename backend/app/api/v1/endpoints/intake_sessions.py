@@ -40,7 +40,9 @@ async def create_intake_session(
     # Force nullable FK to null on creation. Some environments may still have an
     # old DB default (gen_random_uuid) that would violate FK to search_profiles.
     result = await execute_db_safe(
-        client.table("intake_sessions").insert({"search_profile_id": None}).execute(),
+        client.table("intake_sessions")
+        .insert({"search_profile_id": None, "criteria": {}})
+        .execute(),
     )
     row = require_single_row(
         result.data,
