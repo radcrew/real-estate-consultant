@@ -11,12 +11,12 @@ from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.models.intake_sessions import IntakeSession
 from app.schemas.intake_sessions import (
     CreateIntakeSessionResponse,
-    IntakeSessionFirstQuestion,
     SubmitIntakeSessionAnswersRequest,
     SubmitIntakeSessionAnswersResponse,
 )
 from app.utils.intake_criteria import normalize_intake_criteria
 from app.utils.intake_questions import (
+    map_question_to_model,
     max_answered_order_for_keys,
     merge_intake_criteria_dict,
     next_question_row_after_order,
@@ -26,25 +26,6 @@ from app.utils.intake_rows import strip_intake_session_row
 from app.utils.supabase_response import as_row_list, require_single_row
 
 router = APIRouter(tags=["intake-sessions"])
-
-
-def _question_snippet_from_row(row: dict) -> IntakeSessionFirstQuestion:
-    qid, qtext, qtype = row.get("id"), row.get("text"), row.get("type")
-    if isinstance(qid, UUID):
-        qid_uuid = qid
-    elif isinstance(qid, str):
-        qid_uuid = UUID(qid)
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unexpected response from Supabase when loading question definition.",
-        )
-    if not isinstance(qtext, str) or not isinstance(qtype, str):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unexpected response from Supabase when loading question definition.",
-        )
-    return IntakeSessionFirstQuestion(id=qid_uuid, text=qtext, type=qtype)
 
 
 @router.post(
@@ -79,7 +60,7 @@ async def create_intake_session(
         ).data,
         detail="No question is configured for intake flow.",
     )
-    first_q = _question_snippet_from_row(question)
+    first_q = map_question_to_model(question)
 
     if session.id is None:
         raise HTTPException(
@@ -92,28 +73,6 @@ async def create_intake_session(
         status=session.status,
         first_question=first_q,
     )
-
-
-@router.get(
-    "/intake-sessions",
-    response_model=list[IntakeSession],
-)
-async def list_intake_sessions(
-    client: SupabaseSdkDep,
-    current_user: CurrentUser,
-) -> list[IntakeSession]:
-    """Return intake sessions whose linked search profile belongs to the caller."""
-    sessions = await execute_db_safe(
-        client.table("intake_sessions")
-        .select("id, status, created_at, search_profile_id, criteria")
-        .eq("search_profiles.user_id", str(current_user.id))
-        .order("created_at", desc=True)
-        .execute(),
-    )
-    return [
-        IntakeSession.model_validate(strip_intake_session_row(r))
-        for r in as_row_list(sessions.data)
-    ]
 
 
 @router.get(
@@ -197,7 +156,7 @@ async def submit_intake_session_answers(
         after_order = max_answered_order_for_keys(questions, merged_criteria)
 
     next_row = next_question_row_after_order(questions, after_order=after_order)
-    next_question = _question_snippet_from_row(next_row) if next_row is not None else None
+    next_question = map_question_to_model(next_row) if next_row is not None else None
 
     result = await execute_db_safe(
         client.table("intake_sessions")

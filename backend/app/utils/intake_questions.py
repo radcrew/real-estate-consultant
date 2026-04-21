@@ -5,6 +5,27 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from fastapi import HTTPException, status
+
+from app.schemas.intake_sessions import IntakeSessionFirstQuestion
+
+
+def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
+    """Map a PostgREST ``questions`` row into ``IntakeSessionFirstQuestion``."""
+    try:
+        qid = question.get("id")
+        qtext = question.get("text")
+        qtype = question.get("type")
+        qid_uuid = qid if isinstance(qid, UUID) else UUID(str(qid))
+        if not isinstance(qtext, str) or not isinstance(qtype, str):
+            raise ValueError("Invalid question fields")
+        return IntakeSessionFirstQuestion(id=qid_uuid, text=qtext, type=qtype)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Unexpected response from Supabase when loading question definition.",
+        ) from exc
+
 
 def has_answer_value(value: Any) -> bool:
     """Whether ``value`` counts as an answered field for progress tracking."""
