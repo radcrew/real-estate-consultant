@@ -1,4 +1,5 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@lib/config";
 
@@ -20,12 +21,7 @@ export const getSupabaseBrowserClient = (): SupabaseClient => {
   }
 
   if (!browserClient) {
-    browserClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        flowType: "pkce",
-        detectSessionInUrl: true,
-      },
-    });
+    browserClient = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 
   return browserClient;
