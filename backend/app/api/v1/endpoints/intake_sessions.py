@@ -14,7 +14,6 @@ from app.schemas.intake_sessions import (
     SubmitIntakeSessionAnswersRequest,
     SubmitIntakeSessionAnswersResponse,
 )
-from app.utils.intake_criteria import normalize_intake_criteria
 from app.utils.intake_questions import (
     append_intake_criteria_answer,
     map_question_to_model,
@@ -189,7 +188,6 @@ async def complete_intake_session(
         detail="Unexpected response from Supabase when loading intake session.",
     )
 
-    normalized_filters = normalize_intake_criteria(session_row.get("criteria"))
     existing_profile_id = session_row.get("search_profile_id")
     if existing_profile_id is not None:
         owned_profile = await execute_db_safe(
@@ -206,16 +204,10 @@ async def complete_intake_session(
                 detail="Intake session not found.",
             )
         search_profile_id = str(existing_profile_id)
-        await execute_db_safe(
-            client.table("search_profiles")
-            .update({"filters": normalized_filters})
-            .eq("id", search_profile_id)
-            .execute(),
-        )
     else:
         profile_result = await execute_db_safe(
             client.table("search_profiles")
-            .insert({"user_id": str(current_user.id), "filters": normalized_filters})
+            .insert({"user_id": str(current_user.id)})
             .execute(),
         )
         profile_row = require_single_row(
