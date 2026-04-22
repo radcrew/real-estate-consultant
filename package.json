@@ -2,9 +2,14 @@
   "name": "real-estate-consultant",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter radestate dev",
+    "dev": "concurrently --names \"FE,BE\" \"pnpm run dev:fe\" \"pnpm run dev:be\"",
+    "dev:fe": "pnpm --filter radestate dev",
+    "dev:be": "node backend/scripts/setup.mjs",
     "build": "pnpm --filter radestate build",
     "start": "pnpm --filter radestate start",
     "lint": "pnpm --filter radestate lint"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }
