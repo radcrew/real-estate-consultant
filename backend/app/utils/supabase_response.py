@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status
 
+_MISSING = object()
+
 
 def as_row_list(raw: object) -> list[dict]:
     """Normalize ``result.data`` to a list of dict rows."""
@@ -14,7 +16,7 @@ def as_row_list(raw: object) -> list[dict]:
     return [r for r in raw if isinstance(r, dict)]
 
 
-def require_single_row(raw: object, *, detail: str) -> dict:
+def expect_single_row(raw: object, *, detail: str) -> dict:
     """Expect exactly one dict row; otherwise raise HTTP 502."""
     if isinstance(raw, dict):
         return raw
@@ -24,3 +26,11 @@ def require_single_row(raw: object, *, detail: str) -> dict:
             return raw[0]
 
     raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
+
+
+def expect_single_row_from_result(result: object, *, detail: str) -> dict:
+    """Extract exactly one dict row from a Supabase response object."""
+    raw = getattr(result, "data", _MISSING)
+    if raw is _MISSING:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
+    return expect_single_row(raw, detail=detail)

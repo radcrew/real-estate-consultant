@@ -21,7 +21,10 @@ from app.utils.intake_questions import (
     order_for_question_key,
 )
 from app.utils.intake_rows import strip_intake_session_row
-from app.utils.supabase_response import as_row_list, require_single_row
+from app.utils.supabase_response import (
+    as_row_list,
+    expect_single_row_from_result,
+)
 
 router = APIRouter(tags=["intake-sessions"])
 
@@ -35,29 +38,27 @@ async def create_intake_session(
     client: SupabaseSdkDep,
 ) -> CreateIntakeSessionResponse:
     """Create an intake session and return first question."""
-    # Force nullable FK to null on creation. Some environments may still have an
-    # old DB default (gen_random_uuid) that would violate FK to search_profiles.
+
     result = await execute_db_safe(
         client.table("intake_sessions")
         .insert({"search_profile_id": None, "criteria": {}})
         .execute(),
     )
-    row = require_single_row(
-        result.data,
+    row = expect_single_row_from_result(
+        result,
         detail="Unexpected response from Supabase when creating intake session.",
     )
     session = IntakeSession.model_validate(row)
 
-    question = require_single_row(
-        (
-            await execute_db_safe(
-                client.table("questions")
-                .select("key, text, type")
-                .order("order_index")
-                .limit(1)
-                .execute()
-            )
-        ).data,
+    question_result = await execute_db_safe(
+        client.table("questions")
+        .select("key, text, type")
+        .order("order_index")
+        .limit(1)
+        .execute()
+    )
+    question = expect_single_row_from_result(
+        question_result,
         detail="No question is configured for intake flow.",
     )
     first_q = map_question_to_model(question)
@@ -120,8 +121,8 @@ async def submit_intake_session_answers(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Intake session not found.",
         )
-    session_row = require_single_row(
-        session_result.data,
+    session_row = expect_single_row_from_result(
+        session_result,
         detail="Unexpected response from Supabase when loading intake session.",
     )
 
@@ -161,8 +162,8 @@ async def submit_intake_session_answers(
         .eq("id", str(session_id))
         .execute(),
     )
-    row = require_single_row(
-        result.data,
+    row = expect_single_row_from_result(
+        result,
         detail="Unexpected response from Supabase when submitting intake session answers.",
     )
     return SubmitIntakeSessionAnswersResponse(
@@ -183,8 +184,13 @@ async def complete_intake_session(
     session_result = await execute_db_safe(
         client.table("intake_sessions").select("*").eq("id", str(session_id)).limit(1).execute(),
     )
-    session_row = require_single_row(
-        session_result.data,
+    if not as_row_list(session_result.data):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Intake session not found.",
+        )
+    session_row = expect_single_row_from_result(
+        session_result,
         detail="Unexpected response from Supabase when loading intake session.",
     )
 
@@ -210,8 +216,8 @@ async def complete_intake_session(
             .insert({"user_id": str(current_user.id)})
             .execute(),
         )
-        profile_row = require_single_row(
-            profile_result.data,
+        profile_row = expect_single_row_from_result(
+            profile_result,
             detail="Unexpected response from Supabase when creating search profile.",
         )
         profile_id = profile_row.get("id")
@@ -228,8 +234,8 @@ async def complete_intake_session(
         .eq("id", str(session_id))
         .execute(),
     )
-    updated_row = require_single_row(
-        session_update.data,
+    updated_row = expect_single_row_from_result(
+        session_update,
         detail="Unexpected response from Supabase when completing intake session.",
     )
     return IntakeSession.model_validate(updated_row)
