@@ -16,15 +16,18 @@ from app.schemas.intake_sessions import (
 )
 from app.utils.intake_questions import (
     append_intake_criteria_answer,
+    load_first_intake_question,
+    load_intake_questions,
     map_question_to_model,
     next_question_row_after_order,
     order_for_question_key,
 )
-from app.utils.intake_rows import strip_intake_session_row
-from app.utils.supabase_response import (
-    as_row_list,
-    expect_single_row_from_result,
+from app.utils.intake_rows import (
+    load_intake_session_row,
+    parse_intake_session,
 )
+from app.utils.search_profiles import create_search_profile, ensure_search_profile_access
+from app.utils.supabase_response import expect_single_row_from_result
 
 router = APIRouter(tags=["intake-sessions"])
 
@@ -38,30 +41,17 @@ async def create_intake_session(
     client: SupabaseSdkDep,
 ) -> CreateIntakeSessionResponse:
     """Create an intake session and return first question."""
-
-    result = await execute_db_safe(
+    session_result = await execute_db_safe(
         client.table("intake_sessions")
         .insert({"search_profile_id": None, "criteria": {}})
         .execute(),
     )
-    row = expect_single_row_from_result(
-        result,
+    session_row = expect_single_row_from_result(
+        session_result,
         detail="Unexpected response from Supabase when creating intake session.",
     )
-    session = IntakeSession.model_validate(row)
-
-    question_result = await execute_db_safe(
-        client.table("questions")
-        .select("key, text, type")
-        .order("order_index")
-        .limit(1)
-        .execute()
-    )
-    question = expect_single_row_from_result(
-        question_result,
-        detail="No question is configured for intake flow.",
-    )
-    first_q = map_question_to_model(question)
+    session = parse_intake_session(session_row)
+    first_question = await load_first_intake_question(client)
 
     if session.id is None:
         raise HTTPException(
@@ -72,7 +62,7 @@ async def create_intake_session(
     return CreateIntakeSessionResponse(
         session_id=session.id,
         status=session.status,
-        first_question=first_q,
+        first_question=first_question,
     )
 
 
@@ -86,20 +76,13 @@ async def get_intake_session(
     current_user: CurrentUser,
 ) -> IntakeSession:
     """Return one session only if its linked search profile belongs to the caller."""
-    result = await execute_db_safe(
-        client.table("intake_sessions")
-        .select("id, status, created_at, search_profile_id, criteria")
-        .eq("id", str(session_id))
-        .limit(1)
-        .execute(),
+    session_row = await load_intake_session_row(client, session_id)
+    await ensure_search_profile_access(
+        client,
+        session_row.get("search_profile_id"),
+        current_user.id,
     )
-    rows = as_row_list(result.data)
-    if not rows:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Intake session not found.",
-        )
-    return IntakeSession.model_validate(strip_intake_session_row(rows[0]))
+    return parse_intake_session(session_row)
 
 
 @router.patch(
@@ -112,32 +95,8 @@ async def submit_intake_session_answers(
     client: SupabaseSdkDep,
 ) -> SubmitIntakeSessionAnswersResponse:
     answer_key = body.key.strip()
-
-    session_result = await execute_db_safe(
-        client.table("intake_sessions").select("*").eq("id", str(session_id)).limit(1).execute(),
-    )
-    if not as_row_list(session_result.data):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Intake session not found.",
-        )
-    session_row = expect_single_row_from_result(
-        session_result,
-        detail="Unexpected response from Supabase when loading intake session.",
-    )
-
-    questions_result = await execute_db_safe(
-        client.table("questions")
-        .select("key, text, type, order_index")
-        .order("order_index")
-        .execute(),
-    )
-    questions = as_row_list(questions_result.data)
-    if not questions:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="No question is configured for intake flow.",
-        )
+    session_row = await load_intake_session_row(client, session_id)
+    questions = await load_intake_questions(client)
 
     merged_criteria = append_intake_criteria_answer(
         session_row.get("criteria"),
@@ -151,9 +110,8 @@ async def submit_intake_session_answers(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unknown question key for this questionnaire.",
         )
-    after_order = answered_order
 
-    next_row = next_question_row_after_order(questions, after_order=after_order)
+    next_row = next_question_row_after_order(questions, after_order=answered_order)
     next_question = map_question_to_model(next_row) if next_row is not None else None
 
     result = await execute_db_safe(
@@ -167,7 +125,7 @@ async def submit_intake_session_answers(
         detail="Unexpected response from Supabase when submitting intake session answers.",
     )
     return SubmitIntakeSessionAnswersResponse(
-        session=IntakeSession.model_validate(row),
+        session=parse_intake_session(row),
         next_question=next_question,
     )
 
@@ -181,52 +139,14 @@ async def complete_intake_session(
     client: SupabaseSdkDep,
     current_user: CurrentUser,
 ) -> IntakeSession:
-    session_result = await execute_db_safe(
-        client.table("intake_sessions").select("*").eq("id", str(session_id)).limit(1).execute(),
+    session_row = await load_intake_session_row(client, session_id)
+    search_profile_id = await ensure_search_profile_access(
+        client,
+        session_row.get("search_profile_id"),
+        current_user.id,
     )
-    if not as_row_list(session_result.data):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Intake session not found.",
-        )
-    session_row = expect_single_row_from_result(
-        session_result,
-        detail="Unexpected response from Supabase when loading intake session.",
-    )
-
-    existing_profile_id = session_row.get("search_profile_id")
-    if existing_profile_id is not None:
-        owned_profile = await execute_db_safe(
-            client.table("search_profiles")
-            .select("id")
-            .eq("id", str(existing_profile_id))
-            .eq("user_id", str(current_user.id))
-            .limit(1)
-            .execute(),
-        )
-        if not as_row_list(owned_profile.data):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Intake session not found.",
-            )
-        search_profile_id = str(existing_profile_id)
-    else:
-        profile_result = await execute_db_safe(
-            client.table("search_profiles")
-            .insert({"user_id": str(current_user.id)})
-            .execute(),
-        )
-        profile_row = expect_single_row_from_result(
-            profile_result,
-            detail="Unexpected response from Supabase when creating search profile.",
-        )
-        profile_id = profile_row.get("id")
-        if not isinstance(profile_id, str):
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Unexpected response from Supabase when creating search profile.",
-            )
-        search_profile_id = profile_id
+    if search_profile_id is None:
+        search_profile_id = await create_search_profile(client, current_user.id)
 
     session_update = await execute_db_safe(
         client.table("intake_sessions")
@@ -238,6 +158,4 @@ async def complete_intake_session(
         session_update,
         detail="Unexpected response from Supabase when completing intake session.",
     )
-    return IntakeSession.model_validate(updated_row)
-
-
+    return parse_intake_session(updated_row)
