@@ -15,7 +15,7 @@ export const RangeQuestionInput = ({
   onChange,
 }: RangeQuestionInputProps) => (
   <div className="max-w-xl space-y-4">
-    <div className="flex items-end justify-between gap-3 border border-border/70 bg-background px-3 py-2.5">
+    <div className="flex items-end justify-between gap-3 rounded-lg border border-border/70 bg-background px-3 py-2.5">
       <div>
         <p className="text-xs text-muted-foreground">Current value</p>
         <p className="text-lg font-semibold sm:text-xl">

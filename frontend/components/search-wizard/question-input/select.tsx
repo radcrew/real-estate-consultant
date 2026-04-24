@@ -8,12 +8,11 @@ type SelectOptionCardProps = {
   label: string;
   hint?: string;
   selected: boolean;
-  rounded?: boolean;
   onClick: () => void;
 };
 
 const CARD_CLASSNAME =
-  "group relative grid min-h-24 grid-rows-[auto_auto_1fr] items-start justify-items-center overflow-hidden border px-3 py-3.5 text-center transition-all duration-200";
+  "group relative grid min-h-24 grid-rows-[auto_auto_1fr] items-start justify-items-center overflow-hidden rounded-xl border px-3 py-3.5 text-center transition-all duration-200";
 const CARD_IDLE_CLASSNAME =
   "border-slate-200/90 bg-white shadow-[0_8px_24px_-18px_rgba(15,23,42,0.35)] hover:-translate-y-0.5 hover:border-amber-300/70 hover:shadow-[0_20px_45px_-28px_rgba(245,158,11,0.45)]";
 const CARD_SELECTED_CLASSNAME =

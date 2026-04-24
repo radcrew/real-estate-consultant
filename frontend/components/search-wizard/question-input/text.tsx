@@ -16,12 +16,6 @@ export const TextQuestionInput = ({
   onChange,
 }: TextQuestionInputProps) => (
   <div className="space-y-2">
-    <label
-      htmlFor={question.id}
-      className="text-xs font-medium text-foreground"
-    >
-      Enter your preferred location
-    </label>
     <Input
       id={question.id}
       value={answer}

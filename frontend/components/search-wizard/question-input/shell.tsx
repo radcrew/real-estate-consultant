@@ -39,12 +39,12 @@ export const QuestionInputShell = ({
       </div>
     </div>
 
-    <div className="space-y-2.5">
-      <h3 className="text-base font-semibold tracking-tight sm:text-lg">
+    <div>
+      <h3 className="text-lg font-semibold tracking-tight sm:text-xl">
         {question.title}
       </h3>
 
-      {children}
+      <div className="mt-6 sm:mt-7">{children}</div>
     </div>
   </div>
 );

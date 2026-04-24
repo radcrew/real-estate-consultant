@@ -23,7 +23,7 @@ export const WIZARD_QUESTIONS: WizardQuestion[] = [
       {
         label: "Open to both",
         value: "both",
-        hint: "Show opportunities across both tracks",
+        hint: "Opportunities across both",
       },
     ],
   },

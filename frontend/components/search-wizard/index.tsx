@@ -47,13 +47,13 @@ const SUMMARY_GRID_WITH_PANEL_CLASS_NAME = [
 ].join(" ");
 
 const SECTION_WITHOUT_PANEL_CLASS_NAME = [
-  "flex w-full max-w-2xl justify-self-center flex-col",
+  "flex w-full max-w-2xl justify-self-center flex-col rounded-xl",
   "border border-border/70 bg-background/90",
   "p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.55)] sm:p-5",
 ].join(" ");
 
 const SECTION_WITH_PANEL_CLASS_NAME = [
-  "flex w-full min-h-[22rem] flex-col",
+  "flex w-full min-h-[22rem] flex-col rounded-xl",
   "border border-border/70 bg-background/90",
   "p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.55)] sm:p-5",
 ].join(" ");
@@ -175,7 +175,7 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
                 }
               />
 
-              <div className="mt-4 flex flex-col gap-2.5 border-t border-border/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-8 flex flex-col gap-3 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
                 <Button
                   variant="outline"
                   size="default"
