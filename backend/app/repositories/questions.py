@@ -1,4 +1,4 @@
-"""Questionnaire ordering and loading for intake sessions."""
+"""Persistence and questionnaire helpers for ``public.questions`` (Supabase)."""
 
 from __future__ import annotations
 
@@ -32,17 +32,6 @@ def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Unexpected response from Supabase when loading question definition.",
         ) from exc
-
-
-def append_intake_criteria_answer(
-    previous_criteria: object,
-    question_key: str,
-    answers: Any,
-) -> dict[str, Any]:
-    """Return prior criteria with ``{question_key: answers}`` applied (shallow copy)."""
-    base: dict[str, Any] = previous_criteria if isinstance(previous_criteria, dict) else {}
-    key = question_key.strip()
-    return {**base, key: answers}
 
 
 def order_for_question_key(questions: list[dict], key: str) -> int | None:
@@ -103,3 +92,11 @@ async def load_intake_questions(client: AsyncClient) -> list[dict[str, Any]]:
             detail=_LOAD_QUESTIONS_ERROR,
         )
     return questions
+
+
+async def insert_question_row(client: AsyncClient, payload: dict[str, Any]) -> dict[str, Any]:
+    result = await execute_db_safe(client.table("questions").insert(payload).execute())
+    return expect_single_row_from_result(
+        result,
+        detail="Unexpected response from Supabase when creating question.",
+    )

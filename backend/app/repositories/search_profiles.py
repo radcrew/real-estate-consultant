@@ -1,4 +1,4 @@
-"""Supabase access for ``search_profiles`` used by intake completion."""
+"""Persistence for ``public.search_profiles`` (Supabase)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 from supabase import AsyncClient
 
 from app.core.db_safe import execute_db_safe
-from app.utils.intake_rows import intake_session_not_found
+from app.repositories.intake_sessions import intake_session_not_found
 from app.utils.supabase_response import as_row_list, expect_single_row_from_result
 
 _CREATE_PROFILE_ERROR = "Unexpected response from Supabase when creating search profile."

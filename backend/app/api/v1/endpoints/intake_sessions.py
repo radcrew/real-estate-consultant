@@ -6,29 +6,32 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.core.db_safe import execute_db_safe
 from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.models.intake_sessions import IntakeSession
-from app.schemas.intake_sessions import (
-    CreateIntakeSessionResponse,
-    SubmitIntakeSessionAnswersRequest,
-    SubmitIntakeSessionAnswersResponse,
-)
-from app.utils.intake_questions import (
+from app.repositories.intake_sessions import (
     append_intake_criteria_answer,
+    create_intake_session_row,
+    load_intake_session_row,
+    parse_intake_session,
+    update_intake_session_after_answers,
+    update_intake_session_completed,
+)
+from app.repositories.questions import (
     load_first_intake_question,
     load_intake_questions,
     map_question_to_model,
     next_question_row_after_order,
     order_for_question_key,
 )
-from app.utils.intake_rows import (
-    load_intake_session_row,
-    parse_intake_session,
+from app.repositories.search_profiles import (
+    create_search_profile,
+    ensure_search_profile_access,
 )
-from app.utils.search_profiles import create_search_profile, ensure_search_profile_access
-from app.utils.supabase_response import expect_single_row_from_result
-
+from app.schemas.intake_sessions import (
+    CreateIntakeSessionResponse,
+    SubmitIntakeSessionAnswersRequest,
+    SubmitIntakeSessionAnswersResponse,
+)
 router = APIRouter(tags=["intake-sessions"])
 
 
@@ -41,15 +44,7 @@ async def create_intake_session(
     client: SupabaseSdkDep,
 ) -> CreateIntakeSessionResponse:
     """Create an intake session and return first question."""
-    session_result = await execute_db_safe(
-        client.table("intake_sessions")
-        .insert({"search_profile_id": None, "criteria": {}})
-        .execute(),
-    )
-    session_row = expect_single_row_from_result(
-        session_result,
-        detail="Unexpected response from Supabase when creating intake session.",
-    )
+    session_row = await create_intake_session_row(client)
     session = parse_intake_session(session_row)
     first_question = await load_first_intake_question(client)
 
@@ -114,15 +109,10 @@ async def submit_intake_session_answers(
     next_row = next_question_row_after_order(questions, after_order=answered_order)
     next_question = map_question_to_model(next_row) if next_row is not None else None
 
-    result = await execute_db_safe(
-        client.table("intake_sessions")
-        .update({"criteria": merged_criteria, "status": "in_progress"})
-        .eq("id", str(session_id))
-        .execute(),
-    )
-    row = expect_single_row_from_result(
-        result,
-        detail="Unexpected response from Supabase when submitting intake session answers.",
+    row = await update_intake_session_after_answers(
+        client,
+        session_id,
+        merged_criteria,
     )
     return SubmitIntakeSessionAnswersResponse(
         session=parse_intake_session(row),
@@ -148,14 +138,9 @@ async def complete_intake_session(
     if search_profile_id is None:
         search_profile_id = await create_search_profile(client, current_user.id)
 
-    session_update = await execute_db_safe(
-        client.table("intake_sessions")
-        .update({"status": "completed", "search_profile_id": search_profile_id})
-        .eq("id", str(session_id))
-        .execute(),
-    )
-    updated_row = expect_single_row_from_result(
-        session_update,
-        detail="Unexpected response from Supabase when completing intake session.",
+    updated_row = await update_intake_session_completed(
+        client,
+        session_id,
+        search_profile_id,
     )
     return parse_intake_session(updated_row)
