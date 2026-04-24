@@ -36,7 +36,7 @@ class PatchIntakeSessionStatusRequest(BaseModel):
     status: str
 
 
-class SubmitIntakeSessionAnswersRequest(BaseModel):
+class UpdateIntakeSessionAnswersRequest(BaseModel):
     """Request body for ``PATCH /api/v1/intake-sessions/{session_id}/answers``."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -51,7 +51,7 @@ class SubmitIntakeSessionAnswersRequest(BaseModel):
     )
 
 
-class SubmitIntakeSessionAnswersResponse(BaseModel):
+class UpdateIntakeSessionAnswersResponse(BaseModel):
     """Response for ``PATCH /api/v1/intake-sessions/{session_id}/answers``."""
 
     model_config = ConfigDict(str_strip_whitespace=True)

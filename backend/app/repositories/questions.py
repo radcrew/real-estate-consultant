@@ -9,7 +9,7 @@ from supabase import AsyncClient
 
 from app.core.db_safe import execute_db_safe
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
-from app.utils.supabase_response import as_row_list, expect_single_row_from_result
+from app.utils.supabase_response import as_row_list, get_single_row
 
 _FIRST_QUESTION_SELECT = "key, text, type"
 _QUESTION_SELECT = "key, text, type, order_index"
@@ -74,7 +74,7 @@ async def load_first_intake_question(client: AsyncClient) -> IntakeSessionFirstQ
         .limit(1)
         .execute(),
     )
-    row = expect_single_row_from_result(result, detail=_LOAD_QUESTIONS_ERROR)
+    row = get_single_row(result, detail=_LOAD_QUESTIONS_ERROR)
     return map_question_to_model(row)
 
 
@@ -96,7 +96,7 @@ async def load_intake_questions(client: AsyncClient) -> list[dict[str, Any]]:
 
 async def insert_question_row(client: AsyncClient, payload: dict[str, Any]) -> dict[str, Any]:
     result = await execute_db_safe(client.table("questions").insert(payload).execute())
-    return expect_single_row_from_result(
+    return get_single_row(
         result,
         detail="Unexpected response from Supabase when creating question.",
     )

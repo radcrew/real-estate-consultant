@@ -29,8 +29,8 @@ from app.repositories.search_profiles import (
 )
 from app.schemas.intake_sessions import (
     CreateIntakeSessionResponse,
-    SubmitIntakeSessionAnswersRequest,
-    SubmitIntakeSessionAnswersResponse,
+    UpdateIntakeSessionAnswersRequest,
+    UpdateIntakeSessionAnswersResponse,
 )
 router = APIRouter(tags=["intake-sessions"])
 
@@ -44,19 +44,22 @@ async def create_intake_session(
     client: SupabaseSdkDep,
 ) -> CreateIntakeSessionResponse:
     """Create an intake session and return first question."""
-    session_row = await create_intake_session_row(client)
-    session = parse_intake_session(session_row)
+    
+    created_session = await create_intake_session_row(client)
+    
+    validated_session = parse_intake_session(created_session)
+    
     first_question = await load_first_intake_question(client)
 
-    if session.id is None:
+    if validated_session.id is None:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Unexpected response from Supabase when creating intake session.",
         )
 
     return CreateIntakeSessionResponse(
-        session_id=session.id,
-        status=session.status,
+        session_id=validated_session.id,
+        status=validated_session.status,
         first_question=first_question,
     )
 
@@ -82,13 +85,13 @@ async def get_intake_session(
 
 @router.patch(
     "/intake-sessions/{session_id}/answers",
-    response_model=SubmitIntakeSessionAnswersResponse,
+    response_model=UpdateIntakeSessionAnswersResponse,
 )
 async def submit_intake_session_answers(
     session_id: UUID,
-    body: SubmitIntakeSessionAnswersRequest,
+    body: UpdateIntakeSessionAnswersRequest,
     client: SupabaseSdkDep,
-) -> SubmitIntakeSessionAnswersResponse:
+) -> UpdateIntakeSessionAnswersResponse:
     answer_key = body.key.strip()
     session_row = await load_intake_session_row(client, session_id)
     questions = await load_intake_questions(client)
@@ -114,7 +117,7 @@ async def submit_intake_session_answers(
         session_id,
         merged_criteria,
     )
-    return SubmitIntakeSessionAnswersResponse(
+    return UpdateIntakeSessionAnswersResponse(
         session=parse_intake_session(row),
         next_question=next_question,
     )

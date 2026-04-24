@@ -9,7 +9,7 @@ from supabase import AsyncClient
 
 from app.core.db_safe import execute_db_safe
 from app.repositories.intake_sessions import intake_session_not_found
-from app.utils.supabase_response import as_row_list, expect_single_row_from_result
+from app.utils.supabase_response import as_row_list, get_single_row
 
 _CREATE_PROFILE_ERROR = "Unexpected response from Supabase when creating search profile."
 
@@ -39,7 +39,7 @@ async def create_search_profile(client: AsyncClient, user_id: UUID) -> str:
     result = await execute_db_safe(
         client.table("search_profiles").insert({"user_id": str(user_id)}).execute(),
     )
-    row = expect_single_row_from_result(result, detail=_CREATE_PROFILE_ERROR)
+    row = get_single_row(result, detail=_CREATE_PROFILE_ERROR)
     profile_id = row.get("id")
     if not isinstance(profile_id, str):
         raise HTTPException(

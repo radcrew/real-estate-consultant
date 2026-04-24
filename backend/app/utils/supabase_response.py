@@ -28,7 +28,7 @@ def expect_single_row(raw: object, *, detail: str) -> dict:
     raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
 
 
-def expect_single_row_from_result(result: object, *, detail: str) -> dict:
+def get_single_row(result: object, *, detail: str) -> dict:
     """Extract exactly one dict row from a Supabase response object."""
     raw = getattr(result, "data", _MISSING)
     if raw is _MISSING:
