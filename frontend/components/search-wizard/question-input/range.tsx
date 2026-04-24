@@ -14,20 +14,20 @@ export const RangeQuestionInput = ({
   answer,
   onChange,
 }: RangeQuestionInputProps) => (
-  <div className="max-w-3xl space-y-5">
-    <div className="flex items-end justify-between gap-4 border border-border/70 bg-background px-4 py-3">
+  <div className="max-w-xl space-y-4">
+    <div className="flex items-end justify-between gap-3 border border-border/70 bg-background px-3 py-2.5">
       <div>
-        <p className="text-xs text-muted-foreground sm:text-sm">Current value</p>
-        <p className="text-2xl font-semibold sm:text-3xl">
+        <p className="text-xs text-muted-foreground">Current value</p>
+        <p className="text-lg font-semibold sm:text-xl">
           {formatRangeValue(answer, question.unit)}
         </p>
       </div>
-      <p className="max-w-xs text-right text-xs text-muted-foreground sm:text-sm">
+      <p className="max-w-[14rem] text-right text-xs text-muted-foreground">
         Drag the slider to set the floor requirement for this search.
       </p>
     </div>
 
-    <div className="space-y-2.5">
+    <div className="space-y-2">
       <input
         id={question.id}
         type="range"
@@ -38,7 +38,7 @@ export const RangeQuestionInput = ({
         onChange={(event) => onChange(Number(event.target.value))}
         className="h-2 w-full cursor-pointer appearance-none bg-transparent accent-primary"
       />
-      <div className="flex items-center justify-between text-xs text-muted-foreground sm:text-sm">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{question.minLabel ?? question.min}</span>
         <span>{question.maxLabel ?? question.max}</span>
       </div>

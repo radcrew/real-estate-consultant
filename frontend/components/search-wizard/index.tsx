@@ -32,30 +32,30 @@ const PANEL_CLASS_NAME = [
 ].join(" ");
 
 const CONTENT_CLASS_NAME = [
-  "mx-auto flex w-full max-w-7xl flex-1 flex-col",
-  "px-4 pt-6 pb-5 sm:px-6 lg:px-10",
+  "mx-auto flex w-full max-w-5xl flex-1 flex-col",
+  "px-4 pt-5 pb-4 sm:px-6 lg:px-8",
 ].join(" ");
 
 const SUMMARY_GRID_CLASS_NAME = [
-  "mt-6 grid flex-1 gap-6",
+  "mt-5 grid flex-1 gap-4",
   "justify-items-center items-start",
 ].join(" ");
 
 const SUMMARY_GRID_WITH_PANEL_CLASS_NAME = [
-  "mt-6 grid flex-1 gap-6",
-  "lg:grid-cols-[minmax(0,1.35fr)_360px]",
+  "mt-5 grid flex-1 gap-4",
+  "lg:grid-cols-[minmax(0,1.35fr)_320px]",
 ].join(" ");
 
 const SECTION_WITHOUT_PANEL_CLASS_NAME = [
-  "flex w-full max-w-4xl justify-self-center flex-col",
+  "flex w-full max-w-2xl justify-self-center flex-col",
   "border border-border/70 bg-background/90",
-  "p-5 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.55)] sm:p-6",
+  "p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.55)] sm:p-5",
 ].join(" ");
 
 const SECTION_WITH_PANEL_CLASS_NAME = [
-  "flex w-full min-h-[28rem] flex-col",
+  "flex w-full min-h-[22rem] flex-col",
   "border border-border/70 bg-background/90",
-  "p-5 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.55)] sm:p-6",
+  "p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.55)] sm:p-5",
 ].join(" ");
 
 export const SearchWizard = ({ onClose }: SearchWizardProps) => {
@@ -127,13 +127,13 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
         <ProgressBar stepIndex={stepIndex}/>
 
         <div className={CONTENT_CLASS_NAME}>
-          <div className="flex items-start justify-between gap-6">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1.5">
+              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Search intake
               </p>
-              <div className="space-y-1">
-                <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              <div className="space-y-0.5">
+                <h2 className="text-lg font-semibold tracking-tight sm:text-xl">
                   Define the search in a few quick steps
                 </h2>
               </div>
@@ -141,12 +141,12 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
 
             <Button
               variant="ghost"
-              size="icon-lg"
+              size="icon"
               className="rounded-full border border-border/70 bg-background/80"
               onClick={onClose}
               aria-label="Close search wizard"
             >
-              <X className="size-5" />
+              <X className="size-4" />
             </Button>
           </div>
 
@@ -175,11 +175,11 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
                 }
               />
 
-              <div className="mt-5 flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-4 flex flex-col gap-2.5 border-t border-border/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
                 <Button
                   variant="outline"
-                  size="lg"
-                  className="h-10 px-4 text-sm"
+                  size="default"
+                  className="h-9 px-3 text-sm"
                   onClick={() => setStepIndex((current) => Math.max(0, current - 1))}
                   disabled={stepIndex === 0}
                 >
@@ -188,8 +188,8 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
                 </Button>
 
                 <Button
-                  size="lg"
-                  className="h-10 px-4 text-sm"
+                  size="default"
+                  className="h-9 px-3 text-sm"
                   onClick={isLastStep ? onClose : handleNext}
                   disabled={!canContinue}
                 >

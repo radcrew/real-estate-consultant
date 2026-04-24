@@ -4,22 +4,22 @@ type SummaryPanelProps = {
   rows: SummaryRow[];
 };
 
-const PANEL_CLASSNAME = "flex flex-col border border-border/70 bg-slate-950 p-6 text-slate-100 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.7)]";
+const PANEL_CLASSNAME = "flex flex-col border border-border/70 bg-slate-950 p-4 text-slate-100 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.7)] sm:p-5";
 
 export const SummaryPanel = ({ rows }: SummaryPanelProps) => (
   <aside className={PANEL_CLASSNAME}>
-    <div className="space-y-2">
-      <p className="text-sm font-semibold uppercase tracking-[0.24em] text-amber-200/80">
+    <div className="space-y-1.5">
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-200/80">
         Search draft
       </p>
-      <h3 className="text-2xl font-semibold">Answers so far</h3>
+      <h3 className="text-base font-semibold sm:text-lg">Answers so far</h3>
     </div>
 
-    <div className="mt-6 space-y-3">
+    <div className="mt-4 space-y-2.5">
       {rows.map((row, index) => (
         <div
           key={row.id}
-          className="border border-white/10 bg-white/4 px-4 py-3"
+          className="border border-white/10 bg-white/4 px-3 py-2.5"
         >
           <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
             Step {index + 1}

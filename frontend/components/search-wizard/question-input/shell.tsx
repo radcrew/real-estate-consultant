@@ -11,14 +11,14 @@ type QuestionInputShellProps = {
 
 const QuestionIcon = ({ question }: { question: WizardQuestion }) => {
   if (question.id === "market") {
-    return <MapPinned className="size-5" aria-hidden />;
+    return <MapPinned className="size-4" aria-hidden />;
   }
 
   if (question.id === "propertyTypes") {
-    return <Warehouse className="size-5" aria-hidden />;
+    return <Warehouse className="size-4" aria-hidden />;
   }
 
-  return <SlidersHorizontal className="size-5" aria-hidden />;
+  return <SlidersHorizontal className="size-4" aria-hidden />;
 };
 
 export const QuestionInputShell = ({
@@ -27,9 +27,9 @@ export const QuestionInputShell = ({
   totalSteps,
   children,
 }: QuestionInputShellProps) => (
-  <div className="space-y-5">
-    <div className="flex items-center gap-3 text-xs text-muted-foreground sm:text-sm">
-      <span className="inline-flex size-9 items-center justify-center rounded-full bg-primary/18 text-primary">
+  <div className="space-y-4">
+    <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+      <span className="inline-flex size-8 items-center justify-center rounded-full bg-primary/18 text-primary">
         <QuestionIcon question={question} />
       </span>
       <div>
@@ -39,8 +39,8 @@ export const QuestionInputShell = ({
       </div>
     </div>
 
-    <div className="space-y-3">
-      <h3 className="text-2xl font-semibold tracking-tight sm:text-4xl">
+    <div className="space-y-2.5">
+      <h3 className="text-base font-semibold tracking-tight sm:text-lg">
         {question.title}
       </h3>
 

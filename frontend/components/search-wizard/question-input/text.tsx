@@ -15,10 +15,10 @@ export const TextQuestionInput = ({
   answer,
   onChange,
 }: TextQuestionInputProps) => (
-  <div className="space-y-2.5">
+  <div className="space-y-2">
     <label
       htmlFor={question.id}
-      className="text-xs font-medium text-foreground sm:text-sm"
+      className="text-xs font-medium text-foreground"
     >
       Enter your preferred location
     </label>
@@ -27,7 +27,7 @@ export const TextQuestionInput = ({
       value={answer}
       onChange={(event) => onChange(event.target.value)}
       placeholder={question.placeholder}
-      className="h-12 border-border/80 bg-background px-4 text-sm sm:text-base"
+      className="h-9 border-border/80 bg-background px-3 text-sm"
     />
   </div>
 );
