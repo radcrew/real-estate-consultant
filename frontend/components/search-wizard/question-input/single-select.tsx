@@ -15,7 +15,7 @@ export const SingleSelectQuestionInput = ({
   answer,
   onChange,
 }: SingleSelectQuestionInputProps) => (
-  <div className="grid gap-3 md:grid-cols-3">
+  <div className="grid gap-2.5 md:grid-cols-3">
     {question.options.map((option) => (
       <SelectOptionCard
         key={option.value}

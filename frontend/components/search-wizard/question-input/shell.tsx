@@ -27,9 +27,9 @@ export const QuestionInputShell = ({
   totalSteps,
   children,
 }: QuestionInputShellProps) => (
-  <div className="space-y-8">
-    <div className="flex items-center gap-3 text-sm text-muted-foreground">
-      <span className="inline-flex size-11 items-center justify-center rounded-full bg-primary/18 text-primary">
+  <div className="space-y-5">
+    <div className="flex items-center gap-3 text-xs text-muted-foreground sm:text-sm">
+      <span className="inline-flex size-9 items-center justify-center rounded-full bg-primary/18 text-primary">
         <QuestionIcon question={question} />
       </span>
       <div>
@@ -39,8 +39,8 @@ export const QuestionInputShell = ({
       </div>
     </div>
 
-    <div className="space-y-4">
-      <h3 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">
+    <div className="space-y-3">
+      <h3 className="text-2xl font-semibold tracking-tight sm:text-4xl">
         {question.title}
       </h3>
 
