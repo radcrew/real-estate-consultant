@@ -85,17 +85,18 @@ export const SearchModeSelector = () => {
   const {
     errorMessage,
     isBusy,
-    mode,
+    isGuidedFormOpen,
+    isSmartChatOpen,
     onClose,
     showSmartChat,
     startGuidedForm,
   } = useSearchWizard();
 
-  if (mode === "guided-form") {
+  if (isGuidedFormOpen) {
     return <GuidedQuestionnaire />;
   }
 
-  if (mode === "smart-chat") {
+  if (isSmartChatOpen) {
     return <SmartChat />;
   }
 
