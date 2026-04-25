@@ -19,7 +19,6 @@ from app.repositories.intake_sessions import (
     update_intake_session_completed,
 )
 from app.repositories.questions import (
-    load_first_intake_question,
     load_intake_questions,
     map_question_to_model,
     next_question_row_after_order,
@@ -103,6 +102,17 @@ def _extract_llm_payload(text: str) -> LlmExtractedIntakePayload:
     )
 
 
+def _current_index_for_next_question(questions: list[dict], next_question_key: str | None) -> int:
+    if not questions:
+        return 0
+    if next_question_key is None:
+        return len(questions)
+    idx = order_for_question_key(questions, next_question_key)
+    if idx is None:
+        return len(questions)
+    return idx
+
+
 @router.post(
     "/intake-sessions",
     status_code=status.HTTP_201_CREATED,
@@ -118,6 +128,8 @@ async def create_intake_session(
     """Create an intake session. Guided mode returns the first question; LLM mode returns a welcome message."""
     created_session = await create_intake_session_row(client)
     validated_session = parse_intake_session(created_session)
+    questions = await load_intake_questions(client)
+    total_questions = len(questions)
 
     if validated_session.id is None:
         raise HTTPException(
@@ -130,14 +142,18 @@ async def create_intake_session(
             mode="llm",
             session_id=validated_session.id,
             status=validated_session.status,
+            current_index=0,
+            total_questions=total_questions,
             message=LLM_INTAKE_OPENING_MESSAGE,
         )
 
-    first_question = await load_first_intake_question(client)
+    first_question = map_question_to_model(questions[0])
     return CreateIntakeSessionResponseGuided(
         mode="guided",
         session_id=validated_session.id,
         status=validated_session.status,
+        current_index=1,
+        total_questions=total_questions,
         first_question=first_question,
     )
 
@@ -189,6 +205,8 @@ async def submit_intake_session_answers(
 
     next_row = next_question_row_after_order(questions, after_order=answered_order)
     next_question = map_question_to_model(next_row) if next_row is not None else None
+    next_key = next_question.key if next_question is not None else None
+    current_index = _current_index_for_next_question(questions, next_key)
 
     row = await update_intake_session_after_answers(
         client,
@@ -197,6 +215,8 @@ async def submit_intake_session_answers(
     )
     return UpdateIntakeSessionAnswersResponse(
         session=parse_intake_session(row),
+        current_index=current_index,
+        total_questions=len(questions),
         next_question=next_question,
     )
 
@@ -228,10 +248,15 @@ async def submit_llm_intake_input(
             next_question = map_question_to_model(q)
             break
 
+    next_key = next_question.key if next_question is not None else None
+    current_index = _current_index_for_next_question(questions, next_key)
+
     await update_intake_session_after_answers(client, session_id, merged_criteria)
     return SubmitLlmIntakeInputResponse(
         extracted=extracted,
         criteria=merged_criteria,
+        current_index=current_index,
+        total_questions=len(questions),
         missing_fields=missing_fields,
         next_question=next_question,
         is_complete=len(missing_fields) == 0,

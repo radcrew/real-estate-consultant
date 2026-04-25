@@ -26,6 +26,8 @@ class CreateIntakeSessionResponseGuided(BaseModel):
     mode: Literal["guided"] = "guided"
     session_id: UUID
     status: str
+    current_index: int
+    total_questions: int
     first_question: IntakeSessionFirstQuestion
 
 
@@ -37,6 +39,8 @@ class CreateIntakeSessionResponseLlm(BaseModel):
     mode: Literal["llm"] = "llm"
     session_id: UUID
     status: str
+    current_index: int
+    total_questions: int
     message: str
 
 
@@ -74,6 +78,8 @@ class UpdateIntakeSessionAnswersResponse(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     session: IntakeSession
+    current_index: int
+    total_questions: int
     next_question: IntakeSessionFirstQuestion | None = None
 
 
@@ -110,6 +116,8 @@ class SubmitLlmIntakeInputResponse(BaseModel):
 
     extracted: LlmExtractedIntakePayload
     criteria: dict[str, Any]
+    current_index: int
+    total_questions: int
     missing_fields: list[str]
     next_question: IntakeSessionFirstQuestion | None = None
     is_complete: bool
