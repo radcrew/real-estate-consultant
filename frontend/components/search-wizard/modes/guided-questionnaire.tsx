@@ -118,7 +118,7 @@ export const GuidedQuestionnaire = () => {
             <Button
               size="default"
               className="h-9 px-3 text-sm"
-              onClick={() => void goToNextQuestion()}
+              onClick={goToNextQuestion}
               disabled={!canContinue || isBusy}
             >
               {isSubmitting ? "Saving..." : "Continue"}

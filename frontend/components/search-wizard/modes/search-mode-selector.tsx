@@ -140,7 +140,7 @@ export const SearchModeSelector = () => {
           <Button
             variant="outline"
             className={CHOICE_FORM_CTA_CLASS_NAME}
-            onClick={() => void startGuidedForm()}
+            onClick={startGuidedForm}
             disabled={isBusy}
           >
             {isBusy ? "Loading form..." : "Use Form"}
