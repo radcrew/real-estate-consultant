@@ -4,7 +4,6 @@ import { ArrowRight, ChevronLeft } from "lucide-react";
 
 import { Button } from "@components/ui/button";
 
-import { ASSUMED_TOTAL_QUESTION_STEPS } from "../constants";
 import { ProgressBar } from "../progress-bar";
 import { QuestionInput } from "../question-input";
 import { useSearchWizard } from "../context/search-wizard";
@@ -51,6 +50,7 @@ export const GuidedQuestionnaire = () => {
     isSubmitting,
     resetToChooser,
     stepIndex,
+    totalSteps,
     toggleCurrentMultiSelect,
     updateCurrentAnswer,
   } = useSearchWizard();
@@ -70,10 +70,7 @@ export const GuidedQuestionnaire = () => {
             : MAIN_COLUMN_CLASS_NAME
         }
       >
-        <ProgressBar
-          stepIndex={stepIndex}
-          totalSteps={ASSUMED_TOTAL_QUESTION_STEPS}
-        />
+        <ProgressBar stepIndex={stepIndex} totalSteps={totalSteps} />
 
         <section
           className={

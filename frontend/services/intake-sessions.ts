@@ -6,11 +6,23 @@ export type IntakeSessionQuestion = {
   key: string;
   text: string;
   type: string;
+  options?: Array<{
+    label: string;
+    value: string;
+    hint?: string;
+  }>;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  min_label?: string;
+  max_label?: string;
 };
 
 export type CreateIntakeSessionResponse = {
   session_id: string;
   status: string;
+  total_questions: number;
   first_question: IntakeSessionQuestion;
 };
 
