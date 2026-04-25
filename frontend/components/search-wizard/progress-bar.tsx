@@ -1,18 +1,35 @@
-import { WIZARD_QUESTIONS } from "./questions";
-
 type ProgressBarProps = {
   stepIndex: number;
-}
+  totalSteps: number;
+};
 
-export const ProgressBar = ({ stepIndex }: ProgressBarProps) => {
-  const progressValue = ((stepIndex + 1) / WIZARD_QUESTIONS.length) * 100;
+export const ProgressBar = ({ stepIndex, totalSteps }: ProgressBarProps) => {
+  const currentStep = stepIndex + 1;
+  const progressPercent =
+    totalSteps > 0 ? (currentStep / totalSteps) * 100 : 0;
+  const displayPercent = Math.round(progressPercent);
 
   return (
-    <div className="absolute inset-x-0 top-0 h-1 bg-border/60">
+    <div className="w-full shrink-0">
+      <div className="mb-2 flex items-baseline justify-between gap-3 text-xs text-muted-foreground sm:text-sm">
+        <span className="font-medium tabular-nums text-foreground">
+          Step {currentStep} of {totalSteps}
+        </span>
+        <span className="tabular-nums">{displayPercent}% complete</span>
+      </div>
       <div
-      className="h-full bg-primary transition-[width] duration-300 ease-out"
-      style={{ width: `${progressValue}%` }}
-      />
+        className="h-1.5 w-full overflow-hidden rounded-full bg-border/70"
+        role="progressbar"
+        aria-valuenow={displayPercent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Step ${currentStep} of ${totalSteps}, ${displayPercent}% complete`}
+      >
+        <div
+          className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
     </div>
   );
-}
+};

@@ -26,7 +26,7 @@ const OVERLAY_CLASS_NAME = [
 ].join(" ");
 
 const PANEL_CLASS_NAME = [
-  "relative flex min-h-screen w-full flex-col overflow-hidden",
+  "flex min-h-screen w-full flex-col overflow-hidden",
   "bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.2),_transparent_30%),linear-gradient(180deg,_rgba(255,251,235,0.98),_rgba(248,250,252,0.98))]",
   "text-foreground",
 ].join(" ");
@@ -46,11 +46,16 @@ const SUMMARY_GRID_WITH_PANEL_CLASS_NAME = [
   "lg:grid-cols-[minmax(0,1.35fr)_320px]",
 ].join(" ");
 
+const MAIN_COLUMN_CLASS_NAME = "flex w-full max-w-2xl flex-col gap-3 justify-self-center";
+
 const SECTION_WITHOUT_PANEL_CLASS_NAME = [
-  "flex w-full max-w-2xl justify-self-center flex-col rounded-xl",
+  "flex w-full flex-col rounded-xl",
   "border border-border/70 bg-background/90",
   "p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.55)] sm:p-5",
 ].join(" ");
+
+const MAIN_COLUMN_WITH_SUMMARY_CLASS_NAME =
+  "flex w-full min-w-0 flex-col gap-3";
 
 const SECTION_WITH_PANEL_CLASS_NAME = [
   "flex w-full min-h-[22rem] flex-col rounded-xl",
@@ -123,32 +128,7 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
   return (
     <div className={OVERLAY_CLASS_NAME}>
       <div className={PANEL_CLASS_NAME}>
-
-        <ProgressBar stepIndex={stepIndex}/>
-
         <div className={CONTENT_CLASS_NAME}>
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1.5">
-              <p className="text-[0.65rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                Search intake
-              </p>
-              <div className="space-y-0.5">
-                <h2 className="text-lg font-semibold tracking-tight sm:text-xl">
-                  Define the search in a few quick steps
-                </h2>
-              </div>
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full border border-border/70 bg-background/80"
-              onClick={onClose}
-              aria-label="Close search wizard"
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
 
           <div
             className={
@@ -157,47 +137,64 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
                 : SUMMARY_GRID_CLASS_NAME
             }
           >
-            <section
+            <div
               className={
                 showSummaryPanel
-                  ? SECTION_WITH_PANEL_CLASS_NAME
-                  : SECTION_WITHOUT_PANEL_CLASS_NAME
+                  ? MAIN_COLUMN_WITH_SUMMARY_CLASS_NAME
+                  : MAIN_COLUMN_CLASS_NAME
               }
             >
-              <QuestionInput
-                question={currentQuestion}
-                answer={currentAnswer}
+              <ProgressBar
                 stepIndex={stepIndex}
                 totalSteps={WIZARD_QUESTIONS.length}
-                onAnswerChange={(value) => updateAnswer(currentQuestion.id, value)}
-                onMultiSelectToggle={(value) =>
-                  handleToggleMultiSelect(currentQuestion.id, value)
-                }
               />
 
-              <div className="mt-8 flex flex-col gap-3 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                <Button
-                  variant="outline"
-                  size="default"
-                  className="h-9 px-3 text-sm"
-                  onClick={() => setStepIndex((current) => Math.max(0, current - 1))}
-                  disabled={stepIndex === 0}
-                >
-                  <ChevronLeft className="size-4" aria-hidden />
-                  Back
-                </Button>
+              <section
+                className={
+                  showSummaryPanel
+                    ? SECTION_WITH_PANEL_CLASS_NAME
+                    : SECTION_WITHOUT_PANEL_CLASS_NAME
+                }
+              >
+                <QuestionInput
+                  question={currentQuestion}
+                  answer={currentAnswer}
+                  onAnswerChange={(value) =>
+                    updateAnswer(currentQuestion.id, value)
+                  }
+                  onMultiSelectToggle={(value) =>
+                    handleToggleMultiSelect(currentQuestion.id, value)
+                  }
+                />
 
-                <Button
-                  size="default"
-                  className="h-9 px-3 text-sm"
-                  onClick={isLastStep ? onClose : handleNext}
-                  disabled={!canContinue}
-                >
-                  {isLastStep ? "Finish for now" : "Continue"}
-                  {!isLastStep && <ArrowRight className="size-4" aria-hidden />}
-                </Button>
-              </div>
-            </section>
+                <div className="mt-8 flex flex-col gap-3 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                  <Button
+                    variant="outline"
+                    size="default"
+                    className="h-9 px-3 text-sm"
+                    onClick={() =>
+                      setStepIndex((current) => Math.max(0, current - 1))
+                    }
+                    disabled={stepIndex === 0}
+                  >
+                    <ChevronLeft className="size-4" aria-hidden />
+                    Back
+                  </Button>
+
+                  <Button
+                    size="default"
+                    className="h-9 px-3 text-sm"
+                    onClick={isLastStep ? onClose : handleNext}
+                    disabled={!canContinue}
+                  >
+                    {isLastStep ? "Finish for now" : "Continue"}
+                    {!isLastStep && (
+                      <ArrowRight className="size-4" aria-hidden />
+                    )}
+                  </Button>
+                </div>
+              </section>
+            </div>
 
             {showSummaryPanel && <SummaryPanel rows={summaryRows} />}
           </div>

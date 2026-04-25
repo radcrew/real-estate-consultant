@@ -11,8 +11,6 @@ import { TextQuestionInput } from "./text";
 type QuestionInputProps = {
   question: WizardQuestion;
   answer: AnswerValue | undefined;
-  stepIndex: number;
-  totalSteps: number;
   onAnswerChange: (value: AnswerValue) => void;
   onMultiSelectToggle: (value: string) => void;
 };
@@ -20,16 +18,10 @@ type QuestionInputProps = {
 export const QuestionInput = ({
   question,
   answer,
-  stepIndex,
-  totalSteps,
   onAnswerChange,
   onMultiSelectToggle,
 }: QuestionInputProps) => (
-  <QuestionInputShell
-    question={question}
-    stepIndex={stepIndex}
-    totalSteps={totalSteps}
-  >
+  <QuestionInputShell question={question}>
     {question.kind === "text" && (
       <TextQuestionInput
         question={question}
