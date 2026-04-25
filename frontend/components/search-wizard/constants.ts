@@ -1,0 +1,1 @@
+export const ASSUMED_TOTAL_QUESTION_STEPS = 4;

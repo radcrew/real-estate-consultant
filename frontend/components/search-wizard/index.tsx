@@ -1,19 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronLeft, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, ChevronLeft } from "lucide-react";
 
 import { Button } from "@components/ui/button";
+import { getApiErrorMessage } from "@lib/api-errors";
+import {
+  intakeSessionsService,
+  type IntakeSessionQuestion,
+} from "@services/intake-sessions";
 
 import { QuestionInput } from "./question-input";
-import { WIZARD_QUESTIONS } from "./questions";
 import { SummaryPanel } from "./summary-panel";
-import type { AnswerValue, WizardAnswers } from "./types";
+import type { AnswerValue, WizardAnswers, WizardQuestion } from "./types";
 import {
-  buildSummaryRows,
-  createInitialAnswers,
+  getDefaultAnswer,
   isQuestionComplete,
 } from "./utils";
+import { ASSUMED_TOTAL_QUESTION_STEPS } from "./constants";
 import { ProgressBar } from "./progress-bar";
 
 type SearchWizardProps = {
@@ -64,11 +69,17 @@ const SECTION_WITH_PANEL_CLASS_NAME = [
 ].join(" ");
 
 export const SearchWizard = ({ onClose }: SearchWizardProps) => {
+  const router = useRouter();
   const showSummaryPanel = false;
   const [stepIndex, setStepIndex] = useState(0);
-  const [answers, setAnswers] = useState<WizardAnswers>(() =>
-    createInitialAnswers(WIZARD_QUESTIONS),
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<WizardQuestion | null>(
+    null,
   );
+  const [answers, setAnswers] = useState<WizardAnswers>({});
+  const [isLoadingQuestion, setLoadingQuestion] = useState(true);
+  const [isSubmitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -88,15 +99,53 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
     };
   }, [onClose]);
 
-  const currentQuestion = WIZARD_QUESTIONS[stepIndex];
-  const currentAnswer = answers[currentQuestion.id];
-  const isLastStep = stepIndex === WIZARD_QUESTIONS.length - 1;
-  const canContinue = isQuestionComplete(currentQuestion, currentAnswer);
+  useEffect(() => {
+    let isActive = true;
 
-  const summaryRows = useMemo(
-    () => buildSummaryRows(WIZARD_QUESTIONS, answers),
-    [answers],
-  );
+    const startSession = async () => {
+      setLoadingQuestion(true);
+      setErrorMessage(null);
+
+      try {
+        const response = await intakeSessionsService.createSession();
+        const firstQuestion = mapApiQuestionToWizardQuestion(
+          response.first_question,
+        );
+
+        if (!isActive) {
+          return;
+        }
+
+        setSessionId(response.session_id);
+        setCurrentQuestion(firstQuestion);
+        setAnswers({
+          [firstQuestion.id]: getDefaultAnswer(firstQuestion),
+        });
+        setStepIndex(0);
+      } catch (error) {
+        if (!isActive) {
+          return;
+        }
+
+        setErrorMessage(getApiErrorMessage(error));
+      } finally {
+        if (isActive) {
+          setLoadingQuestion(false);
+        }
+      }
+    };
+
+    void startSession();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
+  const canContinue =
+    currentQuestion != null &&
+    isQuestionComplete(currentQuestion, currentAnswer);
 
   const updateAnswer = (questionId: string, value: AnswerValue) => {
     setAnswers((current) => ({
@@ -117,13 +166,55 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
     );
   };
 
-  const handleNext = () => {
-    if (!canContinue || isLastStep) {
+  const handleNext = async () => {
+    if (
+      !currentQuestion ||
+      !sessionId ||
+      !canContinue ||
+      isLoadingQuestion ||
+      isSubmitting
+    ) {
       return;
     }
 
-    setStepIndex((current) => current + 1);
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const answerToSubmit = answers[currentQuestion.id];
+
+      if (answerToSubmit === undefined) {
+        return;
+      }
+
+      const response = await intakeSessionsService.submitAnswer(sessionId, {
+        key: currentQuestion.id,
+        answers: answerToSubmit,
+      });
+
+      if (response.next_question == null) {
+        onClose();
+        router.push("/dashboard");
+        return;
+      }
+
+      const nextQuestion = mapApiQuestionToWizardQuestion(response.next_question);
+
+      setCurrentQuestion(nextQuestion);
+      setAnswers((current) => ({
+        ...current,
+        [nextQuestion.id]:
+          current[nextQuestion.id] ?? getDefaultAnswer(nextQuestion),
+      }));
+      setStepIndex((current) => current + 1);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  const isBusy = isLoadingQuestion || isSubmitting;
 
   return (
     <div className={OVERLAY_CLASS_NAME}>
@@ -146,7 +237,7 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
             >
               <ProgressBar
                 stepIndex={stepIndex}
-                totalSteps={WIZARD_QUESTIONS.length}
+                totalSteps={ASSUMED_TOTAL_QUESTION_STEPS}
               />
 
               <section
@@ -156,26 +247,38 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
                     : SECTION_WITHOUT_PANEL_CLASS_NAME
                 }
               >
-                <QuestionInput
-                  question={currentQuestion}
-                  answer={currentAnswer}
-                  onAnswerChange={(value) =>
-                    updateAnswer(currentQuestion.id, value)
-                  }
-                  onMultiSelectToggle={(value) =>
-                    handleToggleMultiSelect(currentQuestion.id, value)
-                  }
-                />
+                {errorMessage && (
+                  <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                    {errorMessage}
+                  </div>
+                )}
+
+                {currentQuestion ? (
+                  <QuestionInput
+                    question={currentQuestion}
+                    answer={currentAnswer}
+                    onAnswerChange={(value) =>
+                      updateAnswer(currentQuestion.id, value)
+                    }
+                    onMultiSelectToggle={(value) =>
+                      handleToggleMultiSelect(currentQuestion.id, value)
+                    }
+                  />
+                ) : (
+                  <div className="py-10 text-sm text-muted-foreground">
+                    {isLoadingQuestion
+                      ? "Loading your questionnaire..."
+                      : "We couldn't load the questionnaire."}
+                  </div>
+                )}
 
                 <div className="mt-8 flex flex-col gap-3 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between">
                   <Button
                     variant="outline"
                     size="default"
                     className="h-9 px-3 text-sm"
-                    onClick={() =>
-                      setStepIndex((current) => Math.max(0, current - 1))
-                    }
-                    disabled={stepIndex === 0}
+                    onClick={onClose}
+                    disabled={isBusy}
                   >
                     <ChevronLeft className="size-4" aria-hidden />
                     Back
@@ -184,22 +287,44 @@ export const SearchWizard = ({ onClose }: SearchWizardProps) => {
                   <Button
                     size="default"
                     className="h-9 px-3 text-sm"
-                    onClick={isLastStep ? onClose : handleNext}
-                    disabled={!canContinue}
+                    onClick={() => void handleNext()}
+                    disabled={!canContinue || isBusy}
                   >
-                    {isLastStep ? "Finish for now" : "Continue"}
-                    {!isLastStep && (
-                      <ArrowRight className="size-4" aria-hidden />
-                    )}
+                    {isSubmitting ? "Saving..." : "Continue"}
+                    <ArrowRight className="size-4" aria-hidden />
                   </Button>
                 </div>
               </section>
             </div>
 
-            {showSummaryPanel && <SummaryPanel rows={summaryRows} />}
+            {showSummaryPanel && <SummaryPanel rows={[]} />}
           </div>
         </div>
       </div>
     </div>
   );
+};
+
+const mapApiQuestionToWizardQuestion = (
+  question: IntakeSessionQuestion,
+): WizardQuestion => {
+  const normalizedType = question.type.trim().toLowerCase();
+
+  if (normalizedType === "text" || normalizedType === "textarea") {
+    return {
+      id: question.key,
+      kind: "text",
+      title: question.text,
+      description: "",
+      required: true,
+    };
+  }
+
+  return {
+    id: question.key,
+    kind: "text",
+    title: question.text,
+    description: "",
+    required: true,
+  };
 };
