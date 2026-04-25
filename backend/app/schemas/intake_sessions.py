@@ -75,3 +75,41 @@ class UpdateIntakeSessionAnswersResponse(BaseModel):
 
     session: IntakeSession
     next_question: IntakeSessionFirstQuestion | None = None
+
+
+class SubmitLlmIntakeInputRequest(BaseModel):
+    """Request body for ``POST /api/v1/intake-sessions/{session_id}/llm-input``."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    input: str = Field(..., description="User free-text intake prompt.")
+
+
+class LlmExtractedLocation(BaseModel):
+    label: str
+    lat: float | None = None
+    lng: float | None = None
+
+
+class LlmExtractedRange(BaseModel):
+    min: float | None = None
+    max: float | None = None
+
+
+class LlmExtractedIntakePayload(BaseModel):
+    building_type: list[str] | None = None
+    location: LlmExtractedLocation | None = None
+    size_sqft: LlmExtractedRange | None = None
+    rent_range: LlmExtractedRange | None = None
+
+
+class SubmitLlmIntakeInputResponse(BaseModel):
+    """Response body for ``POST /api/v1/intake-sessions/{session_id}/llm-input``."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    extracted: LlmExtractedIntakePayload
+    criteria: dict[str, Any]
+    missing_fields: list[str]
+    next_question: IntakeSessionFirstQuestion | None = None
+    is_complete: bool

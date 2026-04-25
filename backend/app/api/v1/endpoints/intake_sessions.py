@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 from uuid import UUID
 
@@ -32,6 +33,11 @@ from app.schemas.intake_sessions import (
     CreateIntakeSessionResponse,
     CreateIntakeSessionResponseGuided,
     CreateIntakeSessionResponseLlm,
+    LlmExtractedIntakePayload,
+    LlmExtractedLocation,
+    LlmExtractedRange,
+    SubmitLlmIntakeInputRequest,
+    SubmitLlmIntakeInputResponse,
     UpdateIntakeSessionAnswersRequest,
     UpdateIntakeSessionAnswersResponse,
 )
@@ -44,6 +50,57 @@ LLM_INTAKE_OPENING_MESSAGE = (
 )
 
 router = APIRouter(tags=["intake-sessions"])
+
+_KNOWN_LOCATIONS: dict[str, tuple[str, float, float]] = {
+    "dallas": ("Dallas, TX", 32.7767, -96.7970),
+    "chicago": ("Chicago, IL", 41.8781, -87.6298),
+    "los angeles": ("Los Angeles, CA", 34.0522, -118.2437),
+    "new york": ("New York, NY", 40.7128, -74.0060),
+}
+_REQUIRED_LLM_FIELDS: tuple[str, ...] = ("building_type", "location", "radius_miles", "listing_type")
+
+
+def _extract_llm_payload(text: str) -> LlmExtractedIntakePayload:
+    lower = text.lower()
+    building_type: list[str] | None = None
+    if "warehouse" in lower or "industrial" in lower:
+        building_type = ["industrial"]
+    elif "office" in lower:
+        building_type = ["office"]
+    elif "retail" in lower:
+        building_type = ["retail"]
+
+    location: LlmExtractedLocation | None = None
+    for key, (label, lat, lng) in _KNOWN_LOCATIONS.items():
+        if key in lower:
+            location = LlmExtractedLocation(label=label, lat=lat, lng=lng)
+            break
+
+    size_sqft: LlmExtractedRange | None = None
+    size_match = re.search(r"(\d+(?:[.,]\d+)?)\s*(k|m)?\s*(?:sq\s*ft|sqft|sf)\b", lower)
+    if size_match:
+        base = float(size_match.group(1).replace(",", ""))
+        suffix = size_match.group(2)
+        if suffix == "k":
+            base *= 1000
+        elif suffix == "m":
+            base *= 1_000_000
+        size_sqft = LlmExtractedRange(min=max(0.0, base - 500), max=base + 500)
+
+    rent_range: LlmExtractedRange | None = None
+    rent_match = re.search(r"(?:under|below|max(?:imum)?|up to)\s*\$?\s*(\d+(?:[.,]\d+)?)(k)?", lower)
+    if rent_match:
+        amount = float(rent_match.group(1).replace(",", ""))
+        if rent_match.group(2) == "k":
+            amount *= 1000
+        rent_range = LlmExtractedRange(max=amount)
+
+    return LlmExtractedIntakePayload(
+        building_type=building_type,
+        location=location,
+        size_sqft=size_sqft,
+        rent_range=rent_range,
+    )
 
 
 @router.post(
@@ -141,6 +198,43 @@ async def submit_intake_session_answers(
     return UpdateIntakeSessionAnswersResponse(
         session=parse_intake_session(row),
         next_question=next_question,
+    )
+
+
+@router.post(
+    "/intake-sessions/{session_id}/llm-input",
+    response_model=SubmitLlmIntakeInputResponse,
+)
+async def submit_llm_intake_input(
+    session_id: UUID,
+    body: SubmitLlmIntakeInputRequest,
+    client: SupabaseSdkDep,
+) -> SubmitLlmIntakeInputResponse:
+    session_row = await load_intake_session_row(client, session_id)
+    questions = await load_intake_questions(client)
+    extracted = _extract_llm_payload(body.input)
+
+    current_criteria = session_row.get("criteria")
+    merged_criteria = dict(current_criteria) if isinstance(current_criteria, dict) else {}
+    extracted_dict = extracted.model_dump(exclude_none=True)
+    merged_criteria.update(extracted_dict)
+
+    missing_fields = [key for key in _REQUIRED_LLM_FIELDS if key not in merged_criteria]
+
+    next_question = None
+    for q in questions:
+        qkey = q.get("key")
+        if isinstance(qkey, str) and qkey in missing_fields:
+            next_question = map_question_to_model(q)
+            break
+
+    await update_intake_session_after_answers(client, session_id, merged_criteria)
+    return SubmitLlmIntakeInputResponse(
+        extracted=extracted,
+        criteria=merged_criteria,
+        missing_fields=missing_fields,
+        next_question=next_question,
+        is_complete=len(missing_fields) == 0,
     )
 
 
