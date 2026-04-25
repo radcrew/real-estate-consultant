@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.models.intake_sessions import IntakeSession
@@ -29,9 +30,19 @@ from app.repositories.search_profiles import (
 )
 from app.schemas.intake_sessions import (
     CreateIntakeSessionResponse,
+    CreateIntakeSessionResponseGuided,
+    CreateIntakeSessionResponseLlm,
     UpdateIntakeSessionAnswersRequest,
     UpdateIntakeSessionAnswersResponse,
 )
+
+LLM_INTAKE_OPENING_MESSAGE = (
+    "Hi! I'm here to help you find the right commercial property. "
+    "Tell me what you're looking for — be as detailed or brief as you want. "
+    'For example: "I need a 100k sqft industrial warehouse with 32ft clear '
+    'height in Chicago for lease, with at least 20 dock doors."'
+)
+
 router = APIRouter(tags=["intake-sessions"])
 
 
@@ -42,14 +53,14 @@ router = APIRouter(tags=["intake-sessions"])
 )
 async def create_intake_session(
     client: SupabaseSdkDep,
+    mode: Literal["llm", "guided"] = Query(
+        "guided",
+        description='Intake style: "guided" uses the questionnaire; "llm" returns an open prompt.',
+    ),
 ) -> CreateIntakeSessionResponse:
-    """Create an intake session and return first question."""
-    
+    """Create an intake session. Guided mode returns the first question; LLM mode returns a welcome message."""
     created_session = await create_intake_session_row(client)
-    
     validated_session = parse_intake_session(created_session)
-    
-    first_question = await load_first_intake_question(client)
 
     if validated_session.id is None:
         raise HTTPException(
@@ -57,7 +68,17 @@ async def create_intake_session(
             detail="Unexpected response from Supabase when creating intake session.",
         )
 
-    return CreateIntakeSessionResponse(
+    if mode == "llm":
+        return CreateIntakeSessionResponseLlm(
+            mode="llm",
+            session_id=validated_session.id,
+            status=validated_session.status,
+            message=LLM_INTAKE_OPENING_MESSAGE,
+        )
+
+    first_question = await load_first_intake_question(client)
+    return CreateIntakeSessionResponseGuided(
+        mode="guided",
         session_id=validated_session.id,
         status=validated_session.status,
         first_question=first_question,

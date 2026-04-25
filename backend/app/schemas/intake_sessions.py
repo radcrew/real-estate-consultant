@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,14 +18,31 @@ class IntakeSessionFirstQuestion(BaseModel):
     type: str
 
 
-class CreateIntakeSessionResponse(BaseModel):
-    """Response body for ``POST /api/v1/intake-sessions``."""
+class CreateIntakeSessionResponseGuided(BaseModel):
+    """Guided flow: first questionnaire step is returned."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    mode: Literal["guided"] = "guided"
     session_id: UUID
     status: str
     first_question: IntakeSessionFirstQuestion
+
+
+class CreateIntakeSessionResponseLlm(BaseModel):
+    """LLM flow: client receives an open-ended prompt; session is still created for follow-up APIs."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    mode: Literal["llm"] = "llm"
+    session_id: UUID
+    status: str
+    message: str
+
+
+CreateIntakeSessionResponse = (
+    CreateIntakeSessionResponseGuided | CreateIntakeSessionResponseLlm
+)
 
 
 class PatchIntakeSessionStatusRequest(BaseModel):
