@@ -103,7 +103,7 @@ If seeding fails after [Dataset preparation](#dataset-preparation) and [Seeding]
 
 - Run the command from **`backend/`** so `app` imports resolve (same as the server).
 - **`SUPABASE_URL`** and **`SUPABASE_SERVICE_ROLE_KEY`** must be valid; connection problems are logged with an `httpx` explanation.
-- Apply the SQL migrations under `supabase/migrations/` so **`public.properties`** exists with the columns in `app/models/properties.py`. If you had an older `source_property_id` column, run **`20260418120000_properties_drop_source_property_id.sql`** then **`NOTIFY pgrst, 'reload schema';`** ([docs](https://supabase.com/docs/guides/troubleshooting/refresh-postgrest-schema)). PostgREST **`PGRST204`** usually means the schema cache is stale after DDL—run the same `NOTIFY`, then retry **`python -m app.seed.main`**.
+- Ensure **`public.properties`** (and any related tables your seed uses) exist and match the columns expected in `app/models/properties.py` and the seed code. Apply schema in the Supabase SQL editor or whatever migration workflow your team uses. After DDL, run **`NOTIFY pgrst, 'reload schema';`** if PostgREST still serves a stale schema ([docs](https://supabase.com/docs/guides/troubleshooting/refresh-postgrest-schema)). PostgREST **`PGRST204`** usually means the schema cache is stale after DDL—run the same `NOTIFY`, then retry **`python -m app.seed.main`**.
 - Property rows use **upsert** on **`id`**; images for those ids are deleted then re-inserted. For a full reset in dev, truncate or delete rows as needed, then run **`python -m app.seed.main`** again.
 
 ## Linting

@@ -1,3 +1,4 @@
+import httpx
 from fastapi import APIRouter, HTTPException, status
 from supabase import AuthApiError, AuthInvalidCredentialsError
 
@@ -38,6 +39,11 @@ async def sign_in(body: SignInRequest, client: SupabaseSdkDep) -> SignInResponse
         raise HTTPException(
             status_code=exc.status if 400 <= exc.status < 600 else status.HTTP_400_BAD_REQUEST,
             detail=exc.message,
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is temporarily unavailable. Please try again.",
         ) from exc
 
     session = result.session
