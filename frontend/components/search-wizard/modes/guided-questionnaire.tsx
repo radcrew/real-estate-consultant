@@ -4,11 +4,11 @@ import { ArrowRight, ChevronLeft } from "lucide-react";
 
 import { Button } from "@components/ui/button";
 
-import { ASSUMED_TOTAL_QUESTION_STEPS } from "./constants";
-import { ProgressBar } from "./progress-bar";
-import { QuestionInput } from "./question-input";
-import { useSearchWizard } from "./context/search-wizard";
-import { SummaryPanel } from "./summary-panel";
+import { ASSUMED_TOTAL_QUESTION_STEPS } from "../constants";
+import { ProgressBar } from "../progress-bar";
+import { QuestionInput } from "../question-input";
+import { useSearchWizard } from "../context/search-wizard";
+import { SummaryPanel } from "../summary-panel";
 
 const SUMMARY_GRID_CLASS_NAME = [
   "mt-5 grid flex-1 gap-4",

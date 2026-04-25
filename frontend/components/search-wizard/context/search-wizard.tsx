@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { getApiErrorMessage } from "@lib/api-errors";
 import { intakeSessionsService } from "@services/intake-sessions";
 
-import { mapApiQuestionToWizardQuestion } from "../map-api-question";
+import { mapApiQuestionToWizardQuestion } from "../utils";
 import type { AnswerValue, WizardAnswers, WizardQuestion } from "../types";
 import { getDefaultAnswer, isQuestionComplete } from "../utils";
 

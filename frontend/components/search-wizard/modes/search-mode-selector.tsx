@@ -12,7 +12,7 @@ import {
 import { Button } from "@components/ui/button";
 
 import { GuidedQuestionnaire } from "./guided-questionnaire";
-import { useSearchWizard } from "./context/search-wizard";
+import { useSearchWizard } from "../context/search-wizard";
 import { SmartChat } from "./smart-chat";
 
 const CHOOSER_WRAPPER_CLASS_NAME =

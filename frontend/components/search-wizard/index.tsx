@@ -1,7 +1,7 @@
 "use client";
 
 import { SearchWizardProvider } from "./context/search-wizard";
-import { SearchModeSelector } from "./search-mode-selector";
+import { SearchModeSelector } from "./modes/search-mode-selector";
 
 type SearchWizardProps = {
   onClose: () => void;
