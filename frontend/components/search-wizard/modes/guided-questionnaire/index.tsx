@@ -30,6 +30,12 @@ export const GuidedQuestionnaire = () => {
   } = useSearchWizard();
   const isLastStep = stepIndex >= totalSteps - 1;
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter") {
+      goNext();
+    }
+  };
+
   return (
     <div className={styles.summaryGrid}>
       <div className={styles.progressRow}>
@@ -37,7 +43,10 @@ export const GuidedQuestionnaire = () => {
       </div>
 
       <div className={styles.mainColumn}>
-        <section className={styles.section}>
+        <section
+          className={styles.section}
+          onKeyDown={handleKeyDown}
+        >
           {errorMessage && (
             <div className={styles.errorBanner}>{errorMessage}</div>
           )}

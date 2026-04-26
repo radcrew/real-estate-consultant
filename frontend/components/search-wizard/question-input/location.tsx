@@ -37,6 +37,7 @@ export const LocationQuestionInput = ({
       <Input
         id={question.id}
         value={query}
+        autoFocus
         onChange={(event) => {
           handleQueryChange(event.target.value);
         }}

@@ -6,6 +6,7 @@ type NumberFieldProps = {
   label: string;
   value: number | null;
   onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  autoFocus?: boolean;
 };
 
 export const NumberField = ({
@@ -13,6 +14,7 @@ export const NumberField = ({
   label,
   value,
   onChange,
+  autoFocus = false,
 }: NumberFieldProps) => (
   <div className="space-y-1.5">
     <label htmlFor={id} className="text-sm font-medium">
@@ -24,6 +26,7 @@ export const NumberField = ({
       inputMode="numeric"
       value={value ?? ""}
       onChange={onChange}
+      autoFocus={autoFocus}
       className="h-9 border-border/80 bg-background px-3 text-sm"
     />
   </div>

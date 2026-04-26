@@ -34,6 +34,7 @@ export const RangeQuestionInput = ({
         label={`Min ${question.unit ?? ""}`}
         value={answer.min}
         onChange={handleChange("min")}
+        autoFocus
       />
       <NumberField
         id={`${question.id}-max`}
