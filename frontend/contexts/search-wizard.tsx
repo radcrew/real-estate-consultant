@@ -31,13 +31,14 @@ type SearchWizardContextValue = {
   currentAnswer: AnswerValue | undefined;
   currentQuestion: WizardQuestion | null;
   errorMessage: string | null;
-  goToNextQuestion: () => Promise<void>;
+  goNext: () => Promise<void>;
   isBusy: boolean;
   isGuidedFormOpen: boolean;
   isLoadingQuestion: boolean;
   isSmartChatOpen: boolean;
   isSubmitting: boolean;
   onClose: () => void;
+  goPrev: () => void;
   resetToChooser: () => void;
   setErrorMessage: (value: string | null) => void;
   showSmartChat: () => void;
@@ -68,6 +69,7 @@ export const SearchWizardProvider = ({
   const [currentQuestion, setCurrentQuestion] = useState<WizardQuestion | null>(
     null,
   );
+  const [questionHistory, setQuestionHistory] = useState<WizardQuestion[]>([]);
   const [summaryRows, setSummaryRows] = useState<SummaryRow[]>([]);
   const [answers, setAnswers] = useState<WizardAnswers>({});
   const [isLoadingQuestion, setLoadingQuestion] = useState(false);
@@ -81,6 +83,7 @@ export const SearchWizardProvider = ({
   const resetQuestionnaireState = () => {
     setSessionId(null);
     setCurrentQuestion(null);
+    setQuestionHistory([]);
     setSummaryRows([]);
     setAnswers({});
     setStepIndex(0);
@@ -113,6 +116,7 @@ export const SearchWizardProvider = ({
       setSessionId(response.session_id);
       setTotalSteps(Math.max(response.total_questions, 1));
       setCurrentQuestion(firstQuestion);
+      setQuestionHistory([firstQuestion]);
       setAnswers({
         [firstQuestion.id]: getDefaultAnswer(firstQuestion),
       });
@@ -129,6 +133,29 @@ export const SearchWizardProvider = ({
     setErrorMessage(null);
     setSmartChatOpen(true);
     setGuidedFormOpen(false);
+  };
+
+  const goPrev = () => {
+    if (isLoadingQuestion || isSubmitting) {
+      return;
+    }
+
+    if (stepIndex <= 0) {
+      resetToChooser();
+      return;
+    }
+
+    const previousIndex = stepIndex - 1;
+    const previousQuestion = questionHistory[previousIndex];
+
+    if (!previousQuestion) {
+      resetToChooser();
+      return;
+    }
+
+    setCurrentQuestion(previousQuestion);
+    setStepIndex(previousIndex);
+    setSummaryRows((current) => current.slice(0, -1));
   };
 
   const updateCurrentAnswer = (value: AnswerValue) => {
@@ -158,7 +185,7 @@ export const SearchWizardProvider = ({
     }));
   };
 
-  const goToNextQuestion = async () => {
+  const goNext = async () => {
     if (
       !currentQuestion ||
       !sessionId ||
@@ -194,6 +221,8 @@ export const SearchWizardProvider = ({
       ]);
 
       if (response.next_question == null) {
+        setStepIndex(totalSteps);
+        await new Promise((resolve) => setTimeout(resolve, 550));
         onClose();
         router.push("/");
         return;
@@ -202,6 +231,10 @@ export const SearchWizardProvider = ({
       const nextQuestion = parseApiQuestion(response.next_question);
 
       setCurrentQuestion(nextQuestion);
+      setQuestionHistory((current) => [
+        ...current.slice(0, stepIndex + 1),
+        nextQuestion,
+      ]);
       setAnswers((current) => ({
         ...current,
         [nextQuestion.id]: current[nextQuestion.id] ?? getDefaultAnswer(nextQuestion),
@@ -219,13 +252,14 @@ export const SearchWizardProvider = ({
     currentAnswer,
     currentQuestion,
     errorMessage,
-    goToNextQuestion,
+    goNext,
     isBusy,
     isGuidedFormOpen,
     isLoadingQuestion,
     isSmartChatOpen,
     isSubmitting,
     onClose,
+    goPrev,
     resetToChooser,
     setErrorMessage,
     showSmartChat,

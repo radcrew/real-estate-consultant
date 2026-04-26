@@ -17,17 +17,18 @@ export const GuidedQuestionnaire = () => {
     currentAnswer,
     currentQuestion,
     errorMessage,
-    goToNextQuestion,
+    goNext,
+    goPrev,
     isBusy,
     isLoadingQuestion,
     isSubmitting,
-    resetToChooser,
     summaryRows,
     stepIndex,
     totalSteps,
     toggleCurrentMultiSelect,
     updateCurrentAnswer,
   } = useSearchWizard();
+  const isLastStep = stepIndex >= totalSteps - 1;
 
   return (
     <div className={styles.summaryGrid}>
@@ -61,7 +62,7 @@ export const GuidedQuestionnaire = () => {
               variant="outline"
               size="default"
               className={styles.buttonDefault}
-              onClick={resetToChooser}
+              onClick={goPrev}
               disabled={isBusy}
             >
               <ChevronLeft className="size-4" aria-hidden />
@@ -71,10 +72,16 @@ export const GuidedQuestionnaire = () => {
             <Button
               size="default"
               className={styles.buttonDefault}
-              onClick={() => void goToNextQuestion()}
+              onClick={goNext}
               disabled={!canContinue || isBusy}
             >
-              {isSubmitting ? "Saving..." : "Continue"}
+              {isSubmitting
+                ? isLastStep
+                  ? "Searching..."
+                  : "Saving..."
+                : isLastStep
+                  ? "Search"
+                  : "Continue"}
               <ArrowRight className="size-4" aria-hidden />
             </Button>
           </div>

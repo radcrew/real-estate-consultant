@@ -35,7 +35,7 @@ export const styles = {
     "text-base font-medium text-white shadow-none hover:from-violet-600 hover:to-indigo-500",
   ].join(" "),
   chooserBackLink: [
-    "mt-10 inline-flex items-center gap-2 text-sm font-medium text-slate-900",
+    "mt-10 inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-slate-900",
     "transition-colors hover:text-slate-600",
   ].join(" "),
 } as const;
