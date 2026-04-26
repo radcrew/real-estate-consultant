@@ -41,8 +41,8 @@ type SearchWizardContextValue = {
   goPrev: () => void;
   resetToChooser: () => void;
   setErrorMessage: (value: string | null) => void;
-  showSmartChat: () => void;
   startGuidedForm: () => Promise<void>;
+  startSmartChat: () => Promise<void>;
   stepIndex: number;
   summaryRows: SummaryRow[];
   totalSteps: number;
@@ -114,7 +114,7 @@ export const SearchWizardProvider = ({
       const firstQuestion = parseQuestion(response.first_question);
 
       setSessionId(response.session_id);
-      setTotalSteps(Math.max(response.total_questions, 1));
+      setTotalSteps(Math.max(response.total_questions ?? 1, 1));
       setCurrentQuestion(firstQuestion);
       setQuestionHistory([firstQuestion]);
       setAnswers({
@@ -129,10 +129,25 @@ export const SearchWizardProvider = ({
     }
   };
 
-  const showSmartChat = () => {
-    setErrorMessage(null);
-    setSmartChatOpen(true);
+  const startSmartChat = async () => {
+    if (isLoadingQuestion || isSubmitting) {
+      return;
+    }
+
     setGuidedFormOpen(false);
+    setSmartChatOpen(true);
+    setLoadingQuestion(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await intakeSessionsService.createSession();
+      setSessionId(response.session_id);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error));
+      setSmartChatOpen(false);
+    } finally {
+      setLoadingQuestion(false);
+    }
   };
 
   const goPrev = () => {
@@ -263,8 +278,8 @@ export const SearchWizardProvider = ({
     goPrev,
     resetToChooser,
     setErrorMessage,
-    showSmartChat,
     startGuidedForm,
+    startSmartChat,
     stepIndex,
     summaryRows,
     totalSteps,
