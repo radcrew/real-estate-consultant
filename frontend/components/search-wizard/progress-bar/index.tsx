@@ -8,8 +8,9 @@ type ProgressBarProps = {
 export const ProgressBar = ({ stepIndex, totalSteps }: ProgressBarProps) => {
   const safeTotalSteps = Math.max(totalSteps, 1);
   const currentStep = Math.min(stepIndex + 1, safeTotalSteps);
+  const completedSteps = Math.min(Math.max(stepIndex, 0), safeTotalSteps);
   const progressPercent =
-    safeTotalSteps > 0 ? (currentStep / safeTotalSteps) * 100 : 0;
+    safeTotalSteps > 0 ? (completedSteps / safeTotalSteps) * 100 : 0;
   const displayPercent = Math.round(progressPercent);
 
   return (

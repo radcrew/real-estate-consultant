@@ -28,7 +28,7 @@ export const RangeQuestionInput = ({
     };
 
   return (
-    <div className="grid max-w-xl gap-3 sm:grid-cols-2">
+    <div className="grid w-full gap-3 sm:grid-cols-2">
       <NumberField
         id={`${question.id}-min`}
         label={`Min ${question.unit ?? ""}`}
