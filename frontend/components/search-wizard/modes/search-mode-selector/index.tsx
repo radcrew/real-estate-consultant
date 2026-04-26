@@ -24,7 +24,7 @@ export const SearchModeSelector = () => {
     isGuidedFormOpen,
     isSmartChatOpen,
     onClose,
-    showSmartChat,
+    startSmartChat,
     startGuidedForm,
   } = useSearchWizard();
 
@@ -105,7 +105,7 @@ export const SearchModeSelector = () => {
 
           <Button
             className={styles.choiceAiCta}
-            onClick={showSmartChat}
+            onClick={startSmartChat}
             disabled={isBusy}
           >
             Use AI Chat

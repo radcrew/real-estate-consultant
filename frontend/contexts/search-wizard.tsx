@@ -48,6 +48,7 @@ type SearchWizardContextValue = {
   totalSteps: number;
   updateCurrentAnswer: (value: AnswerValue) => void;
   toggleCurrentMultiSelect: (value: string) => void;
+  sessionId: string | null;
 };
 
 const SearchWizardContext = createContext<SearchWizardContextValue | null>(null);
@@ -285,6 +286,7 @@ export const SearchWizardProvider = ({
     totalSteps,
     updateCurrentAnswer,
     toggleCurrentMultiSelect,
+    sessionId,
   };
 
   return (

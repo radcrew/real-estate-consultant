@@ -19,6 +19,8 @@ export const styles = {
     "max-w-[min(100%,34rem)] rounded-2xl rounded-tl-md border border-border/60 bg-muted/40 px-3.5 py-2.5 text-sm leading-relaxed text-foreground",
   bubbleUser:
     "max-w-[min(100%,34rem)] rounded-2xl rounded-tr-md bg-amber-400 px-3.5 py-2.5 text-sm font-medium leading-relaxed text-amber-950",
+  typingBubble:
+    "flex items-center gap-2 rounded-2xl rounded-tl-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground",
   composer: "border-t border-border/60 p-3 sm:p-4",
   composerInner: "flex gap-2 sm:gap-3",
   textarea: [
