@@ -11,12 +11,6 @@ export type IntakeSessionQuestion = {
     value: string;
     hint?: string;
   }>;
-  min?: number;
-  max?: number;
-  step?: number;
-  unit?: string;
-  min_label?: string;
-  max_label?: string;
 };
 
 export type CreateIntakeSessionResponse = {

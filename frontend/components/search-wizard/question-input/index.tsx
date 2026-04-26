@@ -7,6 +7,7 @@ import { QuestionInputShell } from "./shell";
 import { RangeQuestionInput } from "./range";
 import { SingleSelectQuestionInput } from "./single-select";
 import { TextQuestionInput } from "./text";
+import { LocationQuestionInput } from "./location";
 
 type QuestionInputProps = {
   question: WizardQuestion;
@@ -48,6 +49,14 @@ export const QuestionInput = ({
 
     {question.kind === "range" && (
       <RangeQuestionInput
+        question={question}
+        answer={answer}
+        onChange={onAnswerChange}
+      />
+    )}
+
+    {question.kind === "location" && (
+      <LocationQuestionInput
         question={question}
         answer={answer}
         onChange={onAnswerChange}

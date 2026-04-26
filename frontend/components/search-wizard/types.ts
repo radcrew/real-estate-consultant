@@ -1,6 +1,7 @@
 export type QuestionOption = {
   label: string;
   value: string;
+  hint?: string;
 };
 
 type BaseQuestion<TKind extends string> = {
@@ -22,6 +23,8 @@ export type MultiSelectQuestion = SelectQuestion<"multi-select">;
 
 export type TextQuestion = BaseQuestion<"text">;
 
+export type LocationQuestion = BaseQuestion<"location">;
+
 export type RangeQuestion = BaseQuestion<"range"> & {
   unit?: string;
 };
@@ -30,6 +33,7 @@ export type WizardQuestion =
   | SingleSelectQuestion
   | MultiSelectQuestion
   | TextQuestion
+  | LocationQuestion
   | RangeQuestion;
 
 export type RangeAnswerValue = {
@@ -45,11 +49,4 @@ export type SummaryRow = {
   id: string;
   label: string;
   value: string;
-};
-
-export type ApiQuestionSchema = {
-  key: string;
-  text: string;
-  type: string;
-  options?: QuestionOption[];
 };

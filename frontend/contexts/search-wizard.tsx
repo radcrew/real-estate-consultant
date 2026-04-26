@@ -23,7 +23,7 @@ import {
   formatAnswerForSummary,
   getDefaultAnswer,
   isQuestionComplete,
-  parseApiQuestion,
+  parseQuestion,
 } from "../components/search-wizard/utils";
 
 type SearchWizardContextValue = {
@@ -111,7 +111,7 @@ export const SearchWizardProvider = ({
 
     try {
       const response = await intakeSessionsService.createSession();
-      const firstQuestion = parseApiQuestion(response.first_question);
+      const firstQuestion = parseQuestion(response.first_question);
 
       setSessionId(response.session_id);
       setTotalSteps(Math.max(response.total_questions, 1));
@@ -228,7 +228,7 @@ export const SearchWizardProvider = ({
         return;
       }
 
-      const nextQuestion = parseApiQuestion(response.next_question);
+      const nextQuestion = parseQuestion(response.next_question);
 
       setCurrentQuestion(nextQuestion);
       setQuestionHistory((current) => [

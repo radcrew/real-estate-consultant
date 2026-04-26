@@ -1,45 +1,29 @@
-import type {
-  ApiQuestionSchema,
-  AnswerValue,
-  RangeAnswerValue,
-  WizardAnswers,
-  WizardQuestion,
-} from "./types";
+import type { IntakeSessionQuestion } from "@services/intake-sessions";
 
-const normalizeQuestionType = (questionType: string) =>
-  questionType.trim().toLowerCase();
+import type { AnswerValue, RangeAnswerValue, WizardAnswers, WizardQuestion } from "./types";
 
-export const parseApiQuestion = (question: ApiQuestionSchema): WizardQuestion => {
-  const normalizedType = normalizeQuestionType(question.type);
-
-  if (normalizedType === "multi_select" || normalizedType === "multi-select") {
-    return {
-      id: question.key,
-      kind: "multi-select",
-      title: question.key,
-      description: question.text,
-      required: true,
-      options: question.options ?? [],
-    };
-  }
-
-  if (normalizedType === "range") {
-    return {
-      id: question.key,
-      kind: "range",
-      title: question.key,
-      description: question.text,
-      required: true,
-    };
-  }
-
-  return {
+export const parseQuestion = (question: IntakeSessionQuestion): WizardQuestion => {
+  const baseQuestion = {
     id: question.key,
-    kind: "text",
     title: question.key,
     description: question.text,
     required: true,
   };
+
+  switch (question.type) {
+    case "multi-select":
+      return {
+        ...baseQuestion,
+        kind: "multi-select",
+        options: question.options ?? [],
+      };
+    case "range":
+      return { ...baseQuestion, kind: "range" };
+    case "location":
+      return { ...baseQuestion, kind: "location" };
+    default:
+      return { ...baseQuestion, kind: "text" };
+  }
 };
 
 export const formatRangeValue = (value: number, unit?: string) => {
@@ -81,6 +65,29 @@ export const formatAnswerForSummary = (
       return `${formatRangeValue(answer.min, question.unit)} - ${formatRangeValue(answer.max, question.unit)}`;
     }
     return "Not answered";
+  }
+
+  if (question.kind === "location") {
+    if (
+      typeof answer === "object" &&
+      answer != null &&
+      !Array.isArray(answer)
+    ) {
+      const parts = [answer.city, answer.state, answer.country].filter(Boolean);
+      if (parts.length > 0) {
+        return parts.join(", ");
+      }
+      if (typeof answer.label === "string" && answer.label.trim().length > 0) {
+        return answer.label;
+      }
+      if (typeof answer.input === "string" && answer.input.trim().length > 0) {
+        return answer.input;
+      }
+    }
+
+    return typeof answer === "string" && answer.trim().length > 0
+      ? answer
+      : "Not answered";
   }
 
   return typeof answer === "string" && answer.trim().length > 0
@@ -129,6 +136,20 @@ export const isQuestionComplete = (
       typeof rangeAnswer.max === "number" &&
       rangeAnswer.min <= rangeAnswer.max
     );
+  }
+
+  if (question.kind === "location") {
+    if (typeof answer === "string") {
+      return answer.trim().length > 0;
+    }
+    if (typeof answer === "object" && answer != null && !Array.isArray(answer)) {
+      return (
+        typeof answer.label === "string" ||
+        typeof answer.input === "string" ||
+        typeof answer.city === "string"
+      );
+    }
+    return false;
   }
 
   return typeof answer === "string" && answer.trim().length > 0;
