@@ -1,15 +1,20 @@
 "use client";
 
+import { useState } from "react";
+
+import type { LlmInputResponse } from "@services/intake-sessions";
+
 import { ChatPanel } from "./chat-panel";
-import { SmartChatProvider } from "@contexts/smart-chat";
 import { SidePanel } from "./side-panel";
 import { styles } from "./styles";
 
-export const SmartChat = () => (
-  <SmartChatProvider>
+export const SmartChat = () => {
+  const [lastResponse, setLastResponse] = useState<LlmInputResponse | null>(null);
+
+  return (
     <div className={styles.layout}>
-      <ChatPanel />
-      <SidePanel />
+      <ChatPanel onLlmSuccess={setLastResponse} />
+      <SidePanel lastResponse={lastResponse} />
     </div>
-  </SmartChatProvider>
-);
+  );
+};

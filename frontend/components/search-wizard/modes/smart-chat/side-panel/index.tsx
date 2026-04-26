@@ -1,20 +1,58 @@
 "use client";
 
+import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, SlidersHorizontal, Wand2 } from "lucide-react";
 
-import { useSmartChat } from "@contexts/smart-chat";
+import { useSearchWizard } from "@contexts/search-wizard";
+import { useIntakeSessions } from "@hooks/use-intake-sessions";
+import { getApiErrorMessage } from "@lib/api-errors";
+import type { LlmInputResponse } from "@services/intake-sessions";
+
+import { buildExtractedRows } from "./utils";
 import { styles } from "../styles";
 
-export const SidePanel = () => {
-  const {
-    extractedRows,
-    handleSearchProperties,
+type SidePanelProps = {
+  lastResponse: LlmInputResponse | null;
+};
+
+export const SidePanel = ({ lastResponse }: SidePanelProps) => {
+  const router = useRouter();
+  const { completeSession } = useIntakeSessions();
+  const { sessionId, setErrorMessage, resetToChooser, onClose } = useSearchWizard();
+  const [isSearchBusy, setIsSearchBusy] = useState(false);
+
+  const extractedRows = useMemo(
+    () => buildExtractedRows(lastResponse?.extracted ?? null),
+    [lastResponse],
+  );
+  const isComplete = lastResponse?.is_complete ?? false;
+  const missingFields = lastResponse?.missing_fields ?? [];
+
+  const handleSearchProperties = useCallback(async () => {
+    if (!sessionId || !isComplete || isSearchBusy) {
+      return;
+    }
+    setIsSearchBusy(true);
+    setErrorMessage(null);
+    try {
+      await completeSession(sessionId);
+      onClose();
+      router.push("/");
+    } catch (err) {
+      setErrorMessage(getApiErrorMessage(err));
+    } finally {
+      setIsSearchBusy(false);
+    }
+  }, [
+    completeSession,
     isComplete,
     isSearchBusy,
-    missingFields,
-    resetToChooser,
+    onClose,
+    router,
     sessionId,
-  } = useSmartChat();
+    setErrorMessage,
+  ]);
 
   return (
     <aside className={styles.sidebar}>

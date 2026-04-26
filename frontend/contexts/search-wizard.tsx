@@ -8,10 +8,8 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
+import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@lib/api-errors";
-import {
-  intakeSessionsService,
-} from "@services/intake-sessions";
 
 import type {
   AnswerValue,
@@ -62,6 +60,7 @@ export const SearchWizardProvider = ({
   onClose,
 }: SearchWizardProviderProps) => {
   const router = useRouter();
+  const { createSession, submitAnswer, completeSession } = useIntakeSessions();
   const [isGuidedFormOpen, setGuidedFormOpen] = useState(false);
   const [isSmartChatOpen, setSmartChatOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
@@ -111,7 +110,7 @@ export const SearchWizardProvider = ({
     setErrorMessage(null);
 
     try {
-      const response = await intakeSessionsService.createSession();
+      const response = await createSession();
       const firstQuestion = parseQuestion(response.first_question);
 
       setSessionId(response.session_id);
@@ -141,7 +140,7 @@ export const SearchWizardProvider = ({
     setErrorMessage(null);
 
     try {
-      const response = await intakeSessionsService.createSession();
+      const response = await createSession();
       setSessionId(response.session_id);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
@@ -222,7 +221,7 @@ export const SearchWizardProvider = ({
         return;
       }
 
-      const response = await intakeSessionsService.submitAnswer(sessionId, {
+      const response = await submitAnswer(sessionId, {
         key: currentQuestion.id,
         answers: answerToSubmit,
       });
@@ -237,7 +236,7 @@ export const SearchWizardProvider = ({
       ]);
 
       if (response.next_question == null) {
-        await intakeSessionsService.completeSession(sessionId);
+        await completeSession(sessionId);
         setStepIndex(totalSteps);
         await new Promise((resolve) => setTimeout(resolve, 550));
         onClose();
