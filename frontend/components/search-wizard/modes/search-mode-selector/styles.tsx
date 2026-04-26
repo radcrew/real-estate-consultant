@@ -1,10 +1,6 @@
 export const styles = {
   chooserWrapper:
     "mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center py-10",
-  chooserBadge: [
-    "inline-flex items-center justify-center rounded-md border border-border/70",
-    "bg-background px-3 py-1 text-xs font-semibold text-foreground shadow-sm",
-  ].join(" "),
   chooserGrid: "mt-8 grid w-full gap-4 md:grid-cols-2",
   choiceCard: [
     "relative flex min-h-[19.75rem] flex-col rounded-xl border border-slate-200",

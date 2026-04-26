@@ -38,8 +38,6 @@ export const SearchModeSelector = () => {
 
   return (
     <div className={styles.chooserWrapper}>
-      <div className={styles.chooserBadge}>Step 1 of 2</div>
-
       <div className={styles.chooserIntro}>
         <h2 className={styles.chooserHeading}>
           How would you like to search?
