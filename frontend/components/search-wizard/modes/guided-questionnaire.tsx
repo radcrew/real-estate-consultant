@@ -6,7 +6,7 @@ import { Button } from "@components/ui/button";
 
 import { ProgressBar } from "../progress-bar";
 import { QuestionInput } from "../question-input";
-import { useSearchWizard } from "../context/search-wizard";
+import { useSearchWizard } from "../../../contexts/search-wizard";
 import { SummaryPanel } from "../summary-panel";
 
 const SUMMARY_GRID_CLASS_NAME = [

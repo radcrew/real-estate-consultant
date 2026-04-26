@@ -28,7 +28,13 @@ export type CreateIntakeSessionResponse = {
 
 export type SubmitIntakeSessionAnswerBody = {
   key: string;
-  answers: string | string[] | number;
+  answers:
+    | string
+    | string[]
+    | {
+        min: number | null;
+        max: number | null;
+      };
 };
 
 export type SubmitIntakeSessionAnswerResponse = {

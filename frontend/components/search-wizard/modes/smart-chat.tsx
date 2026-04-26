@@ -3,7 +3,7 @@
 import { ChevronLeft, Sparkles } from "lucide-react";
 
 import { Button } from "@components/ui/button";
-import { useSearchWizard } from "../context/search-wizard";
+import { useSearchWizard } from "../../../contexts/search-wizard";
 
 const WRAPPER_CLASS_NAME =
   "mx-auto mt-5 flex w-full max-w-2xl flex-1 flex-col justify-center";

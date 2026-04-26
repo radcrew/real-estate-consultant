@@ -1,6 +1,6 @@
 "use client";
 
-import { SearchWizardProvider } from "./context/search-wizard";
+import { SearchWizardProvider } from "../../contexts/search-wizard";
 import { SearchModeSelector } from "./modes/search-mode-selector";
 
 type SearchWizardProps = {

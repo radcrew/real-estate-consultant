@@ -9,11 +9,12 @@ import {
 import { useRouter } from "next/navigation";
 
 import { getApiErrorMessage } from "@lib/api-errors";
-import { intakeSessionsService } from "@services/intake-sessions";
+import {
+  intakeSessionsService,
+} from "@services/intake-sessions";
 
-import { mapApiQuestionToWizardQuestion } from "../utils";
-import type { AnswerValue, WizardAnswers, WizardQuestion } from "../types";
-import { getDefaultAnswer, isQuestionComplete } from "../utils";
+import type { AnswerValue, WizardAnswers, WizardQuestion } from "../components/search-wizard/types";
+import { getDefaultAnswer, isQuestionComplete, parseApiQuestion } from "../components/search-wizard/utils";
 
 type SearchWizardContextValue = {
   canContinue: boolean;
@@ -32,6 +33,7 @@ type SearchWizardContextValue = {
   showSmartChat: () => void;
   startGuidedForm: () => Promise<void>;
   stepIndex: number;
+  totalSteps: number;
   updateCurrentAnswer: (value: AnswerValue) => void;
   toggleCurrentMultiSelect: (value: string) => void;
 };
@@ -50,6 +52,7 @@ export const SearchWizardProvider = ({
   const [isGuidedFormOpen, setGuidedFormOpen] = useState(false);
   const [isSmartChatOpen, setSmartChatOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
+  const [totalSteps, setTotalSteps] = useState(1);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<WizardQuestion | null>(
     null,
@@ -68,6 +71,7 @@ export const SearchWizardProvider = ({
     setCurrentQuestion(null);
     setAnswers({});
     setStepIndex(0);
+    setTotalSteps(1);
     setLoadingQuestion(false);
     setSubmitting(false);
     setErrorMessage(null);
@@ -91,11 +95,10 @@ export const SearchWizardProvider = ({
 
     try {
       const response = await intakeSessionsService.createSession();
-      const firstQuestion = mapApiQuestionToWizardQuestion(
-        response.first_question,
-      );
+      const firstQuestion = parseApiQuestion(response.first_question);
 
       setSessionId(response.session_id);
+      setTotalSteps(Math.max(response.total_questions, 1));
       setCurrentQuestion(firstQuestion);
       setAnswers({
         [firstQuestion.id]: getDefaultAnswer(firstQuestion),
@@ -174,7 +177,7 @@ export const SearchWizardProvider = ({
         return;
       }
 
-      const nextQuestion = mapApiQuestionToWizardQuestion(response.next_question);
+      const nextQuestion = parseApiQuestion(response.next_question);
 
       setCurrentQuestion(nextQuestion);
       setAnswers((current) => ({
@@ -206,6 +209,7 @@ export const SearchWizardProvider = ({
     showSmartChat,
     startGuidedForm,
     stepIndex,
+    totalSteps,
     updateCurrentAnswer,
     toggleCurrentMultiSelect,
   };

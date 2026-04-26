@@ -20,7 +20,6 @@ export const TextQuestionInput = ({
       id={question.id}
       value={answer}
       onChange={(event) => onChange(event.target.value)}
-      placeholder={question.placeholder}
       className="h-9 border-border/80 bg-background px-3 text-sm"
     />
   </div>
