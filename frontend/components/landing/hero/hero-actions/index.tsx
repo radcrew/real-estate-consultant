@@ -8,13 +8,7 @@ import { Button, buttonVariants } from "@components/ui/button";
 import { useAuth } from "@contexts/auth";
 import { cn } from "@lib/utils";
 
-const HERO_ACTIONS_ROW = "mt-8 flex flex-wrap items-center justify-center gap-3";
-
-const HERO_PRIMARY_ACTION_EXTRA =
-  "inline-flex h-11 min-h-11 items-center gap-2.5 px-7 text-base font-semibold shadow-none";
-
-const HERO_OUTLINE_ACTION_EXTRA =
-  "h-11 min-h-11 border-border bg-background px-7 text-base font-semibold shadow-none";
+import { styles } from "./styles";
 
 export const HeroActions = () => {
   const router = useRouter();
@@ -22,11 +16,11 @@ export const HeroActions = () => {
   const showSignIn = ready && !session;
 
   return (
-    <div className={HERO_ACTIONS_ROW}>
+    <div className={styles.row}>
       <Button
         size="lg"
         onClick={() => router.push("/questionnaire")}
-        className={cn(HERO_PRIMARY_ACTION_EXTRA)}
+        className={cn(styles.primaryAction)}
       >
         <Search className="size-5 shrink-0" aria-hidden />
         Start Searching
@@ -37,7 +31,7 @@ export const HeroActions = () => {
           href="/sign-in"
           className={cn(
             buttonVariants({ variant: "outline", size: "lg" }),
-            HERO_OUTLINE_ACTION_EXTRA,
+            styles.outlineAction,
           )}
         >
           Sign In
