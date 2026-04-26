@@ -10,7 +10,7 @@ import { TextQuestionInput } from "./text";
 
 type QuestionInputProps = {
   question: WizardQuestion;
-  answer: AnswerValue | undefined;
+  answer: AnswerValue;
   onAnswerChange: (value: AnswerValue) => void;
   onMultiSelectToggle: (value: string) => void;
 };
@@ -25,7 +25,7 @@ export const QuestionInput = ({
     {question.kind === "text" && (
       <TextQuestionInput
         question={question}
-        answer={typeof answer === "string" ? answer : ""}
+        answer={answer}
         onChange={onAnswerChange}
       />
     )}
@@ -33,7 +33,7 @@ export const QuestionInput = ({
     {question.kind === "single-select" && (
       <SingleSelectQuestionInput
         question={question}
-        answer={typeof answer === "string" ? answer : ""}
+        answer={answer}
         onChange={onAnswerChange}
       />
     )}
@@ -41,7 +41,7 @@ export const QuestionInput = ({
     {question.kind === "multi-select" && (
       <MultiSelectQuestionInput
         question={question}
-        answer={Array.isArray(answer) ? answer : []}
+        answer={answer}
         onToggle={onMultiSelectToggle}
       />
     )}
@@ -49,7 +49,7 @@ export const QuestionInput = ({
     {question.kind === "range" && (
       <RangeQuestionInput
         question={question}
-        answer={typeof answer === "number" ? answer : question.min}
+        answer={answer}
         onChange={onAnswerChange}
       />
     )}

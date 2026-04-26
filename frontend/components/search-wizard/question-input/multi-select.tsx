@@ -20,7 +20,6 @@ export const MultiSelectQuestionInput = ({
       <SelectOptionCard
         key={option.value}
         label={option.label}
-        hint={option.hint}
         selected={answer.includes(option.value)}
         onClick={() => onToggle(option.value)}
       />

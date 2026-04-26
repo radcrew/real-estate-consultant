@@ -28,13 +28,8 @@ export type CreateIntakeSessionResponse = {
 
 export type SubmitIntakeSessionAnswerBody = {
   key: string;
-  answers:
-    | string
-    | string[]
-    | {
-        min: number | null;
-        max: number | null;
-      };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  answers: any;
 };
 
 export type SubmitIntakeSessionAnswerResponse = {

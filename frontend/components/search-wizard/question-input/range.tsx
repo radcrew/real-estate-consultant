@@ -1,47 +1,46 @@
 "use client";
 
-import { formatRangeValue } from "../utils";
-import type { RangeQuestion } from "../types";
+import type { ChangeEvent } from "react";
+
+import { NumberField } from "./number";
+import type { RangeAnswerValue, RangeQuestion } from "../types";
 
 type RangeQuestionInputProps = {
   question: RangeQuestion;
-  answer: number;
-  onChange: (value: number) => void;
+  answer: RangeAnswerValue;
+  onChange: (value: RangeAnswerValue) => void;
 };
+
 
 export const RangeQuestionInput = ({
   question,
   answer,
   onChange,
-}: RangeQuestionInputProps) => (
-  <div className="max-w-xl space-y-4">
-    <div className="flex items-end justify-between gap-3 rounded-lg border border-border/70 bg-background px-3 py-2.5">
-      <div>
-        <p className="text-xs text-muted-foreground">Current value</p>
-        <p className="text-lg font-semibold sm:text-xl">
-          {formatRangeValue(answer, question.unit)}
-        </p>
-      </div>
-      <p className="max-w-[14rem] text-right text-xs text-muted-foreground">
-        Drag the slider to set the floor requirement for this search.
-      </p>
-    </div>
+}: RangeQuestionInputProps) => {
+  const handleChange =
+    (field: keyof RangeAnswerValue) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const value = event.target.value.trim();
+      onChange({
+        ...answer,
+        [field]: value === "" ? null : Number(value),
+      });
+    };
 
-    <div className="space-y-2">
-      <input
-        id={question.id}
-        type="range"
-        min={question.min}
-        max={question.max}
-        step={question.step ?? 1}
-        value={answer}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="h-2 w-full cursor-pointer appearance-none bg-transparent accent-primary"
+  return (
+    <div className="grid max-w-xl gap-3 sm:grid-cols-2">
+      <NumberField
+        id={`${question.id}-min`}
+        label={`Min ${question.unit ?? ""}`}
+        value={answer.min}
+        onChange={handleChange("min")}
       />
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{question.minLabel ?? question.min}</span>
-        <span>{question.maxLabel ?? question.max}</span>
-      </div>
+      <NumberField
+        id={`${question.id}-max`}
+        label={`Max ${question.unit ?? ""}`}
+        value={answer.max}
+        onChange={handleChange("max")}
+      />
     </div>
-  </div>
-);
+  );
+};

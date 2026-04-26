@@ -1,50 +1,29 @@
-export type SingleSelectQuestion = {
-  id: string;
-  kind: "single-select";
-  title: string;
-  description: string;
-  required?: boolean;
-  options: Array<{
-    label: string;
-    value: string;
-    hint?: string;
-  }>;
+export type QuestionOption = {
+  label: string;
+  value: string;
 };
 
-export type MultiSelectQuestion = {
+type BaseQuestion<TKind extends string> = {
   id: string;
-  kind: "multi-select";
+  kind: TKind;
   title: string;
   description: string;
   required?: boolean;
-  options: Array<{
-    label: string;
-    value: string;
-    hint?: string;
-  }>;
 };
 
-export type TextQuestion = {
-  id: string;
-  kind: "text";
-  title: string;
-  description: string;
-  required?: boolean;
-  placeholder?: string;
-};
+type SelectQuestion<TKind extends "single-select" | "multi-select"> =
+  BaseQuestion<TKind> & {
+    options: QuestionOption[];
+  };
 
-export type RangeQuestion = {
-  id: string;
-  kind: "range";
-  title: string;
-  description: string;
-  required?: boolean;
-  min: number;
-  max: number;
-  step?: number;
+export type SingleSelectQuestion = SelectQuestion<"single-select">;
+
+export type MultiSelectQuestion = SelectQuestion<"multi-select">;
+
+export type TextQuestion = BaseQuestion<"text">;
+
+export type RangeQuestion = BaseQuestion<"range"> & {
   unit?: string;
-  minLabel?: string;
-  maxLabel?: string;
 };
 
 export type WizardQuestion =
@@ -53,11 +32,24 @@ export type WizardQuestion =
   | TextQuestion
   | RangeQuestion;
 
-export type AnswerValue = string | string[] | number;
+export type RangeAnswerValue = {
+  min: number | null;
+  max: number | null;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnswerValue = any;
 export type WizardAnswers = Record<string, AnswerValue>;
 
 export type SummaryRow = {
   id: string;
   label: string;
   value: string;
+};
+
+export type ApiQuestionSchema = {
+  key: string;
+  text: string;
+  type: string;
+  options?: QuestionOption[];
 };
