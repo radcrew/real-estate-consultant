@@ -16,7 +16,8 @@ export type IntakeSessionQuestion = {
 export type CreateIntakeSessionResponse = {
   session_id: string;
   status: string;
-  total_questions: number;
+  /** Present when the API returns questionnaire length; otherwise treat as single-step. */
+  total_questions?: number;
   first_question: IntakeSessionQuestion;
 };
 
@@ -40,6 +41,47 @@ export type CompleteIntakeSessionResponse = {
   id?: string;
   status?: string;
   criteria?: Record<string, unknown> | null;
+};
+
+export type LlmExtractedLocation = {
+  label: string;
+  lat: number;
+  lng: number;
+};
+
+export type LlmExtractedRange = {
+  min: number;
+  max: number;
+};
+
+export type LlmExtracted = {
+  building_type: string[];
+  location: LlmExtractedLocation | null;
+  size_sqft: LlmExtractedRange;
+  rent_range: LlmExtractedRange;
+};
+
+export type LlmNextQuestion = {
+  key: string;
+  text: string;
+  type: string;
+  options?: unknown;
+};
+
+export type LlmInputResponse = {
+  mode: "llm";
+  extracted: LlmExtracted;
+  criteria: Record<string, unknown>;
+  current_index: number;
+  total_questions: number;
+  missing_fields: string[];
+  next_question: LlmNextQuestion | null;
+  is_complete: boolean;
+};
+
+export type LlmInputBody = {
+  input: string;
+  mode: "llm";
 };
 
 export class IntakeSessionsService {
@@ -68,6 +110,17 @@ export class IntakeSessionsService {
   ): Promise<CompleteIntakeSessionResponse> {
     const { data } = await this.http.post<CompleteIntakeSessionResponse>(
       `/intake-sessions/${sessionId}/complete`,
+    );
+    return data;
+  }
+
+  async submitLlmInput(
+    sessionId: string,
+    body: LlmInputBody,
+  ): Promise<LlmInputResponse> {
+    const { data } = await this.http.post<LlmInputResponse>(
+      `/intake-sessions/${sessionId}/llm-input`,
+      body,
     );
     return data;
   }
