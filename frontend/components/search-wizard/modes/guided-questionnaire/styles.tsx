@@ -1,22 +1,13 @@
 export const styles = {
   summaryGrid: [
-    "mt-5 grid flex-1 gap-4",
-    "justify-items-center items-start",
-  ].join(" "),
-  summaryGridWithPanel: [
-    "mt-5 grid flex-1 gap-4",
+    "mt-5 grid gap-4 items-start",
     "lg:grid-cols-[minmax(0,1.35fr)_320px]",
   ].join(" "),
-  mainColumn:
-    "flex w-full max-w-2xl flex-col gap-3 justify-self-center",
-  mainColumnWithSummary: "flex w-full min-w-0 flex-col gap-3",
-  sectionWithoutPanel: [
+  progressRow: "w-full lg:col-span-2",
+  mainColumn: "flex w-full min-w-0 flex-col gap-3",
+  summaryColumn: "w-full",
+  section: [
     "flex w-full flex-col rounded-xl",
-    "border border-border/70 bg-background/90",
-    "p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.55)] sm:p-5",
-  ].join(" "),
-  sectionWithPanel: [
-    "flex w-full min-h-[22rem] flex-col rounded-xl",
     "border border-border/70 bg-background/90",
     "p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.55)] sm:p-5",
   ].join(" "),

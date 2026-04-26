@@ -58,6 +58,36 @@ export const formatRangeValue = (value: number, unit?: string) => {
   return `${value}${unit ? ` ${unit}` : ""}`;
 };
 
+export const formatAnswerForSummary = (
+  question: WizardQuestion,
+  answer: AnswerValue,
+) => {
+  if (question.kind === "multi-select") {
+    const selectedValues = Array.isArray(answer) ? answer : [];
+    const labels = question.options
+      .filter((option) => selectedValues.includes(option.value))
+      .map((option) => option.label);
+    return labels.length > 0 ? labels.join(", ") : "Not answered";
+  }
+
+  if (question.kind === "range") {
+    if (
+      typeof answer === "object" &&
+      answer != null &&
+      !Array.isArray(answer) &&
+      typeof answer.min === "number" &&
+      typeof answer.max === "number"
+    ) {
+      return `${formatRangeValue(answer.min, question.unit)} - ${formatRangeValue(answer.max, question.unit)}`;
+    }
+    return "Not answered";
+  }
+
+  return typeof answer === "string" && answer.trim().length > 0
+    ? answer
+    : "Not answered";
+};
+
 export const getDefaultAnswer = (question: WizardQuestion): AnswerValue => {
   if (question.kind === "multi-select") {
     return [];

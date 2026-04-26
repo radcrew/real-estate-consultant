@@ -13,8 +13,18 @@ import {
   intakeSessionsService,
 } from "@services/intake-sessions";
 
-import type { AnswerValue, WizardAnswers, WizardQuestion } from "../components/search-wizard/types";
-import { getDefaultAnswer, isQuestionComplete, parseApiQuestion } from "../components/search-wizard/utils";
+import type {
+  AnswerValue,
+  SummaryRow,
+  WizardAnswers,
+  WizardQuestion,
+} from "../components/search-wizard/types";
+import {
+  formatAnswerForSummary,
+  getDefaultAnswer,
+  isQuestionComplete,
+  parseApiQuestion,
+} from "../components/search-wizard/utils";
 
 type SearchWizardContextValue = {
   canContinue: boolean;
@@ -33,6 +43,7 @@ type SearchWizardContextValue = {
   showSmartChat: () => void;
   startGuidedForm: () => Promise<void>;
   stepIndex: number;
+  summaryRows: SummaryRow[];
   totalSteps: number;
   updateCurrentAnswer: (value: AnswerValue) => void;
   toggleCurrentMultiSelect: (value: string) => void;
@@ -57,6 +68,7 @@ export const SearchWizardProvider = ({
   const [currentQuestion, setCurrentQuestion] = useState<WizardQuestion | null>(
     null,
   );
+  const [summaryRows, setSummaryRows] = useState<SummaryRow[]>([]);
   const [answers, setAnswers] = useState<WizardAnswers>({});
   const [isLoadingQuestion, setLoadingQuestion] = useState(false);
   const [isSubmitting, setSubmitting] = useState(false);
@@ -69,6 +81,7 @@ export const SearchWizardProvider = ({
   const resetQuestionnaireState = () => {
     setSessionId(null);
     setCurrentQuestion(null);
+    setSummaryRows([]);
     setAnswers({});
     setStepIndex(0);
     setTotalSteps(1);
@@ -171,6 +184,15 @@ export const SearchWizardProvider = ({
         answers: answerToSubmit,
       });
 
+      setSummaryRows((current) => [
+        ...current,
+        {
+          id: currentQuestion.id,
+          label: currentQuestion.title,
+          value: formatAnswerForSummary(currentQuestion, answerToSubmit),
+        },
+      ]);
+
       if (response.next_question == null) {
         onClose();
         router.push("/");
@@ -209,6 +231,7 @@ export const SearchWizardProvider = ({
     showSmartChat,
     startGuidedForm,
     stepIndex,
+    summaryRows,
     totalSteps,
     updateCurrentAnswer,
     toggleCurrentMultiSelect,

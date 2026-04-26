@@ -12,7 +12,6 @@ import { SummaryPanel } from "../../summary-panel";
 import { styles } from "./styles";
 
 export const GuidedQuestionnaire = () => {
-  const showSummaryPanel = false;
   const {
     canContinue,
     currentAnswer,
@@ -23,6 +22,7 @@ export const GuidedQuestionnaire = () => {
     isLoadingQuestion,
     isSubmitting,
     resetToChooser,
+    summaryRows,
     stepIndex,
     totalSteps,
     toggleCurrentMultiSelect,
@@ -30,29 +30,13 @@ export const GuidedQuestionnaire = () => {
   } = useSearchWizard();
 
   return (
-    <div
-      className={
-        showSummaryPanel
-          ? styles.summaryGridWithPanel
-          : styles.summaryGrid
-      }
-    >
-      <div
-        className={
-          showSummaryPanel
-            ? styles.mainColumnWithSummary
-            : styles.mainColumn
-        }
-      >
+    <div className={styles.summaryGrid}>
+      <div className={styles.progressRow}>
         <ProgressBar stepIndex={stepIndex} totalSteps={totalSteps} />
+      </div>
 
-        <section
-          className={
-            showSummaryPanel
-              ? styles.sectionWithPanel
-              : styles.sectionWithoutPanel
-          }
-        >
+      <div className={styles.mainColumn}>
+        <section className={styles.section}>
           {errorMessage && (
             <div className={styles.errorBanner}>{errorMessage}</div>
           )}
@@ -97,7 +81,9 @@ export const GuidedQuestionnaire = () => {
         </section>
       </div>
 
-      {showSummaryPanel && <SummaryPanel rows={[]} />}
+      <div className={styles.summaryColumn}>
+        <SummaryPanel rows={summaryRows} />
+      </div>
     </div>
   );
 };

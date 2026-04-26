@@ -1,4 +1,5 @@
 import type { SummaryRow } from "../types";
+import { ListChecks } from "lucide-react";
 
 import { styles } from "./styles";
 
@@ -8,19 +9,27 @@ type SummaryPanelProps = {
 
 export const SummaryPanel = ({ rows }: SummaryPanelProps) => (
   <aside className={styles.panel}>
-    <div className={styles.headerStack}>
-      <p className={styles.eyebrow}>Search draft</p>
-      <h3 className={styles.title}>Answers so far</h3>
+    <div className={styles.header}>
+      <div className={styles.headerLeft}>
+        <ListChecks className="size-4 text-amber-500" aria-hidden />
+        <h3 className={styles.title}>Your Answers</h3>
+      </div>
+      <span className={styles.badge}>{rows.length}</span>
     </div>
 
-    <div className={styles.rowList}>
-      {rows.map((row, index) => (
-        <div key={row.id} className={styles.rowCard}>
-          <p className={styles.rowStep}>Step {index + 1}</p>
-          <p className={styles.rowLabel}>{row.label}</p>
-          <p className={styles.rowValue}>{row.value}</p>
-        </div>
-      ))}
-    </div>
+    {rows.length === 0 ? (
+      <div className={styles.placeholder}>
+        Answers will appear here as you complete each step.
+      </div>
+    ) : (
+      <div className={styles.rowList}>
+        {rows.map((row) => (
+          <div key={row.id} className={styles.rowItem}>
+            <p className={styles.rowLabel}>{row.label}</p>
+            <p className={styles.rowValue}>{row.value}</p>
+          </div>
+        ))}
+      </div>
+    )}
   </aside>
 );
