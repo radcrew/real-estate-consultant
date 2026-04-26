@@ -16,12 +16,13 @@ export const SingleSelectQuestionInput = ({
   onChange,
 }: SingleSelectQuestionInputProps) => (
   <div className="grid gap-2.5 md:grid-cols-3">
-    {question.options.map((option) => (
+    {question.options.map((option, index) => (
       <SelectOptionCard
         key={option.value}
         label={option.label}
         hint={option.hint}
         selected={answer === option.value}
+        autoFocus={index === 0}
         onClick={() => onChange(option.value)}
       />
     ))}

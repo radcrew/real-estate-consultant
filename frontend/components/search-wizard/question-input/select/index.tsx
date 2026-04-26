@@ -11,6 +11,8 @@ type SelectOptionCardProps = {
   hint?: string;
   selected: boolean;
   onClick: () => void;
+  /** Focus this card when the step mounts (first option in a select grid). */
+  autoFocus?: boolean;
 };
 
 const SELECT_OPTION_ICON_MAP = {
@@ -34,9 +36,11 @@ export const SelectOptionCard = ({
   hint,
   selected,
   onClick,
+  autoFocus = false,
 }: SelectOptionCardProps) => (
   <button
     type="button"
+    autoFocus={autoFocus}
     onClick={onClick}
     className={cn(
       styles.card,

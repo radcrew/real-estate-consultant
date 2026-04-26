@@ -16,11 +16,12 @@ export const MultiSelectQuestionInput = ({
   onToggle,
 }: MultiSelectQuestionInputProps) => (
   <div className="grid gap-2.5 md:grid-cols-3">
-    {question.options.map((option) => (
+    {question.options.map((option, index) => (
       <SelectOptionCard
         key={option.value}
         label={option.label}
         selected={answer.includes(option.value)}
+        autoFocus={index === 0}
         onClick={() => onToggle(option.value)}
       />
     ))}

@@ -53,6 +53,7 @@ export const GuidedQuestionnaire = () => {
 
           {currentQuestion ? (
             <QuestionInput
+              key={currentQuestion.id}
               question={currentQuestion}
               answer={currentAnswer}
               onAnswerChange={updateCurrentAnswer}
