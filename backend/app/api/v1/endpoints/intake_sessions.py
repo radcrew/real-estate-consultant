@@ -38,7 +38,10 @@ from app.schemas.intake_sessions import (
     UpdateIntakeSessionAnswersRequest,
     UpdateIntakeSessionAnswersResponse,
 )
-from app.services.huggingface_intake import parse_intake_with_huggingface
+from app.services.huggingface_intake import (
+    generate_llm_opening_question_text,
+    parse_intake_with_huggingface,
+)
 
 LLM_INTAKE_OPENING_MESSAGE = (
     "Hi! I'm here to help you find the right commercial property. "
@@ -52,15 +55,74 @@ router = APIRouter(tags=["intake-sessions"])
 _REQUIRED_LLM_FIELDS: tuple[str, ...] = ("building_type", "location", "radius_miles", "listing_type")
 
 
-def _current_index_for_next_question(questions: list[dict], next_question_key: str | None) -> int:
-    if not questions:
+def _has_answer(value: object) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict, tuple, set)):
+        return len(value) > 0
+    return True
+
+
+def _current_index_for_answered_count(questions: list[dict], criteria: object) -> int:
+    if not questions or not isinstance(criteria, dict):
         return 0
-    if next_question_key is None:
-        return len(questions)
-    idx = order_for_question_key(questions, next_question_key)
-    if idx is None:
-        return len(questions)
-    return idx
+    count = 0
+    for row in questions:
+        qkey = row.get("key")
+        if not isinstance(qkey, str):
+            continue
+        if _has_answer(criteria.get(qkey)):
+            count += 1
+    return count
+
+
+def _next_question_from_llm_response(
+    questions: list[dict],
+    proposed_next: object,
+    missing_fields: list[str],
+) -> IntakeSessionFirstQuestion | None:
+    """Prefer LLM-authored ``text``; bind to a real question row when possible."""
+    if not isinstance(proposed_next, dict):
+        proposed_next = {}
+    proposed_key = proposed_next.get("key")
+    proposed_text = proposed_next.get("text")
+
+    if isinstance(proposed_text, str) and proposed_text.strip():
+        text = proposed_text.strip()
+        base_row = None
+        if isinstance(proposed_key, str):
+            for row in questions:
+                if row.get("key") == proposed_key:
+                    base_row = row
+                    break
+        if base_row is None and missing_fields:
+            mk = missing_fields[0]
+            for row in questions:
+                if row.get("key") == mk:
+                    base_row = row
+                    break
+        if base_row is not None:
+            mapped = map_question_to_model(base_row)
+            return IntakeSessionFirstQuestion(
+                key=mapped.key,
+                text=text,
+                type=mapped.type,
+                options=mapped.options,
+            )
+        return IntakeSessionFirstQuestion(key="llm_followup", text=text, type="text", options=None)
+
+    if isinstance(proposed_key, str):
+        for row in questions:
+            if row.get("key") == proposed_key:
+                return map_question_to_model(row)
+
+    for row in questions:
+        qkey = row.get("key")
+        if isinstance(qkey, str) and qkey in missing_fields:
+            return map_question_to_model(row)
+    return None
 
 
 @router.post(
@@ -88,6 +150,27 @@ async def create_intake_session(
         )
 
     if mode == "llm":
+        if not questions:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="No questions configured for intake flow.",
+            )
+        first_mapped = map_question_to_model(questions[0])
+        try:
+            llm_question_text = await generate_llm_opening_question_text(
+                welcome_message=LLM_INTAKE_OPENING_MESSAGE,
+                question_key=first_mapped.key,
+                question_type=first_mapped.type,
+                question_options=first_mapped.options,
+            )
+        except HTTPException:
+            llm_question_text = first_mapped.text
+        next_question = IntakeSessionFirstQuestion(
+            key=first_mapped.key,
+            text=llm_question_text,
+            type=first_mapped.type,
+            options=first_mapped.options,
+        )
         return CreateIntakeSessionResponseLlm(
             mode="llm",
             session_id=validated_session.id,
@@ -95,6 +178,7 @@ async def create_intake_session(
             current_index=0,
             total_questions=total_questions,
             message=LLM_INTAKE_OPENING_MESSAGE,
+            next_question=next_question,
         )
 
     first_question = map_question_to_model(questions[0])
@@ -102,7 +186,7 @@ async def create_intake_session(
         mode="guided",
         session_id=validated_session.id,
         status=validated_session.status,
-        current_index=1,
+        current_index=0,
         total_questions=total_questions,
         first_question=first_question,
     )
@@ -155,8 +239,7 @@ async def submit_intake_session_answers(
 
     next_row = next_question_row_after_order(questions, after_order=answered_order)
     next_question = map_question_to_model(next_row) if next_row is not None else None
-    next_key = next_question.key if next_question is not None else None
-    current_index = _current_index_for_next_question(questions, next_key)
+    current_index = _current_index_for_answered_count(questions, merged_criteria)
 
     row = await update_intake_session_after_answers(
         client,
@@ -202,37 +285,17 @@ async def submit_llm_intake_input(
     merged_criteria = parsed["merged_criteria"]
     missing_fields = parsed["missing_fields"]
 
-    proposed_next = parsed["next_question"]
-    proposed_key = proposed_next.get("key") if isinstance(proposed_next, dict) else None
-    proposed_text = proposed_next.get("text") if isinstance(proposed_next, dict) else None
+    next_question = _next_question_from_llm_response(
+        questions,
+        parsed["next_question"],
+        missing_fields,
+    )
 
-    next_question = None
-    if isinstance(proposed_key, str):
-        for row in questions:
-            if row.get("key") == proposed_key:
-                mapped = map_question_to_model(row)
-                if isinstance(proposed_text, str) and proposed_text.strip():
-                    next_question = IntakeSessionFirstQuestion(
-                        key=mapped.key,
-                        text=proposed_text.strip(),
-                        type=mapped.type,
-                    )
-                else:
-                    next_question = mapped
-                break
-
-    if next_question is None:
-        for row in questions:
-            qkey = row.get("key")
-            if isinstance(qkey, str) and qkey in missing_fields:
-                next_question = map_question_to_model(row)
-                break
-
-    next_key = next_question.key if next_question is not None else None
-    current_index = _current_index_for_next_question(questions, next_key)
+    current_index = _current_index_for_answered_count(questions, merged_criteria)
 
     await update_intake_session_after_answers(client, session_id, merged_criteria)
     return SubmitLlmIntakeInputResponse(
+        mode=body.mode,
         extracted=extracted,
         criteria=merged_criteria,
         current_index=current_index,

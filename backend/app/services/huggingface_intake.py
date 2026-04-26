@@ -152,3 +152,91 @@ async def parse_intake_with_huggingface(
         "next_question": next_question,
         "is_complete": is_complete,
     }
+
+
+async def generate_llm_opening_question_text(
+    *,
+    welcome_message: str,
+    question_key: str,
+    question_type: str,
+) -> str:
+    """Ask the model for a single conversational question line (JSON ``{"text": "..."}``)."""
+    if not settings.huggingface_api_key.strip():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Hugging Face API key is not configured.",
+        )
+
+    system_prompt = (
+        "You write one short, friendly question for a commercial real-estate intake chatbot.\n"
+        "Return ONLY valid JSON: {\"text\": string}\n"
+        "The question should invite the user to describe what they are looking for in natural language.\n"
+        "Do not repeat the entire welcome message; write only the question line (one or two sentences max)."
+    )
+    user_prompt = json.dumps(
+        {
+            "welcome_message": welcome_message,
+            "question_key": question_key,
+            "question_type": question_type,
+        },
+        ensure_ascii=True,
+    )
+
+    payload = {
+        "model": settings.huggingface_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.35,
+        "max_tokens": 200,
+    }
+    headers = {
+        "Authorization": f"Bearer {settings.huggingface_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+            response = await client.post(
+                settings.huggingface_base_url,
+                headers=headers,
+                json=payload,
+            )
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to call Hugging Face API: {exc}",
+        ) from exc
+
+    body = response.json()
+    content = (
+        body.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+    )
+    if isinstance(content, list):
+        content = "".join(
+            part.get("text", "")
+            for part in content
+            if isinstance(part, dict)
+        )
+    if not isinstance(content, str):
+        content = str(content)
+
+    try:
+        parsed = _extract_json_payload(content)
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Hugging Face response was not valid JSON.",
+        ) from exc
+
+    text = parsed.get("text")
+    if not isinstance(text, str) or not text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Hugging Face response missing text field.",
+        )
+    return text.strip()

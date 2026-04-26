@@ -16,6 +16,7 @@ class IntakeSessionFirstQuestion(BaseModel):
     key: str
     text: str
     type: str
+    options: Any | None = None
 
 
 class CreateIntakeSessionResponseGuided(BaseModel):
@@ -32,7 +33,7 @@ class CreateIntakeSessionResponseGuided(BaseModel):
 
 
 class CreateIntakeSessionResponseLlm(BaseModel):
-    """LLM flow: client receives an open-ended prompt; session is still created for follow-up APIs."""
+    """LLM flow: welcome message plus an LLM-shaped next prompt (same shape as guided first question)."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -42,6 +43,7 @@ class CreateIntakeSessionResponseLlm(BaseModel):
     current_index: int
     total_questions: int
     message: str
+    next_question: IntakeSessionFirstQuestion
 
 
 CreateIntakeSessionResponse = (
@@ -89,6 +91,10 @@ class SubmitLlmIntakeInputRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     input: str = Field(..., description="User free-text intake prompt.")
+    mode: Literal["llm", "guided"] = Field(
+        default="llm",
+        description='Echoed on the response; use ``"guided"`` when the client is driving the questionnaire UI.',
+    )
 
 
 class LlmExtractedLocation(BaseModel):
@@ -114,6 +120,7 @@ class SubmitLlmIntakeInputResponse(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    mode: Literal["llm", "guided"]
     extracted: LlmExtractedIntakePayload
     criteria: dict[str, Any]
     current_index: int
