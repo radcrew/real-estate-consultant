@@ -35,6 +35,13 @@ export type SubmitIntakeSessionAnswerResponse = {
   next_question: IntakeSessionQuestion | null;
 };
 
+/** Response from `POST /intake-sessions/{session_id}/complete` (matches backend `IntakeSession`). */
+export type CompleteIntakeSessionResponse = {
+  id?: string;
+  status?: string;
+  criteria?: Record<string, unknown> | null;
+};
+
 export class IntakeSessionsService {
   constructor(private readonly http: AxiosInstance) {}
 
@@ -52,6 +59,15 @@ export class IntakeSessionsService {
     const { data } = await this.http.patch<SubmitIntakeSessionAnswerResponse>(
       `/intake-sessions/${sessionId}/answers`,
       body,
+    );
+    return data;
+  }
+
+  async completeSession(
+    sessionId: string,
+  ): Promise<CompleteIntakeSessionResponse> {
+    const { data } = await this.http.post<CompleteIntakeSessionResponse>(
+      `/intake-sessions/${sessionId}/complete`,
     );
     return data;
   }

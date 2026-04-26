@@ -221,6 +221,7 @@ export const SearchWizardProvider = ({
       ]);
 
       if (response.next_question == null) {
+        await intakeSessionsService.completeSession(sessionId);
         setStepIndex(totalSteps);
         await new Promise((resolve) => setTimeout(resolve, 550));
         onClose();
