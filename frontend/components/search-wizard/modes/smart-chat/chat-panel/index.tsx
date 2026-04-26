@@ -113,7 +113,7 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
           Connecting…
         </div>
       ) : (
-        <>
+        <div className={styles.chatBody}>
           <MessageList messages={messages} isSending={isSending} />
           <ChatComposer
             draft={draft}
@@ -123,7 +123,7 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
             isSending={isSending}
             onSend={handleSend}
           />
-        </>
+        </div>
       )}
     </div>
   );

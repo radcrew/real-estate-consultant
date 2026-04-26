@@ -37,7 +37,7 @@ export const ChatComposer = ({
             onSend();
           }
         }}
-        rows={3}
+        rows={5}
       />
       <button
         type="button"

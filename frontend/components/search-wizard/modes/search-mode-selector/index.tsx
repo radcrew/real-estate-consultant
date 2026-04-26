@@ -33,7 +33,11 @@ export const SearchModeSelector = () => {
   }
 
   if (isSmartChatOpen) {
-    return <SmartChat />;
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <SmartChat />
+      </div>
+    );
   }
 
   return (

@@ -9,7 +9,7 @@ export const styles = {
     "text-foreground",
   ].join(" "),
   content: [
-    "mx-auto flex w-full max-w-5xl flex-1 flex-col",
+    "mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col",
     "px-4 pt-5 pb-6 sm:px-6 lg:px-8",
   ].join(" "),
 } as const;
