@@ -34,15 +34,9 @@ export const styles = {
   card: [
     "rounded-xl border border-border/70 bg-background/95 p-4 shadow-[0_16px_50px_-40px_rgba(15,23,42,0.45)]",
   ].join(" "),
-  cardHeader: "mb-3 flex items-center justify-between gap-2",
+  cardHeader: "mb-3 flex items-center gap-2",
   cardTitleRow: "flex items-center gap-2",
   cardTitle: "text-sm font-semibold text-foreground",
-  badgeCount:
-    "inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground",
-  criteriaTable: "space-y-2 text-sm",
-  criteriaRow: "flex justify-between gap-3 border-b border-border/40 py-1.5 last:border-0",
-  criteriaLabel: "text-muted-foreground",
-  criteriaValue: "text-right font-medium text-foreground",
   missingCard:
     "rounded-xl border border-amber-300/80 bg-amber-50/90 p-4 text-sm text-amber-950 shadow-sm dark:border-amber-700/50 dark:bg-amber-950/25 dark:text-amber-50",
   missingTitle: "mb-2 font-semibold",

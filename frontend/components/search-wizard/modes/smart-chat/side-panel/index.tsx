@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, SlidersHorizontal, Wand2 } from "lucide-react";
 
@@ -9,7 +9,6 @@ import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@lib/api-errors";
 import type { LlmInputResponse } from "@services/intake-sessions";
 
-import { buildExtractedRows } from "./utils";
 import { styles } from "../styles";
 
 type SidePanelProps = {
@@ -22,10 +21,6 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
   const { sessionId, setErrorMessage, resetToChooser, onClose } = useSearchWizard();
   const [isSearchBusy, setIsSearchBusy] = useState(false);
 
-  const extractedRows = useMemo(
-    () => buildExtractedRows(lastResponse?.extracted ?? null),
-    [lastResponse],
-  );
   const isComplete = lastResponse?.is_complete ?? false;
   const missingFields = lastResponse?.missing_fields ?? [];
 
@@ -62,22 +57,10 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
             <SlidersHorizontal className="size-4 text-amber-600" aria-hidden />
             <h3 className={styles.cardTitle}>Extracted Criteria</h3>
           </div>
-          <span className={styles.badgeCount}>{extractedRows.length}</span>
         </div>
-        {extractedRows.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Criteria extracted from the chat will show up here.
-          </p>
-        ) : (
-          <div className={styles.criteriaTable}>
-            {extractedRows.map((row) => (
-              <div key={row.label} className={styles.criteriaRow}>
-                <span className={styles.criteriaLabel}>{row.label}</span>
-                <span className={styles.criteriaValue}>{row.value}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="text-sm text-muted-foreground">
+          Structured criteria from this chat will appear here once the API provides them.
+        </p>
       </div>
 
       {missingFields.length > 0 && (
