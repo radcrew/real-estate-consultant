@@ -159,6 +159,7 @@ async def generate_llm_opening_question_text(
     welcome_message: str,
     question_key: str,
     question_type: str,
+    question_options: Any | None = None,
 ) -> str:
     """Ask the model for a single conversational question line (JSON ``{"text": "..."}``)."""
     if not settings.huggingface_api_key.strip():
@@ -173,14 +174,20 @@ async def generate_llm_opening_question_text(
         "The question should invite the user to describe what they are looking for in natural language.\n"
         "Do not repeat the entire welcome message; write only the question line (one or two sentences max)."
     )
-    user_prompt = json.dumps(
-        {
-            "welcome_message": welcome_message,
-            "question_key": question_key,
-            "question_type": question_type,
-        },
-        ensure_ascii=True,
-    )
+    if question_options is not None:
+        system_prompt += (
+            "\nIf question_options lists choices, phrase the question so the user can select from those "
+            "options (you may name the options briefly) or add a short clarification."
+        )
+
+    user_payload: dict[str, Any] = {
+        "welcome_message": welcome_message,
+        "question_key": question_key,
+        "question_type": question_type,
+    }
+    if question_options is not None:
+        user_payload["question_options"] = question_options
+    user_prompt = json.dumps(user_payload, ensure_ascii=True)
 
     payload = {
         "model": settings.huggingface_model,
