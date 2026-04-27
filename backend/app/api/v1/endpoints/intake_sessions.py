@@ -212,7 +212,7 @@ async def get_intake_session(
 
 
 @router.patch(
-    "/intake-sessions/{session_id}/answers",
+    "/intake-sessions/{session_id}/answers/guided",
     response_model=UpdateIntakeSessionAnswersResponse,
 )
 async def submit_intake_session_answers(
@@ -255,7 +255,7 @@ async def submit_intake_session_answers(
 
 
 @router.post(
-    "/intake-sessions/{session_id}/llm-input",
+    "/intake-sessions/{session_id}/answers/llm",
     response_model=SubmitLlmIntakeInputResponse,
 )
 async def submit_llm_intake_input(
@@ -295,7 +295,6 @@ async def submit_llm_intake_input(
 
     await update_intake_session_after_answers(client, session_id, merged_criteria)
     return SubmitLlmIntakeInputResponse(
-        mode=body.mode,
         extracted=extracted,
         criteria=merged_criteria,
         current_index=current_index,

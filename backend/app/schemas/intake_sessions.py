@@ -60,7 +60,7 @@ class PatchIntakeSessionStatusRequest(BaseModel):
 
 
 class UpdateIntakeSessionAnswersRequest(BaseModel):
-    """Request body for ``PATCH /api/v1/intake-sessions/{session_id}/answers``."""
+    """Request body for ``PATCH /api/v1/intake-sessions/{session_id}/answers/guided``."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -75,7 +75,7 @@ class UpdateIntakeSessionAnswersRequest(BaseModel):
 
 
 class UpdateIntakeSessionAnswersResponse(BaseModel):
-    """Response for ``PATCH /api/v1/intake-sessions/{session_id}/answers``."""
+    """Response for ``PATCH /api/v1/intake-sessions/{session_id}/answers/guided``."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -86,15 +86,11 @@ class UpdateIntakeSessionAnswersResponse(BaseModel):
 
 
 class SubmitLlmIntakeInputRequest(BaseModel):
-    """Request body for ``POST /api/v1/intake-sessions/{session_id}/llm-input``."""
+    """Request body for ``POST /api/v1/intake-sessions/{session_id}/answers/llm``."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     input: str = Field(..., description="User free-text intake prompt.")
-    mode: Literal["llm", "guided"] = Field(
-        default="llm",
-        description='Echoed on the response; use ``"guided"`` when the client is driving the questionnaire UI.',
-    )
 
 
 class LlmExtractedLocation(BaseModel):
@@ -116,11 +112,10 @@ class LlmExtractedIntakePayload(BaseModel):
 
 
 class SubmitLlmIntakeInputResponse(BaseModel):
-    """Response body for ``POST /api/v1/intake-sessions/{session_id}/llm-input``."""
+    """Response body for ``POST /api/v1/intake-sessions/{session_id}/answers/llm``."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    mode: Literal["llm", "guided"]
     extracted: LlmExtractedIntakePayload
     criteria: dict[str, Any]
     current_index: int

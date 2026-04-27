@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -10,7 +11,44 @@ from fastapi import HTTPException, status
 
 from app.core.config import settings
 
-_TIMEOUT_SECONDS = 25.0
+# Separate connect vs read: slow inference should not share the same budget as TLS setup.
+_HF_HTTP_TIMEOUT = httpx.Timeout(connect=20.0, read=75.0, write=30.0, pool=10.0)
+_HF_TRANSIENT_RETRIES = 3
+_HF_RETRY_BASE_DELAY_S = 0.35
+
+
+async def _post_huggingface_chat(
+    *,
+    payload: dict[str, Any],
+    headers: dict[str, str],
+) -> httpx.Response:
+    """POST to Hugging Face with retries for transient connection failures."""
+    last_exc: httpx.HTTPError | None = None
+    for attempt in range(_HF_TRANSIENT_RETRIES):
+        try:
+            async with httpx.AsyncClient(timeout=_HF_HTTP_TIMEOUT) as client:
+                response = await client.post(
+                    settings.huggingface_base_url,
+                    headers=headers,
+                    json=payload,
+                )
+                response.raise_for_status()
+                return response
+        except (httpx.ConnectTimeout, httpx.ConnectError) as exc:
+            last_exc = exc
+            if attempt + 1 < _HF_TRANSIENT_RETRIES:
+                await asyncio.sleep(_HF_RETRY_BASE_DELAY_S * (2**attempt))
+        except httpx.HTTPError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Failed to call Hugging Face API: {exc}",
+            ) from exc
+
+    assert last_exc is not None
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=f"Failed to call Hugging Face API after retries: {last_exc}",
+    ) from last_exc
 
 
 def _extract_json_payload(raw_content: str) -> dict[str, Any]:
@@ -89,19 +127,7 @@ async def parse_intake_with_huggingface(
         "Content-Type": "application/json",
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
-            response = await client.post(
-                settings.huggingface_base_url,
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to call Hugging Face API: {exc}",
-        ) from exc
+    response = await _post_huggingface_chat(payload=payload, headers=headers)
 
     body = response.json()
     content = (
@@ -171,13 +197,15 @@ async def generate_llm_opening_question_text(
     system_prompt = (
         "You write one short, friendly question for a commercial real-estate intake chatbot.\n"
         "Return ONLY valid JSON: {\"text\": string}\n"
-        "The question should invite the user to describe what they are looking for in natural language.\n"
-        "Do not repeat the entire welcome message; write only the question line (one or two sentences max)."
+        "The question should invite the user to describe what they are looking for in "
+        "natural language.\n"
+        "Do not repeat the entire welcome message; write only the question line "
+        "(one or two sentences max)."
     )
     if question_options is not None:
         system_prompt += (
-            "\nIf question_options lists choices, phrase the question so the user can select from those "
-            "options (you may name the options briefly) or add a short clarification."
+            "\nIf question_options lists choices, phrase the question so the user can select "
+            "from those options (you may name the options briefly) or add a short clarification."
         )
 
     user_payload: dict[str, Any] = {
@@ -203,19 +231,7 @@ async def generate_llm_opening_question_text(
         "Content-Type": "application/json",
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
-            response = await client.post(
-                settings.huggingface_base_url,
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
-    except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to call Hugging Face API: {exc}",
-        ) from exc
+    response = await _post_huggingface_chat(payload=payload, headers=headers)
 
     body = response.json()
     content = (
