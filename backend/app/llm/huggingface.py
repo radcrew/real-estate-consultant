@@ -130,11 +130,7 @@ async def parse_intake_with_huggingface(
     response = await _post_huggingface_chat(payload=payload, headers=headers)
 
     body = response.json()
-    content = (
-        body.get("choices", [{}])[0]
-        .get("message", {})
-        .get("content", "")
-    )
+    content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
     if isinstance(content, list):
         content = "".join(
             part.get("text", "")
@@ -234,11 +230,7 @@ async def generate_llm_opening_question_text(
     response = await _post_huggingface_chat(payload=payload, headers=headers)
 
     body = response.json()
-    content = (
-        body.get("choices", [{}])[0]
-        .get("message", {})
-        .get("content", "")
-    )
+    content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
     if isinstance(content, list):
         content = "".join(
             part.get("text", "")
