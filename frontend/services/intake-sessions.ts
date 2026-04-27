@@ -13,12 +13,16 @@ export type IntakeSessionQuestion = {
   }>;
 };
 
+/** Query param for ``POST /intake-sessions`` (default on API is ``guided``). */
+export type IntakeSessionCreateMode = "guided" | "llm";
+
 export type CreateIntakeSessionResponse = {
   session_id: string;
   status: string;
   /** Present when the API returns questionnaire length; otherwise treat as single-step. */
   total_questions?: number;
-  first_question: IntakeSessionQuestion;
+  /** Set for ``guided`` mode; may be absent for ``llm`` (welcome-only) responses. */
+  first_question?: IntakeSessionQuestion | null;
 };
 
 export type SubmitIntakeSessionAnswerBody = {
@@ -87,9 +91,13 @@ export type LlmInputBody = {
 export class IntakeSessionsService {
   constructor(private readonly http: AxiosInstance) {}
 
-  async createSession(): Promise<CreateIntakeSessionResponse> {
+  async createSession(
+    mode: IntakeSessionCreateMode,
+  ): Promise<CreateIntakeSessionResponse> {
     const { data } = await this.http.post<CreateIntakeSessionResponse>(
       "/intake-sessions",
+      undefined,
+      { params: { mode } },
     );
     return data;
   }

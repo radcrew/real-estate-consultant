@@ -110,7 +110,14 @@ export const SearchWizardProvider = ({
     setErrorMessage(null);
 
     try {
-      const response = await createSession();
+      const response = await createSession("guided");
+      if (!response.first_question) {
+        setErrorMessage(
+          "The server is temporarily unavailable. Please try again later.",
+        );
+        setGuidedFormOpen(false);
+        return;
+      }
       const firstQuestion = parseQuestion(response.first_question);
 
       setSessionId(response.session_id);
@@ -140,7 +147,7 @@ export const SearchWizardProvider = ({
     setErrorMessage(null);
 
     try {
-      const response = await createSession();
+      const response = await createSession("llm");
       setSessionId(response.session_id);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
