@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useState,
   type PropsWithChildren,
@@ -47,6 +48,9 @@ type SearchWizardContextValue = {
   updateCurrentAnswer: (value: AnswerValue) => void;
   toggleCurrentMultiSelect: (value: string) => void;
   sessionId: string | null;
+  /** Assistant bubble texts from ``POST /intake-sessions?mode=llm`` (welcome + next question); cleared after ChatPanel consumes. */
+  llmChatBootstrap: string[] | null;
+  clearLlmChatBootstrap: () => void;
 };
 
 const SearchWizardContext = createContext<SearchWizardContextValue | null>(null);
@@ -75,6 +79,11 @@ export const SearchWizardProvider = ({
   const [isLoadingQuestion, setLoadingQuestion] = useState(false);
   const [isSubmitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [llmChatBootstrap, setLlmChatBootstrap] = useState<string[] | null>(null);
+
+  const clearLlmChatBootstrap = useCallback(() => {
+    setLlmChatBootstrap(null);
+  }, []);
 
   const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
   const canContinue = currentQuestion != null && isQuestionComplete(currentQuestion, currentAnswer);
@@ -91,6 +100,7 @@ export const SearchWizardProvider = ({
     setLoadingQuestion(false);
     setSubmitting(false);
     setErrorMessage(null);
+    setLlmChatBootstrap(null);
   };
 
   const resetToChooser = () => {
@@ -149,6 +159,16 @@ export const SearchWizardProvider = ({
     try {
       const response = await createSession("llm");
       setSessionId(response.session_id);
+      const parts: string[] = [];
+      const welcome = response.message?.trim();
+      if (welcome) {
+        parts.push(welcome);
+      }
+      const followUp = response.next_question?.text?.trim();
+      if (followUp) {
+        parts.push(followUp);
+      }
+      setLlmChatBootstrap(parts.length > 0 ? parts : null);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
       setSmartChatOpen(false);
@@ -293,6 +313,8 @@ export const SearchWizardProvider = ({
     updateCurrentAnswer,
     toggleCurrentMultiSelect,
     sessionId,
+    llmChatBootstrap,
+    clearLlmChatBootstrap,
   };
 
   return (

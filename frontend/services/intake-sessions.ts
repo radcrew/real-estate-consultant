@@ -16,12 +16,11 @@ export type IntakeSessionQuestion = {
 /** Query param for ``POST /intake-sessions`` (default on API is ``guided``). */
 export type IntakeSessionCreateMode = "guided" | "llm";
 
-export type CreateIntakeSessionResponse = {
+export type CreateGuidedIntakeSessionResponse = {
   session_id: string;
   status: string;
   /** Present when the API returns questionnaire length; otherwise treat as single-step. */
   total_questions?: number;
-  /** Set for ``guided`` mode; may be absent for ``llm`` (welcome-only) responses. */
   first_question?: IntakeSessionQuestion | null;
 };
 
@@ -72,6 +71,17 @@ export type LlmNextQuestion = {
   options?: unknown;
 };
 
+/** Response for ``POST /intake-sessions?mode=llm``. */
+export type CreateLlmIntakeSessionResponse = {
+  mode: "llm";
+  session_id: string;
+  status: string;
+  current_index: number;
+  total_questions: number;
+  message: string;
+  next_question: LlmNextQuestion | null;
+};
+
 export type LlmInputResponse = {
   mode: "llm";
   extracted: LlmExtracted;
@@ -91,14 +101,14 @@ export type LlmInputBody = {
 export class IntakeSessionsService {
   constructor(private readonly http: AxiosInstance) {}
 
+  async createSession(mode: "guided"): Promise<CreateGuidedIntakeSessionResponse>;
+  async createSession(mode: "llm"): Promise<CreateLlmIntakeSessionResponse>;
   async createSession(
     mode: IntakeSessionCreateMode,
-  ): Promise<CreateIntakeSessionResponse> {
-    const { data } = await this.http.post<CreateIntakeSessionResponse>(
-      "/intake-sessions",
-      undefined,
-      { params: { mode } },
-    );
+  ): Promise<CreateGuidedIntakeSessionResponse | CreateLlmIntakeSessionResponse> {
+    const { data } = await this.http.post<
+      CreateGuidedIntakeSessionResponse | CreateLlmIntakeSessionResponse
+    >("/intake-sessions", undefined, { params: { mode } });
     return data;
   }
 

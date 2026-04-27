@@ -4,20 +4,16 @@ import { useCallback } from "react";
 
 import {
   intakeSessionsService,
-  type IntakeSessionCreateMode,
   type LlmInputBody,
   type LlmInputResponse,
   type SubmitIntakeSessionAnswerBody,
   type SubmitIntakeSessionAnswerResponse,
-  type CreateIntakeSessionResponse,
   type CompleteIntakeSessionResponse,
 } from "@services/intake-sessions";
 
 export const useIntakeSessions = () => {
   const createSession = useCallback(
-    (mode: IntakeSessionCreateMode): Promise<CreateIntakeSessionResponse> => {
-      return intakeSessionsService.createSession(mode);
-    },
+    intakeSessionsService.createSession.bind(intakeSessionsService),
     [],
   );
 

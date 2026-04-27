@@ -8,7 +8,6 @@ import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@lib/api-errors";
 import type { LlmInputResponse } from "@services/intake-sessions";
 
-import { INTRO_MESSAGE } from "./constants";
 import type { ChatMessage } from "../types";
 import { ChatComposer } from "./chat-composer";
 import { MessageList } from "./message-list";
@@ -21,9 +20,11 @@ type ChatPanelProps = {
 export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
   const { submitLlmInput } = useIntakeSessions();
   const {
+    clearLlmChatBootstrap,
     errorMessage,
     isLoadingQuestion,
     isSubmitting,
+    llmChatBootstrap,
     sessionId,
     setErrorMessage,
   } = useSearchWizard();
@@ -32,23 +33,33 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
   const [draft, setDraft] = useState("");
   const [isSending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const welcomeSeeded = useRef(false);
+  const bootstrapAppliedForSession = useRef<string | null>(null);
 
   const isBusy = isLoadingQuestion && !sessionId;
 
   useEffect(() => {
-    if (!sessionId || welcomeSeeded.current) {
+    if (!sessionId) {
+      bootstrapAppliedForSession.current = null;
       return;
     }
-    welcomeSeeded.current = true;
-    setMessages([
-      {
+
+    if (
+      !llmChatBootstrap?.length ||
+      bootstrapAppliedForSession.current === sessionId
+    ) {
+      return;
+    }
+
+    bootstrapAppliedForSession.current = sessionId;
+    setMessages(
+      llmChatBootstrap.map((content) => ({
         id: crypto.randomUUID(),
-        role: "assistant",
-        content: INTRO_MESSAGE,
-      },
-    ]);
-  }, [sessionId]);
+        role: "assistant" as const,
+        content,
+      })),
+    );
+    clearLlmChatBootstrap();
+  }, [sessionId, llmChatBootstrap, clearLlmChatBootstrap]);
 
   useEffect(() => {
     textareaRef.current?.focus();
