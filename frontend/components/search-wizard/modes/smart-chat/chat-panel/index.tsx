@@ -88,6 +88,18 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
         mode: "llm",
       });
       onLlmSuccess(data);
+
+      const followUp = data.next_question?.text?.trim();
+      if (followUp) {
+        setMessages((m) => [
+          ...m,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: followUp,
+          },
+        ]);
+      }
     } catch (err) {
       setErrorMessage(getApiErrorMessage(err));
       setMessages((m) => m.filter((x) => x.id !== userMsg.id));
