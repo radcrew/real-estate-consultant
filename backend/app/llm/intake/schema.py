@@ -1,4 +1,4 @@
-"""Build JSON Schema prompts for intake extraction from question rows."""
+"""JSON Schema builders for intake extraction prompts."""
 
 from __future__ import annotations
 
@@ -13,47 +13,42 @@ from app.schemas.llm_intake_parse import LlmParseNextQuestion
 QuestionRow = dict[str, Any]
 
 
-def _extract_question_key(row: QuestionRow) -> str | None:
+def _question_key(row: QuestionRow) -> str | None:
     key = row.get("key")
     return key.strip() if isinstance(key, str) and key.strip() else None
 
 
-def _normalize_string_options(options: Any) -> list[str]:
+def _string_options(options: Any) -> list[str]:
     if isinstance(options, list):
-        return [str(x) for x in options if isinstance(x, (str, int, float))]
+        return [str(value) for value in options if isinstance(value, (str, int, float))]
     return []
 
 
-def list_question_keys(questions: list[QuestionRow]) -> list[str]:
+def list_available_question_keys(questions: list[QuestionRow]) -> list[str]:
     return [
         key
         for row in sorted_intake_questions(questions)
-        if (key := _extract_question_key(row))
+        if (key := _question_key(row))
     ]
 
 
 def list_required_question_keys(questions: list[QuestionRow]) -> list[str]:
-    """Keys the model should treat as required until filled."""
-    ordered = sorted_intake_questions(questions)
-
+    """Keys the model should continue treating as required until they are filled."""
+    ordered_questions = sorted_intake_questions(questions)
     required_keys = [
         key
-        for row in ordered
-        if (key := _extract_question_key(row)) and row.get("required")
+        for row in ordered_questions
+        if (key := _question_key(row)) and row.get("required")
     ]
+    return required_keys or list_available_question_keys(questions)
 
-    return required_keys or list_question_keys(questions)
 
-
-# -----------------------------
-# Schema builders
-# -----------------------------
-def _json_type_for_question_row(row: QuestionRow) -> dict[str, Any]:
+def _build_question_value_schema(row: QuestionRow) -> dict[str, Any]:
     raw_type = row.get("type")
-    qtype = raw_type.strip().lower() if isinstance(raw_type, str) else "text"
-    options = _normalize_string_options(row.get("options"))
+    question_type = raw_type.strip().lower() if isinstance(raw_type, str) else "text"
+    options = _string_options(row.get("options"))
 
-    if qtype in {"location", "geo", "address"}:
+    if question_type in {"location", "geo", "address"}:
         return {
             "type": "object",
             "description": (
@@ -67,7 +62,7 @@ def _json_type_for_question_row(row: QuestionRow) -> dict[str, Any]:
             },
         }
 
-    if qtype in {"range", "numeric_range", "sqft_range", "rent_range", "size_range"}:
+    if question_type in {"range", "numeric_range", "sqft_range", "rent_range", "size_range"}:
         return {
             "type": "object",
             "description": "Numeric bounds; omit keys or use null when unknown.",
@@ -77,7 +72,7 @@ def _json_type_for_question_row(row: QuestionRow) -> dict[str, Any]:
             },
         }
 
-    if qtype in {"multiselect", "multi_select", "tags", "checkboxes", "building_types"}:
+    if question_type in {"multiselect", "multi_select", "tags", "checkboxes", "building_types"}:
         schema: dict[str, Any] = {
             "type": "array",
             "items": {"type": "string"},
@@ -86,25 +81,33 @@ def _json_type_for_question_row(row: QuestionRow) -> dict[str, Any]:
             schema["description"] = f"Prefer one or more of: {', '.join(options)}"
         return schema
 
-    if qtype in {"number", "integer", "float"}:
+    if question_type in {"number", "integer", "float"}:
         return {"type": "number"}
 
-    if qtype in {"boolean", "bool"}:
+    if question_type in {"boolean", "bool"}:
         return {"type": "boolean"}
 
-    if qtype in {"select", "single_choice", "radio"} and options:
+    if question_type in {"select", "single_choice", "radio"} and options:
         return {"type": "string", "enum": options}
 
     return {"type": "string"}
 
 
-def build_intake_extraction_schema(*, questions: list[QuestionRow]) -> dict[str, Any]:
-    ordered = sorted_intake_questions(questions)
+def _add_question_description(schema: dict[str, Any], row: QuestionRow) -> dict[str, Any]:
+    text = row.get("text")
+    if isinstance(text, str) and text.strip():
+        description = f"Question: {text.strip()}"
+        existing = schema.get("description")
+        schema["description"] = f"{description}. {existing}" if existing else description
+    return schema
 
+
+def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, Any]:
+    ordered_questions = sorted_intake_questions(questions)
     extracted_properties = {
-        key: _with_question_description(_json_type_for_question_row(row), row)
-        for row in ordered
-        if (key := _extract_question_key(row))
+        key: _add_question_description(_build_question_value_schema(row), row)
+        for row in ordered_questions
+        if (key := _question_key(row))
     }
 
     return {
@@ -133,18 +136,9 @@ def build_intake_extraction_schema(*, questions: list[QuestionRow]) -> dict[str,
     }
 
 
-def _with_question_description(schema: dict[str, Any], row: QuestionRow) -> dict[str, Any]:
-    text = row.get("text")
-    if isinstance(text, str) and text.strip():
-        hint = f"Question: {text.strip()}"
-        desc = schema.get("description")
-        schema["description"] = f"{hint}. {desc}" if desc else hint
-    return schema
-
-
-def render_intake_extraction_schema(*, questions: list[QuestionRow]) -> str:
+def render_intake_response_schema(*, questions: list[QuestionRow]) -> str:
     return json.dumps(
-        build_intake_extraction_schema(questions=questions),
+        build_intake_response_schema(questions=questions),
         indent=2,
         ensure_ascii=True,
     )

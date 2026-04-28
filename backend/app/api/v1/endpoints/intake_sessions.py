@@ -8,8 +8,12 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, SupabaseSdkDep
-from app.llm.huggingface import extract_intake_answers, generate_opening_question_text
-from app.llm.intake import select_next_question
+from app.llm import (
+    INTAKE_OPENING_MESSAGE,
+    extract_intake_with_huggingface,
+    generate_opening_question_with_huggingface,
+    resolve_next_intake_question,
+)
 from app.models.intake_sessions import IntakeSession
 from app.repositories.intake_sessions import (
     append_intake_criteria_answer,
@@ -41,13 +45,6 @@ from app.schemas.intake_sessions import (
     UpdateIntakeSessionAnswersResponse,
 )
 
-INTAKE_OPENING_MESSAGE = (
-    "Hi! I'm here to help you find the right commercial property. "
-    "Tell me what you're looking for — be as detailed or brief as you want. "
-    'For example: "I need a 100k sqft industrial warehouse with 32ft clear '
-    'height in Chicago for lease, with at least 20 dock doors."'
-)
-
 router = APIRouter(tags=["intake-sessions"])
 
 
@@ -66,10 +63,10 @@ def compute_current_index(questions: list[dict], criteria: object) -> int:
         return 0
     count = 0
     for row in questions:
-        qkey = row.get("key")
-        if not isinstance(qkey, str):
+        question_key = row.get("key")
+        if not isinstance(question_key, str):
             continue
-        if _has_answer(criteria.get(qkey)):
+        if _has_answer(criteria.get(question_key)):
             count += 1
     return count
 
@@ -90,7 +87,7 @@ async def create_intake_session(
     created_session = await create_intake_session_row(client)
     questions = await load_intake_questions(client)
     total_questions = len(questions)
-    
+
     if not questions:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -99,10 +96,9 @@ async def create_intake_session(
 
     first_question = map_question_to_model(questions[0])
 
-
     if mode == "llm":
         try:
-            llm_question_text = await generate_opening_question_text(
+            llm_question_text = await generate_opening_question_with_huggingface(
                 welcome_message=INTAKE_OPENING_MESSAGE,
                 question_key=first_question.key,
                 question_type=first_question.type,
@@ -110,6 +106,7 @@ async def create_intake_session(
             )
         except HTTPException:
             llm_question_text = first_question.text
+
         next_question = IntakeSessionFirstQuestion(
             key=first_question.key,
             text=llm_question_text,
@@ -185,11 +182,7 @@ async def submit_intake_session_answers(
     next_question = map_question_to_model(next_row) if next_row is not None else None
     current_index = compute_current_index(questions, merged_criteria)
 
-    row = await save_intake_criteria(
-        client,
-        session_id,
-        merged_criteria,
-    )
+    row = await save_intake_criteria(client, session_id, merged_criteria)
     return UpdateIntakeSessionAnswersResponse(
         session=parse_intake_session(row),
         current_index=current_index,
@@ -211,11 +204,11 @@ async def submit_llm_intake_input(
     questions = await load_intake_questions(client)
 
     current_criteria = session_row.get("criteria")
-    existing_criteria = dict(current_criteria) if isinstance(current_criteria, dict) else {}
+    validated_criteria = dict(current_criteria) if isinstance(current_criteria, dict) else {}
 
-    llm_result = await extract_intake_answers(
+    llm_result = await extract_intake_with_huggingface(
         user_input=body.input,
-        existing_criteria=existing_criteria,
+        validated_criteria=validated_criteria,
         questions=questions,
     )
 
@@ -224,7 +217,7 @@ async def submit_llm_intake_input(
     missing_fields = llm_result["missing_fields"]
     is_complete = bool(llm_result["is_complete"])
 
-    next_question = select_next_question(
+    next_question = resolve_next_intake_question(
         questions,
         llm_result["next_question"],
         missing_fields,
