@@ -10,16 +10,16 @@ from fastapi import APIRouter, HTTPException, Query, status
 from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.llm.huggingface import (
     generate_llm_opening_question_text,
-    parse_intake_with_huggingface,
+    extract_intake_from_input,
 )
-from app.llm.intake import next_question_from_llm_response
+from app.llm.intake import resolve_next_question
 from app.models.intake_sessions import IntakeSession
 from app.repositories.intake_sessions import (
     append_intake_criteria_answer,
     create_intake_session_row,
     load_intake_session_row,
     parse_intake_session,
-    update_intake_session_after_answers,
+    save_intake_criteria,
     update_intake_session_completed,
 )
 from app.repositories.questions import (
@@ -65,7 +65,7 @@ def _has_answer(value: object) -> bool:
     return True
 
 
-def _current_index_for_answered_count(questions: list[dict], criteria: object) -> int:
+def compute_current_index(questions: list[dict], criteria: object) -> int:
     if not questions or not isinstance(criteria, dict):
         return 0
     count = 0
@@ -187,9 +187,9 @@ async def submit_intake_session_answers(
 
     next_row = next_question_row_after_order(questions, after_order=answered_order)
     next_question = map_question_to_model(next_row) if next_row is not None else None
-    current_index = _current_index_for_answered_count(questions, merged_criteria)
+    current_index = compute_current_index(questions, merged_criteria)
 
-    row = await update_intake_session_after_answers(
+    row = await save_intake_criteria(
         client,
         session_id,
         merged_criteria,
@@ -214,34 +214,35 @@ async def submit_llm_intake_input(
     session_row = await load_intake_session_row(client, session_id)
     questions = await load_intake_questions(client)
     question_keys = [
-        q["key"]
+        key
         for q in questions
-        if isinstance(q.get("key"), str) and q["key"].strip()
+        if isinstance(key := q.get("key"), str) and key.strip()
     ]
 
     current_criteria = session_row.get("criteria")
     existing_criteria = dict(current_criteria) if isinstance(current_criteria, dict) else {}
 
-    parsed = await parse_intake_with_huggingface(
+    llm_result = await extract_intake_from_input(
         user_input=body.input,
         existing_criteria=existing_criteria,
         question_keys=question_keys,
         required_fields=list(_REQUIRED_LLM_FIELDS),
     )
 
-    extracted = LlmExtractedIntakePayload.model_validate(parsed["extracted"])
-    merged_criteria = parsed["merged_criteria"]
-    missing_fields = parsed["missing_fields"]
+    extracted = LlmExtractedIntakePayload.model_validate(llm_result["extracted"])
+    merged_criteria = llm_result["merged_criteria"]
+    missing_fields = llm_result["missing_fields"]
+    is_complete = bool(llm_result["is_complete"])
 
-    next_question = next_question_from_llm_response(
+    next_question = resolve_next_question(
         questions,
-        parsed["next_question"],
+        llm_result["next_question"],
         missing_fields,
     )
 
-    current_index = _current_index_for_answered_count(questions, merged_criteria)
+    current_index = compute_current_index(questions, merged_criteria)
 
-    await update_intake_session_after_answers(client, session_id, merged_criteria)
+    await save_intake_criteria(client, session_id, merged_criteria)
     return SubmitLlmIntakeInputResponse(
         extracted=extracted,
         criteria=merged_criteria,
@@ -249,7 +250,7 @@ async def submit_llm_intake_input(
         total_questions=len(questions),
         missing_fields=missing_fields,
         next_question=next_question,
-        is_complete=bool(parsed["is_complete"]),
+        is_complete=is_complete,
     )
 
 

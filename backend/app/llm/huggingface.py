@@ -66,7 +66,7 @@ def _fallback_missing_fields(
     return [key for key in required_fields if key not in merged_criteria]
 
 
-async def parse_intake_with_huggingface(
+async def extract_intake_from_input(
     *,
     user_input: str,
     existing_criteria: dict[str, Any],

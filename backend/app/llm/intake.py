@@ -20,7 +20,7 @@ REQUIRED_LLM_FIELDS: tuple[str, ...] = (
 )
 
 
-def next_question_from_llm_response(
+def resolve_next_question(
     questions: list[dict],
     proposed_next: object,
     missing_fields: list[str],

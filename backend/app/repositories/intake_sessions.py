@@ -76,7 +76,7 @@ async def create_intake_session_row(client: AsyncClient) -> dict[str, Any]:
     )
 
 
-async def update_intake_session_after_answers(
+async def save_intake_criteria(
     client: AsyncClient,
     session_id: UUID,
     merged_criteria: dict[str, Any],
