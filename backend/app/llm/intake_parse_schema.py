@@ -1,9 +1,9 @@
-"""Build JSON Schema text for LLM intake parsing from ``public.questions`` rows."""
+"""Build JSON Schema text for LLM intake parsing from `public.questions` rows."""
 
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Iterable
 
 from pydantic import TypeAdapter
 
@@ -11,44 +11,45 @@ from app.repositories.questions import sorted_intake_questions
 from app.schemas.llm_intake_parse import LlmParseNextQuestion
 
 
+def _valid_key(row: dict) -> str | None:
+    key = row.get("key")
+    return key.strip() if isinstance(key, str) and key.strip() else None
+
+
+def _string_options(options: Any) -> list[str]:
+    if isinstance(options, list):
+        return [str(x) for x in options if isinstance(x, (str, int, float))]
+    return []
+
+
 def question_criteria_keys(questions: list[dict]) -> list[str]:
-    keys: list[str] = []
-    for row in sorted_intake_questions(questions):
-        k = row.get("key")
-        if isinstance(k, str) and k.strip():
-            keys.append(k.strip())
-    return keys
+    return [
+        key
+        for row in sorted_intake_questions(questions)
 
 
 def required_criteria_keys_for_llm(questions: list[dict]) -> list[str]:
-    """Keys the model should treat as required until filled.
-
-    Uses each row's ``required`` flag. If no row is marked required, every question
-    key is treated as required so the LLM funnel matches the configured questionnaire.
-    """
+    """Keys the model should treat as required until filled."""
     ordered = sorted_intake_questions(questions)
-    flagged: list[str] = []
-    for row in ordered:
-        k = row.get("key")
-        if not isinstance(k, str) or not k.strip():
-            continue
-        if bool(row.get("required")):
-            flagged.append(k.strip())
-    if flagged:
-        return flagged
-    return question_criteria_keys(questions)
+
+    required_keys = [
+        key
+        for row in ordered
+        if (key := _valid_key(row)) and row.get("required")
+    ]
+
+    return required_keys or question_criteria_keys(questions)
 
 
+# -----------------------------
+# Schema builders
+# -----------------------------
 def _json_type_for_question_row(row: dict) -> dict[str, Any]:
-    """Map a question ``type`` (and optional ``options``) to a JSON Schema fragment."""
     raw_type = row.get("type")
     qtype = raw_type.strip().lower() if isinstance(raw_type, str) else "text"
-    options = row.get("options")
-    opt_list: list[str] = []
-    if isinstance(options, list):
-        opt_list = [str(x) for x in options if isinstance(x, (str, int, float))]
+    options = _string_options(row.get("options"))
 
-    if qtype in ("location", "geo", "address"):
+    if qtype in {"location", "geo", "address"}:
         return {
             "type": "object",
             "description": (
@@ -62,7 +63,7 @@ def _json_type_for_question_row(row: dict) -> dict[str, Any]:
             },
         }
 
-    if qtype in ("range", "numeric_range", "sqft_range", "rent_range", "size_range"):
+    if qtype in {"range", "numeric_range", "sqft_range", "rent_range", "size_range"}:
         return {
             "type": "object",
             "description": "Numeric bounds; omit keys or use null when unknown.",
@@ -72,45 +73,35 @@ def _json_type_for_question_row(row: dict) -> dict[str, Any]:
             },
         }
 
-    if qtype in ("multiselect", "multi_select", "tags", "checkboxes", "building_types"):
-        frag: dict[str, Any] = {
+    if qtype in {"multiselect", "multi_select", "tags", "checkboxes", "building_types"}:
+        schema: dict[str, Any] = {
             "type": "array",
             "items": {"type": "string"},
         }
-        if opt_list:
-            frag["description"] = f"Prefer one or more of: {', '.join(opt_list)}"
-        return frag
+        if options:
+            schema["description"] = f"Prefer one or more of: {', '.join(options)}"
+        return schema
 
-    if qtype in ("number", "integer", "float"):
+    if qtype in {"number", "integer", "float"}:
         return {"type": "number"}
 
-    if qtype in ("boolean", "bool"):
+    if qtype in {"boolean", "bool"}:
         return {"type": "boolean"}
 
-    if qtype in ("select", "single_choice", "radio") and opt_list:
-        return {"type": "string", "enum": opt_list}
+    if qtype in {"select", "single_choice", "radio"} and options:
+        return {"type": "string", "enum": options}
 
     return {"type": "string"}
 
 
 def build_intake_parse_json_schema(*, questions: list[dict]) -> dict[str, Any]:
-    """Full JSON Schema for the model response (``extracted`` keys follow Supabase rows)."""
     ordered = sorted_intake_questions(questions)
-    extracted_properties: dict[str, Any] = {}
-    for row in ordered:
-        k = row.get("key")
-        if not isinstance(k, str) or not k.strip():
-            continue
-        key = k.strip()
-        frag = _json_type_for_question_row(row)
-        qtext = row.get("text")
-        if isinstance(qtext, str) and qtext.strip():
-            desc = frag.get("description")
-            hint = f"Question: {qtext.strip()}"
-            frag["description"] = f"{hint}. {desc}" if desc else hint
-        extracted_properties[key] = frag
 
-    next_q_schema = TypeAdapter(LlmParseNextQuestion).json_schema()
+    extracted_properties = {
+        key: _with_question_description(_json_type_for_question_row(row), row)
+        for row in ordered
+        if (key := _valid_key(row))
+    }
 
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -121,24 +112,35 @@ def build_intake_parse_json_schema(*, questions: list[dict]) -> dict[str, Any]:
                 "type": "object",
                 "additionalProperties": False,
                 "description": (
-                    "Sparse answers keyed by criteria field name (see questionnaire). "
-                    "Omit a property entirely when unknown."
+                    "Sparse answers keyed by criteria field name. "
+                    "Omit properties when unknown."
                 ),
                 "properties": extracted_properties,
             },
             "missing_fields": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Subset of required criteria keys that are still unknown.",
+                "description": "Required criteria keys still missing.",
             },
-            "next_question": next_q_schema,
+            "next_question": TypeAdapter(LlmParseNextQuestion).json_schema(),
             "is_complete": {"type": "boolean"},
         },
         "required": ["extracted", "missing_fields", "next_question", "is_complete"],
     }
 
 
+def _with_question_description(schema: dict[str, Any], row: dict) -> dict[str, Any]:
+    text = row.get("text")
+    if isinstance(text, str) and text.strip():
+        hint = f"Question: {text.strip()}"
+        desc = schema.get("description")
+        schema["description"] = f"{hint}. {desc}" if desc else hint
+    return schema
+
+
 def format_intake_parse_schema_for_prompt(*, questions: list[dict]) -> str:
-    """Indented JSON Schema string embedded in the system prompt."""
-    schema = build_intake_parse_json_schema(questions=questions)
-    return json.dumps(schema, indent=2, ensure_ascii=True)
+    return json.dumps(
+        build_intake_parse_json_schema(questions=questions),
+        indent=2,
+        ensure_ascii=True,
+    )
