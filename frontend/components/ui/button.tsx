@@ -10,6 +10,7 @@ import { cn } from "@lib/utils"
 
 const buttonRoot = [
   "group/button inline-flex shrink-0 items-center justify-center gap-1.5",
+  "cursor-pointer",
   "rounded-none border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap",
   "outline-none transition-colors select-none disabled:pointer-events-none disabled:opacity-50",
   "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 ring-offset-background",
