@@ -64,16 +64,17 @@ async def load_intake_session_row(client: AsyncClient, session_id: UUID) -> dict
     return get_single_row(result, detail=_LOAD_SESSION_ERROR)
 
 
-async def create_intake_session_row(client: AsyncClient) -> dict[str, Any]:
+async def create_intake_session_row(client: AsyncClient) -> IntakeSession:
     result = await execute_db_safe(
         client.table("intake_sessions")
         .insert({"search_profile_id": None, "criteria": {}})
         .execute(),
     )
-    return get_single_row(
+    row = get_single_row(
         result,
         detail="Unexpected response from Supabase when creating intake session.",
     )
+    return parse_intake_session(row)
 
 
 async def save_intake_criteria(
