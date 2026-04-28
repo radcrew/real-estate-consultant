@@ -10,12 +10,15 @@ from fastapi import HTTPException, status
 from pydantic import ValidationError
 
 from app.core.config import Settings, settings
-from app.llm.intake.schema import (
-    list_available_question_keys,
-    list_required_question_keys,
-    render_intake_response_schema,
-)
+from app.llm.intake.schema import extract_question_keys, render_intake_response_schema
 from app.llm.providers.http_client import post_json
+from app.llm.providers.prompts import (
+    DEFAULT_NEXT_QUESTION_PLACEHOLDER,
+    INTAKE_PARSE_SYSTEM_PROMPT_HEADER,
+    INTAKE_PARSE_SYSTEM_PROMPT_RULES,
+    OPENING_QUESTION_OPTIONS_HINT,
+    OPENING_QUESTION_SYSTEM_PROMPT_BASE,
+)
 from app.schemas.llm_intake_parse import LlmParseModelOutput
 
 HF_CONNECT_TIMEOUT = 20.0
@@ -55,24 +58,13 @@ class HuggingFaceProvider:
         questions: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Extract intake criteria and suggest a follow-up question from free-form text."""
-        self._ensure_api_key()
+        self._require_api_key()
 
-        question_keys = list_available_question_keys(questions)
-        required_fields = list_required_question_keys(questions)
+        question_keys, required_fields = extract_question_keys(questions)
         intake_schema = render_intake_response_schema(questions=questions)
-
         system_prompt = (
-            "You parse user real-estate search prompts into structured JSON.\n"
-            "Return ONLY one JSON object that validates against this JSON Schema "
-            "(no markdown fences, no commentary):\n"
-            f"{intake_schema}\n"
-            "Rules:\n"
-            "- Keep ``extracted`` sparse: omit properties when unknown.\n"
-            "- ``missing_fields`` must list only keys still missing from required criteria "
-            "(see required_fields in the user message).\n"
-            "- ``next_question.key`` should be one of question_keys when possible, "
-            "ideally the first missing required field.\n"
-            "- ``next_question.text`` should be concise and conversational."
+            f"{INTAKE_PARSE_SYSTEM_PROMPT_HEADER}{intake_schema}\n"
+            f"{INTAKE_PARSE_SYSTEM_PROMPT_RULES}"
         )
 
         user_prompt = json.dumps(
@@ -85,7 +77,7 @@ class HuggingFaceProvider:
             ensure_ascii=True,
         )
 
-        response_body = await self._chat_completion(
+        response_body = await self._post_messages(
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -94,15 +86,135 @@ class HuggingFaceProvider:
             max_tokens=450,
         )
         response_text = self._extract_chat_message_text(response_body)
+        parsed_payload = self._parse_llm_response_json(response_text)
+        return self._compose_intake_parse_result(
+            parsed_payload=parsed_payload,
+            question_keys=question_keys,
+            current_criteria=current_criteria,
+            required_fields=required_fields,
+        )
 
-        try:
-            parsed_payload = self._parse_json_object_from_text(response_text)
-        except (ValueError, json.JSONDecodeError) as exc:
+    async def generate_opening_question_text(
+        self,
+        *,
+        welcome_message: str,
+        question_key: str,
+        question_type: str,
+        question_options: Any | None = None,
+    ) -> str:
+        """Generate one short conversational opening question line as JSON."""
+        self._require_api_key()
+
+        system_prompt = OPENING_QUESTION_SYSTEM_PROMPT_BASE
+        if question_options is not None:
+            system_prompt += OPENING_QUESTION_OPTIONS_HINT
+
+        user_payload: dict[str, Any] = {
+            "welcome_message": welcome_message,
+            "question_key": question_key,
+            "question_type": question_type,
+        }
+        if question_options is not None:
+            user_payload["question_options"] = question_options
+
+        response_body = await self._post_messages(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": json.dumps(user_payload, ensure_ascii=True),
+                },
+            ],
+            temperature=0.35,
+            max_tokens=200,
+        )
+        response_text = self._extract_chat_message_text(response_body)
+        parsed_payload = self._parse_llm_response_json(response_text)
+
+        text = parsed_payload.get("text")
+        if not isinstance(text, str) or not text.strip():
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Hugging Face response was not valid JSON.",
-            ) from exc
+                detail="Hugging Face response missing text field.",
+            )
+        return text.strip()
 
+    async def _post_messages(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        temperature: float,
+        max_tokens: int,
+    ) -> dict[str, Any]:
+        """POST chat messages to the provider and return parsed JSON body."""
+        payload = {
+            "model": self.settings.huggingface_model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        headers = {
+            "Authorization": f"Bearer {self.settings.huggingface_api_key}",
+            "Content-Type": "application/json",
+        }
+        response = await post_json(
+            url=self.settings.huggingface_base_url,
+            headers=headers,
+            payload=payload,
+            timeout=self.timeout,
+            retries=self.transient_retries,
+            retry_base_delay_s=self.retry_base_delay_s,
+            error_prefix="Failed to call Hugging Face API",
+        )
+        return response.json()
+
+    def _build_intake_parse_fallback(
+        self,
+        *,
+        parsed_payload: dict[str, Any],
+        current_criteria: dict[str, Any],
+        question_keys: list[str],
+        required_fields: list[str],
+    ) -> dict[str, Any]:
+        extracted = parsed_payload.get("extracted")
+        if not isinstance(extracted, dict):
+            extracted = {}
+        allowed_keys = set(question_keys)
+        extracted = {key: value for key, value in extracted.items() if key in allowed_keys}
+        merged_criteria = {**current_criteria, **extracted}
+
+        missing_fields = parsed_payload.get("missing_fields")
+        if not isinstance(missing_fields, list):
+            missing_fields = self._missing_required_fields(merged_criteria, required_fields)
+        else:
+            missing_fields = [
+                key for key in missing_fields if isinstance(key, str) and key in required_fields
+            ]
+
+        next_question = parsed_payload.get("next_question")
+        if not isinstance(next_question, dict):
+            next_question = dict(DEFAULT_NEXT_QUESTION_PLACEHOLDER)
+
+        is_complete = parsed_payload.get("is_complete")
+        if not isinstance(is_complete, bool):
+            is_complete = len(missing_fields) == 0
+
+        return {
+            "extracted": extracted,
+            "merged_criteria": merged_criteria,
+            "missing_fields": missing_fields,
+            "next_question": next_question,
+            "is_complete": is_complete,
+        }
+
+    def _compose_intake_parse_result(
+        self,
+        *,
+        parsed_payload: dict[str, Any],
+        question_keys: list[str],
+        current_criteria: dict[str, Any],
+        required_fields: list[str],
+    ) -> dict[str, Any]:
         try:
             normalized_output = LlmParseModelOutput.model_validate(
                 parsed_payload,
@@ -141,152 +253,23 @@ class HuggingFaceProvider:
             "is_complete": is_complete,
         }
 
-    async def generate_opening_question_text(
-        self,
-        *,
-        welcome_message: str,
-        question_key: str,
-        question_type: str,
-        question_options: Any | None = None,
-    ) -> str:
-        """Generate one short conversational opening question line as JSON."""
-        self._ensure_api_key()
-
-        system_prompt = (
-            "You write one short, friendly question for a commercial real-estate intake chatbot.\n"
-            "Return ONLY valid JSON: {\"text\": string}\n"
-            "The question should invite the user to describe what they are looking for in "
-            "natural language.\n"
-            "Do not repeat the entire welcome message; write only the question line "
-            "(one or two sentences max)."
-        )
-        if question_options is not None:
-            system_prompt += (
-                "\nIf question_options lists choices, phrase the question so the user can select "
-                "from those options (you may name the options briefly) "
-                "or add a short clarification."
-            )
-
-        user_payload: dict[str, Any] = {
-            "welcome_message": welcome_message,
-            "question_key": question_key,
-            "question_type": question_type,
-        }
-        if question_options is not None:
-            user_payload["question_options"] = question_options
-
-        response_body = await self._chat_completion(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {
-                    "role": "user",
-                    "content": json.dumps(user_payload, ensure_ascii=True),
-                },
-            ],
-            temperature=0.35,
-            max_tokens=200,
-        )
-        response_text = self._extract_chat_message_text(response_body)
-
-        try:
-            parsed_payload = self._parse_json_object_from_text(response_text)
-        except (ValueError, json.JSONDecodeError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Hugging Face response was not valid JSON.",
-            ) from exc
-
-        text = parsed_payload.get("text")
-        if not isinstance(text, str) or not text.strip():
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Hugging Face response missing text field.",
-            )
-        return text.strip()
-
-    async def _chat_completion(
-        self,
-        *,
-        messages: list[dict[str, Any]],
-        temperature: float,
-        max_tokens: int,
-    ) -> dict[str, Any]:
-        payload = {
-            "model": self.settings.huggingface_model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        }
-        headers = {
-            "Authorization": f"Bearer {self.settings.huggingface_api_key}",
-            "Content-Type": "application/json",
-        }
-        response = await self._post_chat_completion(payload=payload, headers=headers)
-        return response.json()
-
-    async def _post_chat_completion(
-        self,
-        *,
-        payload: dict[str, Any],
-        headers: dict[str, str],
-    ) -> httpx.Response:
-        """POST to Hugging Face with shared retry behavior."""
-        return await post_json(
-            url=self.settings.huggingface_base_url,
-            headers=headers,
-            payload=payload,
-            timeout=self.timeout,
-            retries=self.transient_retries,
-            retry_base_delay_s=self.retry_base_delay_s,
-            error_prefix="Failed to call Hugging Face API",
-        )
-
-    def _build_intake_parse_fallback(
-        self,
-        *,
-        parsed_payload: dict[str, Any],
-        current_criteria: dict[str, Any],
-        question_keys: list[str],
-        required_fields: list[str],
-    ) -> dict[str, Any]:
-        extracted = parsed_payload.get("extracted")
-        if not isinstance(extracted, dict):
-            extracted = {}
-        allowed_keys = set(question_keys)
-        extracted = {key: value for key, value in extracted.items() if key in allowed_keys}
-        merged_criteria = {**current_criteria, **extracted}
-
-        missing_fields = parsed_payload.get("missing_fields")
-        if not isinstance(missing_fields, list):
-            missing_fields = self._missing_required_fields(merged_criteria, required_fields)
-        else:
-            missing_fields = [
-                key for key in missing_fields if isinstance(key, str) and key in required_fields
-            ]
-
-        next_question = parsed_payload.get("next_question")
-        if not isinstance(next_question, dict):
-            next_question = {"key": None, "text": None}
-
-        is_complete = parsed_payload.get("is_complete")
-        if not isinstance(is_complete, bool):
-            is_complete = len(missing_fields) == 0
-
-        return {
-            "extracted": extracted,
-            "merged_criteria": merged_criteria,
-            "missing_fields": missing_fields,
-            "next_question": next_question,
-            "is_complete": is_complete,
-        }
-
-    def _ensure_api_key(self) -> None:
+    def _require_api_key(self) -> None:
         if self.settings.huggingface_api_key.strip():
             return
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Hugging Face API key is not configured.",
         )
+
+    def _parse_llm_response_json(self, response_text: str) -> dict[str, Any]:
+        try:
+            return self._parse_json_object_from_text(response_text)
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Hugging Face response was not valid JSON.",
+            ) from exc
+
 
     @staticmethod
     def _parse_json_object_from_text(raw_content: str) -> dict[str, Any]:
@@ -295,6 +278,7 @@ class HuggingFaceProvider:
         if start == -1 or end == -1 or end <= start:
             raise ValueError("Model response did not contain a JSON object.")
         return json.loads(raw_content[start : end + 1])
+
 
     @staticmethod
     def _missing_required_fields(

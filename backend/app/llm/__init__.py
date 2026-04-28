@@ -3,9 +3,8 @@
 from app.llm.intake import (
     INTAKE_OPENING_MESSAGE,
     build_intake_response_schema,
+    extract_question_keys,
     generate_opening_question,
-    list_available_question_keys,
-    list_required_question_keys,
     parse_user_input,
     render_intake_response_schema,
     resolve_next_intake_question,
@@ -17,9 +16,8 @@ __all__ = [
     "build_intake_response_schema",
     "huggingface_provider",
     "parse_user_input",
+    "extract_question_keys",
     "generate_opening_question",
-    "list_available_question_keys",
-    "list_required_question_keys",
     "render_intake_response_schema",
     "resolve_next_intake_question",
 ]

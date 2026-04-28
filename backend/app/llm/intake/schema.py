@@ -24,23 +24,26 @@ def _string_options(options: Any) -> list[str]:
     return []
 
 
-def list_available_question_keys(questions: list[QuestionRow]) -> list[str]:
-    return [
+def extract_question_keys(
+    questions: list[QuestionRow],
+) -> tuple[list[str], list[str]]:
+    """Return (all question keys in order, keys treated as required until filled).
+
+    If no rows are marked required, required_fields matches the full key list.
+    """
+    ordered_questions = sorted_intake_questions(questions)
+    available = [
         key
-        for row in sorted_intake_questions(questions)
+        for row in ordered_questions
         if (key := _question_key(row))
     ]
-
-
-def list_required_question_keys(questions: list[QuestionRow]) -> list[str]:
-    """Keys the model should continue treating as required until they are filled."""
-    ordered_questions = sorted_intake_questions(questions)
-    required_keys = [
+    required = [
         key
         for row in ordered_questions
         if (key := _question_key(row)) and row.get("required")
     ]
-    return required_keys or list_available_question_keys(questions)
+    required_fields = required or available
+    return available, required_fields
 
 
 def _build_question_value_schema(row: QuestionRow) -> dict[str, Any]:
