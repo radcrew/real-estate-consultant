@@ -92,53 +92,48 @@ async def create_intake_session(
 ) -> CreateIntakeSessionResponse:
     """Create an intake session. Guided mode returns the first question; LLM mode returns a welcome message."""
     created_session = await create_intake_session_row(client)
-    validated_session = parse_intake_session(created_session)
     questions = await load_intake_questions(client)
     total_questions = len(questions)
-
-    if validated_session.id is None:
+    
+    if not questions:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unexpected response from Supabase when creating intake session.",
+            detail="No questions configured for intake flow.",
         )
 
+    first_question = map_question_to_model(questions[0])
+
+
     if mode == "llm":
-        if not questions:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="No questions configured for intake flow.",
-            )
-        first_mapped = map_question_to_model(questions[0])
         try:
             llm_question_text = await generate_llm_opening_question_text(
                 welcome_message=LLM_INTAKE_OPENING_MESSAGE,
-                question_key=first_mapped.key,
-                question_type=first_mapped.type,
-                question_options=first_mapped.options,
+                question_key=first_question.key,
+                question_type=first_question.type,
+                question_options=first_question.options,
             )
         except HTTPException:
-            llm_question_text = first_mapped.text
+            llm_question_text = first_question.text
         next_question = IntakeSessionFirstQuestion(
-            key=first_mapped.key,
+            key=first_question.key,
             text=llm_question_text,
-            type=first_mapped.type,
-            options=first_mapped.options,
+            type=first_question.type,
+            options=first_question.options,
         )
         return CreateIntakeSessionResponseLlm(
             mode="llm",
-            session_id=validated_session.id,
-            status=validated_session.status,
+            session_id=created_session.id,
+            status=created_session.status,
             current_index=0,
             total_questions=total_questions,
             message=LLM_INTAKE_OPENING_MESSAGE,
             next_question=next_question,
         )
 
-    first_question = map_question_to_model(questions[0])
     return CreateIntakeSessionResponseGuided(
         mode="guided",
-        session_id=validated_session.id,
-        status=validated_session.status,
+        session_id=created_session.id,
+        status=created_session.status,
         current_index=0,
         total_questions=total_questions,
         first_question=first_question,
