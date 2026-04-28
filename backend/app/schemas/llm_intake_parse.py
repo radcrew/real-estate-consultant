@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, ValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 
 class LlmParseNextQuestion(BaseModel):
@@ -46,7 +46,3 @@ class LlmParseModelOutput(BaseModel):
             return v
         allow = set(allowed)
         return {k: val for k, val in v.items() if k in allow}
-
-
-class LlmExtractedIntakePayload(RootModel[dict[str, Any]]):
-    """Sparse criteria extracted from user text; keys match ``public.questions.key``."""

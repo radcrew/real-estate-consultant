@@ -8,7 +8,6 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.intake_sessions import IntakeSession
-from app.schemas.llm_intake_parse import LlmExtractedIntakePayload
 
 
 class IntakeSessionFirstQuestion(BaseModel):
@@ -99,7 +98,7 @@ class SubmitLlmIntakeInputResponse(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    extracted: LlmExtractedIntakePayload
+    extracted: dict[str, Any]
     criteria: dict[str, Any]
     current_index: int
     total_questions: int

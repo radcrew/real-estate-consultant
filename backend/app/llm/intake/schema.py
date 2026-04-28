@@ -111,7 +111,6 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
     }
 
     return {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "additionalProperties": False,
         "properties": {

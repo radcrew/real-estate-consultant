@@ -10,8 +10,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.llm import (
     INTAKE_OPENING_MESSAGE,
-    extract_intake_with_huggingface,
-    generate_opening_question_with_huggingface,
+    generate_opening_question,
+    parse_user_input,
     resolve_next_intake_question,
 )
 from app.models.intake_sessions import IntakeSession
@@ -38,37 +38,14 @@ from app.schemas.intake_sessions import (
     CreateIntakeSessionResponseGuided,
     CreateIntakeSessionResponseLlm,
     IntakeSessionFirstQuestion,
-    LlmExtractedIntakePayload,
     SubmitLlmIntakeInputRequest,
     SubmitLlmIntakeInputResponse,
     UpdateIntakeSessionAnswersRequest,
     UpdateIntakeSessionAnswersResponse,
 )
+from app.utils.intake_validation import compute_current_index
 
 router = APIRouter(tags=["intake-sessions"])
-
-
-def _has_answer(value: object) -> bool:
-    if value is None:
-        return False
-    if isinstance(value, str):
-        return bool(value.strip())
-    if isinstance(value, (list, dict, tuple, set)):
-        return len(value) > 0
-    return True
-
-
-def compute_current_index(questions: list[dict], criteria: object) -> int:
-    if not questions or not isinstance(criteria, dict):
-        return 0
-    count = 0
-    for row in questions:
-        question_key = row.get("key")
-        if not isinstance(question_key, str):
-            continue
-        if _has_answer(criteria.get(question_key)):
-            count += 1
-    return count
 
 
 @router.post(
@@ -98,7 +75,7 @@ async def create_intake_session(
 
     if mode == "llm":
         try:
-            llm_question_text = await generate_opening_question_with_huggingface(
+            llm_question_text = await generate_opening_question(
                 welcome_message=INTAKE_OPENING_MESSAGE,
                 question_key=first_question.key,
                 question_type=first_question.type,
@@ -204,15 +181,15 @@ async def submit_llm_intake_input(
     questions = await load_intake_questions(client)
 
     current_criteria = session_row.get("criteria")
-    validated_criteria = dict(current_criteria) if isinstance(current_criteria, dict) else {}
+    current_criteria_dict = dict(current_criteria) if isinstance(current_criteria, dict) else {}
 
-    llm_result = await extract_intake_with_huggingface(
+    llm_result = await parse_user_input(
         user_input=body.input,
-        validated_criteria=validated_criteria,
+        current_criteria=current_criteria_dict,
         questions=questions,
     )
 
-    extracted = LlmExtractedIntakePayload.model_validate(llm_result["extracted"])
+    extracted = llm_result["extracted"]
     merged_criteria = llm_result["merged_criteria"]
     missing_fields = llm_result["missing_fields"]
     is_complete = bool(llm_result["is_complete"])

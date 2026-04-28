@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from typing import Any
 
@@ -16,7 +15,15 @@ from app.llm.intake.schema import (
     list_required_question_keys,
     render_intake_response_schema,
 )
+from app.llm.providers.http_client import post_json
 from app.schemas.llm_intake_parse import LlmParseModelOutput
+
+HF_CONNECT_TIMEOUT = 20.0
+HF_READ_TIMEOUT = 75.0
+HF_WRITE_TIMEOUT = 30.0
+HF_POOL_TIMEOUT = 10.0
+HF_TRANSIENT_RETRIES = 3
+HF_RETRY_BASE_DELAY = 0.35
 
 
 class HuggingFaceProvider:
@@ -27,24 +34,24 @@ class HuggingFaceProvider:
         *,
         settings: Settings,
         timeout: httpx.Timeout | None = None,
-        transient_retries: int = 3,
-        retry_base_delay_s: float = 0.35,
+        transient_retries: int = HF_TRANSIENT_RETRIES,
+        retry_base_delay_s: float = HF_RETRY_BASE_DELAY,
     ) -> None:
         self.settings = settings
         self.timeout = timeout or httpx.Timeout(
-            connect=20.0,
-            read=75.0,
-            write=30.0,
-            pool=10.0,
+            connect = HF_CONNECT_TIMEOUT,
+            read = HF_READ_TIMEOUT,
+            write = HF_WRITE_TIMEOUT,
+            pool = HF_POOL_TIMEOUT,
         )
         self.transient_retries = transient_retries
         self.retry_base_delay_s = retry_base_delay_s
 
-    async def extract_intake_answers(
+    async def parse_user_input(
         self,
         *,
         user_input: str,
-        validated_criteria: dict[str, Any],
+        current_criteria: dict[str, Any],
         questions: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Extract intake criteria and suggest a follow-up question from free-form text."""
@@ -52,13 +59,13 @@ class HuggingFaceProvider:
 
         question_keys = list_available_question_keys(questions)
         required_fields = list_required_question_keys(questions)
-        schema_block = render_intake_response_schema(questions=questions)
+        intake_schema = render_intake_response_schema(questions=questions)
 
         system_prompt = (
             "You parse user real-estate search prompts into structured JSON.\n"
             "Return ONLY one JSON object that validates against this JSON Schema "
             "(no markdown fences, no commentary):\n"
-            f"{schema_block}\n"
+            f"{intake_schema}\n"
             "Rules:\n"
             "- Keep ``extracted`` sparse: omit properties when unknown.\n"
             "- ``missing_fields`` must list only keys still missing from required criteria "
@@ -71,7 +78,7 @@ class HuggingFaceProvider:
         user_prompt = json.dumps(
             {
                 "user_input": user_input,
-                "validated_criteria": validated_criteria,
+                "current_criteria": current_criteria,
                 "question_keys": question_keys,
                 "required_fields": required_fields,
             },
@@ -102,15 +109,15 @@ class HuggingFaceProvider:
                 context={"allowed_criteria_keys": question_keys},
             )
         except ValidationError:
-            return self._coerce_intake_parse_fallback(
+            return self._build_intake_parse_fallback(
                 parsed_payload=parsed_payload,
-                validated_criteria=validated_criteria,
+                current_criteria=current_criteria,
                 question_keys=question_keys,
                 required_fields=required_fields,
             )
 
         extracted = normalized_output.extracted
-        merged_criteria = {**validated_criteria, **extracted}
+        merged_criteria = {**current_criteria, **extracted}
         still_missing = self._missing_required_fields(merged_criteria, required_fields)
         model_missing = [
             key for key in normalized_output.missing_fields if key in required_fields
@@ -156,7 +163,8 @@ class HuggingFaceProvider:
         if question_options is not None:
             system_prompt += (
                 "\nIf question_options lists choices, phrase the question so the user can select "
-                "from those options (you may name the options briefly) or add a short clarification."
+                "from those options (you may name the options briefly) "
+                "or add a short clarification."
             )
 
         user_payload: dict[str, Any] = {
@@ -222,39 +230,22 @@ class HuggingFaceProvider:
         payload: dict[str, Any],
         headers: dict[str, str],
     ) -> httpx.Response:
-        """POST to Hugging Face with retries for transient connection failures."""
-        last_exception: httpx.HTTPError | None = None
-        for attempt in range(self.transient_retries):
-            try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    response = await client.post(
-                        self.settings.huggingface_base_url,
-                        headers=headers,
-                        json=payload,
-                    )
-                    response.raise_for_status()
-                    return response
-            except (httpx.ConnectTimeout, httpx.ConnectError) as exc:
-                last_exception = exc
-                if attempt + 1 < self.transient_retries:
-                    await asyncio.sleep(self.retry_base_delay_s * (2**attempt))
-            except httpx.HTTPError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"Failed to call Hugging Face API: {exc}",
-                ) from exc
+        """POST to Hugging Face with shared retry behavior."""
+        return await post_json(
+            url=self.settings.huggingface_base_url,
+            headers=headers,
+            payload=payload,
+            timeout=self.timeout,
+            retries=self.transient_retries,
+            retry_base_delay_s=self.retry_base_delay_s,
+            error_prefix="Failed to call Hugging Face API",
+        )
 
-        assert last_exception is not None
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to call Hugging Face API after retries: {last_exception}",
-        ) from last_exception
-
-    def _coerce_intake_parse_fallback(
+    def _build_intake_parse_fallback(
         self,
         *,
         parsed_payload: dict[str, Any],
-        validated_criteria: dict[str, Any],
+        current_criteria: dict[str, Any],
         question_keys: list[str],
         required_fields: list[str],
     ) -> dict[str, Any]:
@@ -263,7 +254,7 @@ class HuggingFaceProvider:
             extracted = {}
         allowed_keys = set(question_keys)
         extracted = {key: value for key, value in extracted.items() if key in allowed_keys}
-        merged_criteria = {**validated_criteria, **extracted}
+        merged_criteria = {**current_criteria, **extracted}
 
         missing_fields = parsed_payload.get("missing_fields")
         if not isinstance(missing_fields, list):
@@ -326,40 +317,9 @@ class HuggingFaceProvider:
         return content
 
 
-default_huggingface_provider = HuggingFaceProvider(settings=settings)
-
-
-async def extract_intake_with_huggingface(
-    *,
-    user_input: str,
-    validated_criteria: dict[str, Any],
-    questions: list[dict[str, Any]],
-) -> dict[str, Any]:
-    return await default_huggingface_provider.extract_intake_answers(
-        user_input=user_input,
-        validated_criteria=validated_criteria,
-        questions=questions,
-    )
-
-
-async def generate_opening_question_with_huggingface(
-    *,
-    welcome_message: str,
-    question_key: str,
-    question_type: str,
-    question_options: Any | None = None,
-) -> str:
-    return await default_huggingface_provider.generate_opening_question_text(
-        welcome_message=welcome_message,
-        question_key=question_key,
-        question_type=question_type,
-        question_options=question_options,
-    )
+huggingface_provider = HuggingFaceProvider(settings=settings)
 
 
 __all__ = [
-    "HuggingFaceProvider",
-    "default_huggingface_provider",
-    "extract_intake_with_huggingface",
-    "generate_opening_question_with_huggingface",
+    "huggingface_provider",
 ]
