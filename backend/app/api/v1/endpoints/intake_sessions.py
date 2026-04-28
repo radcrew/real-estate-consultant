@@ -9,8 +9,8 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.llm.huggingface import (
-    generate_llm_opening_question_text,
     extract_intake_from_input,
+    generate_llm_opening_question_text,
 )
 from app.llm.intake import resolve_next_question
 from app.models.intake_sessions import IntakeSession
@@ -36,13 +36,14 @@ from app.schemas.intake_sessions import (
     CreateIntakeSessionResponse,
     CreateIntakeSessionResponseGuided,
     CreateIntakeSessionResponseLlm,
-    LlmExtractedIntakePayload,
     IntakeSessionFirstQuestion,
+    LlmExtractedIntakePayload,
     SubmitLlmIntakeInputRequest,
     SubmitLlmIntakeInputResponse,
     UpdateIntakeSessionAnswersRequest,
     UpdateIntakeSessionAnswersResponse,
 )
+
 LLM_INTAKE_OPENING_MESSAGE = (
     "Hi! I'm here to help you find the right commercial property. "
     "Tell me what you're looking for — be as detailed or brief as you want. "
@@ -51,8 +52,6 @@ LLM_INTAKE_OPENING_MESSAGE = (
 )
 
 router = APIRouter(tags=["intake-sessions"])
-
-_REQUIRED_LLM_FIELDS: tuple[str, ...] = ("building_type", "location", "radius_miles", "listing_type")
 
 
 def _has_answer(value: object) -> bool:
@@ -90,7 +89,7 @@ async def create_intake_session(
         description='Intake style: "guided" uses the questionnaire; "llm" returns an open prompt.',
     ),
 ) -> CreateIntakeSessionResponse:
-    """Create an intake session. Guided mode returns the first question; LLM mode returns a welcome message."""
+    """Create an intake session (guided: first question; LLM: welcome + next prompt)."""
     created_session = await create_intake_session_row(client)
     questions = await load_intake_questions(client)
     total_questions = len(questions)
@@ -213,11 +212,6 @@ async def submit_llm_intake_input(
 ) -> SubmitLlmIntakeInputResponse:
     session_row = await load_intake_session_row(client, session_id)
     questions = await load_intake_questions(client)
-    question_keys = [
-        key
-        for q in questions
-        if isinstance(key := q.get("key"), str) and key.strip()
-    ]
 
     current_criteria = session_row.get("criteria")
     existing_criteria = dict(current_criteria) if isinstance(current_criteria, dict) else {}
@@ -225,8 +219,7 @@ async def submit_llm_intake_input(
     llm_result = await extract_intake_from_input(
         user_input=body.input,
         existing_criteria=existing_criteria,
-        question_keys=question_keys,
-        required_fields=list(_REQUIRED_LLM_FIELDS),
+        questions=questions,
     )
 
     extracted = LlmExtractedIntakePayload.model_validate(llm_result["extracted"])

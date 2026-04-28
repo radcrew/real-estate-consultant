@@ -7,16 +7,9 @@ from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 
 LLM_INTAKE_OPENING_MESSAGE = (
     "Hi! I'm here to help you find the right commercial property. "
-    "Tell me what you're looking for â€” be as detailed or brief as you want. "
+    "Tell me what you're looking for — be as detailed or brief as you want. "
     'For example: "I need a 100k sqft industrial warehouse with 32ft clear '
     'height in Chicago for lease, with at least 20 dock doors."'
-)
-
-REQUIRED_LLM_FIELDS: tuple[str, ...] = (
-    "building_type",
-    "location",
-    "radius_miles",
-    "listing_type",
 )
 
 

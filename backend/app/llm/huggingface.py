@@ -8,8 +8,15 @@ from typing import Any
 
 import httpx
 from fastapi import HTTPException, status
+from pydantic import ValidationError
 
 from app.core.config import settings
+from app.llm.intake_parse_schema import (
+    format_intake_parse_schema_for_prompt,
+    question_criteria_keys,
+    required_criteria_keys_for_llm,
+)
+from app.schemas.llm_intake_parse import LlmParseModelOutput
 
 # Separate connect vs read: slow inference should not share the same budget as TLS setup.
 _HF_HTTP_TIMEOUT = httpx.Timeout(connect=20.0, read=75.0, write=30.0, pool=10.0)
@@ -70,8 +77,7 @@ async def extract_intake_from_input(
     *,
     user_input: str,
     existing_criteria: dict[str, Any],
-    question_keys: list[str],
-    required_fields: list[str],
+    questions: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Use Hugging Face chat completion API to extract criteria and suggest next question."""
     if not settings.huggingface_api_key.strip():
@@ -80,26 +86,22 @@ async def extract_intake_from_input(
             detail="Hugging Face API key is not configured.",
         )
 
+    question_keys = question_criteria_keys(questions)
+    required_fields = required_criteria_keys_for_llm(questions)
+    schema_block = format_intake_parse_schema_for_prompt(questions=questions)
+
     system_prompt = (
         "You parse user real-estate search prompts into structured JSON.\n"
-        "Return ONLY valid JSON with this shape:\n"
-        "{\n"
-        '  "extracted": {\n'
-        '    "building_type": [string],\n'
-        '    "location": {"label": string, "lat": number|null, "lng": number|null},\n'
-        '    "size_sqft": {"min": number|null, "max": number|null},\n'
-        '    "rent_range": {"min": number|null, "max": number|null}\n'
-        "  },\n"
-        '  "missing_fields": [string],\n'
-        '  "next_question": {"key": string|null, "text": string|null},\n'
-        '  "is_complete": boolean\n'
-        "}\n"
+        "Return ONLY one JSON object that validates against this JSON Schema "
+        "(no markdown fences, no commentary):\n"
+        f"{schema_block}\n"
         "Rules:\n"
-        "- Use null for unknown nested values.\n"
-        "- Keep extracted object sparse: omit fields if unknown.\n"
-        "- missing_fields should include only fields from required_fields.\n"
-        "- next_question.key should be one of question_keys and ideally in missing_fields.\n"
-        "- next_question.text should be concise and conversational."
+        "- Keep ``extracted`` sparse: omit properties when unknown.\n"
+        "- ``missing_fields`` must list only keys still missing from required criteria "
+        "(see required_fields in the user message).\n"
+        "- ``next_question.key`` should be one of question_keys when possible, "
+        "ideally the first missing required field.\n"
+        "- ``next_question.text`` should be concise and conversational."
     )
 
     user_prompt = json.dumps(
@@ -148,24 +150,51 @@ async def extract_intake_from_input(
             detail="Hugging Face response was not valid JSON.",
         ) from exc
 
-    extracted = parsed.get("extracted")
-    if not isinstance(extracted, dict):
-        extracted = {}
+    try:
+        normalized = LlmParseModelOutput.model_validate(
+            parsed,
+            context={"allowed_criteria_keys": question_keys},
+        )
+    except ValidationError:
+        extracted = parsed.get("extracted")
+        if not isinstance(extracted, dict):
+            extracted = {}
+        extracted = {k: v for k, v in extracted.items() if k in set(question_keys)}
+        merged_criteria = {**existing_criteria, **extracted}
+        missing_fields = parsed.get("missing_fields")
+        if not isinstance(missing_fields, list):
+            missing_fields = _fallback_missing_fields(merged_criteria, required_fields)
+        else:
+            missing_fields = [
+                k for k in missing_fields if isinstance(k, str) and k in required_fields
+            ]
+        next_question = parsed.get("next_question")
+        if not isinstance(next_question, dict):
+            next_question = {"key": None, "text": None}
+        is_complete = parsed.get("is_complete")
+        if not isinstance(is_complete, bool):
+            is_complete = len(missing_fields) == 0
+        return {
+            "extracted": extracted,
+            "merged_criteria": merged_criteria,
+            "missing_fields": missing_fields,
+            "next_question": next_question,
+            "is_complete": is_complete,
+        }
 
+    extracted = normalized.extracted
     merged_criteria = {**existing_criteria, **extracted}
-    missing_fields = parsed.get("missing_fields")
-    if not isinstance(missing_fields, list):
-        missing_fields = _fallback_missing_fields(merged_criteria, required_fields)
+    still_needed = _fallback_missing_fields(merged_criteria, required_fields)
+    model_missing = [k for k in normalized.missing_fields if k in required_fields]
+    if model_missing:
+        missing_fields = [k for k in model_missing if k in still_needed]
+        if not missing_fields:
+            missing_fields = still_needed
     else:
-        missing_fields = [k for k in missing_fields if isinstance(k, str) and k in required_fields]
+        missing_fields = still_needed
 
-    next_question = parsed.get("next_question")
-    if not isinstance(next_question, dict):
-        next_question = {"key": None, "text": None}
-
-    is_complete = parsed.get("is_complete")
-    if not isinstance(is_complete, bool):
-        is_complete = len(missing_fields) == 0
+    next_question = normalized.next_question.model_dump()
+    is_complete = len(missing_fields) == 0
 
     return {
         "extracted": extracted,

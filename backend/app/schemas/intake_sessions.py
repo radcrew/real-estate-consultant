@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.intake_sessions import IntakeSession
+from app.schemas.llm_intake_parse import LlmExtractedIntakePayload
 
 
 class IntakeSessionFirstQuestion(BaseModel):
@@ -33,7 +34,7 @@ class CreateIntakeSessionResponseGuided(BaseModel):
 
 
 class CreateIntakeSessionResponseLlm(BaseModel):
-    """LLM flow: welcome message plus an LLM-shaped next prompt (same shape as guided first question)."""
+    """LLM flow: welcome plus an LLM-shaped next prompt (same shape as guided first question)."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -91,24 +92,6 @@ class SubmitLlmIntakeInputRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     input: str = Field(..., description="User free-text intake prompt.")
-
-
-class LlmExtractedLocation(BaseModel):
-    label: str
-    lat: float | None = None
-    lng: float | None = None
-
-
-class LlmExtractedRange(BaseModel):
-    min: float | None = None
-    max: float | None = None
-
-
-class LlmExtractedIntakePayload(BaseModel):
-    building_type: list[str] | None = None
-    location: LlmExtractedLocation | None = None
-    size_sqft: LlmExtractedRange | None = None
-    rent_range: LlmExtractedRange | None = None
 
 
 class SubmitLlmIntakeInputResponse(BaseModel):
