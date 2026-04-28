@@ -9,13 +9,17 @@ from app.llm.intake import (
     resolve_next_intake_question,
 )
 from app.llm.providers import (
+    HuggingFaceProvider,
+    default_huggingface_provider,
     extract_intake_with_huggingface,
     generate_opening_question_with_huggingface,
 )
 
 __all__ = [
+    "HuggingFaceProvider",
     "INTAKE_OPENING_MESSAGE",
     "build_intake_response_schema",
+    "default_huggingface_provider",
     "extract_intake_with_huggingface",
     "generate_opening_question_with_huggingface",
     "list_available_question_keys",
