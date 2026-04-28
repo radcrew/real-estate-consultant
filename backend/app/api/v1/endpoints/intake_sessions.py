@@ -8,11 +8,8 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, SupabaseSdkDep
-from app.llm.huggingface import (
-    extract_intake_from_input,
-    generate_llm_opening_question_text,
-)
-from app.llm.intake import resolve_next_question
+from app.llm.huggingface import extract_intake_answers, generate_opening_question_text
+from app.llm.intake import select_next_question
 from app.models.intake_sessions import IntakeSession
 from app.repositories.intake_sessions import (
     append_intake_criteria_answer,
@@ -44,7 +41,7 @@ from app.schemas.intake_sessions import (
     UpdateIntakeSessionAnswersResponse,
 )
 
-LLM_INTAKE_OPENING_MESSAGE = (
+INTAKE_OPENING_MESSAGE = (
     "Hi! I'm here to help you find the right commercial property. "
     "Tell me what you're looking for — be as detailed or brief as you want. "
     'For example: "I need a 100k sqft industrial warehouse with 32ft clear '
@@ -105,8 +102,8 @@ async def create_intake_session(
 
     if mode == "llm":
         try:
-            llm_question_text = await generate_llm_opening_question_text(
-                welcome_message=LLM_INTAKE_OPENING_MESSAGE,
+            llm_question_text = await generate_opening_question_text(
+                welcome_message=INTAKE_OPENING_MESSAGE,
                 question_key=first_question.key,
                 question_type=first_question.type,
                 question_options=first_question.options,
@@ -125,7 +122,7 @@ async def create_intake_session(
             status=created_session.status,
             current_index=0,
             total_questions=total_questions,
-            message=LLM_INTAKE_OPENING_MESSAGE,
+            message=INTAKE_OPENING_MESSAGE,
             next_question=next_question,
         )
 
@@ -216,7 +213,7 @@ async def submit_llm_intake_input(
     current_criteria = session_row.get("criteria")
     existing_criteria = dict(current_criteria) if isinstance(current_criteria, dict) else {}
 
-    llm_result = await extract_intake_from_input(
+    llm_result = await extract_intake_answers(
         user_input=body.input,
         existing_criteria=existing_criteria,
         questions=questions,
@@ -227,7 +224,7 @@ async def submit_llm_intake_input(
     missing_fields = llm_result["missing_fields"]
     is_complete = bool(llm_result["is_complete"])
 
-    next_question = resolve_next_question(
+    next_question = select_next_question(
         questions,
         llm_result["next_question"],
         missing_fields,

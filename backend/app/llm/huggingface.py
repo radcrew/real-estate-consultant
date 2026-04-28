@@ -12,9 +12,9 @@ from pydantic import ValidationError
 
 from app.core.config import settings
 from app.llm.intake_parse_schema import (
-    format_intake_parse_schema_for_prompt,
-    question_criteria_keys,
-    required_criteria_keys_for_llm,
+    list_question_keys,
+    list_required_question_keys,
+    render_intake_extraction_schema,
 )
 from app.schemas.llm_intake_parse import LlmParseModelOutput
 
@@ -66,14 +66,27 @@ def _extract_json_payload(raw_content: str) -> dict[str, Any]:
     return json.loads(raw_content[start : end + 1])
 
 
-def _fallback_missing_fields(
+def _compute_missing_required_fields(
     merged_criteria: dict[str, Any],
     required_fields: list[str],
 ) -> list[str]:
     return [key for key in required_fields if key not in merged_criteria]
 
 
-async def extract_intake_from_input(
+def _extract_message_content(response_body: dict[str, Any]) -> str:
+    content = response_body.get("choices", [{}])[0].get("message", {}).get("content", "")
+    if isinstance(content, list):
+        content = "".join(
+            part.get("text", "")
+            for part in content
+            if isinstance(part, dict)
+        )
+    if not isinstance(content, str):
+        content = str(content)
+    return content
+
+
+async def extract_intake_answers(
     *,
     user_input: str,
     existing_criteria: dict[str, Any],
@@ -86,9 +99,9 @@ async def extract_intake_from_input(
             detail="Hugging Face API key is not configured.",
         )
 
-    question_keys = question_criteria_keys(questions)
-    required_fields = required_criteria_keys_for_llm(questions)
-    schema_block = format_intake_parse_schema_for_prompt(questions=questions)
+    question_keys = list_question_keys(questions)
+    required_fields = list_required_question_keys(questions)
+    schema_block = render_intake_extraction_schema(questions=questions)
 
     system_prompt = (
         "You parse user real-estate search prompts into structured JSON.\n"
@@ -132,15 +145,7 @@ async def extract_intake_from_input(
     response = await _post_huggingface_chat(payload=payload, headers=headers)
 
     body = response.json()
-    content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
-    if isinstance(content, list):
-        content = "".join(
-            part.get("text", "")
-            for part in content
-            if isinstance(part, dict)
-        )
-    if not isinstance(content, str):
-        content = str(content)
+    content = _extract_message_content(body)
 
     try:
         parsed = _extract_json_payload(content)
@@ -163,7 +168,7 @@ async def extract_intake_from_input(
         merged_criteria = {**existing_criteria, **extracted}
         missing_fields = parsed.get("missing_fields")
         if not isinstance(missing_fields, list):
-            missing_fields = _fallback_missing_fields(merged_criteria, required_fields)
+            missing_fields = _compute_missing_required_fields(merged_criteria, required_fields)
         else:
             missing_fields = [
                 k for k in missing_fields if isinstance(k, str) and k in required_fields
@@ -184,7 +189,7 @@ async def extract_intake_from_input(
 
     extracted = normalized.extracted
     merged_criteria = {**existing_criteria, **extracted}
-    still_needed = _fallback_missing_fields(merged_criteria, required_fields)
+    still_needed = _compute_missing_required_fields(merged_criteria, required_fields)
     model_missing = [k for k in normalized.missing_fields if k in required_fields]
     if model_missing:
         missing_fields = [k for k in model_missing if k in still_needed]
@@ -205,7 +210,7 @@ async def extract_intake_from_input(
     }
 
 
-async def generate_llm_opening_question_text(
+async def generate_opening_question_text(
     *,
     welcome_message: str,
     question_key: str,
@@ -259,15 +264,7 @@ async def generate_llm_opening_question_text(
     response = await _post_huggingface_chat(payload=payload, headers=headers)
 
     body = response.json()
-    content = body.get("choices", [{}])[0].get("message", {}).get("content", "")
-    if isinstance(content, list):
-        content = "".join(
-            part.get("text", "")
-            for part in content
-            if isinstance(part, dict)
-        )
-    if not isinstance(content, str):
-        content = str(content)
+    content = _extract_message_content(body)
 
     try:
         parsed = _extract_json_payload(content)
