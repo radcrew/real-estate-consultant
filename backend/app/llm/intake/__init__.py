@@ -1,9 +1,6 @@
 """Intake-specific LLM helpers."""
 
 from app.llm.intake.prompts import INTAKE_OPENING_MESSAGE
-from app.llm.intake.question_selection import (
-    resolve_next_intake_question,
-)
 from app.llm.intake.schema import (
     build_intake_response_schema,
     extract_question_keys,
@@ -12,6 +9,7 @@ from app.llm.intake.schema import (
 from app.llm.intake.service import (
     generate_opening_question,
     parse_user_input,
+    resolve_next_intake_question,
 )
 
 __all__ = [
