@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     huggingface_api_key: str = ""
     huggingface_model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-    huggingface_base_url: str = "https://router.huggingface.co/v1/chat/completions"
+    huggingface_base_url: str = "https://router.huggingface.co/v1"
 
 
 settings = Settings()

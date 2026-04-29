@@ -34,4 +34,3 @@ OPENING_QUESTION_OPTIONS_HINT = (
     "or add a short clarification."
 )
 
-DEFAULT_NEXT_QUESTION_PLACEHOLDER: dict[str, None] = {"key": None, "text": None}

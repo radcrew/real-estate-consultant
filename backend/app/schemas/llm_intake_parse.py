@@ -1,4 +1,4 @@
-"""Pydantic shapes for Hugging Face intake JSON (aligned with ``public.questions``)."""
+"""Pydantic shapes for structured LLM intake outputs."""
 
 from __future__ import annotations
 
@@ -15,6 +15,31 @@ class LlmParseNextQuestion(BaseModel):
     key: str | None = None
     text: str | None = None
 
+    @field_validator("key", "text", mode="before")
+    @classmethod
+    def validate_optional_text(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return None
+
+
+class LlmOpeningQuestionOutput(BaseModel):
+    """Structured opening-question payload from the provider."""
+
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    text: str = ""
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def validate_text(cls, value: object) -> str:
+        if isinstance(value, str):
+            return value.strip()
+        return ""
+
 class LlmParseModelOutput(BaseModel):
     """Expected top-level JSON object from the intake parsing model."""
 
@@ -23,21 +48,40 @@ class LlmParseModelOutput(BaseModel):
     extracted: dict[str, Any] = Field(default_factory=dict)
     missing_fields: list[str] = Field(default_factory=list)
     next_question: LlmParseNextQuestion = Field(default_factory=LlmParseNextQuestion)
-    i_complete: bool = False
+    is_complete: bool = False
 
     @field_validator("extracted", mode="before")
     @classmethod
     def validate_extracted(cls, v: object, info: ValidationInfo) -> dict[str, Any]:
-        # Coerce to dict
         if not isinstance(v, dict):
             return {}
 
         data = dict(v)
 
-        # Filter by allowed keys if provided
         allowed = info.context.get("allowed_criteria_keys") if info.context else None
         if isinstance(allowed, (set, list, tuple, frozenset)):
             allowed_set = set(allowed)
             data = {k: val for k, val in data.items() if k in allowed_set}
 
         return data
+
+    @field_validator("missing_fields", mode="before")
+    @classmethod
+    def validate_missing_fields(cls, value: object) -> list[str]:
+        if not isinstance(value, list):
+            return []
+        return [item for item in value if isinstance(item, str)]
+
+    @field_validator("next_question", mode="before")
+    @classmethod
+    def validate_next_question(cls, value: object) -> dict[str, object]:
+        if isinstance(value, dict):
+            return value
+        return {}
+
+    @field_validator("is_complete", mode="before")
+    @classmethod
+    def validate_is_complete(cls, value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        return False
