@@ -7,6 +7,8 @@ import { ArrowLeft, Loader2, SlidersHorizontal, Wand2 } from "lucide-react";
 import { useSearchWizard } from "@contexts/search-wizard";
 import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@lib/api-errors";
+import { chipsFromLlmResponse } from "@lib/llm-criteria-chips";
+import { writeSearchResultsHandoff } from "@lib/search-results-handoff";
 import type { LlmInputResponse } from "@services/intake-sessions";
 
 import { styles } from "../styles";
@@ -25,15 +27,17 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
   const missingFields = lastResponse?.missing_fields ?? [];
 
   const handleSearchProperties = useCallback(async () => {
-    if (!sessionId || !isComplete || isSearchBusy) {
+    if (!sessionId || !isComplete || isSearchBusy || !lastResponse) {
       return;
     }
     setIsSearchBusy(true);
     setErrorMessage(null);
     try {
       await completeSession(sessionId);
+      const chips = chipsFromLlmResponse(lastResponse);
+      writeSearchResultsHandoff({ sessionId, chips });
       onClose();
-      router.push("/");
+      router.push(`/search/results?session=${encodeURIComponent(sessionId)}`);
     } catch (err) {
       setErrorMessage(getApiErrorMessage(err));
     } finally {
@@ -43,6 +47,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
     completeSession,
     isComplete,
     isSearchBusy,
+    lastResponse,
     onClose,
     router,
     sessionId,
