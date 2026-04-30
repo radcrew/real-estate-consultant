@@ -24,6 +24,7 @@ export type CreateGuidedIntakeSessionResponse = {
   first_question?: IntakeSessionQuestion | null;
 };
 
+/** Body for ``PATCH /intake-sessions/{session_id}/answers/guided``. */
 export type SubmitIntakeSessionAnswerBody = {
   key: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,6 +94,7 @@ export type LlmInputResponse = {
   is_complete: boolean;
 };
 
+/** Body for ``POST /intake-sessions/{session_id}/answers/llm``. */
 export type LlmInputBody = {
   input: string;
   mode: "llm";
@@ -117,7 +119,7 @@ export class IntakeSessionsService {
     body: SubmitIntakeSessionAnswerBody,
   ): Promise<SubmitIntakeSessionAnswerResponse> {
     const { data } = await this.http.patch<SubmitIntakeSessionAnswerResponse>(
-      `/intake-sessions/${sessionId}/answers`,
+      `/intake-sessions/${sessionId}/answers/guided`,
       body,
     );
     return data;
@@ -137,7 +139,7 @@ export class IntakeSessionsService {
     body: LlmInputBody,
   ): Promise<LlmInputResponse> {
     const { data } = await this.http.post<LlmInputResponse>(
-      `/intake-sessions/${sessionId}/llm-input`,
+      `/intake-sessions/${sessionId}/answers/llm`,
       body,
     );
     return data;
