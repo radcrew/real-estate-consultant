@@ -19,7 +19,7 @@ class IntakeSessionFirstQuestion(BaseModel):
     options: Any | None = None
 
 
-class CreateIntakeSessionResponseGuided(BaseModel):
+class CreateIntakeSessionGuidedResponse(BaseModel):
     """Guided flow: first questionnaire step is returned."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -32,7 +32,7 @@ class CreateIntakeSessionResponseGuided(BaseModel):
     first_question: IntakeSessionFirstQuestion
 
 
-class CreateIntakeSessionResponseLlm(BaseModel):
+class CreateIntakeSessionLlmResponse(BaseModel):
     """LLM flow: welcome plus an LLM-shaped next prompt (same shape as guided first question)."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -47,7 +47,7 @@ class CreateIntakeSessionResponseLlm(BaseModel):
 
 
 CreateIntakeSessionResponse = (
-    CreateIntakeSessionResponseGuided | CreateIntakeSessionResponseLlm
+    CreateIntakeSessionGuidedResponse | CreateIntakeSessionLlmResponse
 )
 
 

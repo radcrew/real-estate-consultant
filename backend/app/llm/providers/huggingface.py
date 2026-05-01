@@ -72,7 +72,10 @@ class HuggingFaceProvider:
         except ValidationError as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Hugging Face response did not match the expected schema.",
+                detail=(
+                    "We couldn't process the assistant's reply. "
+                    "Please try again in a moment."
+                ),
             ) from exc
         except APITimeoutError as exc:
             raise HTTPException(
@@ -95,7 +98,10 @@ class HuggingFaceProvider:
             )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Hugging Face response did not include parsed structured output.",
+            detail=(
+                "The assistant's reply didn't come through completely. "
+                "Please try again in a moment."
+            ),
         )
 
 

@@ -71,22 +71,22 @@ async def parse_user_input(
 async def generate_opening_question(
     *,
     welcome_message: str,
-    question_key: str,
-    question_type: str,
-    question_options: Any | None = None,
+    key: str,
+    type: str,
+    options: Any | None = None,
 ) -> str:
     """Generate the opening intake question text via the configured provider."""
     system_prompt = OPENING_QUESTION_SYSTEM_PROMPT_BASE
-    if question_options is not None:
+    if options is not None:
         system_prompt += OPENING_QUESTION_OPTIONS_HINT
 
     user_payload: dict[str, Any] = {
         "welcome_message": welcome_message,
-        "question_key": question_key,
-        "question_type": question_type,
+        "question_key": key,
+        "question_type": type,
     }
-    if question_options is not None:
-        user_payload["question_options"] = question_options
+    if options is not None:
+        user_payload["question_options"] = options
 
     response_output = await huggingface_provider.generate_structured_output(
         messages=[

@@ -35,8 +35,8 @@ from app.repositories.search_profiles import (
 )
 from app.schemas.intake_sessions import (
     CreateIntakeSessionResponse,
-    CreateIntakeSessionResponseGuided,
-    CreateIntakeSessionResponseLlm,
+    CreateIntakeSessionGuidedResponse,
+    CreateIntakeSessionLlmResponse,
     IntakeSessionFirstQuestion,
     SubmitLlmIntakeInputRequest,
     SubmitLlmIntakeInputResponse,
@@ -77,9 +77,9 @@ async def create_intake_session(
         try:
             llm_question_text = await generate_opening_question(
                 welcome_message=INTAKE_OPENING_MESSAGE,
-                question_key=first_question.key,
-                question_type=first_question.type,
-                question_options=first_question.options,
+                key=first_question.key,
+                type=first_question.type,
+                options=first_question.options,
             )
         except HTTPException:
             llm_question_text = first_question.text
@@ -90,7 +90,7 @@ async def create_intake_session(
             type=first_question.type,
             options=first_question.options,
         )
-        return CreateIntakeSessionResponseLlm(
+        return CreateIntakeSessionLlmResponse(
             mode="llm",
             session_id=created_session.id,
             status=created_session.status,
@@ -100,7 +100,7 @@ async def create_intake_session(
             next_question=next_question,
         )
 
-    return CreateIntakeSessionResponseGuided(
+    return CreateIntakeSessionGuidedResponse(
         mode="guided",
         session_id=created_session.id,
         status=created_session.status,
