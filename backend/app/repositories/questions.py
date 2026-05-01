@@ -11,8 +11,8 @@ from app.core.db_safe import execute_db_safe
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.utils.supabase_response import as_row_list, get_single_row
 
-_FIRST_QUESTION_SELECT = "key, text, type"
-_QUESTION_SELECT = "key, text, type, order_index"
+_FIRST_QUESTION_SELECT = "key, text, type, options, required"
+_QUESTION_SELECT = "key, text, type, options, order_index, required"
 _LOAD_QUESTIONS_ERROR = "No question is configured for intake flow."
 
 
@@ -22,11 +22,17 @@ def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
         qkey = question.get("key")
         qtext = question.get("text")
         qtype = question.get("type")
+        qoptions = question.get("options")
         if not isinstance(qkey, str) or not qkey.strip():
             raise ValueError("Invalid question key")
         if not isinstance(qtext, str) or not isinstance(qtype, str):
             raise ValueError("Invalid question fields")
-        return IntakeSessionFirstQuestion(key=qkey.strip(), text=qtext, type=qtype)
+        return IntakeSessionFirstQuestion(
+            key=qkey.strip(),
+            text=qtext,
+            type=qtype,
+            options=qoptions,
+        )
     except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -51,6 +57,11 @@ def _order_key(row: dict) -> int:
         return int(row["order_index"])
     except (KeyError, TypeError, ValueError):
         return 0
+
+
+def sorted_intake_questions(questions: list[dict]) -> list[dict]:
+    """Return questionnaire rows ordered by ``order_index`` (stable for prompts and UI)."""
+    return sorted(questions, key=_order_key)
 
 
 def next_question_row_after_order(questions: list[dict], *, after_order: int) -> dict | None:
