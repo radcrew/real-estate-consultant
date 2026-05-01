@@ -63,7 +63,6 @@ async def search_listings(
     limit: int = Query(50, ge=1, le=100, description="Page size (max 100)."),
     offset: int = Query(0, ge=0, description="Offset for pagination."),
 ) -> SearchPropertiesResponse:
-    """Example: ``/api/v1/search?type=industrial&location=Canada&minPrice=100&maxPrice=100``."""
     criteria = _search_criteria_dict(
         kind=kind,
         location=location,
@@ -75,7 +74,6 @@ async def search_listings(
     rows, total = await search_properties(client, criteria, limit=limit, offset=offset)
     results = [Properties.model_validate(row) for row in rows]
     return SearchPropertiesResponse(
-        criteria=criteria,
         results=results,
         total=total,
         limit=limit,
