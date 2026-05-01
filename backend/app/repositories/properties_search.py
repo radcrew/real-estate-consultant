@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from supabase import AsyncClient
@@ -11,24 +10,15 @@ from app.core.db_safe import execute_db_safe
 from app.utils.supabase_response import as_row_list
 
 
-def _sanitize_ilike_literal(value: str) -> str:
-    """Strip SQL LIKE wildcards so user input cannot broaden matches."""
-    return re.sub(r"[%_]+", " ", value).strip()
-
-
 def build_search_query(query: Any, criteria: dict[str, Any]) -> Any:
     """Apply ``type``, ``location``, price range, and size range to a ``properties`` query."""
     if t := criteria.get("type"):
-        esc = _sanitize_ilike_literal(t)
-        if esc:
-            query = query.ilike("property_type", f"%{esc}%")
+        query = query.ilike("property_type", f"%{t}%")
 
     if loc := criteria.get("location"):
-        esc = _sanitize_ilike_literal(loc)
-        if esc:
-            query = query.or_(
-                f"city.ilike.%{esc}%,state.ilike.%{esc}%,address.ilike.%{esc}%,country.ilike.%{esc}%"
-            )
+        query = query.or_(
+            f"city.ilike.%{loc}%,state.ilike.%{loc}%,address.ilike.%{loc}%,country.ilike.%{loc}%"
+        )
 
     if (v := criteria.get("minPrice")) is not None:
         query = query.gte("price", v)
