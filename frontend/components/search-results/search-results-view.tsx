@@ -18,9 +18,6 @@ import { sortRankedListings } from "./sort-listings";
 const handoffSubscribe = () => () => {};
 
 export const SearchResultsView = () => {
-  const searchParams = useSearchParams();
-  const sessionFromQuery = searchParams.get("session");
-
   const handoff = useSyncExternalStore(
     handoffSubscribe,
     getSearchResultsHandoffSnapshot,
@@ -29,7 +26,6 @@ export const SearchResultsView = () => {
   const [sortBy, setSortBy] = useState<ResultsSortOption>("match");
 
   const chips = handoff?.chips ?? [];
-  const sessionLabel = handoff?.sessionId ?? sessionFromQuery;
 
   const sortedListings = useMemo(
     () => sortRankedListings(MOCK_RANKED_LISTINGS, sortBy),
@@ -44,19 +40,6 @@ export const SearchResultsView = () => {
           sortBy={sortBy}
           onSortChange={setSortBy}
         />
-
-        {sessionLabel ? (
-          <p className="mb-6 text-xs text-muted-foreground">
-            Session <span className="font-mono text-foreground">{sessionLabel}</span>
-            {" · "}
-            Ranking API coming soon; scores are illustrative.
-          </p>
-        ) : (
-          <p className="mb-6 text-xs text-muted-foreground">
-            Complete a search from the questionnaire to load your criteria here. Scores are
-            illustrative until the ranking API ships.
-          </p>
-        )}
 
         {chips.length > 0 ? (
           <div className="mb-8">
