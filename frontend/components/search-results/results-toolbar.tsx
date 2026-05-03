@@ -11,7 +11,32 @@ type ResultsToolbarProps = {
 };
 
 export const ResultsToolbar = ({ resultCount }: ResultsToolbarProps) => (
-  <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
+  <div className="flex flex-col gap-4 border-b border-border pb-6">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <Link
+        href="/"
+        className={cn(
+          buttonVariants({ variant: "ghost", size: "sm" }),
+          "inline-flex shrink-0 gap-1.5 self-start no-underline",
+        )}
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+        Home
+      </Link>
+      <div className="flex flex-wrap gap-2 sm:ml-auto">
+        <Link
+          href="/questionnaire"
+          className={cn(
+            buttonVariants({ variant: "secondary", size: "sm" }),
+            "inline-flex gap-1.5 no-underline",
+          )}
+        >
+          <Sparkles className="size-4" aria-hidden />
+          New search
+        </Link>
+      </div>
+    </div>
+
     <div>
       <div className="flex items-center gap-2 text-amber-600">
         <Sparkles className="size-5 shrink-0" aria-hidden />
@@ -25,39 +50,6 @@ export const ResultsToolbar = ({ resultCount }: ResultsToolbarProps) => (
           ? "No listings to show yet."
           : `${resultCount} propert${resultCount === 1 ? "y" : "ies"} (order from search; demo data).`}
       </p>
-    </div>
-
-    <div className="flex flex-wrap gap-2 sm:justify-end">
-      <Link
-        href="/questionnaire"
-        className={cn(
-          buttonVariants({ variant: "outline", size: "sm" }),
-          "inline-flex gap-1.5 no-underline",
-        )}
-      >
-        <Pencil className="size-4" aria-hidden />
-        Edit search
-      </Link>
-      <Link
-        href="/questionnaire"
-        className={cn(
-          buttonVariants({ variant: "secondary", size: "sm" }),
-          "inline-flex gap-1.5 no-underline",
-        )}
-      >
-        <Sparkles className="size-4" aria-hidden />
-        New search
-      </Link>
-      <Link
-        href="/"
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "sm" }),
-          "inline-flex gap-1.5 no-underline",
-        )}
-      >
-        <ArrowLeft className="size-4" aria-hidden />
-        Home
-      </Link>
     </div>
   </div>
 );
