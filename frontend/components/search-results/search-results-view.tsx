@@ -2,14 +2,13 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 
 import { buttonVariants } from "@components/ui/button";
 import { getSearchResultsHandoffSnapshot } from "@lib/search-results-handoff";
 import { cn } from "@lib/utils";
 
-import { CriteriaRecap } from "./criteria-recap";
+import { SearchFilter } from "./search-filter";
 import { MOCK_RANKED_LISTINGS } from "./mock-data";
 import { ResultCard } from "./result-card";
 import { ResultsToolbar, type ResultsSortOption } from "./results-toolbar";
@@ -43,7 +42,7 @@ export const SearchResultsView = () => {
 
         {chips.length > 0 ? (
           <div className="mb-8">
-            <CriteriaRecap chips={chips} />
+            <SearchFilter chips={chips} />
           </div>
         ) : (
           <div className="mb-8 rounded-lg border border-dashed border-border bg-card/50 px-4 py-6 text-center sm:px-6">

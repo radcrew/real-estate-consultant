@@ -1,10 +1,10 @@
 import type { SearchResultsChip } from "@lib/search-results-handoff";
 
-type CriteriaRecapProps = {
+type SearchFilterProps = {
   chips: SearchResultsChip[];
 };
 
-export const CriteriaRecap = ({ chips }: CriteriaRecapProps) => {
+export const SearchFilter = ({ chips }: SearchFilterProps) => {
   if (chips.length === 0) {
     return null;
   }
