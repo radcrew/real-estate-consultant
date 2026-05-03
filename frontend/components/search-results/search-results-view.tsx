@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 
@@ -11,8 +11,7 @@ import { cn } from "@lib/utils";
 import { SearchFilter } from "./search-filter";
 import { MOCK_RANKED_LISTINGS } from "./mock-data";
 import { ResultCard } from "./result-card";
-import { ResultsToolbar, type ResultsSortOption } from "./results-toolbar";
-import { sortRankedListings } from "./sort-listings";
+import { ResultsToolbar } from "./results-toolbar";
 
 const handoffSubscribe = () => () => {};
 
@@ -22,23 +21,14 @@ export const SearchResultsView = () => {
     getSearchResultsHandoffSnapshot,
     () => null,
   );
-  const [sortBy, setSortBy] = useState<ResultsSortOption>("match");
-
   const chips = handoff?.chips ?? [];
 
-  const sortedListings = useMemo(
-    () => sortRankedListings(MOCK_RANKED_LISTINGS, sortBy),
-    [sortBy],
-  );
+  const listings = MOCK_RANKED_LISTINGS;
 
   return (
     <div className="min-h-[60vh] bg-muted/20">
       <div className="mx-auto max-w-screen-xl px-4 py-10 sm:py-14">
-        <ResultsToolbar
-          resultCount={sortedListings.length}
-          sortBy={sortBy}
-          onSortChange={setSortBy}
-        />
+        <ResultsToolbar resultCount={listings.length} />
 
         {chips.length > 0 ? (
           <div className="mb-8">
@@ -57,11 +47,11 @@ export const SearchResultsView = () => {
           </div>
         )}
 
-        {sortedListings.length === 0 ? (
+        {listings.length === 0 ? (
           <p className="py-12 text-center text-muted-foreground">No listings to display.</p>
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8">
-            {sortedListings.map((listing) => (
+            {listings.map((listing) => (
               <ResultCard key={listing.id} listing={listing} />
             ))}
           </div>
