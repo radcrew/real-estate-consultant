@@ -21,7 +21,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
   const router = useRouter();
   const { completeSession } = useIntakeSessions();
   const { sessionId, setErrorMessage, resetToChooser, onClose } = useSearchWizard();
-  const [isSearchBusy, setIsSearchBusy] = useState(false);
+  const [isSearchBusy, setSearchBusy] = useState(false);
 
   const isComplete = lastResponse?.is_complete ?? false;
   const missingFields = lastResponse?.missing_fields ?? [];
@@ -30,7 +30,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
     if (!sessionId || !isComplete || isSearchBusy || !lastResponse) {
       return;
     }
-    setIsSearchBusy(true);
+    setSearchBusy(true);
     setErrorMessage(null);
     try {
       await completeSession(sessionId);
@@ -41,7 +41,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
     } catch (err) {
       setErrorMessage(getApiErrorMessage(err));
     } finally {
-      setIsSearchBusy(false);
+      setSearchBusy(false);
     }
   }, [
     completeSession,
@@ -83,7 +83,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
         type="button"
         className={styles.searchCta}
         disabled={!isComplete || isSearchBusy || !sessionId}
-        onClick={() => void handleSearchProperties()}
+        onClick={handleSearchProperties}
       >
         {isSearchBusy ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />
