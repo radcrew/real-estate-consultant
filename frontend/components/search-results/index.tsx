@@ -15,7 +15,7 @@ import { ResultsToolbar } from "./results-toolbar";
 
 const handoffSubscribe = () => () => {};
 
-export const SearchResultsView = () => {
+export const SearchResults = () => {
   const handoff = useSyncExternalStore(
     handoffSubscribe,
     getSearchResultsHandoffSnapshot,
