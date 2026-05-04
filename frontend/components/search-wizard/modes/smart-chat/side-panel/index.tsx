@@ -31,9 +31,14 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
     setSearchBusy(true);
     setErrorMessage(null);
     try {
-      await completeSession(sessionId);
+      const completed = await completeSession(sessionId);
+      const profileId = completed.search_profile_id;
+      if (!profileId) {
+        setErrorMessage("Search profile was not created. Please try again.");
+        return;
+      }
       onClose();
-      router.push(`/search/results?session=${encodeURIComponent(sessionId)}`);
+      router.push(`/search/results/${profileId}`);
     } catch (err) {
       setErrorMessage(getApiErrorMessage(err));
     } finally {

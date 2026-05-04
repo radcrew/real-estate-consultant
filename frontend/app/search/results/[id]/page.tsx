@@ -8,7 +8,7 @@ const ResultsFallback = () => (
   </div>
 );
 
-export default function SearchResultsPage() {
+export default function SearchResultsByProfilePage() {
   return (
     <Suspense fallback={<ResultsFallback />}>
       <SearchResults />

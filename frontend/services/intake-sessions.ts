@@ -44,6 +44,8 @@ export type SubmitIntakeSessionAnswerResponse = {
 export type CompleteIntakeSessionResponse = {
   id?: string;
   status?: string;
+  created_at?: string;
+  search_profile_id?: string | null;
   criteria?: Record<string, unknown> | null;
 };
 
