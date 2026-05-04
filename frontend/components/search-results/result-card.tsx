@@ -1,11 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import type { ResultCardListing } from "@lib/map-property-match";
+
 import { featuredListingsStyles } from "./featured-styles";
-import type { RankedPropertyListing } from "./mock-data";
 
 type ResultCardProps = {
-  listing: RankedPropertyListing;
+  listing: ResultCardListing;
 };
 
 export const ResultCard = ({ listing }: ResultCardProps) => {
@@ -29,7 +30,7 @@ export const ResultCard = ({ listing }: ResultCardProps) => {
         </div>
         <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3">
           <span className="rounded-md bg-amber-600 px-2 py-1 text-xs font-bold tabular-nums text-white shadow-sm">
-            {listing.matchScore} match
+            {listing.matchScore}% match
           </span>
         </div>
       </div>
