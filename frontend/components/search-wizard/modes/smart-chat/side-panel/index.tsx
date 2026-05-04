@@ -7,8 +7,6 @@ import { ArrowLeft, Loader2, SlidersHorizontal, Wand2 } from "lucide-react";
 import { useSearchWizard } from "@contexts/search-wizard";
 import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@lib/api-errors";
-import { chipsFromLlmResponse } from "@lib/llm-criteria-chips";
-import { writeSearchResultsHandoff } from "@lib/search-results-handoff";
 import type { LlmInputResponse } from "@services/intake-sessions";
 
 import { styles } from "../styles";
@@ -34,8 +32,6 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
     setErrorMessage(null);
     try {
       await completeSession(sessionId);
-      const chips = chipsFromLlmResponse(lastResponse);
-      writeSearchResultsHandoff({ sessionId, chips });
       onClose();
       router.push(`/search/results?session=${encodeURIComponent(sessionId)}`);
     } catch (err) {

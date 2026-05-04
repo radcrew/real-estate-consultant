@@ -1,4 +1,4 @@
-import type { SearchResultsChip } from "@lib/search-results-handoff";
+import type { SearchResultsChip } from "@lib/search-results-chips";
 
 type SearchFilterProps = {
   chips: SearchResultsChip[];

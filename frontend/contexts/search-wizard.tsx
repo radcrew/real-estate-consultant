@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation";
 
 import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@lib/api-errors";
-import { clearSearchResultsHandoff, writeSearchResultsHandoff } from "@lib/search-results-handoff";
 
 import type {
   AnswerValue,
@@ -115,7 +114,6 @@ export const SearchWizardProvider = ({
       return;
     }
 
-    clearSearchResultsHandoff();
     setGuidedFormOpen(true);
     setSmartChatOpen(false);
     setLoadingQuestion(true);
@@ -153,7 +151,6 @@ export const SearchWizardProvider = ({
       return;
     }
 
-    clearSearchResultsHandoff();
     setGuidedFormOpen(false);
     setSmartChatOpen(true);
     setLoadingQuestion(true);
@@ -266,11 +263,6 @@ export const SearchWizardProvider = ({
 
       if (response.next_question == null) {
         await completeSession(sessionId);
-        const chips = [...summaryRows, newSummaryRow].map((row) => ({
-          label: row.label,
-          value: row.value,
-        }));
-        writeSearchResultsHandoff({ sessionId, chips });
         setStepIndex(totalSteps);
         await new Promise((resolve) => setTimeout(resolve, 550));
         onClose();

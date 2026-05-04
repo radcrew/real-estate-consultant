@@ -1,6 +1,6 @@
 import type { LlmInputResponse } from "@services/intake-sessions";
 
-import type { SearchResultsChip } from "./search-results-handoff";
+import type { SearchResultsChip } from "./search-results-chips";
 
 const formatRange = (min: number, max: number, suffix: string): string => {
   if (min === max) {

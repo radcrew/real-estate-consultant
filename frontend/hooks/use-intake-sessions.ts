@@ -9,11 +9,19 @@ import {
   type SubmitIntakeSessionAnswerBody,
   type SubmitIntakeSessionAnswerResponse,
   type CompleteIntakeSessionResponse,
+  type IntakeSessionDto,
 } from "@services/intake-sessions";
 
 export const useIntakeSessions = () => {
   const createSession = useCallback(
     intakeSessionsService.createSession.bind(intakeSessionsService),
+    [],
+  );
+
+  const getSession = useCallback(
+    (sessionId: string): Promise<IntakeSessionDto> => {
+      return intakeSessionsService.getSession(sessionId);
+    },
     [],
   );
 
@@ -43,6 +51,7 @@ export const useIntakeSessions = () => {
 
   return {
     createSession,
+    getSession,
     submitAnswer,
     completeSession,
     submitLlmInput,

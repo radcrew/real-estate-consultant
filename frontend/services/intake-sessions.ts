@@ -47,6 +47,13 @@ export type CompleteIntakeSessionResponse = {
   criteria?: Record<string, unknown> | null;
 };
 
+/** ``GET /intake-sessions/{session_id}`` — same shape as backend ``IntakeSession``. */
+export type IntakeSessionDto = {
+  id?: string | null;
+  status?: string;
+  criteria?: Record<string, unknown> | null;
+};
+
 export type LlmExtractedLocation = {
   label: string;
   lat: number;
@@ -111,6 +118,13 @@ export class IntakeSessionsService {
     const { data } = await this.http.post<
       CreateGuidedIntakeSessionResponse | CreateLlmIntakeSessionResponse
     >("/intake-sessions", undefined, { params: { mode } });
+    return data;
+  }
+
+  async getSession(sessionId: string): Promise<IntakeSessionDto> {
+    const { data } = await this.http.get<IntakeSessionDto>(
+      `/intake-sessions/${sessionId}`,
+    );
     return data;
   }
 
