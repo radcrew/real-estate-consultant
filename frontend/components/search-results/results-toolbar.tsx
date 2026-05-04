@@ -45,11 +45,6 @@ export const ResultsToolbar = ({ resultCount }: ResultsToolbarProps) => (
       <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
         Property matches
       </h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {resultCount === 0
-          ? "No listings to show yet."
-          : `${resultCount} propert${resultCount === 1 ? "y" : "ies"} (order from search; demo data).`}
-      </p>
     </div>
   </div>
 );
