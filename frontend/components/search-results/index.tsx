@@ -5,25 +5,18 @@ import { Search } from "lucide-react";
 
 import { buttonVariants } from "@components/ui/button";
 import { cn } from "@lib/utils";
-import type { SearchResultsChip } from "@lib/search-results-chips";
 
-import { SearchFilter } from "./search-filter";
 import { MOCK_RANKED_LISTINGS } from "./mock-data";
 import { ResultCard } from "./result-card";
 import { ResultsToolbar } from "./results-toolbar";
 
 export const SearchResults = () => {
   const listings = MOCK_RANKED_LISTINGS;
-  const chips: SearchResultsChip[] = [];
 
   return (
     <div className="min-h-[60vh] bg-muted/20">
       <div className="mx-auto max-w-screen-xl px-4 py-10 sm:py-14">
         <ResultsToolbar resultCount={listings.length} />
-
-        <div className="mb-8">
-          <SearchFilter chips={chips} />
-        </div>
 
         {listings.length === 0 ? (
           <p className="py-12 text-center text-muted-foreground">No listings to display.</p>
