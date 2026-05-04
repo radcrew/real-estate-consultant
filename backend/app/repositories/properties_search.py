@@ -66,10 +66,6 @@ def build_search_query(query: Any, criteria: dict[str, Any]) -> Any:
     loc = criteria.get("location")
     if isinstance(loc, str):
         query = _apply_location_string(query, loc)
-    elif isinstance(loc, dict):
-        label = loc.get("label")
-        if isinstance(label, str):
-            query = _apply_location_string(query, label)
 
     query = _apply_numeric_range(query, "price", criteria.get("price"))
     query = _apply_numeric_range(query, "size_sqft", criteria.get("size_sqft"))
