@@ -1,4 +1,4 @@
-"""Search ``public.properties`` using explicit search criteria (from GET query params)."""
+"""Search ``public.properties`` using intake-style ``criteria`` (JSON from sessions)."""
 
 from __future__ import annotations
 
@@ -10,24 +10,69 @@ from app.core.db_safe import execute_db_safe
 from app.utils.supabase_response import as_row_list
 
 
+def _float_or_none(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _apply_numeric_range(query: Any, column: str, bounds: Any) -> Any:
+    """Apply ``gte`` / ``lte`` from ``{"min": ..., "max": ...}`` when present."""
+    if not isinstance(bounds, dict):
+        return query
+    lo = _float_or_none(bounds.get("min"))
+    hi = _float_or_none(bounds.get("max"))
+    if lo is not None:
+        query = query.gte(column, lo)
+    if hi is not None:
+        query = query.lte(column, hi)
+    return query
+
+
+def _apply_location_string(query: Any, loc: str) -> Any:
+    text = loc.strip()
+    if not text:
+        return query
+    return query.or_(
+        f"city.ilike.%{text}%,state.ilike.%{text}%,address.ilike.%{text}%,country.ilike.%{text}%"
+    )
+
+
+def _apply_property_type(query: Any, raw: Any) -> Any:
+    """``property_type`` as a string or list of strings (OR of case-insensitive partial matches)."""
+    if isinstance(raw, str) and raw.strip():
+        return query.ilike("property_type", f"%{raw.strip()}%")
+    if isinstance(raw, list):
+        terms = [item.strip() for item in raw if isinstance(item, str) and item.strip()]
+        if not terms:
+            return query
+        if len(terms) == 1:
+            return query.ilike("property_type", f"%{terms[0]}%")
+        clause = ",".join(f"property_type.ilike.%{t}%" for t in terms)
+        return query.or_(clause)
+    return query
+
+
 def build_search_query(query: Any, criteria: dict[str, Any]) -> Any:
-    """Apply ``type``, ``location``, price range, and size range to a ``properties`` query."""
-    if t := criteria.get("type"):
-        query = query.ilike("property_type", f"%{t}%")
+    """Apply intake-style criteria: ``price``, ``location``, ``size_sqft``, ``property_type``."""
+    if not criteria:
+        return query
 
-    if loc := criteria.get("location"):
-        query = query.or_(
-            f"city.ilike.%{loc}%,state.ilike.%{loc}%,address.ilike.%{loc}%,country.ilike.%{loc}%"
-        )
+    query = _apply_property_type(query, criteria.get("property_type"))
 
-    if (v := criteria.get("minPrice")) is not None:
-        query = query.gte("price", v)
-    if (v := criteria.get("maxPrice")) is not None:
-        query = query.lte("price", v)
-    if (v := criteria.get("minSize")) is not None:
-        query = query.gte("size_sqft", v)
-    if (v := criteria.get("maxSize")) is not None:
-        query = query.lte("size_sqft", v)
+    loc = criteria.get("location")
+    if isinstance(loc, str):
+        query = _apply_location_string(query, loc)
+    elif isinstance(loc, dict):
+        label = loc.get("label")
+        if isinstance(label, str):
+            query = _apply_location_string(query, label)
+
+    query = _apply_numeric_range(query, "price", criteria.get("price"))
+    query = _apply_numeric_range(query, "size_sqft", criteria.get("size_sqft"))
 
     return query
 
