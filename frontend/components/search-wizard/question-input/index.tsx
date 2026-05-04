@@ -58,7 +58,7 @@ export const QuestionInput = ({
     {question.kind === "location" && (
       <LocationQuestionInput
         question={question}
-        answer={answer}
+        answer={answer as string}
         onChange={onAnswerChange}
       />
     )}

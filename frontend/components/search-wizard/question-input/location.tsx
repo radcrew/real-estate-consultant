@@ -7,10 +7,8 @@ import { useLocation } from "../../../hooks/use-location";
 
 type LocationQuestionInputProps = {
   question: LocationQuestion;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  answer: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onChange: (value: any) => void;
+  answer: string;
+  onChange: (value: string) => void;
 };
 
 export const LocationQuestionInput = ({

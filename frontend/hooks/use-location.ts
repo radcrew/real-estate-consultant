@@ -64,8 +64,7 @@ const mapPlaceResultToLocation = (
 
 type UseLocationOptions = {
   initialQuery: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onChange: (value: any) => void;
+  onChange: (value: string) => void;
 };
 
 export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
@@ -154,7 +153,7 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
     setQuery(value);
     setSuggestions([]);
     fetchSuggestions(value);
-    onChange({ input: value });
+    onChange(value);
   };
 
   const selectSuggestion = (suggestion: LocationSuggestion) => {
@@ -163,7 +162,7 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
     setSuggestions([]);
 
     if (!placesService) {
-      onChange({ label: suggestion.label, input: suggestion.label });
+      onChange(suggestion.label);
       return;
     }
 
@@ -175,14 +174,12 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (result: any, status: any) => {
         if (status !== window.google.maps.places.PlacesServiceStatus.OK || !result) {
-          onChange({ label: suggestion.label, input: suggestion.label });
+          onChange(suggestion.label);
           return;
         }
 
-        onChange({
-          ...mapPlaceResultToLocation(result, suggestion.label),
-          input: suggestion.label,
-        });
+        const mapped = mapPlaceResultToLocation(result, suggestion.label);
+        onChange(mapped.label);
       },
     );
   };

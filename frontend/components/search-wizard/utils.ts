@@ -68,6 +68,9 @@ export const formatAnswerForSummary = (
   }
 
   if (question.kind === "location") {
+    if (typeof answer === "string" && answer.trim().length > 0) {
+      return answer.trim();
+    }
     if (
       typeof answer === "object" &&
       answer != null &&
@@ -78,16 +81,13 @@ export const formatAnswerForSummary = (
         return parts.join(", ");
       }
       if (typeof answer.label === "string" && answer.label.trim().length > 0) {
-        return answer.label;
+        return answer.label.trim();
       }
       if (typeof answer.input === "string" && answer.input.trim().length > 0) {
-        return answer.input;
+        return answer.input.trim();
       }
     }
-
-    return typeof answer === "string" && answer.trim().length > 0
-      ? answer
-      : "Not answered";
+    return "Not answered";
   }
 
   return typeof answer === "string" && answer.trim().length > 0
@@ -143,10 +143,11 @@ export const isQuestionComplete = (
       return answer.trim().length > 0;
     }
     if (typeof answer === "object" && answer != null && !Array.isArray(answer)) {
+      const o = answer as { label?: string; input?: string; city?: string };
       return (
-        typeof answer.label === "string" ||
-        typeof answer.input === "string" ||
-        typeof answer.city === "string"
+        (typeof o.label === "string" && o.label.trim().length > 0) ||
+        (typeof o.input === "string" && o.input.trim().length > 0) ||
+        (typeof o.city === "string" && o.city.trim().length > 0)
       );
     }
     return false;
