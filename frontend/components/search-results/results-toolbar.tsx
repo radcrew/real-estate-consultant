@@ -6,11 +6,7 @@ import { ArrowLeft, Sparkles } from "lucide-react";
 import { buttonVariants } from "@components/ui/button";
 import { cn } from "@lib/utils";
 
-type ResultsToolbarProps = {
-  resultCount: number;
-};
-
-export const ResultsToolbar = ({ resultCount }: ResultsToolbarProps) => (
+export const ResultsToolbar = () => (
   <div className="flex flex-col gap-4 border-b border-border pb-6">
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <Link
