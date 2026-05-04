@@ -19,9 +19,36 @@ export const SearchResults = () => {
   return (
     <div className="min-h-[60vh] bg-muted/20">
       <div className="mx-auto max-w-screen-xl px-4 py-10 sm:py-14">
-        <ResultsToolbar />
+        <ResultsToolbar loading={loading} />
 
         {error && <p className="py-6 text-center text-destructive">{error}</p>}
+
+        {loading && !error && (
+          <div
+            className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8"
+            role="status"
+            aria-live="polite"
+            aria-label="Loading search results"
+          >
+            {Array.from({ length: 6 }, (_, i) => (
+              <div
+                key={i}
+                className="overflow-hidden rounded-lg border border-border bg-card shadow-sm"
+              >
+                <div className="aspect-[4/3] animate-pulse bg-muted" />
+                <div className="space-y-3 p-4">
+                  <div className="h-5 w-[85%] max-w-[14rem] animate-pulse rounded-md bg-muted" />
+                  <div className="h-4 w-[55%] max-w-[10rem] animate-pulse rounded-md bg-muted" />
+                  <div className="h-12 w-full animate-pulse rounded-md bg-muted" />
+                  <div className="flex justify-between gap-4 pt-1">
+                    <div className="h-4 w-16 animate-pulse rounded-md bg-muted" />
+                    <div className="h-4 w-20 animate-pulse rounded-md bg-muted" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {!loading && !error && listings.length > 0 && (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8">

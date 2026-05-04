@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
 
 import { buttonVariants } from "@components/ui/button";
 import { cn } from "@lib/utils";
 
-export const ResultsToolbar = () => (
+type ResultsToolbarProps = {
+  loading?: boolean;
+};
+
+export const ResultsToolbar = ({ loading = false }: ResultsToolbarProps) => (
   <div className="flex flex-col gap-4 border-b border-border pb-6">
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
       <Link
@@ -41,6 +45,12 @@ export const ResultsToolbar = () => (
       <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
         Property matches
       </h1>
+      {loading && (
+        <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+          <span>Loading matches…</span>
+        </p>
+      )}
     </div>
   </div>
 );
