@@ -66,11 +66,11 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
           continue;
         }
         if (f.type === "location") {
-          next[key] = { type: "location", data: "" };
+          next[key] = { ...f, type: "location", data: "" };
         } else if (f.type === "range") {
-          next[key] = { type: "range", data: { ...CLEAR_RANGE } };
+          next[key] = { ...f, type: "range", data: { ...CLEAR_RANGE } };
         } else if (f.type === "multi-select") {
-          next[key] = { type: "multi-select", data: [] };
+          next[key] = { ...f, type: "multi-select", data: [] };
         }
       }
       return next;
@@ -103,8 +103,9 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
                 <TextFilter
                   key={key}
                   fieldKey={key}
+                  label={field.label ?? ""}
                   value={field.data}
-                  onChange={(next) => updateField(key, { type: "location", data: next })}
+                  onChange={(next) => updateField(key, { ...field, type: "location", data: next })}
                   disabled={disabled}
                 />
               );
@@ -113,8 +114,9 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
                 <RangeFilter
                   key={key}
                   fieldKey={key}
+                  label={field.label ?? ""}
                   value={field.data}
-                  onChange={(next) => updateField(key, { type: "range", data: next })}
+                  onChange={(next) => updateField(key, { ...field, type: "range", data: next })}
                   disabled={disabled}
                 />
               );
@@ -123,8 +125,9 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
                 <MultiSelectFilter
                   key={key}
                   fieldKey={key}
+                  label={field.label ?? ""}
                   value={field.data}
-                  onChange={(next) => updateField(key, { type: "multi-select", data: next })}
+                  onChange={(next) => updateField(key, { ...field, type: "multi-select", data: next })}
                   disabled={disabled}
                 />
               );

@@ -10,7 +10,6 @@ import {
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu";
 import { cn } from "@lib/utils";
-import { humanizeCriteriaKey } from "@lib/search-criteria";
 
 import { FILTER_BAR_CLUSTER, FILTER_BAR_PILL } from "./styles";
 
@@ -31,6 +30,7 @@ const formatOptionLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).
 
 type MultiSelectFilterProps = {
   fieldKey: string;
+  label: string;
   value: string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
@@ -39,12 +39,12 @@ type MultiSelectFilterProps = {
 
 export const MultiSelectFilter = ({
   fieldKey,
+  label,
   value,
   onChange,
   disabled,
   className,
 }: MultiSelectFilterProps) => {
-  const label = humanizeCriteriaKey(fieldKey);
   const dirty = value.length > 0;
 
   const options = useMemo(() => {

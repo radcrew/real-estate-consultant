@@ -33,7 +33,7 @@ export type SearchPropertyMatch = {
 
 /**
  * Response body from ``GET /api/v1/search/{session_profile_id}?limit=&offset=``.
- * ``criteria`` keys are criterion objects shaped like ``{ type, data }`` (see ``@lib/search-criteria``).
+ * ``criteria`` values are criterion objects: ``{ type, data, label? }`` (see ``@lib/search-criteria``).
  */
 export type SearchResponse = {
   criteria: Record<string, unknown>;

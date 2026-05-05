@@ -10,12 +10,12 @@ import {
 import { Input } from "@components/ui/input";
 import { cn } from "@lib/utils";
 import type { RangeCriterionData } from "@lib/search-criteria";
-import { humanizeCriteriaKey } from "@lib/search-criteria";
 
 import { FILTER_BAR_CLUSTER, FILTER_BAR_PILL } from "./styles";
 
 type RangeFilterProps = {
   fieldKey: string;
+  label: string;
   value: RangeCriterionData;
   onChange: (next: RangeCriterionData) => void;
   disabled?: boolean;
@@ -27,12 +27,10 @@ const fmt = (n: number) =>
 
 export const CLEAR_RANGE: RangeCriterionData = { min: Number.NaN, max: Number.NaN };
 
-export const RangeFilter = ({ fieldKey, value, onChange, disabled, className }: RangeFilterProps) => {
-  const label = humanizeCriteriaKey(fieldKey);
+export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, className }: RangeFilterProps) => {
   const hasBounds = Number.isFinite(value.min) && Number.isFinite(value.max);
   const summary = hasBounds ? `${fmt(value.min)} – ${fmt(value.max)}` : "Not set";
   const dirty = Number.isFinite(value.min) || Number.isFinite(value.max);
-  const triggerLabel = label.replace(/\s+range$/i, "").trim() || label;
 
   const setMin = (raw: string) => {
     const t = raw.trim();
@@ -60,7 +58,7 @@ export const RangeFilter = ({ fieldKey, value, onChange, disabled, className }: 
 
   const triggerInner = (
     <>
-      <span className="max-w-[9rem] truncate">{triggerLabel}</span>
+      <span className="max-w-[9rem] truncate">{label}</span>
       <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
     </>
   );
