@@ -27,7 +27,7 @@ async def search_listings(
     client: SupabaseSdkDep,
     db: DbSession,
     current_user: CurrentUser,
-    limit: int = Query(50, ge=1, le=100, description="Page size (max 100)."),
+    limit: int = Query(20, ge=1, le=100, description="Page size (max 100)."),
     offset: int = Query(0, ge=0, description="Offset for pagination."),
 ) -> SearchPropertiesResponse:
     """``GET /api/v1/search/{session_profile_id}?limit=50&offset=0``
@@ -43,7 +43,7 @@ async def search_listings(
     raw_criteria = session_row.get("criteria")
     criteria: dict[str, Any] = dict(raw_criteria) if isinstance(raw_criteria, dict) else {}
 
-    rows_with_scores, total = await search_properties(db, criteria, limit=limit, offset=offset)
+    rows_with_scores, total = await search_properties(client, criteria, limit=limit, offset=offset)
     results = [
         PropertyMatch(property=Properties.model_validate(row), match_score=score)
         for row, score in rows_with_scores
