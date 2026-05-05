@@ -32,27 +32,15 @@ export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, classN
   const summary = hasBounds ? `${fmt(value.min)} – ${fmt(value.max)}` : "Not set";
   const dirty = Number.isFinite(value.min) || Number.isFinite(value.max);
 
-  const setMin = (raw: string) => {
+  const setBound = (bound: "min" | "max", raw: string) => {
     const t = raw.trim();
     if (t === "") {
-      onChange({ ...value, min: Number.NaN });
+      onChange({ ...value, [bound]: Number.NaN });
       return;
     }
     const n = Number(raw);
     if (Number.isFinite(n)) {
-      onChange({ ...value, min: n });
-    }
-  };
-
-  const setMax = (raw: string) => {
-    const t = raw.trim();
-    if (t === "") {
-      onChange({ ...value, max: Number.NaN });
-      return;
-    }
-    const n = Number(raw);
-    if (Number.isFinite(n)) {
-      onChange({ ...value, max: n });
+      onChange({ ...value, [bound]: n });
     }
   };
 
@@ -100,7 +88,7 @@ export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, classN
                   id={`${fieldKey}-min`}
                   type="number"
                   value={Number.isFinite(value.min) ? value.min : ""}
-                  onChange={(e) => setMin(e.target.value)}
+                  onChange={(e) => setBound("min", e.target.value)}
                 />
               </div>
               <div className="min-w-0 flex-1 space-y-1">
@@ -111,7 +99,7 @@ export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, classN
                   id={`${fieldKey}-max`}
                   type="number"
                   value={Number.isFinite(value.max) ? value.max : ""}
-                  onChange={(e) => setMax(e.target.value)}
+                  onChange={(e) => setBound("max", e.target.value)}
                 />
               </div>
             </div>
