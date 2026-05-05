@@ -89,6 +89,21 @@ async def load_first_intake_question(client: AsyncClient) -> IntakeSessionFirstQ
     return map_question_to_model(row)
 
 
+async def load_question_key_types(client: AsyncClient) -> dict[str, str]:
+    """Map each intake question ``key`` to its ``type`` (for API responses such as search)."""
+    result = await execute_db_safe(
+        client.table("questions").select("key, type").order("order_index").execute(),
+    )
+    rows = as_row_list(result.data)
+    out: dict[str, str] = {}
+    for row in rows:
+        key = row.get("key")
+        qtype = row.get("type")
+        if isinstance(key, str) and key.strip():
+            out[key.strip()] = qtype.strip() if isinstance(qtype, str) and qtype.strip() else "text"
+    return out
+
+
 async def load_intake_questions(client: AsyncClient) -> list[dict[str, Any]]:
     result = await execute_db_safe(
         client.table("questions")
