@@ -10,5 +10,10 @@ export const useSearchByProfile = () => {
     [],
   );
 
-  return { search };
+  const updateCriteria = useCallback(
+    searchService.updateCriteria.bind(searchService),
+    [],
+  );
+
+  return { search, updateCriteria };
 };

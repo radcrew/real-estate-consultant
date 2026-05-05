@@ -71,3 +71,29 @@ export const parseSearchCriteriaEntries = (criteria: Record<string, unknown>): P
       return field ? { key, field } : null;
     })
     .filter((x): x is ParsedCriteriaEntry => x != null);
+
+/** Flatten criterion objects into grouped answer payload for criteria update API. */
+export const toCriteriaAnswers = (
+  fields: Record<string, SearchCriterionField>,
+): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {};
+  for (const [key, field] of Object.entries(fields)) {
+    if (field.type === "location") {
+      const v = field.data.trim();
+      if (v.length > 0) {
+        payload[key] = v;
+      }
+      continue;
+    }
+    if (field.type === "range") {
+      if (Number.isFinite(field.data.min) && Number.isFinite(field.data.max)) {
+        payload[key] = { min: field.data.min, max: field.data.max };
+      }
+      continue;
+    }
+    if (field.type === "multi-select" && field.data.length > 0) {
+      payload[key] = [...field.data];
+    }
+  }
+  return payload;
+};

@@ -43,6 +43,8 @@ export type SearchResponse = {
   offset: number;
 };
 
+export type UpdateSearchCriteriaBody = Record<string, unknown>;
+
 export class SearchService {
   constructor(private readonly http: AxiosInstance) {}
 
@@ -54,6 +56,13 @@ export class SearchService {
       params: pagination,
     });
     return data;
+  }
+
+  async updateCriteria(
+    sessionProfileId: string,
+    criteria: UpdateSearchCriteriaBody,
+  ): Promise<void> {
+    await this.http.put(`/search/${sessionProfileId}`, criteria);
   }
 }
 

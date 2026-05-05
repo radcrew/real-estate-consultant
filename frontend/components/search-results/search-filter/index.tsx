@@ -7,6 +7,7 @@ import { buttonVariants } from "@components/ui/button";
 import { cn } from "@lib/utils";
 import {
   parseSearchCriteriaEntries,
+  toCriteriaAnswers,
   type ParsedCriteriaEntry,
   type SearchCriterionField,
 } from "@lib/search-criteria";
@@ -21,8 +22,8 @@ type SearchFilterProps = {
   criteria: Record<string, unknown>;
   disabled?: boolean;
   className?: string;
-  /** Re-runs the search request (e.g. after adjusting filters). */
-  onSearch?: () => void;
+  /** Sends current grouped criteria payload and re-runs search. */
+  onSearch?: (nextCriteria: Record<string, unknown>) => void | Promise<void>;
 };
 
 const entriesToDraft = (entries: ParsedCriteriaEntry[]): Record<string, SearchCriterionField> =>
@@ -140,7 +141,7 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
           <button
             type="button"
             className={cn(buttonVariants({ variant: "default", size: "sm" }), "inline-flex gap-1.5")}
-            onClick={onSearch}
+            onClick={() => void onSearch(toCriteriaAnswers(draft))}
             disabled={disabled}
           >
             <Search className="size-4 shrink-0" aria-hidden />

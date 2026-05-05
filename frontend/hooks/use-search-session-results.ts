@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useSearchByProfile } from "@hooks/use-search-by-profile";
 import { mapSearchPropertyMatchesToListings, type ResultCardListing } from "@lib/map-property-match";
+import type { UpdateSearchCriteriaBody } from "@services/search";
 
 const DEFAULT_PAGE = { limit: 20, offset: 0 } as const;
 
 export const useSearchSessionResults = (sessionProfileId: string | undefined) => {
-  const { search } = useSearchByProfile();
+  const { search, updateCriteria } = useSearchByProfile();
   const [listings, setListings] = useState<ResultCardListing[]>([]);
   const [criteria, setCriteria] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(() => Boolean(sessionProfileId?.trim()));
@@ -70,5 +71,24 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
     void load();
   }, [load]);
 
-  return { listings, loading, error, criteria, refetch };
+  const applyCriteria = useCallback(
+    async (nextCriteria: UpdateSearchCriteriaBody) => {
+      const id = sessionProfileId?.trim();
+      if (!id) {
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        await updateCriteria(id, nextCriteria);
+        await load();
+      } catch {
+        setLoading(false);
+        setError("Could not update criteria. Try again later.");
+      }
+    },
+    [load, sessionProfileId, updateCriteria],
+  );
+
+  return { listings, loading, error, criteria, refetch, applyCriteria };
 };

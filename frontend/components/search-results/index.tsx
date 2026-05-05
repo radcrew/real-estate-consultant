@@ -16,7 +16,7 @@ const SKELETON_COUNT = 6;
 export const SearchResults = () => {
   const params = useParams<{ id?: string }>();
   const sessionProfileId = typeof params?.id === "string" ? params.id : undefined;
-  const { listings, loading, error, criteria, refetch } = useSearchSessionResults(sessionProfileId);
+  const { listings, loading, error, criteria, applyCriteria } = useSearchSessionResults(sessionProfileId);
 
   const showFilterDock = (loading && !error) || Object.keys(criteria).length > 0;
 
@@ -28,7 +28,7 @@ export const SearchResults = () => {
             {loading && !error ? (
               <SearchFilterSkeleton />
             ) : (
-              <SearchFilter criteria={criteria} disabled={loading} onSearch={refetch} />
+              <SearchFilter criteria={criteria} disabled={loading} onSearch={applyCriteria} />
             )}
           </div>
         </div>
