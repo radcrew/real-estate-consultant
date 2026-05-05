@@ -71,10 +71,3 @@ export const parseSearchCriteriaEntries = (criteria: Record<string, unknown>): P
       return field ? { key, field } : null;
     })
     .filter((x): x is ParsedCriteriaEntry => x != null);
-
-export const humanizeCriteriaKey = (key: string): string =>
-  key
-    .split("_")
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
