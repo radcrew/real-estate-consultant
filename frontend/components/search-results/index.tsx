@@ -18,17 +18,29 @@ export const SearchResults = () => {
   const sessionProfileId = typeof params?.id === "string" ? params.id : undefined;
   const { listings, loading, error, criteria, refetch } = useSearchSessionResults(sessionProfileId);
 
+  const showFilterDock = (loading && !error) || Object.keys(criteria).length > 0;
+
   return (
     <div className="min-h-[60vh] bg-muted/20">
-      <div className="mx-auto max-w-screen-xl px-4 py-4 sm:py-4">
-        <div className="mb-4">
-          {loading && !error ? (
-            <SearchFilterSkeleton />
-          ) : (
-            <SearchFilter criteria={criteria} disabled={loading} onSearch={refetch} />
-          )}
+      {showFilterDock ? (
+        <div className="fixed left-0 right-0 top-16 z-30 border-b border-border bg-background shadow-sm">
+          <div className="mx-auto max-w-screen-xl px-4 pt-4 pb-4">
+            {loading && !error ? (
+              <SearchFilterSkeleton />
+            ) : (
+              <SearchFilter criteria={criteria} disabled={loading} onSearch={refetch} />
+            )}
+          </div>
         </div>
+      ) : null}
 
+      <div
+        className={cn(
+          "mx-auto max-w-screen-xl px-4 pb-4 sm:pb-6",
+          /* Matches former ``pt-4`` + filter row + ``mb-4`` below filter while dock is fixed */
+          showFilterDock ? "pt-[calc(1rem+3.25rem+1rem)]" : "py-4 sm:py-6",
+        )}
+      >
         {error && <p className="py-6 text-center text-destructive">{error}</p>}
 
         {loading && !error && (
