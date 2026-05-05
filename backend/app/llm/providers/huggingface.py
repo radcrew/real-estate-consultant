@@ -40,8 +40,8 @@ class HuggingFaceProvider:
         )
         self.transient_retries = transient_retries
         self.client = client or AsyncOpenAI(
-            api_key=settings.huggingface_api_key or "missing-huggingface-api-key",
-            base_url=settings.huggingface_base_url,
+            api_key=settings.hf_token or "missing-huggingface-api-key",
+            base_url=settings.hf_base_url,
             timeout=self.timeout,
             max_retries=transient_retries,
         )
@@ -55,7 +55,7 @@ class HuggingFaceProvider:
         max_tokens: int,
     ) -> StructuredOutputT:
         """Request a typed structured output from the Hugging Face router."""
-        if not self.settings.huggingface_api_key.strip():
+        if not self.settings.hf_token.strip():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Hugging Face API key is not configured.",
@@ -63,7 +63,7 @@ class HuggingFaceProvider:
 
         try:
             completion = await self.client.beta.chat.completions.parse(
-                model=self.settings.huggingface_model,
+                model=self.settings.hf_model,
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
