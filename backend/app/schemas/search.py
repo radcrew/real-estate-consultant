@@ -4,26 +4,22 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 from app.models.properties import Properties
+
+
+class UpdateSearchCriteriaBody(RootModel[dict[str, Any]]):
+    """Replace intake ``criteria``: keys are question keys; values are answers (any JSON shape)."""
 
 
 class CriteriaFieldItem(BaseModel):
     """One criterion key with question metadata from ``questions`` plus stored value."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
-
-    type: str = Field(
-        ...,
-        description="``questions.type`` for the question row whose ``key`` matches this criterion.",
-    )
-    label: str = Field(
-        default="",
-        description="``questions.title`` for the row whose ``key`` matches this criterion.",
-    )
-    data: Any = Field(..., description="Value stored on the intake session for this criterion key.")
-
+    type: str
+    label: str
+    data: Any
 
 class PropertyMatch(BaseModel):
     """One property row plus LLM match score (0–100)."""

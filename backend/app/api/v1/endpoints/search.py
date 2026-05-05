@@ -8,12 +8,21 @@ from uuid import UUID
 from fastapi import APIRouter, Query
 
 from app.core.deps import CurrentUser, SupabaseSdkDep
+from app.models.intake_sessions import IntakeSession
 from app.models.properties import Properties
-from app.repositories.intake_sessions import load_intake_session_row_by_search_profile_id
+from app.repositories.intake_sessions import (
+    load_intake_session_row_by_search_profile_id,
+    parse_intake_session,
+    save_intake_criteria,
+)
 from app.repositories.properties_search import search_properties
 from app.repositories.questions import load_question_key_metadata
 from app.repositories.search_profiles import ensure_search_profile_access
-from app.schemas.search import PropertyMatch, SearchPropertiesResponse
+from app.schemas.search import (
+    PropertyMatch,
+    SearchPropertiesResponse,
+    UpdateSearchCriteriaBody,
+)
 from app.utils.search_criteria import wrap_criteria_for_search_response
 
 router = APIRouter(tags=["search"])
@@ -59,3 +68,30 @@ async def search_listings(
         limit=limit,
         offset=offset,
     )
+
+
+@router.put(
+    "/search/{session_profile_id}",
+    response_model=IntakeSession,
+    summary="Replace search criteria on the linked intake session",
+)
+async def update_search_criteria(
+    session_profile_id: UUID,
+    client: SupabaseSdkDep,
+    current_user: CurrentUser,
+    body: UpdateSearchCriteriaBody,
+) -> IntakeSession:
+    """``PUT /api/v1/search/{session_profile_id}``
+
+    Replaces ``criteria`` on the **latest** ``intake_sessions`` row for this search profile.
+    Body shape matches the merged object from guided answers (multiple keys at once).
+    """
+    await ensure_search_profile_access(
+        client,
+        session_profile_id,
+        current_user.id,
+    )
+    session_row = await load_intake_session_row_by_search_profile_id(client, session_profile_id)
+    criteria = dict(body.root)
+    updated = await save_intake_criteria(client, UUID(str(session_row["id"])), criteria)
+    return parse_intake_session(updated)
