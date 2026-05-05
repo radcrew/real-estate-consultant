@@ -35,8 +35,8 @@ export const TextFilter = ({ fieldKey, label, value, onChange, disabled, classNa
           "h-9 border-0 bg-transparent pl-9 pr-20 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
           value ? "pr-24" : "pr-12",
         )}
-        placeholder={label || "Location"}
-        aria-label={label || "Location"}
+        placeholder={label}
+        aria-label={label}
       />
       {value ? (
         <button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { createElement, useEffect, useMemo, useState, type ComponentType } from "react";
 import { Search } from "lucide-react";
 
 import { buttonVariants } from "@components/ui/button";
@@ -14,6 +14,8 @@ import {
 import { MultiSelectFilter } from "./filters/multi-select";
 import { CLEAR_RANGE, RangeFilter } from "./filters/range";
 import { TextFilter } from "./filters/text";
+
+export { SearchFilterSkeleton } from "./skeleton";
 
 type SearchFilterProps = {
   criteria: Record<string, unknown>;
@@ -42,6 +44,20 @@ const sortEntries = (entries: ParsedCriteriaEntry[]): ParsedCriteriaEntry[] => {
   return [...entries].sort((a, b) => rank(a) - rank(b) || a.key.localeCompare(b.key));
 };
 
+const FILTER_COMPONENTS_MAP = {
+  location: TextFilter,
+  range: RangeFilter,
+  "multi-select": MultiSelectFilter,
+} as const;
+
+type CriteriaFilterProps = {
+  fieldKey: string;
+  label: string;
+  disabled?: boolean;
+  value: unknown;
+  onChange: (next: unknown) => void;
+};
+
 export const SearchFilter = ({ criteria, disabled, className, onSearch }: SearchFilterProps) => {
   const parsed = useMemo(() => parseSearchCriteriaEntries(criteria), [criteria]);
   const sortedParsed = useMemo(() => sortEntries(parsed), [parsed]);
@@ -57,7 +73,7 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
     setDraft((prev) => ({ ...prev, [key]: field }));
   };
 
-  const clearAll = () => {
+  const handleClear = () => {
     setDraft((prev) => {
       const next = { ...prev };
       for (const key of Object.keys(next)) {
@@ -97,41 +113,16 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
             return null;
           }
 
-          switch (field.type) {
-            case "location":
-              return (
-                <TextFilter
-                  key={key}
-                  fieldKey={key}
-                  label={field.label ?? ""}
-                  value={field.data}
-                  onChange={(next) => updateField(key, { ...field, type: "location", data: next })}
-                  disabled={disabled}
-                />
-              );
-            case "range":
-              return (
-                <RangeFilter
-                  key={key}
-                  fieldKey={key}
-                  label={field.label ?? ""}
-                  value={field.data}
-                  onChange={(next) => updateField(key, { ...field, type: "range", data: next })}
-                  disabled={disabled}
-                />
-              );
-            case "multi-select":
-              return (
-                <MultiSelectFilter
-                  key={key}
-                  fieldKey={key}
-                  label={field.label ?? ""}
-                  value={field.data}
-                  onChange={(next) => updateField(key, { ...field, type: "multi-select", data: next })}
-                  disabled={disabled}
-                />
-              );
-          }
+          const Filter = FILTER_COMPONENTS_MAP[field.type] as ComponentType<CriteriaFilterProps>;
+          return createElement(Filter, {
+            key,
+            fieldKey: key,
+            label: field.label ?? "",
+            disabled,
+            value: field.data,
+            onChange: (next: unknown) =>
+              updateField(key, { ...field, data: next } as SearchCriterionField),
+          });
         })}
       </div>
 
@@ -139,11 +130,12 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
         <button
           type="button"
           className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground")}
-          onClick={clearAll}
+          onClick={handleClear}
           disabled={disabled}
         >
           Clear
         </button>
+
         {onSearch != null && (
           <button
             type="button"
@@ -159,25 +151,3 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
     </section>
   );
 };
-
-/** Placeholder bar matching ``SearchFilter`` layout while results load. */
-export const SearchFilterSkeleton = ({ className }: { className?: string }) => (
-  <section
-    className={cn(
-      "flex flex-nowrap items-center gap-2 overflow-hidden rounded-lg border border-border bg-background p-2 shadow-sm",
-      className,
-    )}
-    aria-busy="true"
-    aria-label="Loading search filters"
-  >
-    <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-hidden">
-      <div className="h-9 w-52 shrink-0 animate-pulse rounded-md bg-muted" />
-      <div className="h-9 w-28 shrink-0 animate-pulse rounded-md bg-muted" />
-      <div className="h-9 w-32 shrink-0 animate-pulse rounded-md bg-muted" />
-    </div>
-    <div className="ml-auto flex shrink-0 gap-2">
-      <div className="h-9 w-14 shrink-0 animate-pulse rounded-md bg-muted" />
-      <div className="h-9 w-20 shrink-0 animate-pulse rounded-md bg-muted" />
-    </div>
-  </section>
-);
