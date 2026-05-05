@@ -9,7 +9,6 @@ import { cn } from "@lib/utils";
 import { useSearchSessionResults } from "@hooks/use-search-session-results";
 
 import { ResultCard } from "./result-card";
-import { ResultsToolbar } from "./results-toolbar";
 import { SearchFilter } from "./search-filter";
 
 const SKELETON_COUNT = 6;
@@ -22,9 +21,7 @@ export const SearchResults = () => {
   return (
     <div className="min-h-[60vh] bg-muted/20">
       <div className="mx-auto max-w-screen-xl px-4 py-10 sm:py-14">
-        <ResultsToolbar loading={loading} />
-
-        <div className="mb-8 mt-6">
+        <div className="mb-8">
           <SearchFilter criteria={criteria} disabled={loading} onSearch={refetch} />
         </div>
 
