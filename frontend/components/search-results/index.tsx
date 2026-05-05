@@ -10,16 +10,23 @@ import { useSearchSessionResults } from "@hooks/use-search-session-results";
 
 import { ResultCard } from "./result-card";
 import { ResultsToolbar } from "./results-toolbar";
+import { SearchFilter } from "./search-filter";
+
+const SKELETON_COUNT = 6;
 
 export const SearchResults = () => {
   const params = useParams<{ id?: string }>();
   const sessionProfileId = typeof params?.id === "string" ? params.id : undefined;
-  const { listings, loading, error } = useSearchSessionResults(sessionProfileId);
+  const { listings, loading, error, criteria } = useSearchSessionResults(sessionProfileId);
 
   return (
     <div className="min-h-[60vh] bg-muted/20">
       <div className="mx-auto max-w-screen-xl px-4 py-10 sm:py-14">
         <ResultsToolbar loading={loading} />
+
+        <div className="mb-8 mt-6">
+          <SearchFilter criteria={criteria} disabled={loading} />
+        </div>
 
         {error && <p className="py-6 text-center text-destructive">{error}</p>}
 
@@ -30,7 +37,7 @@ export const SearchResults = () => {
             aria-live="polite"
             aria-label="Loading search results"
           >
-            {Array.from({ length: 6 }, (_, i) => (
+            {Array.from({ length: SKELETON_COUNT }, (_, i) => (
               <div
                 key={i}
                 className="overflow-hidden rounded-lg border border-border bg-card shadow-sm"

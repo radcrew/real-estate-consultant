@@ -10,6 +10,7 @@ const DEFAULT_PAGE = { limit: 20, offset: 0 } as const;
 export const useSearchSessionResults = (sessionProfileId: string | undefined) => {
   const { search } = useSearchByProfile();
   const [listings, setListings] = useState<ResultCardListing[]>([]);
+  const [criteria, setCriteria] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(() => Boolean(sessionProfileId?.trim()));
   const [error, setError] = useState<string | null>(null);
 
@@ -17,6 +18,7 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
     const id = sessionProfileId?.trim();
     if (!id) {
       setListings([]);
+      setCriteria({});
       setLoading(false);
       setError(null);
       return;
@@ -27,6 +29,7 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
     setLoading(true);
     setError(null);
     setListings([]);
+    setCriteria({});
 
     const run = async () => {
       try {
@@ -35,11 +38,16 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
           return;
         }
         setListings(mapSearchPropertyMatchesToListings(res.results));
+        const c = res.criteria;
+        setCriteria(
+          c !== null && typeof c === "object" && !Array.isArray(c) ? { ...(c as Record<string, unknown>) } : {},
+        );
       } catch {
         if (cancelled) {
           return;
         }
         setListings([]);
+        setCriteria({});
         setError("Could not load search results. Try again later.");
       } finally {
         if (!cancelled) {
@@ -48,12 +56,12 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
       }
     };
 
-    run();
+    void run();
 
     return () => {
       cancelled = true;
     };
   }, [search, sessionProfileId]);
 
-  return { listings, loading, error };
+  return { listings, loading, error, criteria };
 };
