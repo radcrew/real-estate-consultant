@@ -1,9 +1,17 @@
 "use client";
 
-import { MapPin, Search, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@components/ui/dropdown-menu";
 import { Input } from "@components/ui/input";
 import { cn } from "@lib/utils";
+
+import { FILTER_BAR_PILL } from "./styles";
+import { stopMenuTriggerBubble } from "./utils";
 
 type TextFilterProps = {
   fieldKey: string;
@@ -14,42 +22,52 @@ type TextFilterProps = {
   className?: string;
 };
 
-/** Compact location field for single-row filter bar. */
+/** Compact text criterion: pill shows label + chevron until set, then value + clear. */
 export const TextFilter = ({ fieldKey, label, value, onChange, disabled, className }: TextFilterProps) => {
+  const hasValue = value.trim().length > 0;
+  const display = hasValue ? value.trim() : label;
+
+  const handleClear = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+    stopMenuTriggerBubble(e);
+    onChange("");
+  };
+
   return (
-    <div
-      className={cn(
-        "relative flex h-9 w-52 shrink-0 items-center rounded-md border border-border bg-background shadow-sm",
-        disabled && "pointer-events-none opacity-50",
-        className,
-      )}
-    >
-      <MapPin className="pointer-events-none absolute left-2.5 size-4 text-muted-foreground" aria-hidden />
-      <Input
-        id={`${fieldKey}-text`}
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger
         disabled={disabled}
-        className={cn(
-          "h-9 border-0 bg-transparent pl-9 pr-20 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0",
-          value ? "pr-24" : "pr-12",
+        aria-label={hasValue ? `${label}: ${display}` : label}
+        className={cn(FILTER_BAR_PILL, "disabled:pointer-events-none disabled:opacity-50", className)}
+      >
+        <span className="min-w-0 flex-1 truncate text-left">{display}</span>
+        {hasValue ? (
+          <span
+            title={`Clear ${label}`}
+            className="-mr-1 flex size-8 shrink-0 cursor-default items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+            onPointerDown={stopMenuTriggerBubble}
+            onClick={handleClear}
+          >
+            <X className="size-4 shrink-0" aria-hidden />
+          </span>
+        ) : (
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground pointer-events-none" aria-hidden />
         )}
-        placeholder={label}
-        aria-label={label}
-      />
-      {value ? (
-        <button
-          type="button"
-          className="absolute right-9 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-          onClick={() => onChange("")}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="bottom" sideOffset={6} className="w-[min(20rem,calc(100vw-2rem))] p-3">
+        <label className="text-xs font-medium text-muted-foreground" htmlFor={`${fieldKey}-text`}>
+          {label}
+        </label>
+        <Input
+          id={`${fieldKey}-text`}
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
-          aria-label={label ? `Clear ${label}` : "Clear"}
-        >
-          <X className="size-4" aria-hidden />
-        </button>
-      ) : null}
-      <Search className="pointer-events-none absolute right-2.5 size-4 text-muted-foreground" aria-hidden />
-    </div>
+          className="mt-2"
+          placeholder={label}
+          autoFocus
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };

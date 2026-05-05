@@ -11,7 +11,8 @@ import { Input } from "@components/ui/input";
 import { cn } from "@lib/utils";
 import type { RangeCriterionData } from "@lib/search-criteria";
 
-import { FILTER_BAR_CLUSTER, FILTER_BAR_PILL } from "./styles";
+import { FILTER_BAR_PILL } from "./styles";
+import { stopMenuTriggerBubble } from "./utils";
 
 type RangeFilterProps = {
   fieldKey: string;
@@ -23,14 +24,45 @@ type RangeFilterProps = {
 };
 
 const fmt = (n: number) =>
-  new Intl.NumberFormat("en-US", { maximumFractionDigits: n >= 1000 ? 0 : 2, notation: n >= 1e6 ? "compact" : "standard" }).format(n);
+  new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: n >= 1000 ? 0 : 2,
+    notation: n >= 1e6 ? "compact" : "standard",
+  }).format(n);
 
 export const CLEAR_RANGE: RangeCriterionData = { min: Number.NaN, max: Number.NaN };
 
-export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, className }: RangeFilterProps) => {
+function rangeTriggerText(value: RangeCriterionData, label: string) {
   const hasBounds = Number.isFinite(value.min) && Number.isFinite(value.max);
-  const summary = hasBounds ? `${fmt(value.min)} – ${fmt(value.max)}` : "Not set";
-  const dirty = Number.isFinite(value.min) || Number.isFinite(value.max);
+  if (hasBounds) {
+    return `${fmt(value.min)} – ${fmt(value.max)}`;
+  }
+  if (Number.isFinite(value.min)) {
+    return `From ${fmt(value.min)}`;
+  }
+  if (Number.isFinite(value.max)) {
+    return `To ${fmt(value.max)}`;
+  }
+  return label;
+}
+
+function rangeSummaryForAria(value: RangeCriterionData) {
+  const hasBounds = Number.isFinite(value.min) && Number.isFinite(value.max);
+  if (hasBounds) {
+    return `${fmt(value.min)} to ${fmt(value.max)}`;
+  }
+  if (Number.isFinite(value.min)) {
+    return `minimum ${fmt(value.min)}`;
+  }
+  if (Number.isFinite(value.max)) {
+    return `maximum ${fmt(value.max)}`;
+  }
+  return "Not set";
+}
+
+export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, className }: RangeFilterProps) => {
+  const hasValue = Number.isFinite(value.min) || Number.isFinite(value.max);
+  const summary = rangeSummaryForAria(value);
+  const triggerText = rangeTriggerText(value, label);
 
   const setBound = (bound: "min" | "max", raw: string) => {
     const t = raw.trim();
@@ -44,38 +76,33 @@ export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, classN
     }
   };
 
-  const triggerInner = (
-    <>
-      <span className="max-w-[9rem] truncate">{label}</span>
-      <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-    </>
-  );
+  const handleClear = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+    stopMenuTriggerBubble(e);
+    onChange(CLEAR_RANGE);
+  };
 
   return (
     <div className={cn("shrink-0", className)}>
       <DropdownMenu modal={false}>
-        <div className={FILTER_BAR_CLUSTER}>
-          <button
-            type="button"
-            className={cn(
-              "flex min-h-9 w-9 shrink-0 items-center justify-center border-r text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground",
-              dirty ? "visible border-border" : "invisible pointer-events-none border-transparent",
-            )}
-            onClick={() => onChange(CLEAR_RANGE)}
-            disabled={disabled || !dirty}
-            aria-label={dirty ? `Clear ${label}` : undefined}
-            tabIndex={dirty ? 0 : -1}
-          >
-            <X className="size-4 shrink-0" aria-hidden />
-          </button>
-          <DropdownMenuTrigger
-            disabled={disabled}
-            aria-label={`${label}: ${summary}`}
-            className={cn(FILTER_BAR_PILL, "h-9 shrink-0 rounded-none border-0 shadow-none")}
-          >
-            {triggerInner}
-          </DropdownMenuTrigger>
-        </div>
+        <DropdownMenuTrigger
+          disabled={disabled}
+          aria-label={`${label}: ${summary}`}
+          className={cn(FILTER_BAR_PILL, "disabled:pointer-events-none disabled:opacity-50")}
+        >
+          <span className="min-w-0 flex-1 truncate text-left">{triggerText}</span>
+          {hasValue ? (
+            <span
+              title={`Clear ${label}`}
+              className="-mr-1 flex size-8 shrink-0 cursor-default items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              onPointerDown={stopMenuTriggerBubble}
+              onClick={handleClear}
+            >
+              <X className="size-4 shrink-0" aria-hidden />
+            </span>
+          ) : (
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground pointer-events-none" aria-hidden />
+          )}
+        </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="bottom" sideOffset={6} className="min-w-[16rem] p-3">
           <div className="space-y-3">
             <div className="text-xs font-medium text-muted-foreground">{label}</div>

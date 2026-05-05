@@ -11,7 +11,8 @@ import {
 } from "@components/ui/dropdown-menu";
 import { cn } from "@lib/utils";
 
-import { FILTER_BAR_CLUSTER, FILTER_BAR_PILL } from "./styles";
+import { FILTER_BAR_PILL } from "./styles";
+import { stopMenuTriggerBubble } from "./utils";
 
 /** Common types shown as checkboxes; merges with current API selections. */
 const SUGGESTED_TYPES = [
@@ -37,15 +38,18 @@ type MultiSelectFilterProps = {
   className?: string;
 };
 
-export const MultiSelectFilter = ({
-  fieldKey,
-  label,
-  value,
-  onChange,
-  disabled,
-  className,
-}: MultiSelectFilterProps) => {
-  const dirty = value.length > 0;
+function multiTriggerText(value: string[], label: string) {
+  if (value.length === 0) {
+    return label;
+  }
+  if (value.length === 1) {
+    return formatOptionLabel(value[0]);
+  }
+  return `${formatOptionLabel(value[0])} +${value.length - 1}`;
+}
+
+export const MultiSelectFilter = ({ label, value, onChange, disabled, className }: MultiSelectFilterProps) => {
+  const hasValue = value.length > 0;
 
   const options = useMemo(() => {
     const set = new Set<string>([...SUGGESTED_TYPES, ...value.map((x) => x.toLowerCase())]);
@@ -53,11 +57,7 @@ export const MultiSelectFilter = ({
   }, [value]);
 
   const summaryForAria =
-    value.length === 0
-      ? "Any"
-      : value.length === 1
-        ? formatOptionLabel(value[0])
-        : `${value.length} selected`;
+    value.length === 0 ? "Any" : value.length === 1 ? formatOptionLabel(value[0]) : `${value.length} selected`;
 
   const toggle = (opt: string, checked: boolean) => {
     const key = opt.toLowerCase();
@@ -70,38 +70,35 @@ export const MultiSelectFilter = ({
     }
   };
 
-  const triggerInner = (
-    <>
-      <span className="max-w-[9rem] truncate">{label}</span>
-      <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-    </>
-  );
+  const triggerText = multiTriggerText(value, label);
+
+  const handleClear = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+    stopMenuTriggerBubble(e);
+    onChange([]);
+  };
 
   return (
     <div className={cn("shrink-0", className)}>
       <DropdownMenu modal={false}>
-        <div className={FILTER_BAR_CLUSTER}>
-          <button
-            type="button"
-            className={cn(
-              "flex min-h-9 w-9 shrink-0 items-center justify-center border-r text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground",
-              dirty ? "visible border-border" : "invisible pointer-events-none border-transparent",
-            )}
-            onClick={() => onChange([])}
-            disabled={disabled || !dirty}
-            aria-label={dirty ? `Clear ${label}` : undefined}
-            tabIndex={dirty ? 0 : -1}
-          >
-            <X className="size-4 shrink-0" aria-hidden />
-          </button>
-          <DropdownMenuTrigger
-            disabled={disabled}
-            aria-label={`${label}: ${summaryForAria}`}
-            className={cn(FILTER_BAR_PILL, "h-9 shrink-0 rounded-none border-0 shadow-none")}
-          >
-            {triggerInner}
-          </DropdownMenuTrigger>
-        </div>
+        <DropdownMenuTrigger
+          disabled={disabled}
+          aria-label={`${label}: ${summaryForAria}`}
+          className={cn(FILTER_BAR_PILL, "disabled:pointer-events-none disabled:opacity-50")}
+        >
+          <span className="min-w-0 flex-1 truncate text-left">{triggerText}</span>
+          {hasValue ? (
+            <span
+              title={`Clear ${label}`}
+              className="-mr-1 flex size-8 shrink-0 cursor-default items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              onPointerDown={stopMenuTriggerBubble}
+              onClick={handleClear}
+            >
+              <X className="size-4 shrink-0" aria-hidden />
+            </span>
+          ) : (
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground pointer-events-none" aria-hidden />
+          )}
+        </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="bottom" sideOffset={6} className="max-h-72 min-w-[12rem] overflow-y-auto p-1">
           {options.map((opt) => {
             const checked = value.some((x) => x.toLowerCase() === opt.toLowerCase());
