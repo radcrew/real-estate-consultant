@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 
-from app.core.deps import CurrentUser, SupabaseSdkDep
+from app.core.deps import CurrentUser, DbSession, SupabaseSdkDep
 from app.models.intake_sessions import IntakeSession
 from app.models.properties import Properties
 from app.repositories.intake_sessions import (
@@ -36,6 +36,7 @@ router = APIRouter(tags=["search"])
 async def search_listings(
     session_profile_id: UUID,
     client: SupabaseSdkDep,
+    db: DbSession,
     current_user: CurrentUser,
     limit: int = Query(20, ge=1, le=100, description="Page size (max 100)."),
     offset: int = Query(0, ge=0, description="Offset for pagination."),
@@ -56,7 +57,7 @@ async def search_listings(
     key_types, key_titles = await load_question_key_metadata(client)
     criteria_with_types = wrap_criteria_for_search_response(criteria, key_types, key_titles)
 
-    rows_with_scores, total = await search_properties(client, criteria, limit=limit, offset=offset)
+    rows_with_scores, total = await search_properties(db, criteria, limit=limit, offset=offset)
     results = [
         PropertyMatch(property=Properties.model_validate(row), match_score=score)
         for row, score in rows_with_scores

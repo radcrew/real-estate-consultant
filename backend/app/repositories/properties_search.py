@@ -6,9 +6,6 @@ from typing import Any
 
 from sqlalchemy import Float, and_, case, cast, func, literal, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
-from supabase import AsyncClient
-from app.core.db_safe import execute_db_safe
-from app.utils.supabase_response import as_row_list
 
 from app.db.property_row import PropertyRow
 
@@ -220,8 +217,7 @@ def _row_to_property_dict(row: PropertyRow) -> dict[str, Any]:
 
 
 async def search_properties(
-    # session: AsyncSession,
-    client: AsyncClient,
+    session: AsyncSession,
     criteria: Any,
     *,
     limit: int,
@@ -231,7 +227,7 @@ async def search_properties(
     c = criteria if isinstance(criteria, dict) else {}
     lim = max(1, min(limit, 100))
     off = max(0, offset)
-    """
+    
     where_clause = _where_criteria(c)
     score = _score_expr(c).label("match_score")
 
@@ -251,18 +247,4 @@ async def search_properties(
     out: list[tuple[dict[str, Any], float]] = []
     for prop, sc in result.all():
         out.append((_row_to_property_dict(prop), float(sc or 0.0)))
-    return out, total
-    """
-
-     # No criteria: unfiltered list, same pagination as PostgREST range
-    q = client.table("properties").select("*", count="exact")
-    result = await execute_db_safe(
-        q.order("id").range(off, off + lim - 1).execute(),
-    )
-    rows = as_row_list(result.data)
-    total = int(result.count) if getattr(result, "count", None) is not None else len(rows)
-    out: list[tuple[dict[str, Any], float]] = []
-    for raw in rows:
-        row = dict(raw)
-        out.append((row, 100.0))
     return out, total
