@@ -9,7 +9,7 @@ import { cn } from "@lib/utils";
 import { useSearchSessionResults } from "@hooks/use-search-session-results";
 
 import { ResultCard } from "./result-card";
-import { SearchFilter } from "./search-filter";
+import { SearchFilter, SearchFilterSkeleton } from "./search-filter";
 
 const SKELETON_COUNT = 6;
 
@@ -20,9 +20,13 @@ export const SearchResults = () => {
 
   return (
     <div className="min-h-[60vh] bg-muted/20">
-      <div className="mx-auto max-w-screen-xl px-4 py-10 sm:py-14">
-        <div className="mb-8">
-          <SearchFilter criteria={criteria} disabled={loading} onSearch={refetch} />
+      <div className="mx-auto max-w-screen-xl px-4 py-4 sm:py-4">
+        <div className="mb-4">
+          {loading && !error ? (
+            <SearchFilterSkeleton />
+          ) : (
+            <SearchFilter criteria={criteria} disabled={loading} onSearch={refetch} />
+          )}
         </div>
 
         {error && <p className="py-6 text-center text-destructive">{error}</p>}
