@@ -5,7 +5,7 @@ import type { AnswerValue, RangeAnswerValue, WizardAnswers, WizardQuestion } fro
 export const parseQuestion = (question: IntakeSessionQuestion): WizardQuestion => {
   const baseQuestion = {
     id: question.key,
-    title: question.key,
+    title: question.title,
     description: question.text,
     required: true,
   };

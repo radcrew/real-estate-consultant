@@ -11,8 +11,8 @@ from app.core.db_safe import execute_db_safe
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.utils.supabase_response import as_row_list, get_single_row
 
-_FIRST_QUESTION_SELECT = "key, text, type"
-_QUESTION_SELECT = "key, text, type, order_index"
+_FIRST_QUESTION_SELECT = "key, title, text, type"
+_QUESTION_SELECT = "key, title, text, type, order_index"
 _LOAD_QUESTIONS_ERROR = "No question is configured for intake flow."
 
 
@@ -26,7 +26,19 @@ def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
             raise ValueError("Invalid question key")
         if not isinstance(qtext, str) or not isinstance(qtype, str):
             raise ValueError("Invalid question fields")
-        return IntakeSessionFirstQuestion(key=qkey.strip(), text=qtext, type=qtype)
+        key_stripped = qkey.strip()
+        title_raw = question.get("title")
+        title = (
+            title_raw.strip()
+            if isinstance(title_raw, str) and title_raw.strip()
+            else key_stripped
+        )
+        return IntakeSessionFirstQuestion(
+            key=key_stripped,
+            title=title,
+            text=qtext,
+            type=qtype,
+        )
     except (ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

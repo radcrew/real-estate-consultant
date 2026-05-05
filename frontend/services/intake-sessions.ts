@@ -4,6 +4,7 @@ import { apiClient } from "@lib/api-client";
 
 export type IntakeSessionQuestion = {
   key: string;
+  title: string;
   text: string;
   type: string;
   options?: Array<{
