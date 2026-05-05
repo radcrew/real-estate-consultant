@@ -92,19 +92,26 @@ async def load_first_intake_question(client: AsyncClient) -> IntakeSessionFirstQ
     return map_question_to_model(row)
 
 
-async def load_question_key_types(client: AsyncClient) -> dict[str, str]:
-    """Map each intake question ``key`` to its ``type`` (for API responses such as search)."""
+async def load_question_key_metadata(
+    client: AsyncClient,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Map each question ``key`` to ``(type, title)`` for search / display APIs."""
     result = await execute_db_safe(
-        client.table("questions").select("key, type").order("order_index").execute(),
+        client.table("questions").select("key, type, title").order("order_index").execute(),
     )
     rows = as_row_list(result.data)
-    out: dict[str, str] = {}
+    types: dict[str, str] = {}
+    titles: dict[str, str] = {}
     for row in rows:
         key = row.get("key")
+        if not isinstance(key, str) or not key.strip():
+            continue
+        k = key.strip()
         qtype = row.get("type")
-        if isinstance(key, str) and key.strip():
-            out[key.strip()] = qtype.strip() if isinstance(qtype, str) and qtype.strip() else "text"
-    return out
+        types[k] = qtype.strip() if isinstance(qtype, str) and qtype.strip() else "text"
+        qtitle = row.get("title")
+        titles[k] = qtitle.strip() if isinstance(qtitle, str) else ""
+    return types, titles
 
 
 async def load_intake_questions(client: AsyncClient) -> list[dict[str, Any]]:

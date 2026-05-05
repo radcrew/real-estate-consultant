@@ -10,13 +10,17 @@ from app.models.properties import Properties
 
 
 class CriteriaFieldItem(BaseModel):
-    """One criterion key with question ``type`` from ``questions`` plus stored value."""
+    """One criterion key with question metadata from ``questions`` plus stored value."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     type: str = Field(
         ...,
         description="``questions.type`` for the question row whose ``key`` matches this criterion.",
+    )
+    label: str = Field(
+        default="",
+        description="``questions.title`` for the row whose ``key`` matches this criterion.",
     )
     data: Any = Field(..., description="Value stored on the intake session for this criterion key.")
 
@@ -38,7 +42,7 @@ class SearchPropertiesResponse(BaseModel):
     criteria: dict[str, CriteriaFieldItem] = Field(
         default_factory=dict,
         description=(
-            "Intake session criteria: each key is wrapped with ``type`` "
+            "Intake session criteria: each key is wrapped with ``type``, ``label`` "
             "(from ``questions``) and ``data`` (stored value)."
         ),
     )

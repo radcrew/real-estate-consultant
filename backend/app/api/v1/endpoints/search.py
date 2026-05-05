@@ -11,7 +11,7 @@ from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.models.properties import Properties
 from app.repositories.intake_sessions import load_intake_session_row_by_search_profile_id
 from app.repositories.properties_search import search_properties
-from app.repositories.questions import load_question_key_types
+from app.repositories.questions import load_question_key_metadata
 from app.repositories.search_profiles import ensure_search_profile_access
 from app.schemas.search import PropertyMatch, SearchPropertiesResponse
 from app.utils.search_criteria import wrap_criteria_for_search_response
@@ -44,8 +44,8 @@ async def search_listings(
     raw_criteria = session_row.get("criteria")
     criteria: dict[str, Any] = dict(raw_criteria) if isinstance(raw_criteria, dict) else {}
 
-    key_types = await load_question_key_types(client)
-    criteria_with_types = wrap_criteria_for_search_response(criteria, key_types)
+    key_types, key_titles = await load_question_key_metadata(client)
+    criteria_with_types = wrap_criteria_for_search_response(criteria, key_types, key_titles)
 
     rows_with_scores, total = await search_properties(client, criteria, limit=limit, offset=offset)
     results = [
