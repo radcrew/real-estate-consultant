@@ -17,7 +17,6 @@ import { FILTER_BAR_CLUSTER, FILTER_BAR_PILL } from "./styles";
 type RangeFilterProps = {
   fieldKey: string;
   value: RangeCriterionData;
-  initial: RangeCriterionData;
   onChange: (next: RangeCriterionData) => void;
   disabled?: boolean;
   className?: string;
@@ -26,15 +25,21 @@ type RangeFilterProps = {
 const fmt = (n: number) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: n >= 1000 ? 0 : 2, notation: n >= 1e6 ? "compact" : "standard" }).format(n);
 
-const sameRange = (a: RangeCriterionData, b: RangeCriterionData) => a.min === b.min && a.max === b.max;
+export const CLEAR_RANGE: RangeCriterionData = { min: Number.NaN, max: Number.NaN };
 
-export const RangeFilter = ({ fieldKey, value, initial, onChange, disabled, className }: RangeFilterProps) => {
+export const RangeFilter = ({ fieldKey, value, onChange, disabled, className }: RangeFilterProps) => {
   const label = humanizeCriteriaKey(fieldKey);
-  const summary = `${fmt(value.min)} – ${fmt(value.max)}`;
-  const dirty = !sameRange(value, initial);
+  const hasBounds = Number.isFinite(value.min) && Number.isFinite(value.max);
+  const summary = hasBounds ? `${fmt(value.min)} – ${fmt(value.max)}` : "Not set";
+  const dirty = Number.isFinite(value.min) || Number.isFinite(value.max);
   const triggerLabel = label.replace(/\s+range$/i, "").trim() || label;
 
   const setMin = (raw: string) => {
+    const t = raw.trim();
+    if (t === "") {
+      onChange({ ...value, min: Number.NaN });
+      return;
+    }
     const n = Number(raw);
     if (Number.isFinite(n)) {
       onChange({ ...value, min: n });
@@ -42,6 +47,11 @@ export const RangeFilter = ({ fieldKey, value, initial, onChange, disabled, clas
   };
 
   const setMax = (raw: string) => {
+    const t = raw.trim();
+    if (t === "") {
+      onChange({ ...value, max: Number.NaN });
+      return;
+    }
     const n = Number(raw);
     if (Number.isFinite(n)) {
       onChange({ ...value, max: n });
@@ -65,9 +75,9 @@ export const RangeFilter = ({ fieldKey, value, initial, onChange, disabled, clas
               "flex min-h-9 w-9 shrink-0 items-center justify-center border-r text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground",
               dirty ? "visible border-border" : "invisible pointer-events-none border-transparent",
             )}
-            onClick={() => onChange({ ...initial })}
+            onClick={() => onChange(CLEAR_RANGE)}
             disabled={disabled || !dirty}
-            aria-label={dirty ? `Reset ${label}` : undefined}
+            aria-label={dirty ? `Clear ${label}` : undefined}
             tabIndex={dirty ? 0 : -1}
           >
             <X className="size-4 shrink-0" aria-hidden />

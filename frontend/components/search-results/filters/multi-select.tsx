@@ -32,31 +32,20 @@ const formatOptionLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).
 type MultiSelectFilterProps = {
   fieldKey: string;
   value: string[];
-  initial: string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
   className?: string;
 };
 
-const sameSet = (a: string[], b: string[]) => {
-  if (a.length !== b.length) {
-    return false;
-  }
-  const sa = [...a].map((x) => x.toLowerCase()).sort();
-  const sb = [...b].map((x) => x.toLowerCase()).sort();
-  return sa.every((v, i) => v === sb[i]);
-};
-
 export const MultiSelectFilter = ({
   fieldKey,
   value,
-  initial,
   onChange,
   disabled,
   className,
 }: MultiSelectFilterProps) => {
   const label = humanizeCriteriaKey(fieldKey);
-  const dirty = !sameSet(value, initial);
+  const dirty = value.length > 0;
 
   const options = useMemo(() => {
     const set = new Set<string>([...SUGGESTED_TYPES, ...value.map((x) => x.toLowerCase())]);
@@ -98,9 +87,9 @@ export const MultiSelectFilter = ({
               "flex min-h-9 w-9 shrink-0 items-center justify-center border-r text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground",
               dirty ? "visible border-border" : "invisible pointer-events-none border-transparent",
             )}
-            onClick={() => onChange([...initial])}
+            onClick={() => onChange([])}
             disabled={disabled || !dirty}
-            aria-label={dirty ? `Reset ${label}` : undefined}
+            aria-label={dirty ? `Clear ${label}` : undefined}
             tabIndex={dirty ? 0 : -1}
           >
             <X className="size-4 shrink-0" aria-hidden />

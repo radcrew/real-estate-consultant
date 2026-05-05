@@ -8,12 +8,11 @@ import { cn } from "@lib/utils";
 import {
   parseSearchCriteriaEntries,
   type ParsedCriteriaEntry,
-  type RangeCriterion,
   type SearchCriterionField,
 } from "@lib/search-criteria";
 
 import { MultiSelectFilter } from "./filters/multi-select";
-import { RangeFilter } from "./filters/range";
+import { CLEAR_RANGE, RangeFilter } from "./filters/range";
 import { TextFilter } from "./filters/text";
 
 type SearchFilterProps = {
@@ -48,12 +47,10 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
   const sortedParsed = useMemo(() => sortEntries(parsed), [parsed]);
 
   const [draft, setDraft] = useState<Record<string, SearchCriterionField>>({});
-  const [initialDraft, setInitialDraft] = useState<Record<string, SearchCriterionField>>({});
 
   useEffect(() => {
     const next = entriesToDraft(parsed);
     setDraft(cloneCriteriaRecord(next));
-    setInitialDraft(cloneCriteriaRecord(next));
   }, [parsed]);
 
   const updateField = (key: string, field: SearchCriterionField) => {
@@ -61,7 +58,23 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
   };
 
   const clearAll = () => {
-    setDraft(cloneCriteriaRecord(initialDraft));
+    setDraft((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        const f = next[key];
+        if (!f) {
+          continue;
+        }
+        if (f.type === "location") {
+          next[key] = { type: "location", data: "" };
+        } else if (f.type === "range") {
+          next[key] = { type: "range", data: { ...CLEAR_RANGE } };
+        } else if (f.type === "multi-select") {
+          next[key] = { type: "multi-select", data: [] };
+        }
+      }
+      return next;
+    });
   };
 
   if (sortedParsed.length === 0) {
@@ -95,36 +108,26 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
                   disabled={disabled}
                 />
               );
-            case "range": {
-              const init =
-                initialDraft[key]?.type === "range"
-                  ? initialDraft[key].data
-                  : (field as RangeCriterion).data;
+            case "range":
               return (
                 <RangeFilter
                   key={key}
                   fieldKey={key}
                   value={field.data}
-                  initial={init}
                   onChange={(next) => updateField(key, { type: "range", data: next })}
                   disabled={disabled}
                 />
               );
-            }
-            case "multi-select": {
-              const initList =
-                initialDraft[key]?.type === "multi-select" ? initialDraft[key].data : field.data;
+            case "multi-select":
               return (
                 <MultiSelectFilter
                   key={key}
                   fieldKey={key}
                   value={field.data}
-                  initial={initList}
                   onChange={(next) => updateField(key, { type: "multi-select", data: next })}
                   disabled={disabled}
                 />
               );
-            }
           }
         })}
       </div>
