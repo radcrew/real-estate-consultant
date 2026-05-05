@@ -13,12 +13,12 @@ type TextFilterProps = {
   className?: string;
 };
 
-/** Wide location-style field (LoopNet search bar segment). */
+/** Compact location field for single-row filter bar. */
 export const TextFilter = ({ fieldKey, value, onChange, disabled, className }: TextFilterProps) => {
   return (
     <div
       className={cn(
-        "relative flex min-h-9 min-w-0 flex-1 basis-[min(100%,28rem)] items-center rounded-md border border-border bg-background shadow-sm",
+        "relative flex h-9 w-52 shrink-0 items-center rounded-md border border-border bg-background shadow-sm",
         disabled && "pointer-events-none opacity-50",
         className,
       )}

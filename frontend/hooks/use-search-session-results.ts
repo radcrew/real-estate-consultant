@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useSearchByProfile } from "@hooks/use-search-by-profile";
 import { mapSearchPropertyMatchesToListings, type ResultCardListing } from "@lib/map-property-match";
@@ -14,27 +14,29 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
   const [loading, setLoading] = useState(() => Boolean(sessionProfileId?.trim()));
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const id = sessionProfileId?.trim();
-    if (!id) {
-      setListings([]);
-      setCriteria({});
-      setLoading(false);
-      setError(null);
-      return;
-    }
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      const id = sessionProfileId?.trim();
+      if (!id) {
+        if (!signal?.aborted) {
+          setListings([]);
+          setCriteria({});
+          setLoading(false);
+          setError(null);
+        }
+        return;
+      }
 
-    let cancelled = false;
+      if (!signal?.aborted) {
+        setLoading(true);
+        setError(null);
+        setListings([]);
+        setCriteria({});
+      }
 
-    setLoading(true);
-    setError(null);
-    setListings([]);
-    setCriteria({});
-
-    const run = async () => {
       try {
         const res = await search(id, { ...DEFAULT_PAGE });
-        if (cancelled) {
+        if (signal?.aborted) {
           return;
         }
         setListings(mapSearchPropertyMatchesToListings(res.results));
@@ -43,25 +45,30 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
           c !== null && typeof c === "object" && !Array.isArray(c) ? { ...(c as Record<string, unknown>) } : {},
         );
       } catch {
-        if (cancelled) {
+        if (signal?.aborted) {
           return;
         }
         setListings([]);
         setCriteria({});
         setError("Could not load search results. Try again later.");
       } finally {
-        if (!cancelled) {
+        if (!signal?.aborted) {
           setLoading(false);
         }
       }
-    };
+    },
+    [search, sessionProfileId],
+  );
 
-    void run();
+  useEffect(() => {
+    const ac = new AbortController();
+    void load(ac.signal);
+    return () => ac.abort();
+  }, [load]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [search, sessionProfileId]);
+  const refetch = useCallback(() => {
+    void load();
+  }, [load]);
 
-  return { listings, loading, error, criteria };
+  return { listings, loading, error, criteria, refetch };
 };

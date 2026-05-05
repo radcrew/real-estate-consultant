@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ChevronDown, X } from "lucide-react";
 
 import {
@@ -56,7 +56,6 @@ export const MultiSelectFilter = ({
   className,
 }: MultiSelectFilterProps) => {
   const label = humanizeCriteriaKey(fieldKey);
-  const [draft, setDraft] = useState("");
   const dirty = !sameSet(value, initial);
 
   const options = useMemo(() => {
@@ -64,12 +63,12 @@ export const MultiSelectFilter = ({
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [value]);
 
-  const triggerSummary =
+  const summaryForAria =
     value.length === 0
       ? "Any"
       : value.length === 1
         ? formatOptionLabel(value[0])
-        : `${formatOptionLabel(value[0])} +${value.length - 1}`;
+        : `${value.length} selected`;
 
   const toggle = (opt: string, checked: boolean) => {
     const key = opt.toLowerCase();
@@ -84,8 +83,7 @@ export const MultiSelectFilter = ({
 
   const triggerInner = (
     <>
-      <span className="max-w-[5rem] truncate">{label}</span>
-      <span className="max-w-[8rem] truncate text-xs font-normal text-muted-foreground">{triggerSummary}</span>
+      <span className="max-w-[9rem] truncate">{label}</span>
       <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
     </>
   );
@@ -109,10 +107,8 @@ export const MultiSelectFilter = ({
           </button>
           <DropdownMenuTrigger
             disabled={disabled}
-            className={cn(
-              FILTER_BAR_PILL,
-              "h-9 min-w-0 flex-1 rounded-none border-0 shadow-none sm:flex-none",
-            )}
+            aria-label={`${label}: ${summaryForAria}`}
+            className={cn(FILTER_BAR_PILL, "h-9 shrink-0 rounded-none border-0 shadow-none")}
           >
             {triggerInner}
           </DropdownMenuTrigger>

@@ -17,7 +17,7 @@ const SKELETON_COUNT = 6;
 export const SearchResults = () => {
   const params = useParams<{ id?: string }>();
   const sessionProfileId = typeof params?.id === "string" ? params.id : undefined;
-  const { listings, loading, error, criteria } = useSearchSessionResults(sessionProfileId);
+  const { listings, loading, error, criteria, refetch } = useSearchSessionResults(sessionProfileId);
 
   return (
     <div className="min-h-[60vh] bg-muted/20">
@@ -25,7 +25,7 @@ export const SearchResults = () => {
         <ResultsToolbar loading={loading} />
 
         <div className="mb-8 mt-6">
-          <SearchFilter criteria={criteria} disabled={loading} />
+          <SearchFilter criteria={criteria} disabled={loading} onSearch={refetch} />
         </div>
 
         {error && <p className="py-6 text-center text-destructive">{error}</p>}

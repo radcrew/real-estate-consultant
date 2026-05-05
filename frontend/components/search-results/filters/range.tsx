@@ -32,6 +32,7 @@ export const RangeFilter = ({ fieldKey, value, initial, onChange, disabled, clas
   const label = humanizeCriteriaKey(fieldKey);
   const summary = `${fmt(value.min)} – ${fmt(value.max)}`;
   const dirty = !sameRange(value, initial);
+  const triggerLabel = label.replace(/\s+range$/i, "").trim() || label;
 
   const setMin = (raw: string) => {
     const n = Number(raw);
@@ -49,8 +50,7 @@ export const RangeFilter = ({ fieldKey, value, initial, onChange, disabled, clas
 
   const triggerInner = (
     <>
-      <span className="max-w-[10rem] truncate">{label}</span>
-      <span className="max-w-[7rem] truncate text-xs font-normal text-muted-foreground">{summary}</span>
+      <span className="max-w-[9rem] truncate">{triggerLabel}</span>
       <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
     </>
   );
@@ -74,10 +74,8 @@ export const RangeFilter = ({ fieldKey, value, initial, onChange, disabled, clas
           </button>
           <DropdownMenuTrigger
             disabled={disabled}
-            className={cn(
-              FILTER_BAR_PILL,
-              "h-9 min-w-0 flex-1 rounded-none border-0 shadow-none sm:flex-none",
-            )}
+            aria-label={`${label}: ${summary}`}
+            className={cn(FILTER_BAR_PILL, "h-9 shrink-0 rounded-none border-0 shadow-none")}
           >
             {triggerInner}
           </DropdownMenuTrigger>
