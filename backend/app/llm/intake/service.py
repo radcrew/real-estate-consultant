@@ -128,6 +128,7 @@ def resolve_next_intake_question(
 
         return IntakeSessionFirstQuestion(
             key=mapped.key if mapped else "llm_followup",
+            title=mapped.title if mapped else "",
             text=text,
             type=mapped.type if mapped else "text",
             options=mapped.options if mapped else None,

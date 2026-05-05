@@ -11,8 +11,8 @@ from app.core.db_safe import execute_db_safe
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.utils.supabase_response import as_row_list, get_single_row
 
-_FIRST_QUESTION_SELECT = "key, text, type, options, required"
-_QUESTION_SELECT = "key, text, type, options, order_index, required"
+_FIRST_QUESTION_SELECT = "key, title, text, type, options, required"
+_QUESTION_SELECT = "key, title, text, type, options, order_index, required"
 _LOAD_QUESTIONS_ERROR = "No question is configured for intake flow."
 
 
@@ -20,6 +20,7 @@ def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
     """Map a PostgREST ``questions`` row into ``IntakeSessionFirstQuestion``."""
     try:
         qkey = question.get("key")
+        qtitle = question.get("title")
         qtext = question.get("text")
         qtype = question.get("type")
         qoptions = question.get("options")
@@ -27,8 +28,10 @@ def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
             raise ValueError("Invalid question key")
         if not isinstance(qtext, str) or not isinstance(qtype, str):
             raise ValueError("Invalid question fields")
+        title = qtitle.strip() if isinstance(qtitle, str) else ""
         return IntakeSessionFirstQuestion(
             key=qkey.strip(),
+            title=title,
             text=qtext,
             type=qtype,
             options=qoptions,
