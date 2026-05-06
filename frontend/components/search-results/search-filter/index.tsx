@@ -22,7 +22,6 @@ type SearchFilterProps = {
   criteria: Record<string, unknown>;
   disabled?: boolean;
   className?: string;
-  /** Sends current grouped criteria payload and re-runs search. */
   onSearch?: (nextCriteria: Record<string, unknown>) => void | Promise<void>;
 };
 
@@ -56,6 +55,7 @@ type CriteriaFilterProps = {
   label: string;
   disabled?: boolean;
   value: unknown;
+  unit?: string;
   onChange: (next: unknown) => void;
 };
 
@@ -121,6 +121,7 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
             label: field.label ?? "",
             disabled,
             value: field.data,
+            ...(field.type === "range" ? { unit: field.unit } : {}),
             onChange: (next: unknown) =>
               updateField(key, { ...field, data: next } as SearchCriterionField),
           });

@@ -6,8 +6,8 @@ export type RangeCriterionData = {
 export type RangeCriterion = {
   type: "range";
   data: RangeCriterionData;
-  /** Display label from API (``criteria[key].label``). */
   label?: string;
+  unit?: string;
 };
 
 export type LocationCriterion = {
@@ -37,6 +37,11 @@ const parseCriterionLabel = (raw: Record<string, unknown>): string | undefined =
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : undefined;
 };
 
+const parseCriterionUnit = (raw: Record<string, unknown>): string | undefined => {
+  const v = raw.unit;
+  return typeof v === "string" && v.trim().length > 0 ? v.trim() : undefined;
+};
+
 /**
  * Parses one criterion from search ``criteria[key]``.
  * Supports full payloads with ``data`` and layout-only rows with ``{ type, label? }`` (no ``data``),
@@ -51,15 +56,17 @@ export const parseCriterionField = (raw: unknown): SearchCriterionField | null =
   const t = raw.type;
 
   if (t === "range") {
+    const unit = parseCriterionUnit(raw);
+    const unitExtra = unit != null ? { unit } : {};
     const dataRaw = raw.data;
     if (isRecord(dataRaw)) {
       const min = Number(dataRaw.min);
       const max = Number(dataRaw.max);
       if (Number.isFinite(min) && Number.isFinite(max)) {
-        return { type: "range", data: { min, max }, ...labelExtra };
+        return { type: "range", data: { min, max }, ...labelExtra, ...unitExtra };
       }
     }
-    return { type: "range", data: { min: Number.NaN, max: Number.NaN }, ...labelExtra };
+    return { type: "range", data: { min: Number.NaN, max: Number.NaN }, ...labelExtra, ...unitExtra };
   }
   if (t === "location") {
     const d = raw.data;
@@ -101,7 +108,11 @@ export const toCriteriaAnswers = (
     }
     if (field.type === "range") {
       if (Number.isFinite(field.data.min) && Number.isFinite(field.data.max)) {
-        payload[key] = { min: field.data.min, max: field.data.max };
+        const body: Record<string, unknown> = { min: field.data.min, max: field.data.max };
+        if (field.unit != null && field.unit.trim().length > 0) {
+          body.unit = field.unit.trim();
+        }
+        payload[key] = body;
       }
       continue;
     }

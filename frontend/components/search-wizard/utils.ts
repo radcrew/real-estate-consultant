@@ -1,3 +1,4 @@
+import { formatInteger, formatMetricNumber, formatMoney } from "@lib/utils";
 import type { IntakeSessionQuestion } from "@services/intake-sessions";
 
 import {
@@ -15,7 +16,7 @@ export const getRangeQuestionUnit = (question: RangeQuestion): string | undefine
 export const getQuestionInputDisplayTitle = (question: WizardQuestion): string => {
   if (question.kind === "range") {
     const unit = getRangeQuestionUnit(question);
-    if (unit != null && unit.trim().length > 0) {
+    if (unit) {
       return `${question.title} (${unit.trim()})`;
     }
   }
@@ -56,20 +57,17 @@ export const parseQuestion = (question: IntakeSessionQuestion): WizardQuestion =
   }
 };
 
-export const formatRangeValue = (value: number, unit?: string) => {
-  if (unit === "$" || unit === "USD") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(value);
-  }
+const rangeTitleKey = (title: string) => title.trim().toLowerCase();
 
-  if (unit === "SF") {
-    return `${new Intl.NumberFormat("en-US").format(value)} SF`;
+export const formatRangeValue = (value: number, questionTitle: string, unit?: string) => {
+  const key = rangeTitleKey(questionTitle);
+  if (key === "price") {
+    return formatMoney(value, { integerThreshold: 0 });
   }
-
-  return `${value}${unit ? ` ${unit}` : ""}`;
+  if (key === "size") {
+    return unit ? `${formatInteger(value)} ${unit}` : formatInteger(value);
+  }
+  return formatMetricNumber(value);
 };
 
 export const formatAnswerForSummary = (
@@ -93,7 +91,7 @@ export const formatAnswerForSummary = (
       typeof answer.max === "number"
     ) {
       const unit = getRangeQuestionUnit(question);
-      return `${formatRangeValue(answer.min, unit)} - ${formatRangeValue(answer.max, unit)}`;
+      return `${formatRangeValue(answer.min, question.title, unit)} - ${formatRangeValue(answer.max, question.title, unit)}`;
     }
     return "Not answered";
   }

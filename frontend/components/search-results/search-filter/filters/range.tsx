@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu";
 import { Input } from "@components/ui/input";
-import { cn } from "@lib/utils";
+import { cn, formatMetricNumber, formatMoney } from "@lib/utils";
 import type { RangeCriterionData } from "@lib/search-criteria";
 
 import { FILTER_BAR_PILL } from "./styles";
@@ -17,52 +17,78 @@ import { stopMenuKeyboardCapture, stopMenuTriggerBubble } from "./utils";
 type RangeFilterProps = {
   fieldKey: string;
   label: string;
+  unit?: string;
   value: RangeCriterionData;
   onChange: (next: RangeCriterionData) => void;
   disabled?: boolean;
   className?: string;
 };
 
-const fmt = (n: number) =>
-  new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: n >= 1000 ? 0 : 2,
-    notation: n >= 1e6 ? "compact" : "standard",
-  }).format(n);
-
 export const CLEAR_RANGE: RangeCriterionData = { min: Number.NaN, max: Number.NaN };
 
-const rangeTriggerText = (value: RangeCriterionData, label: string) => {
+function rangeTriggerText(value: RangeCriterionData, label: string, unit?: string) {
+  const u = unit?.trim();
+  const uUpper = u?.toUpperCase() ?? "";
+
   const hasBounds = Number.isFinite(value.min) && Number.isFinite(value.max);
+  const hasMin = Number.isFinite(value.min);
+  const hasMax = Number.isFinite(value.max);
+
   if (hasBounds) {
-    return `${fmt(value.min)} – ${fmt(value.max)}`;
+    if (uUpper === "USD") {
+      return `USD ${formatMoney(value.min, { integerThreshold: 1000 })} – ${formatMoney(value.max, { integerThreshold: 1000 })}`;
+    }
+    const suffix = u ? ` ${u}` : "";
+    return `${formatMetricNumber(value.min)} – ${formatMetricNumber(value.max)}${suffix}`;
   }
-  if (Number.isFinite(value.min)) {
-    return `From ${fmt(value.min)}`;
+  if (hasMin) {
+    if (uUpper === "USD") {
+      return `From ${formatMoney(value.min, { integerThreshold: 1000 })}`;
+    }
+    const suffix = u ? ` ${u}` : "";
+    return `From ${formatMetricNumber(value.min)}${suffix}`;
   }
-  if (Number.isFinite(value.max)) {
-    return `To ${fmt(value.max)}`;
+  if (hasMax) {
+    if (uUpper === "USD") {
+      return `Up to ${formatMoney(value.max, { integerThreshold: 1000 })}`;
+    }
+    const suffix = u ? ` ${u}` : "";
+    return `Up to ${formatMetricNumber(value.max)}${suffix}`;
+  }
+  if (u) {
+    return `${label} (${u})`;
   }
   return label;
 }
 
-const rangeSummaryForAria = (value: RangeCriterionData) => {
+function rangeSummaryForAria(value: RangeCriterionData, unit?: string) {
+  const u = unit?.trim();
+  const suffix = u ? ` ${u}` : "";
   const hasBounds = Number.isFinite(value.min) && Number.isFinite(value.max);
   if (hasBounds) {
-    return `${fmt(value.min)} to ${fmt(value.max)}`;
+    return `${formatMetricNumber(value.min)} to ${formatMetricNumber(value.max)}${suffix}`;
   }
   if (Number.isFinite(value.min)) {
-    return `minimum ${fmt(value.min)}`;
+    return `minimum ${formatMetricNumber(value.min)}${suffix}`;
   }
   if (Number.isFinite(value.max)) {
-    return `maximum ${fmt(value.max)}`;
+    return `maximum ${formatMetricNumber(value.max)}${suffix}`;
   }
   return "Not set";
 }
 
-export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, className }: RangeFilterProps) => {
+export const RangeFilter = ({
+  fieldKey,
+  label,
+  unit,
+  value,
+  onChange,
+  disabled,
+  className,
+}: RangeFilterProps) => {
   const hasValue = Number.isFinite(value.min) || Number.isFinite(value.max);
-  const summary = rangeSummaryForAria(value);
-  const triggerText = rangeTriggerText(value, label);
+  const summary = rangeSummaryForAria(value, unit);
+  const triggerText = rangeTriggerText(value, label, unit);
 
   const setBound = (bound: "min" | "max", raw: string) => {
     const t = raw.trim();
@@ -105,7 +131,12 @@ export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, classN
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="bottom" sideOffset={6} className="min-w-[16rem] p-3">
           <div className="space-y-3">
-            <div className="text-xs font-medium text-muted-foreground">{label}</div>
+            <div className="text-xs font-medium text-muted-foreground">
+              {label}
+              {unit != null && unit.trim().length > 0 ? (
+                <span className="font-normal text-muted-foreground"> ({unit.trim()})</span>
+              ) : null}
+            </div>
             <div className="flex gap-3">
               <div className="min-w-0 flex-1 space-y-1">
                 <label className="text-xs text-muted-foreground" htmlFor={`${fieldKey}-min`}>

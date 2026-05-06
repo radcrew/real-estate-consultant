@@ -1,3 +1,4 @@
+import { formatInteger, formatMoney } from "@lib/utils";
 import type { SearchPropertyMatch } from "@services/search";
 
 const PLACEHOLDER_IMAGE =
@@ -21,15 +22,8 @@ const formatSqft = (sqft: number | null): string => {
   if (sqft == null || Number.isNaN(sqft)) {
     return "—";
   }
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(sqft)} SF`;
+  return `${formatInteger(sqft)} SF`;
 };
-
-const formatMoney = (value: number) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: value >= 100 ? 0 : 2,
-  }).format(value);
 
 const priceLabelFromProperty = (p: SearchPropertyMatch["property"]): string | null => {
   const sale = p.price != null && !Number.isNaN(p.price) ? formatMoney(p.price) : null;
