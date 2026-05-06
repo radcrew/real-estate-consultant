@@ -15,24 +15,26 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
   const [loading, setLoading] = useState(() => Boolean(sessionProfileId?.trim()));
   const [error, setError] = useState<string | null>(null);
 
+  const reset = () => {
+    setListings([]);
+    setCriteria({});
+    setError(null);
+  };
+
   const load = useCallback(
     async (signal?: AbortSignal) => {
       const id = sessionProfileId?.trim();
       if (!id) {
         if (!signal?.aborted) {
-          setListings([]);
-          setCriteria({});
           setLoading(false);
-          setError(null);
+          reset();
         }
         return;
       }
 
       if (!signal?.aborted) {
         setLoading(true);
-        setError(null);
-        setListings([]);
-        setCriteria({});
+        reset();
       }
 
       try {
@@ -40,6 +42,7 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
         if (signal?.aborted) {
           return;
         }
+
         setListings(mapSearchPropertyMatchesToListings(res.results));
         const c = res.criteria;
         setCriteria(
@@ -61,12 +64,6 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
     [search, sessionProfileId],
   );
 
-  useEffect(() => {
-    const ac = new AbortController();
-    void load(ac.signal);
-    return () => ac.abort();
-  }, [load]);
-
   const applyCriteria = useCallback(
     async (nextCriteria: UpdateSearchCriteriaBody) => {
       const id = sessionProfileId?.trim();
@@ -85,6 +82,12 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
     },
     [load, sessionProfileId, updateCriteria],
   );
+
+  useEffect(() => {
+    const abortController = new AbortController();
+    load(abortController.signal);
+    return () => abortController.abort();
+  }, [load]);
 
   return { listings, loading, error, criteria, applyCriteria };
 };
