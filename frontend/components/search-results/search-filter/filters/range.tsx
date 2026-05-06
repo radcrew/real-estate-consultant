@@ -8,11 +8,17 @@ import {
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu";
 import { Input } from "@components/ui/input";
-import { cn, formatMetricNumber, formatMoney } from "@lib/utils";
+import { cn } from "@lib/utils";
 import type { RangeCriterionData } from "@lib/search-criteria";
 
 import { FILTER_BAR_PILL } from "./styles";
-import { stopMenuKeyboardCapture, stopMenuTriggerBubble } from "./utils";
+import {
+  isRangeInvalid,
+  rangeSummaryForAria,
+  rangeTriggerText,
+  stopMenuKeyboardCapture,
+  stopMenuTriggerBubble,
+} from "./utils";
 
 type RangeFilterProps = {
   fieldKey: string;
@@ -26,57 +32,6 @@ type RangeFilterProps = {
 
 export const CLEAR_RANGE: RangeCriterionData = { min: Number.NaN, max: Number.NaN };
 
-function rangeTriggerText(value: RangeCriterionData, label: string, unit?: string) {
-  const u = unit?.trim();
-  const uUpper = u?.toUpperCase() ?? "";
-
-  const hasBounds = Number.isFinite(value.min) && Number.isFinite(value.max);
-  const hasMin = Number.isFinite(value.min);
-  const hasMax = Number.isFinite(value.max);
-
-  if (hasBounds) {
-    if (uUpper === "USD") {
-      return `USD ${formatMoney(value.min, { integerThreshold: 1000 })} – ${formatMoney(value.max, { integerThreshold: 1000 })}`;
-    }
-    const suffix = u ? ` ${u}` : "";
-    return `${formatMetricNumber(value.min)} – ${formatMetricNumber(value.max)}${suffix}`;
-  }
-  if (hasMin) {
-    if (uUpper === "USD") {
-      return `From ${formatMoney(value.min, { integerThreshold: 1000 })}`;
-    }
-    const suffix = u ? ` ${u}` : "";
-    return `From ${formatMetricNumber(value.min)}${suffix}`;
-  }
-  if (hasMax) {
-    if (uUpper === "USD") {
-      return `Up to ${formatMoney(value.max, { integerThreshold: 1000 })}`;
-    }
-    const suffix = u ? ` ${u}` : "";
-    return `Up to ${formatMetricNumber(value.max)}${suffix}`;
-  }
-  if (u) {
-    return `${label} (${u})`;
-  }
-  return label;
-}
-
-function rangeSummaryForAria(value: RangeCriterionData, unit?: string) {
-  const u = unit?.trim();
-  const suffix = u ? ` ${u}` : "";
-  const hasBounds = Number.isFinite(value.min) && Number.isFinite(value.max);
-  if (hasBounds) {
-    return `${formatMetricNumber(value.min)} to ${formatMetricNumber(value.max)}${suffix}`;
-  }
-  if (Number.isFinite(value.min)) {
-    return `minimum ${formatMetricNumber(value.min)}${suffix}`;
-  }
-  if (Number.isFinite(value.max)) {
-    return `maximum ${formatMetricNumber(value.max)}${suffix}`;
-  }
-  return "Not set";
-}
-
 export const RangeFilter = ({
   fieldKey,
   label,
@@ -87,7 +42,8 @@ export const RangeFilter = ({
   className,
 }: RangeFilterProps) => {
   const hasValue = Number.isFinite(value.min) || Number.isFinite(value.max);
-  const summary = rangeSummaryForAria(value, unit);
+  const isInvalid = isRangeInvalid(value);
+  const summary = rangeSummaryForAria(value, label, unit);
   const triggerText = rangeTriggerText(value, label, unit);
 
   const setBound = (bound: "min" | "max", raw: string) => {
@@ -146,6 +102,7 @@ export const RangeFilter = ({
                   id={`${fieldKey}-min`}
                   type="number"
                   value={Number.isFinite(value.min) ? value.min : ""}
+                  aria-invalid={isInvalid}
                   onChange={(e) => setBound("min", e.target.value)}
                   onKeyDownCapture={stopMenuKeyboardCapture}
                   disabled={disabled}
@@ -159,12 +116,18 @@ export const RangeFilter = ({
                   id={`${fieldKey}-max`}
                   type="number"
                   value={Number.isFinite(value.max) ? value.max : ""}
+                  aria-invalid={isInvalid}
                   onChange={(e) => setBound("max", e.target.value)}
                   onKeyDownCapture={stopMenuKeyboardCapture}
                   disabled={disabled}
                 />
               </div>
             </div>
+            {isInvalid ? (
+              <p className="text-xs text-destructive" role="alert">
+                Min must be less than or equal to max.
+              </p>
+            ) : null}
           </div>
         </DropdownMenuContent>
       </DropdownMenu>

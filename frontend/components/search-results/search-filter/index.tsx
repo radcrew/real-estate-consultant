@@ -14,6 +14,7 @@ import {
 
 import { MultiSelectFilter } from "./filters/multi-select";
 import { CLEAR_RANGE, RangeFilter } from "./filters/range";
+import { isRangeInvalid } from "./filters/utils";
 import { TextFilter } from "./filters/text";
 
 export { SearchFilterSkeleton } from "./skeleton";
@@ -64,6 +65,11 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
   const sortedParsed = useMemo(() => sortEntries(parsed), [parsed]);
 
   const [draft, setDraft] = useState<Record<string, SearchCriterionField>>({});
+
+  const hasInvalidRange = useMemo(
+    () => Object.values(draft).some((f) => f.type === "range" && isRangeInvalid(f.data)),
+    [draft],
+  );
 
   useEffect(() => {
     const next = entriesToDraft(parsed);
@@ -143,7 +149,7 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
             type="button"
             className={cn(buttonVariants({ variant: "default", size: "sm" }), "inline-flex gap-1.5")}
             onClick={() => void onSearch(toCriteriaAnswers(draft))}
-            disabled={disabled}
+            disabled={disabled || hasInvalidRange}
           >
             <Search className="size-4 shrink-0" aria-hidden />
             Search

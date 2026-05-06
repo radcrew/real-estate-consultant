@@ -107,8 +107,9 @@ export const toCriteriaAnswers = (
       continue;
     }
     if (field.type === "range") {
-      if (Number.isFinite(field.data.min) && Number.isFinite(field.data.max)) {
-        const body: Record<string, unknown> = { min: field.data.min, max: field.data.max };
+      const { min, max } = field.data;
+      if (Number.isFinite(min) && Number.isFinite(max) && min <= max) {
+        const body: Record<string, unknown> = { min, max };
         if (field.unit != null && field.unit.trim().length > 0) {
           body.unit = field.unit.trim();
         }
