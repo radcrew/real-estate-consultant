@@ -31,14 +31,14 @@ export const RangeQuestionInput = ({
     <div className="grid w-full gap-3 sm:grid-cols-2">
       <NumberField
         id={`${question.id}-min`}
-        label={`Min ${question.unit ?? ""}`}
+        label="Min"
         value={answer.min}
         onChange={handleChange("min")}
         autoFocus
       />
       <NumberField
         id={`${question.id}-max`}
-        label={`Max ${question.unit ?? ""}`}
+        label="Max"
         value={answer.max}
         onChange={handleChange("max")}
       />

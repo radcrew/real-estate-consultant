@@ -1,6 +1,26 @@
 import type { IntakeSessionQuestion } from "@services/intake-sessions";
 
-import type { AnswerValue, RangeAnswerValue, WizardAnswers, WizardQuestion } from "./types";
+import {
+  type RangeQuestion,
+  type AnswerValue,
+  type RangeAnswerValue,
+  type WizardAnswers,
+  type WizardQuestion,
+} from "./types";
+
+export const getRangeQuestionUnit = (question: RangeQuestion): string | undefined =>
+  question.options?.unit;
+
+/** Title shown above the input; range questions append ``(unit)`` when present (e.g. ``Price (USD)``). */
+export const getQuestionInputDisplayTitle = (question: WizardQuestion): string => {
+  if (question.kind === "range") {
+    const unit = getRangeQuestionUnit(question);
+    if (unit != null && unit.trim().length > 0) {
+      return `${question.title} (${unit.trim()})`;
+    }
+  }
+  return question.title;
+};
 
 export const parseQuestion = (question: IntakeSessionQuestion): WizardQuestion => {
   const baseQuestion = {
@@ -15,10 +35,20 @@ export const parseQuestion = (question: IntakeSessionQuestion): WizardQuestion =
       return {
         ...baseQuestion,
         kind: "multi-select",
-        options: question.options ?? [],
+        options: Array.isArray(question.options) ? question.options : [],
       };
-    case "range":
-      return { ...baseQuestion, kind: "range" };
+    case "range": {
+      const raw = question.options;
+      const rangeOptions =
+        raw != null && typeof raw === "object" && !Array.isArray(raw)
+          ? (raw as Record<string, string>)
+          : undefined;
+      return {
+        ...baseQuestion,
+        kind: "range",
+        ...(rangeOptions != null && Object.keys(rangeOptions).length > 0 ? { options: rangeOptions } : {}),
+      };
+    }
     case "location":
       return { ...baseQuestion, kind: "location" };
     default:
@@ -27,7 +57,7 @@ export const parseQuestion = (question: IntakeSessionQuestion): WizardQuestion =
 };
 
 export const formatRangeValue = (value: number, unit?: string) => {
-  if (unit === "$") {
+  if (unit === "$" || unit === "USD") {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -62,7 +92,8 @@ export const formatAnswerForSummary = (
       typeof answer.min === "number" &&
       typeof answer.max === "number"
     ) {
-      return `${formatRangeValue(answer.min, question.unit)} - ${formatRangeValue(answer.max, question.unit)}`;
+      const unit = getRangeQuestionUnit(question);
+      return `${formatRangeValue(answer.min, unit)} - ${formatRangeValue(answer.max, unit)}`;
     }
     return "Not answered";
   }

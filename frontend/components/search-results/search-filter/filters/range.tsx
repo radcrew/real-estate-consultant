@@ -31,7 +31,7 @@ const fmt = (n: number) =>
 
 export const CLEAR_RANGE: RangeCriterionData = { min: Number.NaN, max: Number.NaN };
 
-function rangeTriggerText(value: RangeCriterionData, label: string) {
+const rangeTriggerText = (value: RangeCriterionData, label: string) => {
   const hasBounds = Number.isFinite(value.min) && Number.isFinite(value.max);
   if (hasBounds) {
     return `${fmt(value.min)} – ${fmt(value.max)}`;
@@ -45,7 +45,7 @@ function rangeTriggerText(value: RangeCriterionData, label: string) {
   return label;
 }
 
-function rangeSummaryForAria(value: RangeCriterionData) {
+const rangeSummaryForAria = (value: RangeCriterionData) => {
   const hasBounds = Number.isFinite(value.min) && Number.isFinite(value.max);
   if (hasBounds) {
     return `${fmt(value.min)} to ${fmt(value.max)}`;

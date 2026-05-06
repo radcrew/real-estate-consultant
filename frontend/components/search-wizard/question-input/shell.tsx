@@ -1,4 +1,5 @@
 import type { WizardQuestion } from "../types";
+import { getQuestionInputDisplayTitle } from "../utils";
 
 type QuestionInputShellProps = {
   question: WizardQuestion;
@@ -11,7 +12,7 @@ export const QuestionInputShell = ({
 }: QuestionInputShellProps) => (
   <div>
     <h3 className="text-left text-lg font-semibold tracking-tight sm:text-xl">
-      {question.title}
+      {getQuestionInputDisplayTitle(question)}
     </h3>
     <p className="mt-1 text-left text-sm text-muted-foreground sm:text-base">
       {question.description}

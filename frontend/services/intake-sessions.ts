@@ -7,11 +7,14 @@ export type IntakeSessionQuestion = {
   title: string;
   text: string;
   type: string;
-  options?: Array<{
-    label: string;
-    value: string;
-    hint?: string;
-  }>;
+  /** Select lists use an array; range questions use a string map (e.g. ``{ unit: "USD" }``). */
+  options?:
+    | Array<{
+        label: string;
+        value: string;
+        hint?: string;
+      }>
+    | Record<string, string>;
 };
 
 /** Query param for ``POST /intake-sessions`` (default on API is ``guided``). */

@@ -38,7 +38,7 @@ type MultiSelectFilterProps = {
   className?: string;
 };
 
-function multiTriggerText(value: string[], label: string) {
+const multiTriggerText = (value: string[], label: string) => {
   if (value.length === 0) {
     return label;
   }
