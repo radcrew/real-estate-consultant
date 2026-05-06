@@ -21,6 +21,10 @@ class CriteriaFieldItem(BaseModel):
 
     type: str = Field(..., description="``questions.type`` for this key.")
     label: str = Field(default="", description="``questions.title`` for this key.")
+    unit: str | None = Field(
+        default=None,
+        description="From ``questions.options.unit`` for range-style types only.",
+    )
     data: Any | None = Field(
         default=None,
         description="Stored answer when present; omitted when not set.",
@@ -38,7 +42,7 @@ class SearchCriteriaUpdateResponse(BaseModel):
     search_profile_id: UUID | None = None
     criteria: dict[str, CriteriaFieldItem] = Field(
         default_factory=dict,
-        description="All question keys with ``type`` / ``label``; ``data`` when answered.",
+        description="Per key: ``type``, ``label``, optional ``unit``; ``data`` if answered.",
     )
 
 
@@ -60,7 +64,8 @@ class SearchPropertiesResponse(BaseModel):
         default_factory=dict,
         description=(
             "All configured question keys from ``questions``: ``type`` and ``label`` "
-            "always; ``data`` present only when that key exists on the session criteria."
+            "always; ``unit`` for range-style types when ``options.unit`` is set; "
+            "``data`` present only when that key exists on the session criteria."
         ),
     )
     results: list[PropertyMatch]

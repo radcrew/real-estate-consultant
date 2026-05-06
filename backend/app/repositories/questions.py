@@ -15,6 +15,23 @@ _FIRST_QUESTION_SELECT = "key, title, text, type, options, required"
 _QUESTION_SELECT = "key, title, text, type, options, order_index, required"
 _LOAD_QUESTIONS_ERROR = "No question is configured for intake flow."
 
+# ``questions.type`` values that use a numeric range and optional ``options.unit``.
+_RANGE_QUESTION_TYPES: frozenset[str] = frozenset(
+    {"range", "numeric_range", "sqft_range", "rent_range", "size_range"},
+)
+
+
+def _range_unit_from_options(qtype: str, options: Any) -> str | None:
+    """Return ``options["unit"]`` when ``qtype`` is a range style and unit is present."""
+    t = qtype.strip().lower() if isinstance(qtype, str) else ""
+    if t not in _RANGE_QUESTION_TYPES:
+        return None
+    if isinstance(options, dict):
+        raw = options.get("unit")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return None
+
 
 def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
     """Map a PostgREST ``questions`` row into ``IntakeSessionFirstQuestion``."""
@@ -114,21 +131,29 @@ async def load_intake_question_filters(client: AsyncClient) -> dict[str, dict[st
 
 async def load_question_key_metadata(
     client: AsyncClient,
-) -> tuple[dict[str, str], dict[str, str]]:
-    """Map each question ``key`` to ``(type, title)`` for search / display APIs."""
+) -> tuple[dict[str, str], dict[str, str], dict[str, str | None]]:
+    """Map each question ``key`` to ``(type, title, unit)`` for search / display APIs.
+
+    ``unit`` is set from ``questions.options->unit`` only for range-style ``type`` values.
+    """
     result = await execute_db_safe(
-        client.table("questions").select("key, type, title").order("order_index").execute(),
+        client.table("questions")
+        .select("key, type, title, options")
+        .order("order_index")
+        .execute(),
     )
     rows = as_row_list(result.data)
     types: dict[str, str] = {}
     titles: dict[str, str] = {}
+    units: dict[str, str | None] = {}
     for row in rows:
         key = row.get("key")
         if not isinstance(key, str) or not key.strip():
             continue
         types[key] = row.get("type")
         titles[key] = row.get("title")
-    return types, titles
+        units[key] = _range_unit_from_options(row.get("type"), row.get("options"))
+    return types, titles, units
 
 
 async def load_intake_questions(client: AsyncClient) -> list[dict[str, Any]]:

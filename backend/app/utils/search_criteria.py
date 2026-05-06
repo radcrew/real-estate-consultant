@@ -22,18 +22,19 @@ async def normalize_criteria(
     """
     out: dict[str, CriteriaFieldItem] = {}
 
-    types, titles = await load_question_key_metadata(client)
+    types, titles, units = await load_question_key_metadata(client)
 
     for key in types:
         qtype = types[key]
         label = titles[key]
+        unit = units.get(key)
         if key in criteria:
-            out[key] = CriteriaFieldItem(type=qtype, label=label, data=criteria[key])
+            out[key] = CriteriaFieldItem(type=qtype, label=label, unit=unit, data=criteria[key])
         else:
-            out[key] = CriteriaFieldItem(type=qtype, label=label, data=None)
+            out[key] = CriteriaFieldItem(type=qtype, label=label, unit=unit, data=None)
 
     for key, value in criteria.items():
         if key not in out:
-            out[key] = CriteriaFieldItem(type="unknown", label="", data=value)
+            out[key] = CriteriaFieldItem(type="unknown", label="", unit=None, data=value)
 
     return out
