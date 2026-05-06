@@ -12,7 +12,7 @@ import { cn } from "@lib/utils";
 import type { RangeCriterionData } from "@lib/search-criteria";
 
 import { FILTER_BAR_PILL } from "./styles";
-import { stopMenuTriggerBubble } from "./utils";
+import { stopMenuKeyboardCapture, stopMenuTriggerBubble } from "./utils";
 
 type RangeFilterProps = {
   fieldKey: string;
@@ -116,6 +116,8 @@ export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, classN
                   type="number"
                   value={Number.isFinite(value.min) ? value.min : ""}
                   onChange={(e) => setBound("min", e.target.value)}
+                  onKeyDownCapture={stopMenuKeyboardCapture}
+                  disabled={disabled}
                 />
               </div>
               <div className="min-w-0 flex-1 space-y-1">
@@ -127,6 +129,8 @@ export const RangeFilter = ({ fieldKey, label, value, onChange, disabled, classN
                   type="number"
                   value={Number.isFinite(value.max) ? value.max : ""}
                   onChange={(e) => setBound("max", e.target.value)}
+                  onKeyDownCapture={stopMenuKeyboardCapture}
+                  disabled={disabled}
                 />
               </div>
             </div>

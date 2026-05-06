@@ -11,7 +11,7 @@ import { Input } from "@components/ui/input";
 import { cn } from "@lib/utils";
 
 import { FILTER_BAR_PILL } from "./styles";
-import { stopMenuTriggerBubble } from "./utils";
+import { stopMenuKeyboardCapture, stopMenuTriggerBubble } from "./utils";
 
 type TextFilterProps = {
   fieldKey: string;
@@ -62,6 +62,7 @@ export const TextFilter = ({ fieldKey, label, value, onChange, disabled, classNa
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onKeyDownCapture={stopMenuKeyboardCapture}
           disabled={disabled}
           className="mt-2"
           placeholder={label}
