@@ -67,10 +67,6 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
     return () => ac.abort();
   }, [load]);
 
-  const refetch = useCallback(() => {
-    void load();
-  }, [load]);
-
   const applyCriteria = useCallback(
     async (nextCriteria: UpdateSearchCriteriaBody) => {
       const id = sessionProfileId?.trim();
@@ -90,5 +86,5 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
     [load, sessionProfileId, updateCriteria],
   );
 
-  return { listings, loading, error, criteria, refetch, applyCriteria };
+  return { listings, loading, error, criteria, applyCriteria };
 };
