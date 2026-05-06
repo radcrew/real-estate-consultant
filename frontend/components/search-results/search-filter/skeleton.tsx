@@ -8,7 +8,7 @@ type SearchFilterSkeletonProps = {
 export const SearchFilterSkeleton = ({ className }: SearchFilterSkeletonProps) => (
   <section
     className={cn(
-      "flex flex-nowrap items-center gap-2 overflow-hidden rounded-lg border border-border bg-background p-2 shadow-sm",
+      "flex flex-nowrap items-center gap-2 overflow-hidden py-2",
       className,
     )}
     aria-busy="true"

@@ -101,7 +101,7 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
   return (
     <section
       className={cn(
-        "flex flex-nowrap items-center gap-2 overflow-hidden rounded-lg border border-border bg-background p-2 shadow-sm",
+        "flex flex-nowrap items-center gap-2 overflow-hidden py-2",
         disabled && "pointer-events-none opacity-60",
         className,
       )}
