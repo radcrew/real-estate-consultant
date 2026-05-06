@@ -15,7 +15,6 @@ from app.repositories.intake_sessions import (
     save_intake_criteria,
 )
 from app.repositories.properties_search import search_properties
-from app.repositories.questions import load_question_key_metadata
 from app.repositories.search_profiles import ensure_search_profile_access
 from app.schemas.search import (
     PropertyMatch,
@@ -55,8 +54,7 @@ async def search_listings(
     raw_criteria = session_row.get("criteria")
     criteria: dict[str, Any] = dict(raw_criteria) if isinstance(raw_criteria, dict) else {}
 
-    key_types, key_titles = await load_question_key_metadata(client)
-    criteria_with_types = normalize_criteria(criteria, key_types, key_titles)
+    normalized_criteria = await normalize_criteria(client, criteria)
 
     rows_with_scores, total = await search_properties(db, criteria, limit=limit, offset=offset)
     results = [
@@ -64,7 +62,7 @@ async def search_listings(
         for row, score in rows_with_scores
     ]
     return SearchPropertiesResponse(
-        criteria=criteria_with_types,
+        criteria=normalized_criteria,
         results=results,
         total=total,
         limit=limit,
@@ -96,18 +94,15 @@ async def update_search_criteria(
     )
     session_row = await load_intake_session_row_by_search_profile_id(client, session_profile_id)
     criteria = dict(body.root)
-    updated = await save_intake_criteria(client, UUID(str(session_row["id"])), criteria)
-    session = parse_intake_session(updated)
-    raw_after = session.criteria
-    criteria_dict: dict[str, Any] = dict(raw_after) if isinstance(raw_after, dict) else {}
+    updated_session_row = await save_intake_criteria(client, UUID(str(session_row["id"])), criteria)
+    session = parse_intake_session(updated_session_row)
 
-    key_types, key_titles = await load_question_key_metadata(client)
-    criteria_wrapped = normalize_criteria(criteria_dict, key_types, key_titles)
+    normalized_criteria = await normalize_criteria(client, criteria)
 
     return SearchCriteriaUpdateResponse(
         id=session.id,
         status=session.status,
         created_at=session.created_at,
         search_profile_id=session.search_profile_id,
-        criteria=criteria_wrapped,
+        criteria=normalized_criteria,
     )

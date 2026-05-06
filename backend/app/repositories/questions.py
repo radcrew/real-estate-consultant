@@ -126,11 +126,8 @@ async def load_question_key_metadata(
         key = row.get("key")
         if not isinstance(key, str) or not key.strip():
             continue
-        k = key.strip()
-        qtype = row.get("type")
-        types[k] = qtype.strip() if isinstance(qtype, str) and qtype.strip() else "text"
-        qtitle = row.get("title")
-        titles[k] = qtitle.strip() if isinstance(qtitle, str) else ""
+        types[key] = row.get("type")
+        titles[key] = row.get("title")
     return types, titles
 
 
