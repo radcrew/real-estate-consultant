@@ -92,6 +92,26 @@ async def load_first_intake_question(client: AsyncClient) -> IntakeSessionFirstQ
     return map_question_to_model(row)
 
 
+async def load_intake_question_filters(client: AsyncClient) -> dict[str, dict[str, str]]:
+    """Build ``{ question.key: {\"type\", \"label\"} }`` from ``questions`` for UI filters."""
+    result = await execute_db_safe(
+        client.table("questions").select("key, type, title").order("order_index").execute(),
+    )
+    rows = as_row_list(result.data)
+    out: dict[str, dict[str, str]] = {}
+    for row in rows:
+        raw_key = row.get("key")
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            continue
+        k = raw_key.strip()
+        qtype = row.get("type")
+        qtitle = row.get("title")
+        type_str = qtype.strip() if isinstance(qtype, str) and qtype.strip() else "text"
+        label_str = qtitle.strip() if isinstance(qtitle, str) else ""
+        out[k] = {"type": type_str, "label": label_str}
+    return out
+
+
 async def load_question_key_metadata(
     client: AsyncClient,
 ) -> tuple[dict[str, str], dict[str, str]]:

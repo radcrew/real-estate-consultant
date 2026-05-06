@@ -39,7 +39,7 @@ export async function GET(request: Request) {
     const session: StoredSession = {
       accessToken: data.session.access_token,
       refreshToken: data.session.refresh_token,
-      expiresIn: data.session.expires_in ?? 3600,
+      expiresIn: data.session.expires_in ?? 360000,
       tokenType: data.session.token_type,
       user: {
         id: data.session.user.id,
