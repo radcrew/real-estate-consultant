@@ -8,7 +8,6 @@ from uuid import UUID
 from fastapi import APIRouter, Query
 
 from app.core.deps import CurrentUser, DbSession, SupabaseSdkDep
-from app.models.intake_sessions import IntakeSession
 from app.models.properties import Properties
 from app.repositories.intake_sessions import (
     load_intake_session_row_by_search_profile_id,
@@ -20,10 +19,11 @@ from app.repositories.questions import load_question_key_metadata
 from app.repositories.search_profiles import ensure_search_profile_access
 from app.schemas.search import (
     PropertyMatch,
+    SearchCriteriaUpdateResponse,
     SearchPropertiesResponse,
     UpdateSearchCriteriaBody,
 )
-from app.utils.search_criteria import wrap_criteria_for_search_response
+from app.utils.search_criteria import normalize_criteria
 
 router = APIRouter(tags=["search"])
 
@@ -31,6 +31,7 @@ router = APIRouter(tags=["search"])
 @router.get(
     "/search/{session_profile_id}",
     response_model=SearchPropertiesResponse,
+    response_model_exclude_none=True,
     summary="Search properties for a session profile",
 )
 async def search_listings(
@@ -55,7 +56,7 @@ async def search_listings(
     criteria: dict[str, Any] = dict(raw_criteria) if isinstance(raw_criteria, dict) else {}
 
     key_types, key_titles = await load_question_key_metadata(client)
-    criteria_with_types = wrap_criteria_for_search_response(criteria, key_types, key_titles)
+    criteria_with_types = normalize_criteria(criteria, key_types, key_titles)
 
     rows_with_scores, total = await search_properties(db, criteria, limit=limit, offset=offset)
     results = [
@@ -73,7 +74,8 @@ async def search_listings(
 
 @router.put(
     "/search/{session_profile_id}",
-    response_model=IntakeSession,
+    response_model=SearchCriteriaUpdateResponse,
+    response_model_exclude_none=True,
     summary="Replace search criteria on the linked intake session",
 )
 async def update_search_criteria(
@@ -81,7 +83,7 @@ async def update_search_criteria(
     client: SupabaseSdkDep,
     current_user: CurrentUser,
     body: UpdateSearchCriteriaBody,
-) -> IntakeSession:
+) -> SearchCriteriaUpdateResponse:
     """``PUT /api/v1/search/{session_profile_id}``
 
     Replaces ``criteria`` on the **latest** ``intake_sessions`` row for this search profile.
@@ -95,4 +97,17 @@ async def update_search_criteria(
     session_row = await load_intake_session_row_by_search_profile_id(client, session_profile_id)
     criteria = dict(body.root)
     updated = await save_intake_criteria(client, UUID(str(session_row["id"])), criteria)
-    return parse_intake_session(updated)
+    session = parse_intake_session(updated)
+    raw_after = session.criteria
+    criteria_dict: dict[str, Any] = dict(raw_after) if isinstance(raw_after, dict) else {}
+
+    key_types, key_titles = await load_question_key_metadata(client)
+    criteria_wrapped = normalize_criteria(criteria_dict, key_types, key_titles)
+
+    return SearchCriteriaUpdateResponse(
+        id=session.id,
+        status=session.status,
+        created_at=session.created_at,
+        search_profile_id=session.search_profile_id,
+        criteria=criteria_wrapped,
+    )

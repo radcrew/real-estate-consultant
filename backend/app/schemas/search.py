@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
 
 from app.models.properties import Properties
 
@@ -14,12 +15,32 @@ class UpdateSearchCriteriaBody(RootModel[dict[str, Any]]):
 
 
 class CriteriaFieldItem(BaseModel):
-    """One criterion key with question metadata from ``questions`` plus stored value."""
+    """Question-backed criterion: ``type`` / ``label`` always; ``data`` only when answered."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
-    type: str
-    label: str
-    data: Any
+
+    type: str = Field(..., description="``questions.type`` for this key.")
+    label: str = Field(default="", description="``questions.title`` for this key.")
+    data: Any | None = Field(
+        default=None,
+        description="Stored answer when present; omitted when not set.",
+    )
+
+
+class SearchCriteriaUpdateResponse(BaseModel):
+    """Intake session after replacing criteria (same ``criteria`` envelope as GET ``/search``)."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    id: UUID | None = None
+    status: str = Field(default="in_progress")
+    created_at: AwareDatetime | None = None
+    search_profile_id: UUID | None = None
+    criteria: dict[str, CriteriaFieldItem] = Field(
+        default_factory=dict,
+        description="All question keys with ``type`` / ``label``; ``data`` when answered.",
+    )
+
 
 class PropertyMatch(BaseModel):
     """One property row plus LLM match score (0–100)."""
@@ -38,8 +59,8 @@ class SearchPropertiesResponse(BaseModel):
     criteria: dict[str, CriteriaFieldItem] = Field(
         default_factory=dict,
         description=(
-            "Intake session criteria: each key is wrapped with ``type``, ``label`` "
-            "(from ``questions``) and ``data`` (stored value)."
+            "All configured question keys from ``questions``: ``type`` and ``label`` "
+            "always; ``data`` present only when that key exists on the session criteria."
         ),
     )
     results: list[PropertyMatch]
