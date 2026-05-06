@@ -37,29 +37,43 @@ const parseCriterionLabel = (raw: Record<string, unknown>): string | undefined =
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : undefined;
 };
 
+/**
+ * Parses one criterion from search ``criteria[key]``.
+ * Supports full payloads with ``data`` and layout-only rows with ``{ type, label? }`` (no ``data``),
+ * using empty values so filter UI still renders.
+ */
 export const parseCriterionField = (raw: unknown): SearchCriterionField | null => {
   if (!isRecord(raw)) {
     return null;
   }
   const criterionLabel = parseCriterionLabel(raw);
+  const labelExtra = criterionLabel != null ? { label: criterionLabel } : {};
   const t = raw.type;
-  if (t === "range" && isRecord(raw.data)) {
-    const min = Number(raw.data.min);
-    const max = Number(raw.data.max);
-    if (Number.isFinite(min) && Number.isFinite(max)) {
-      return { type: "range", data: { min, max }, ...(criterionLabel != null ? { label: criterionLabel } : {}) };
+
+  if (t === "range") {
+    const dataRaw = raw.data;
+    if (isRecord(dataRaw)) {
+      const min = Number(dataRaw.min);
+      const max = Number(dataRaw.max);
+      if (Number.isFinite(min) && Number.isFinite(max)) {
+        return { type: "range", data: { min, max }, ...labelExtra };
+      }
     }
-    return null;
+    return { type: "range", data: { min: Number.NaN, max: Number.NaN }, ...labelExtra };
   }
-  if (t === "location" && typeof raw.data === "string") {
-    return { type: "location", data: raw.data, ...(criterionLabel != null ? { label: criterionLabel } : {}) };
+  if (t === "location") {
+    const d = raw.data;
+    if (typeof d === "string") {
+      return { type: "location", data: d, ...labelExtra };
+    }
+    return { type: "location", data: "", ...labelExtra };
   }
-  if (t === "multi-select" && Array.isArray(raw.data) && raw.data.every((x) => typeof x === "string")) {
-    return {
-      type: "multi-select",
-      data: [...raw.data],
-      ...(criterionLabel != null ? { label: criterionLabel } : {}),
-    };
+  if (t === "multi-select") {
+    const d = raw.data;
+    if (Array.isArray(d) && d.every((x) => typeof x === "string")) {
+      return { type: "multi-select", data: [...d], ...labelExtra };
+    }
+    return { type: "multi-select", data: [], ...labelExtra };
   }
   return null;
 };
