@@ -45,8 +45,20 @@ export type SearchResponse = {
 
 export type UpdateSearchCriteriaBody = Record<string, unknown>;
 
+export type SearchFiltersResponse = Record<string, unknown>;
+
 export class SearchService {
   constructor(private readonly http: AxiosInstance) {}
+
+  async getFilters(options?: { signal?: AbortSignal }): Promise<SearchFiltersResponse> {
+    const { data } = await this.http.get<SearchFiltersResponse>("/filters", {
+      signal: options?.signal,
+    });
+    if (data !== null) {
+      return data;
+    }
+    return {};
+  }
 
   async search(
     sessionProfileId: string,
