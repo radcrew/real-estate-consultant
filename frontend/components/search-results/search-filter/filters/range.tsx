@@ -14,8 +14,10 @@ import type { RangeCriterionData } from "@lib/search-criteria";
 import { FILTER_BAR_PILL } from "./styles";
 import {
   isRangeInvalid,
-  rangeSummaryForAria,
-  rangeTriggerText,
+  rangeNormalSummaryForAria,
+  rangeNormalTriggerText,
+  rangePriceSummaryForAria,
+  rangePriceTriggerText,
   stopMenuKeyboardCapture,
   stopMenuTriggerBubble,
 } from "./utils";
@@ -43,8 +45,10 @@ export const RangeFilter = ({
 }: RangeFilterProps) => {
   const hasValue = Number.isFinite(value.min) || Number.isFinite(value.max);
   const isInvalid = isRangeInvalid(value);
-  const summary = rangeSummaryForAria(value, label, unit);
-  const triggerText = rangeTriggerText(value, label, unit);
+  const summary =
+    label === "Price" ? rangePriceSummaryForAria(value) : rangeNormalSummaryForAria(value, unit);
+  const triggerText =
+    label === "Price" ? rangePriceTriggerText(value, label, unit) : rangeNormalTriggerText(value, label, unit);
 
   const setBound = (bound: "min" | "max", raw: string) => {
     const t = raw.trim();
