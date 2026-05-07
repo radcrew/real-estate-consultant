@@ -80,10 +80,6 @@ export const SearchWizardProvider = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [llmChatBootstrap, setLlmChatBootstrap] = useState<string[] | null>(null);
 
-  const clearLlmChatBootstrap = useCallback(() => {
-    setLlmChatBootstrap(null);
-  }, []);
-
   const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
   const canContinue = currentQuestion != null && isQuestionComplete(currentQuestion, currentAnswer);
   const isBusy = isLoadingQuestion || isSubmitting;
@@ -180,33 +176,6 @@ export const SearchWizardProvider = ({
     setSummaryRows((current) => current.slice(0, -1));
   };
 
-  const updateCurrentAnswer = (value: AnswerValue) => {
-    if (!currentQuestion) {
-      return;
-    }
-
-    setAnswers((current) => ({
-      ...current,
-      [currentQuestion.id]: value,
-    }));
-  };
-
-  const toggleCurrentMultiSelect = (value: string) => {
-    if (!currentQuestion) {
-      return;
-    }
-
-    const current = answers[currentQuestion.id];
-    const selected = Array.isArray(current) ? current : [];
-
-    setAnswers((existing) => ({
-      ...existing,
-      [currentQuestion.id]: selected.includes(value)
-        ? selected.filter((item) => item !== value)
-        : [...selected, value],
-    }));
-  };
-
   const goNext = async () => {
     if (
       !currentQuestion ||
@@ -274,6 +243,33 @@ export const SearchWizardProvider = ({
       setSubmitting(false);
     }
   };
+  
+  const updateCurrentAnswer = (value: AnswerValue) => {
+    if (!currentQuestion) {
+      return;
+    }
+
+    setAnswers((current) => ({
+      ...current,
+      [currentQuestion.id]: value,
+    }));
+  };
+
+  const toggleCurrentMultiSelect = (value: string) => {
+    if (!currentQuestion) {
+      return;
+    }
+
+    const current = answers[currentQuestion.id];
+    const selected = Array.isArray(current) ? current : [];
+
+    setAnswers((existing) => ({
+      ...existing,
+      [currentQuestion.id]: selected.includes(value)
+        ? selected.filter((item) => item !== value)
+        : [...selected, value],
+    }));
+  };
 
   const resetQuestionnaireState = () => {
     setSessionId(null);
@@ -294,6 +290,11 @@ export const SearchWizardProvider = ({
     setGuidedFormOpen(false);
     setSmartChatOpen(false);
   };
+
+  
+  const clearLlmChatBootstrap = useCallback(() => {
+    setLlmChatBootstrap(null);
+  }, []);
 
   const value: SearchWizardContextValue = {
     canContinue,

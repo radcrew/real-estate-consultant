@@ -53,25 +53,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
 
-  const refresh = useCallback(() => {
-    setSession(readSession());
-  }, []);
-
-  useLayoutEffect(() => {
-    refresh();
-    setReady(true);
-    setError(null);
-  }, [pathname, refresh]);
-
-  useEffect(() => {
-    window.addEventListener(AUTH_SESSION_CHANGED_EVENT, refresh);
-    return () => window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, refresh);
-  }, [refresh]);
-
-  const signOut = useCallback(() => {
-    clearSession();
-  }, []);
-
   const signIn = useCallback(
     async ({ email, password }: AuthCredentials, onSuccess: () => void) => {
       setError(null);
@@ -95,27 +76,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           expiresIn,
           tokenType,
           user,
-        });
-
-        onSuccess();
-      } catch (err) {
-        setError(getApiErrorMessage(err));
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [],
-  );
-
-  const signUp = useCallback(
-    async ({ email, password }: AuthCredentials, onSuccess: () => void) => {
-      setError(null);
-      setSubmitting(true);
-
-      try {
-        await authService.signUp({
-          email: email.trim(),
-          password,
         });
 
         onSuccess();
@@ -158,16 +118,56 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, []);
 
+  const signUp = useCallback(
+    async ({ email, password }: AuthCredentials, onSuccess: () => void) => {
+      setError(null);
+      setSubmitting(true);
+
+      try {
+        await authService.signUp({
+          email: email.trim(),
+          password,
+        });
+
+        onSuccess();
+      } catch (err) {
+        setError(getApiErrorMessage(err));
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [],
+  );
+
+  const signOut = useCallback(() => {
+    clearSession();
+  }, []);
+
+  const refresh = useCallback(() => {
+    setSession(readSession());
+  }, []);
+
+  useLayoutEffect(() => {
+    refresh();
+    setReady(true);
+    setError(null);
+  }, [pathname, refresh]);
+
+  useEffect(() => {
+    window.addEventListener(AUTH_SESSION_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, refresh);
+  }, [refresh]);
+
   return (
     <AuthContext.Provider
       value={{
         session,
         ready,
-        refresh,
-        signOut,
         signIn,
         signInWithGoogle,
         signUp,
+        signOut,
+        refresh,
         error,
         isSubmitting,
       }}
