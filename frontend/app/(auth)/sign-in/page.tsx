@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 
-import { AuthPageFooter } from "@components/auth/auth-page-footer";
-import { AuthPageTitle } from "@components/auth/auth-page-title";
+import { AuthPageFooter } from "@components/auth/main/footer";
+import { AuthPageTitle } from "@components/auth/main/title";
 import { SignInForm } from "@components/auth/forms/sign-in";
-import { OAuthErrorNotice } from "@components/auth/oauth-error-notice";
-import { SignUpNotice } from "@components/auth/sign-up-notice";
+import { OAuthErrorNotice } from "@components/auth/notice/oauth-error";
+import { SignUpNotice } from "@components/auth/notice/sign-up";
 
 export const metadata: Metadata = {
   title: "Sign in",
