@@ -2,8 +2,8 @@
 
 import { useAuth } from "@contexts/auth";
 
-import { NavAuthButtons } from "./nav-auth-buttons";
-import { ProfileDropdown } from "./profile-dropdown";
+import { NavAuthButtons } from "./buttons";
+import { ProfileDropdown } from "./dropdown";
 
 const AuthNavSkeleton = () => (
   <div

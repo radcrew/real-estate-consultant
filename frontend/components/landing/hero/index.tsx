@@ -1,6 +1,6 @@
 import { HERO_STATS } from "@constants";
 
-import { HeroActions } from "./hero-actions";
+import { HeroActions } from "./actions";
 
 import { styles } from "./styles";
 
