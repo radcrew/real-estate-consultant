@@ -3,16 +3,12 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { formatMetricNumber, formatMoney } from "@lib/utils";
 import type { RangeCriterionData } from "@lib/search-criteria";
 
-/**
- * Prevents nested clear hit targets from toggling the menu trigger
- * (Base UI menu can open on pointer down).
- */
+
 export function stopMenuTriggerBubble(e: { preventDefault: () => void; stopPropagation: () => void }): void {
   e.preventDefault();
   e.stopPropagation();
 }
 
-/** Stops Menu composite/typeahead from swallowing keys meant for inputs inside the popup. */
 export function stopMenuKeyboardCapture(e: ReactKeyboardEvent): void {
   e.stopPropagation();
 }
@@ -21,7 +17,7 @@ export function isRangeInvalid(value: RangeCriterionData): boolean {
   return Number.isFinite(value.min) && Number.isFinite(value.max) && value.min > value.max;
 }
 
-/** Chip label when the criterion is price (caller selects by label). */
+
 export function rangePriceTriggerText(value: RangeCriterionData, label: string, unit?: string): string {
   const u = unit?.trim();
   const priceMoneyPrefix = u ? `${u} ` : "USD ";
@@ -45,7 +41,6 @@ export function rangePriceTriggerText(value: RangeCriterionData, label: string, 
   return label;
 }
 
-/** Chip label for non-price range criteria; ``unit`` is appended when present. */
 export function rangeNormalTriggerText(value: RangeCriterionData, label: string, unit?: string): string {
   const u = unit?.trim();
   const suffix = u ? ` ${u}` : "";

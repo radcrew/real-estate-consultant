@@ -9,7 +9,7 @@ import { cn } from "@lib/utils";
 import { useSearchSessionResults } from "@hooks/use-search-session-results";
 
 import { ResultCard } from "./result-card";
-import { SearchFilter, SearchFilterSkeleton } from "./search-filter";
+import { SearchFilter, SearchFilterSkeleton } from "./filter-bar";
 
 const SKELETON_COUNT = 6;
 

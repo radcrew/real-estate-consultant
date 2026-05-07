@@ -17,13 +17,13 @@ import type {
   SummaryRow,
   WizardAnswers,
   WizardQuestion,
-} from "../components/search-wizard/types";
+} from "../components/search/wizard/types";
 import {
   formatAnswerForSummary,
   getDefaultAnswer,
   isQuestionComplete,
   parseQuestion,
-} from "../components/search-wizard/utils";
+} from "../components/search/wizard/utils";
 
 type SearchWizardContextValue = {
   canContinue: boolean;
