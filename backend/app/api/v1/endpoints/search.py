@@ -14,6 +14,7 @@ from app.repositories.intake_sessions import (
     parse_intake_session,
     save_intake_criteria,
 )
+from app.repositories.property_images import fetch_first_image_url
 from app.repositories.properties_search import search_properties
 from app.repositories.search_profiles import ensure_search_profile_access
 from app.schemas.search import (
@@ -57,10 +58,16 @@ async def search_listings(
     normalized_criteria = await normalize_criteria(client, criteria)
 
     rows_with_scores, total = await search_properties(db, criteria, limit=limit, offset=offset)
-    results = [
-        PropertyMatch(property=Properties.model_validate(row), match_score=score)
-        for row, score in rows_with_scores
-    ]
+    results: list[PropertyMatch] = []
+    for row, score in rows_with_scores:
+        property_id = row["id"]
+        image_url = await fetch_first_image_url(client, property_id)
+        results.append(
+            PropertyMatch(
+                property=Properties.model_validate({**row, "image": image_url}),
+                match_score=score,
+            ),
+        )
     return SearchPropertiesResponse(
         criteria=normalized_criteria,
         results=results,
