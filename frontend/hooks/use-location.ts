@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { GOOGLE_MAPS_API_KEY } from "@lib/config";
+
 declare global {
   interface Window {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,19 +82,17 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
   const placesHostRef = useRef<HTMLDivElement | null>(null);
   const suggestionsTimerRef = useRef<number | null>(null);
 
-  const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
-
   useEffect(() => {
     let isMounted = true;
 
     const initialize = async () => {
-      if (!googleMapsApiKey) {
+      if (!GOOGLE_MAPS_API_KEY) {
         if (isMounted) setLoadError("Location autocomplete is not configured.");
         return;
       }
 
       try {
-        await loadGooglePlacesApi(googleMapsApiKey);
+        await loadGooglePlacesApi(GOOGLE_MAPS_API_KEY);
         if (!isMounted || !window.google?.maps?.places) return;
 
         autocompleteServiceRef.current =
@@ -109,7 +109,7 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
     return () => {
       isMounted = false;
     };
-  }, [googleMapsApiKey]);
+  }, []);
 
   useEffect(
     () => () => {
