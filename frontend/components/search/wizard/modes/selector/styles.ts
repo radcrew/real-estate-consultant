@@ -1,4 +1,4 @@
-export const styles = {
+export const STYLES = {
   chooserWrapper:
     "mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center py-10",
   chooserGrid: "mt-8 grid w-full gap-4 md:grid-cols-2",

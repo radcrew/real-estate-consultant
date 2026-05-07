@@ -14,7 +14,6 @@ import { cn } from "@lib/utils";
 import { FILTER_BAR_PILL } from "./styles";
 import { stopMenuTriggerBubble } from "./utils";
 
-/** Common types shown as checkboxes; merges with current API selections. */
 const SUGGESTED_TYPES = [
   "office",
   "coworking",

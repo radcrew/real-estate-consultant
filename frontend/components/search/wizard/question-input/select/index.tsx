@@ -4,14 +4,13 @@ import { Building2, Factory, Store } from "lucide-react";
 
 import { cn } from "@lib/utils";
 
-import { styles } from "./styles";
+import { STYLES } from "./styles";
 
 type SelectOptionCardProps = {
   label: string;
   hint?: string;
   selected: boolean;
   onClick: () => void;
-  /** Focus this card when the step mounts (first option in a select grid). */
   autoFocus?: boolean;
 };
 
@@ -43,22 +42,22 @@ export const SelectOptionCard = ({
     autoFocus={autoFocus}
     onClick={onClick}
     className={cn(
-      styles.card,
-      selected ? styles.cardSelected : styles.cardIdle,
+      STYLES.card,
+      selected ? STYLES.cardSelected : STYLES.cardIdle,
     )}
   >
     <span
       className={cn(
-        styles.iconWrap,
-        selected ? styles.iconWrapSelected : styles.iconWrapIdle,
+        STYLES.iconWrap,
+        selected ? STYLES.iconWrapSelected : STYLES.iconWrapIdle,
       )}
     >
       <SelectOptionIcon label={label} />
     </span>
 
-    <div className={styles.textColumn}>
-      <p className={styles.label}>{label}</p>
-      <span className={styles.hint}>{hint}</span>
+    <div className={STYLES.textColumn}>
+      <p className={STYLES.label}>{label}</p>
+      <span className={STYLES.hint}>{hint}</span>
     </div>
   </button>
 );

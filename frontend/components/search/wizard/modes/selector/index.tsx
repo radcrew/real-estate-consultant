@@ -15,7 +15,7 @@ import { useSearchWizard } from "@contexts/search-wizard";
 import { GuidedQuestionnaire } from "../guided";
 import { SmartChat } from "../llm";
 
-import { styles } from "./styles";
+import { STYLES } from "./styles";
 
 export const SearchModeSelector = () => {
   const {
@@ -41,35 +41,35 @@ export const SearchModeSelector = () => {
   }
 
   return (
-    <div className={styles.chooserWrapper}>
-      <div className={styles.chooserIntro}>
-        <h2 className={styles.chooserHeading}>
+    <div className={STYLES.chooserWrapper}>
+      <div className={STYLES.chooserIntro}>
+        <h2 className={STYLES.chooserHeading}>
           How would you like to search?
         </h2>
-        <p className={styles.chooserSubtitle}>
+        <p className={STYLES.chooserSubtitle}>
           Choose the search style that works best for you.
         </p>
       </div>
 
       {errorMessage && (
-        <div className={styles.chooserError}>{errorMessage}</div>
+        <div className={STYLES.chooserError}>{errorMessage}</div>
       )}
 
-      <div className={styles.chooserGrid}>
-        <section className={styles.choiceCard}>
-          <div className={styles.choiceIconCellSky}>
+      <div className={STYLES.chooserGrid}>
+        <section className={STYLES.choiceCard}>
+          <div className={STYLES.choiceIconCellSky}>
             <ListChecks className="size-6" aria-hidden />
           </div>
 
-          <div className={styles.choiceBodyTop}>
-            <h3 className={styles.choiceTitle}>Step-by-Step Form</h3>
-            <p className={styles.choiceDescription}>
+          <div className={STYLES.choiceBodyTop}>
+            <h3 className={STYLES.choiceTitle}>Step-by-Step Form</h3>
+            <p className={STYLES.choiceDescription}>
               Answer questions one at a time. Best if you know exactly what you
               want.
             </p>
           </div>
 
-          <div className={styles.choiceBullets}>
+          <div className={STYLES.choiceBullets}>
             <ChoiceBullet>Guided 5-step process</ChoiceBullet>
             <ChoiceBullet>All criteria are explicit</ChoiceBullet>
             <ChoiceBullet>Easy to refine each field</ChoiceBullet>
@@ -77,7 +77,7 @@ export const SearchModeSelector = () => {
 
           <Button
             variant="outline"
-            className={styles.choiceFormCta}
+            className={STYLES.choiceFormCta}
             onClick={startGuidedForm}
             disabled={isBusy}
           >
@@ -86,29 +86,29 @@ export const SearchModeSelector = () => {
           </Button>
         </section>
 
-        <section className={styles.choiceCard}>
-          <div className={styles.choiceCornerBadge}>AI</div>
+        <section className={STYLES.choiceCard}>
+          <div className={STYLES.choiceCornerBadge}>AI</div>
 
-          <div className={styles.choiceIconCellViolet}>
+          <div className={STYLES.choiceIconCellViolet}>
             <Sparkles className="size-6" aria-hidden />
           </div>
 
-          <div className={styles.choiceBodyTop}>
-            <h3 className={styles.choiceTitle}>AI Chat</h3>
-            <p className={styles.choiceDescription}>
+          <div className={STYLES.choiceBodyTop}>
+            <h3 className={STYLES.choiceTitle}>AI Chat</h3>
+            <p className={STYLES.choiceDescription}>
               Just describe your needs. AI extracts your criteria and asks
               follow-ups.
             </p>
           </div>
 
-          <div className={styles.choiceBullets}>
+          <div className={STYLES.choiceBullets}>
             <ChoiceBullet>Conversational</ChoiceBullet>
             <ChoiceBullet>AI fills the form for you</ChoiceBullet>
             <ChoiceBullet>Asks for missing info</ChoiceBullet>
           </div>
 
           <Button
-            className={styles.choiceAiCta}
+            className={STYLES.choiceAiCta}
             onClick={startSmartChat}
             disabled={isBusy}
           >
@@ -121,7 +121,7 @@ export const SearchModeSelector = () => {
       <button
         type="button"
         onClick={onClose}
-        className={styles.chooserBackLink}
+        className={STYLES.chooserBackLink}
       >
         <ArrowLeft className="size-4" aria-hidden />
         Back to Home
@@ -131,8 +131,8 @@ export const SearchModeSelector = () => {
 };
 
 const ChoiceBullet = ({ children }: { children: ReactNode }) => (
-  <div className={styles.bulletRow}>
-    <Check className={styles.bulletCheck} aria-hidden />
+  <div className={STYLES.bulletRow}>
+    <Check className={STYLES.bulletCheck} aria-hidden />
     <span>{children}</span>
   </div>
 );

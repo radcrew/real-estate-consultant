@@ -1,7 +1,6 @@
 const STORAGE_KEY = "radestate.session";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
-/** Dispatched on the window after `saveSession` / `clearSession` so clients can re-sync UI. */
 export const AUTH_SESSION_CHANGED_EVENT = "radestate:auth-session-changed";
 
 const emitSessionChange = (): void => {

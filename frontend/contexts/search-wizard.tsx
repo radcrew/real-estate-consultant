@@ -48,7 +48,6 @@ type SearchWizardContextValue = {
   updateCurrentAnswer: (value: AnswerValue) => void;
   toggleCurrentMultiSelect: (value: string) => void;
   sessionId: string | null;
-  /** Assistant bubble texts from ``POST /intake-sessions?mode=llm`` (welcome + next question); cleared after ChatPanel consumes. */
   llmChatBootstrap: string[] | null;
   clearLlmChatBootstrap: () => void;
 };

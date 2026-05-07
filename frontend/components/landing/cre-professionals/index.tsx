@@ -11,7 +11,7 @@ import {
 import type { CreProfessionalFeatureId } from "@constants";
 import { CRE_PROFESSIONAL_FEATURES } from "@constants";
 
-import { styles } from "./styles";
+import { STYLES } from "./styles";
 
 const ICON_MAP: Record<CreProfessionalFeatureId, LucideIcon> = {
   "ai-fit-scoring": Zap,
@@ -24,23 +24,23 @@ const ICON_MAP: Record<CreProfessionalFeatureId, LucideIcon> = {
 
 export const CreProfessionals = () => (
   <section
-    className={styles.section}
+    className={STYLES.section}
     aria-labelledby="cre-professionals-heading"
   >
-    <div className={styles.inner}>
-      <h2 id="cre-professionals-heading" className={styles.title}>
+    <div className={STYLES.inner}>
+      <h2 id="cre-professionals-heading" className={STYLES.title}>
         Built for CRE Professionals
       </h2>
-      <div className={styles.grid}>
+      <div className={STYLES.grid}>
         {CRE_PROFESSIONAL_FEATURES.map((feature) => {
           const Icon = ICON_MAP[feature.id];
           return (
-            <article key={feature.id} className={styles.card}>
-              <div className={styles.iconWrap}>
+            <article key={feature.id} className={STYLES.card}>
+              <div className={STYLES.iconWrap}>
                 <Icon className="size-6 shrink-0" aria-hidden />
               </div>
-              <h3 className={styles.cardTitle}>{feature.title}</h3>
-              <p className={styles.cardBody}>{feature.description}</p>
+              <h3 className={STYLES.cardTitle}>{feature.title}</h3>
+              <p className={STYLES.cardBody}>{feature.description}</p>
             </article>
           );
         })}

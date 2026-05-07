@@ -85,16 +85,16 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
     setDraft((prev) => {
       const next = { ...prev };
       for (const key of Object.keys(next)) {
-        const f = next[key];
-        if (!f) {
+        const filter = next[key];
+        if (!filter) {
           continue;
         }
-        if (f.type === "location") {
-          next[key] = { ...f, type: "location", data: "" };
-        } else if (f.type === "range") {
-          next[key] = { ...f, type: "range", data: { ...CLEAR_RANGE } };
-        } else if (f.type === "multi-select") {
-          next[key] = { ...f, type: "multi-select", data: [] };
+        if (filter.type === "location") {
+          next[key] = { ...filter, type: "location", data: "" };
+        } else if (filter.type === "range") {
+          next[key] = { ...filter, type: "range", data: { ...CLEAR_RANGE } };
+        } else if (filter.type === "multi-select") {
+          next[key] = { ...filter, type: "multi-select", data: [] };
         }
       }
       return next;
@@ -157,7 +157,7 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
               FILTER_BAR_ACTION,
               "inline-flex gap-1.5 shadow-sm",
             )}
-            onClick={() => void onSearch(toCriteriaAnswers(draft))}
+            onClick={() => onSearch(toCriteriaAnswers(draft))}
             disabled={disabled || hasInvalidRange}
           >
             <Search className="size-4 shrink-0" aria-hidden />

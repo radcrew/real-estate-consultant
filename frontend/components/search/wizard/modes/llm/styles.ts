@@ -1,4 +1,4 @@
-export const styles = {
+export const STYLES = {
   layout: [
     "grid min-h-0 w-full max-w-6xl flex-1 gap-5",
     "grid-rows-[minmax(0,1fr)_auto] lg:grid-rows-1",

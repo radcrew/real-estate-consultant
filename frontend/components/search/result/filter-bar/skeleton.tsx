@@ -4,7 +4,6 @@ type SearchFilterSkeletonProps = {
   className?: string;
 };
 
-/** Placeholder bar matching ``SearchFilter`` layout while results load. */
 export const SearchFilterSkeleton = ({ className }: SearchFilterSkeletonProps) => (
   <section
     className={cn(

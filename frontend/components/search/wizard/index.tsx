@@ -3,7 +3,7 @@
 import { SearchWizardProvider } from "../../../contexts/search-wizard";
 import { SearchModeSelector } from "./modes/selector";
 
-import { styles } from "./styles";
+import { STYLES } from "./styles";
 
 type SearchWizardProps = {
   onClose: () => void;
@@ -11,9 +11,9 @@ type SearchWizardProps = {
 
 export const SearchWizard = ({ onClose }: SearchWizardProps) => {
   return (
-    <div className={styles.overlay}>
-      <div className={styles.panel}>
-        <div className={styles.content}>
+    <div className={STYLES.overlay}>
+      <div className={STYLES.panel}>
+        <div className={STYLES.content}>
           <SearchWizardProvider onClose={onClose}>
             <SearchModeSelector />
           </SearchWizardProvider>

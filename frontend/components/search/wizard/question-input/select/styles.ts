@@ -1,4 +1,4 @@
-export const styles = {
+export const STYLES = {
   card:
     "group relative grid min-h-24 grid-rows-[auto_auto_1fr] items-start justify-items-center overflow-hidden rounded-xl border px-3 py-3.5 text-center transition-all duration-200",
   cardIdle:

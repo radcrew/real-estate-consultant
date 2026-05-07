@@ -3,7 +3,7 @@
 import type { RefObject } from "react";
 import { Send } from "lucide-react";
 
-import { styles } from "../../styles";
+import { STYLES } from "../../styles";
 
 type ChatComposerProps = {
   draft: string;
@@ -22,11 +22,11 @@ export const ChatComposer = ({
   isSending,
   onSend,
 }: ChatComposerProps) => (
-  <div className={styles.composer}>
-    <div className={styles.composerInner}>
+  <div className={STYLES.composer}>
+    <div className={STYLES.composerInner}>
       <textarea
         ref={textareaRef}
-        className={styles.textarea}
+        className={STYLES.textarea}
         placeholder="Type your requirements..."
         value={draft}
         disabled={!sessionId || isSending}
@@ -41,7 +41,7 @@ export const ChatComposer = ({
       />
       <button
         type="button"
-        className={styles.sendButton}
+        className={STYLES.sendButton}
         aria-label="Send message"
         disabled={!sessionId || !draft.trim() || isSending}
         onClick={() => onSend()}

@@ -12,7 +12,6 @@ import {
 export const getRangeQuestionUnit = (question: RangeQuestion): string | undefined =>
   question.options?.unit;
 
-/** Title shown above the input; range questions append ``(unit)`` when present (e.g. ``Price (USD)``). */
 export const getQuestionInputDisplayTitle = (question: WizardQuestion): string => {
   if (question.kind === "range") {
     const unit = getRangeQuestionUnit(question);

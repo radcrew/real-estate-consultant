@@ -1,4 +1,4 @@
-export const styles = {
+export const STYLES = {
   section: "border-b border-border/60 bg-muted/30 px-4 py-14 sm:py-16",
   inner: "mx-auto max-w-screen-xl",
   title:

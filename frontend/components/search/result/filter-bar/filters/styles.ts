@@ -1,6 +1,5 @@
 import { cn } from "@lib/utils";
 
-/** LoopNet-style pill trigger: label left, chevron or clear on the right. */
 export const FILTER_BAR_PILL = cn(
   "inline-flex h-9 min-w-[7.5rem] max-w-[13rem] shrink-0 items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm font-semibold text-foreground shadow-sm",
   "outline-none transition-colors select-none",
@@ -8,5 +7,4 @@ export const FILTER_BAR_PILL = cn(
   "data-[popup-open]:border-foreground/25 data-[popup-open]:bg-muted/40",
 );
 
-/** Clear / Search: same vertical rhythm and type as FILTER_BAR_PILL triggers. */
 export const FILTER_BAR_ACTION = "h-9 min-h-9 rounded-md px-3 text-sm font-semibold";

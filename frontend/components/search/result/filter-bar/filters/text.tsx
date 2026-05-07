@@ -22,7 +22,6 @@ type TextFilterProps = {
   className?: string;
 };
 
-/** Compact text criterion: pill shows label + chevron until set, then value + clear. */
 export const TextFilter = ({ fieldKey, label, value, onChange, disabled, className }: TextFilterProps) => {
   const hasValue = value.trim().length > 0;
   const display = hasValue ? value.trim() : label;

@@ -30,7 +30,6 @@ export type AuthCredentials = {
 
 export type AuthContextValue = {
   session: StoredSession | null;
-  /** True after the client has read `sessionStorage` at least once (avoids a false signed-out flash). */
   ready: boolean;
   refresh: () => void;
   signOut: () => void;

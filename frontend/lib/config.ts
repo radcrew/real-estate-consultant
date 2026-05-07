@@ -10,5 +10,4 @@ export const SUPABASE_ANON_KEY =
 export const GOOGLE_MAPS_API_KEY =
   process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() ?? "";
 
-/** Supabase OAuth `redirectTo` path (must match app route + Supabase redirect allowlist). */
 export const OAUTH_CALLBACK_PATH = "/auth/callback";

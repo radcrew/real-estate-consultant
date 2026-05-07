@@ -11,7 +11,7 @@ import type { LlmInputResponse } from "@services/intake-sessions";
 import type { ChatMessage } from "../../types";
 import { ChatComposer } from "./composer";
 import { MessageList } from "./message-list";
-import { styles } from "../../styles";
+import { STYLES } from "../../styles";
 
 type ChatPanelProps = {
   onLlmSuccess: (data: LlmInputResponse) => void;
@@ -118,25 +118,25 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
   ]);
 
   return (
-    <div className={styles.chatColumn}>
-      <header className={styles.chatHeader}>
-        <div className={styles.avatarBot}>
+    <div className={STYLES.chatColumn}>
+      <header className={STYLES.chatHeader}>
+        <div className={STYLES.avatarBot}>
           <Bot className="size-4" aria-hidden />
         </div>
-        <h2 className={styles.chatTitle}>AI Property Assistant</h2>
+        <h2 className={STYLES.chatTitle}>AI Property Assistant</h2>
       </header>
 
       {errorMessage && (
-        <div className={`${styles.errorBanner} mx-4 mt-3 sm:mx-5`}>{errorMessage}</div>
+        <div className={`${STYLES.errorBanner} mx-4 mt-3 sm:mx-5`}>{errorMessage}</div>
       )}
 
       {isBusy ? (
-        <div className={styles.loadingWrap}>
+        <div className={STYLES.loadingWrap}>
           <Loader2 className="mr-2 size-5 animate-spin" aria-hidden />
           Connecting…
         </div>
       ) : (
-        <div className={styles.chatBody}>
+        <div className={STYLES.chatBody}>
           <MessageList messages={messages} isSending={isSending} />
           <ChatComposer
             draft={draft}

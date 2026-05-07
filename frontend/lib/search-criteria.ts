@@ -42,11 +42,6 @@ const parseCriterionUnit = (raw: Record<string, unknown>): string | undefined =>
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : undefined;
 };
 
-/**
- * Parses one criterion from search ``criteria[key]``.
- * Supports full payloads with ``data`` and layout-only rows with ``{ type, label? }`` (no ``data``),
- * using empty values so filter UI still renders.
- */
 export const parseCriterionField = (raw: unknown): SearchCriterionField | null => {
   if (!isRecord(raw)) {
     return null;
@@ -93,7 +88,6 @@ export const parseSearchCriteriaEntries = (criteria: Record<string, unknown>): P
     })
     .filter((x): x is ParsedCriteriaEntry => x != null);
 
-/** Flatten criterion objects into grouped answer payload for criteria update API. */
 export const toCriteriaAnswers = (
   fields: Record<string, SearchCriterionField>,
 ): Record<string, unknown> => {

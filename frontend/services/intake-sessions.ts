@@ -7,7 +7,6 @@ export type IntakeSessionQuestion = {
   title: string;
   text: string;
   type: string;
-  /** Select lists use an array; range questions use a string map (e.g. ``{ unit: "USD" }``). */
   options?:
     | Array<{
         label: string;
@@ -17,18 +16,15 @@ export type IntakeSessionQuestion = {
     | Record<string, string>;
 };
 
-/** Query param for ``POST /intake-sessions`` (default on API is ``guided``). */
 export type IntakeSessionCreateMode = "guided" | "llm";
 
 export type CreateGuidedIntakeSessionResponse = {
   session_id: string;
   status: string;
-  /** Present when the API returns questionnaire length; otherwise treat as single-step. */
   total_questions?: number;
   first_question?: IntakeSessionQuestion | null;
 };
 
-/** Body for ``PATCH /intake-sessions/{session_id}/answers/guided``. */
 export type SubmitIntakeSessionAnswerBody = {
   key: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,7 +40,6 @@ export type SubmitIntakeSessionAnswerResponse = {
   next_question: IntakeSessionQuestion | null;
 };
 
-/** Response from `POST /intake-sessions/{session_id}/complete` (matches backend `IntakeSession`). */
 export type CompleteIntakeSessionResponse = {
   id?: string;
   status?: string;
@@ -53,7 +48,6 @@ export type CompleteIntakeSessionResponse = {
   criteria?: Record<string, unknown> | null;
 };
 
-/** ``GET /intake-sessions/{session_id}`` — same shape as backend ``IntakeSession``. */
 export type IntakeSessionDto = {
   id?: string | null;
   status?: string;
@@ -85,7 +79,6 @@ export type LlmNextQuestion = {
   options?: unknown;
 };
 
-/** Response for ``POST /intake-sessions?mode=llm``. */
 export type CreateLlmIntakeSessionResponse = {
   mode: "llm";
   session_id: string;
@@ -107,7 +100,6 @@ export type LlmInputResponse = {
   is_complete: boolean;
 };
 
-/** Body for ``POST /intake-sessions/{session_id}/answers/llm``. */
 export type LlmInputBody = {
   input: string;
   mode: "llm";

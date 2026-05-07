@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import type { ResultCardListing } from "@lib/map-property-match";
 
-import { styles } from "@components/landing/featured-listings/styles";
+import { STYLES } from "@components/landing/featured-listings/styles";
 
 
 type ResultCardProps = {
@@ -12,20 +12,20 @@ type ResultCardProps = {
 
 export const ResultCard = ({ listing }: ResultCardProps) => {
   return (
-    <Link href={`/listings/${listing.id}`} className={styles.cardLink}>
-      <div className={styles.cardImageWrap}>
+    <Link href={`/listings/${listing.id}`} className={STYLES.cardLink}>
+      <div className={STYLES.cardImageWrap}>
         <Image
           src={listing.imageSrc}
           alt={listing.imageAlt}
           fill
-          className={styles.cardImage}
+          className={STYLES.cardImage}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         />
-        <div className={styles.badgeLeftWrap}>
-          <span className={styles.badgeLeft}>{listing.category}</span>
+        <div className={STYLES.badgeLeftWrap}>
+          <span className={STYLES.badgeLeft}>{listing.category}</span>
         </div>
-        <div className={styles.badgeRightWrap}>
-          <span className={styles.badgeRight}>{listing.transactionType}</span>
+        <div className={STYLES.badgeRightWrap}>
+          <span className={STYLES.badgeRight}>{listing.transactionType}</span>
         </div>
         <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3">
           <span className="rounded-md bg-amber-600 px-2 py-1 text-xs font-bold tabular-nums text-white shadow-sm">
@@ -33,18 +33,18 @@ export const ResultCard = ({ listing }: ResultCardProps) => {
           </span>
         </div>
       </div>
-      <div className={styles.cardBody}>
-        <h3 className={styles.cardTitle}>{listing.title}</h3>
-        <p className={styles.cardLocation}>{listing.location}</p>
+      <div className={STYLES.cardBody}>
+        <h3 className={STYLES.cardTitle}>{listing.title}</h3>
+        <p className={STYLES.cardLocation}>{listing.location}</p>
         <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
           {listing.matchBlurb}
         </p>
-        <div className={styles.cardFooter}>
-          <span className={styles.cardSqft}>{listing.sqftLabel}</span>
+        <div className={STYLES.cardFooter}>
+          <span className={STYLES.cardSqft}>{listing.sqftLabel}</span>
           {listing.priceLabel ? (
-            <span className={styles.cardPrice}>{listing.priceLabel}</span>
+            <span className={STYLES.cardPrice}>{listing.priceLabel}</span>
           ) : (
-            <span className={styles.cardPriceEmpty}>—</span>
+            <span className={STYLES.cardPriceEmpty}>—</span>
           )}
         </div>
       </div>

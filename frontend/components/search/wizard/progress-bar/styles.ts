@@ -1,4 +1,4 @@
-export const styles = {
+export const STYLES = {
   root: "w-full shrink-0",
   header:
     "mb-2 flex items-baseline justify-between gap-3 text-xs text-muted-foreground sm:text-sm",

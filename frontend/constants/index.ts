@@ -1,5 +1,3 @@
-/** Central place for app-wide constants. Add sections as the app grows. */
-
 export const HERO_STATS = [
   { label: "Total Listings", value: "8" },
   { label: "Active Listings", value: "8" },

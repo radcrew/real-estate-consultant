@@ -1,5 +1,4 @@
-/** Full-viewport overlay must start below the global header (``top-16``) and stay at or below its z-index. */
-export const styles = {
+export const STYLES = {
   overlay: [
     "fixed inset-x-0 bottom-0 top-16 z-30 flex flex-col",
     "bg-slate-950/70 backdrop-blur-sm",

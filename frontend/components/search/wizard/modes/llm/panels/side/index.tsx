@@ -9,7 +9,7 @@ import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@lib/api-errors";
 import type { LlmInputResponse } from "@services/intake-sessions";
 
-import { styles } from "../../styles";
+import { STYLES } from "../../styles";
 
 type SidePanelProps = {
   lastResponse: LlmInputResponse | null;
@@ -56,12 +56,12 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
   ]);
 
   return (
-    <aside className={styles.sidebar}>
-      <div className={styles.card}>
-        <div className={styles.cardHeader}>
-          <div className={styles.cardTitleRow}>
+    <aside className={STYLES.sidebar}>
+      <div className={STYLES.card}>
+        <div className={STYLES.cardHeader}>
+          <div className={STYLES.cardTitleRow}>
             <SlidersHorizontal className="size-4 text-amber-600" aria-hidden />
-            <h3 className={styles.cardTitle}>Extracted Criteria</h3>
+            <h3 className={STYLES.cardTitle}>Extracted Criteria</h3>
           </div>
         </div>
         <p className="text-sm text-muted-foreground">
@@ -70,9 +70,9 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
       </div>
 
       {missingFields.length > 0 && (
-        <div className={styles.missingCard}>
-          <p className={styles.missingTitle}>Still needed:</p>
-          <ul className={styles.missingList}>
+        <div className={STYLES.missingCard}>
+          <p className={STYLES.missingTitle}>Still needed:</p>
+          <ul className={STYLES.missingList}>
             {missingFields.map((f) => (
               <li key={f}>{f}</li>
             ))}
@@ -82,7 +82,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
 
       <button
         type="button"
-        className={styles.searchCta}
+        className={STYLES.searchCta}
         disabled={!isComplete || isSearchBusy || !sessionId}
         onClick={handleSearchProperties}
       >
@@ -94,7 +94,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
         Search Properties
       </button>
 
-      <button type="button" className={styles.switchLink} onClick={resetToChooser}>
+      <button type="button" className={STYLES.switchLink} onClick={resetToChooser}>
         <ArrowLeft className="size-4" aria-hidden />
         Switch mode
       </button>

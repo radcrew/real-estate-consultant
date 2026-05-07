@@ -25,7 +25,6 @@ export type TextQuestion = BaseQuestion<"text">;
 
 export type LocationQuestion = BaseQuestion<"location">;
 
-/** Range metadata from API ``options`` (e.g. ``{ unit: "USD" }``). */
 export type RangeQuestionOptions = Record<string, string>;
 
 export type RangeQuestion = BaseQuestion<"range"> & {

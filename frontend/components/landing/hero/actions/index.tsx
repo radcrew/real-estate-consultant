@@ -8,7 +8,7 @@ import { Button, buttonVariants } from "@components/ui/button";
 import { useAuth } from "@contexts/auth";
 import { cn } from "@lib/utils";
 
-import { styles } from "./styles";
+import { STYLES } from "./styles";
 
 export const HeroActions = () => {
   const router = useRouter();
@@ -16,11 +16,11 @@ export const HeroActions = () => {
   const showSignIn = ready && !session;
 
   return (
-    <div className={styles.row}>
+    <div className={STYLES.row}>
       <Button
         size="lg"
         onClick={() => router.push("/questionnaire")}
-        className={cn(styles.primaryAction)}
+        className={cn(STYLES.primaryAction)}
       >
         <Search className="size-5 shrink-0" aria-hidden />
         Start Searching
@@ -31,7 +31,7 @@ export const HeroActions = () => {
           href="/sign-in"
           className={cn(
             buttonVariants({ variant: "outline", size: "lg" }),
-            styles.outlineAction,
+            STYLES.outlineAction,
           )}
         >
           Sign In

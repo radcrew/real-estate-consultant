@@ -1,4 +1,4 @@
-export const styles = {
+export const STYLES = {
   summaryGrid: [
     "mt-5 grid gap-4 items-start",
     "lg:grid-cols-[minmax(0,1.35fr)_320px]",

@@ -9,7 +9,7 @@ import { ProgressBar } from "../../progress-bar";
 import { QuestionInput } from "../../question-input";
 import { SummaryPanel } from "../../summary-panel";
 
-import { styles } from "./styles";
+import { STYLES } from "./styles";
 
 export const GuidedQuestionnaire = () => {
   const {
@@ -37,18 +37,18 @@ export const GuidedQuestionnaire = () => {
   };
 
   return (
-    <div className={styles.summaryGrid}>
-      <div className={styles.progressRow}>
+    <div className={STYLES.summaryGrid}>
+      <div className={STYLES.progressRow}>
         <ProgressBar stepIndex={stepIndex} totalSteps={totalSteps} />
       </div>
 
-      <div className={styles.mainColumn}>
+      <div className={STYLES.mainColumn}>
         <section
-          className={styles.section}
+          className={STYLES.section}
           onKeyDown={handleKeyDown}
         >
           {errorMessage && (
-            <div className={styles.errorBanner}>{errorMessage}</div>
+            <div className={STYLES.errorBanner}>{errorMessage}</div>
           )}
 
           {currentQuestion ? (
@@ -60,18 +60,18 @@ export const GuidedQuestionnaire = () => {
               onMultiSelectToggle={toggleCurrentMultiSelect}
             />
           ) : (
-            <div className={styles.loadingState}>
+            <div className={STYLES.loadingState}>
               {isLoadingQuestion
                 ? "Loading your questionnaire..."
                 : "We couldn't load the questionnaire."}
             </div>
           )}
 
-          <div className={styles.actionsRow}>
+          <div className={STYLES.actionsRow}>
             <Button
               variant="outline"
               size="default"
-              className={styles.buttonDefault}
+              className={STYLES.buttonDefault}
               onClick={goPrev}
               disabled={isBusy}
             >
@@ -81,7 +81,7 @@ export const GuidedQuestionnaire = () => {
 
             <Button
               size="default"
-              className={styles.buttonDefault}
+              className={STYLES.buttonDefault}
               onClick={goNext}
               disabled={!canContinue || isBusy}
             >
@@ -98,7 +98,7 @@ export const GuidedQuestionnaire = () => {
         </section>
       </div>
 
-      <div className={styles.summaryColumn}>
+      <div className={STYLES.summaryColumn}>
         <SummaryPanel rows={summaryRows} />
       </div>
     </div>

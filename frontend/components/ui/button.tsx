@@ -1,7 +1,3 @@
-/**
- * shadcn/ui registry component (Base UI + cva). Refresh:
- * `pnpm dlx shadcn add button --overwrite` — theme tokens live in `app/globals.css`.
- */
 import * as React from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"

@@ -1,4 +1,4 @@
-import { styles } from "./styles";
+import { STYLES } from "./styles";
 
 type ProgressBarProps = {
   stepIndex: number;
@@ -14,15 +14,15 @@ export const ProgressBar = ({ stepIndex, totalSteps }: ProgressBarProps) => {
   const displayPercent = Math.round(progressPercent);
 
   return (
-    <div className={styles.root}>
-      <div className={styles.header}>
-        <span className={styles.stepLabel}>
+    <div className={STYLES.root}>
+      <div className={STYLES.header}>
+        <span className={STYLES.stepLabel}>
           Step {currentStep} of {safeTotalSteps}
         </span>
-        <span className={styles.percentLabel}>{displayPercent}% complete</span>
+        <span className={STYLES.percentLabel}>{displayPercent}% complete</span>
       </div>
       <div
-        className={styles.track}
+        className={STYLES.track}
         role="progressbar"
         aria-valuenow={displayPercent}
         aria-valuemin={0}
@@ -30,7 +30,7 @@ export const ProgressBar = ({ stepIndex, totalSteps }: ProgressBarProps) => {
         aria-label={`Step ${currentStep} of ${safeTotalSteps}, ${displayPercent}% complete`}
       >
         <div
-          className={styles.fill}
+          className={STYLES.fill}
           style={{ width: `${progressPercent}%` }}
         />
       </div>

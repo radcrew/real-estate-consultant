@@ -2,7 +2,7 @@
 
 import { Bot, Loader2, UserRound } from "lucide-react";
 
-import { styles } from "../../styles";
+import { STYLES } from "../../styles";
 import type { ChatMessage } from "../../types";
 
 type MessageListProps = {
@@ -11,30 +11,30 @@ type MessageListProps = {
 };
 
 export const MessageList = ({ messages, isSending }: MessageListProps) => (
-  <div className={styles.messages}>
+  <div className={STYLES.messages}>
     {messages.map((msg) =>
       msg.role === "user" ? (
-        <div key={msg.id} className={styles.messageRowUser}>
-          <div className={styles.bubbleUser}>{msg.content}</div>
-          <div className={styles.avatarUser} aria-hidden>
+        <div key={msg.id} className={STYLES.messageRowUser}>
+          <div className={STYLES.bubbleUser}>{msg.content}</div>
+          <div className={STYLES.avatarUser} aria-hidden>
             <UserRound className="size-4" />
           </div>
         </div>
       ) : (
-        <div key={msg.id} className={styles.messageRowBot}>
-          <div className={styles.avatarBot} aria-hidden>
+        <div key={msg.id} className={STYLES.messageRowBot}>
+          <div className={STYLES.avatarBot} aria-hidden>
             <Bot className="size-4" />
           </div>
-          <div className={styles.bubbleBot}>{msg.content}</div>
+          <div className={STYLES.bubbleBot}>{msg.content}</div>
         </div>
       ),
     )}
     {isSending && (
-      <div className={styles.messageRowBot}>
-        <div className={styles.avatarBot} aria-hidden>
+      <div className={STYLES.messageRowBot}>
+        <div className={STYLES.avatarBot} aria-hidden>
           <Bot className="size-4" />
         </div>
-        <div className={styles.typingBubble}>
+        <div className={STYLES.typingBubble}>
           <Loader2 className="size-4 animate-spin" aria-hidden />
           Thinking…
         </div>

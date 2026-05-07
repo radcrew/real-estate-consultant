@@ -1,4 +1,4 @@
-export const styles = {
+export const STYLES = {
   section:
     "relative border-b border-border/60 bg-gradient-to-br from-amber-200/25 via-background to-background px-4 pt-16 pb-10 sm:py-16",
   inner: "mx-auto flex max-w-3xl flex-col items-center text-center",
