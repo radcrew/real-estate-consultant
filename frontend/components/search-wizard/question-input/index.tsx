@@ -2,10 +2,10 @@
 
 import type { AnswerValue, WizardQuestion } from "../types";
 
-import { MultiSelectQuestionInput } from "./multi-select";
+import { MultiSelectQuestionInput } from "./select/multi";
 import { QuestionInputShell } from "./shell";
 import { RangeQuestionInput } from "./range";
-import { SingleSelectQuestionInput } from "./single-select";
+import { SingleSelectQuestionInput } from "./select/single";
 import { TextQuestionInput } from "./text";
 import { LocationQuestionInput } from "./location";
 

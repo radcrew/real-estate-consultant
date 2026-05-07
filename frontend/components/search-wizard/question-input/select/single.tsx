@@ -1,8 +1,8 @@
 "use client";
 
-import type { SingleSelectQuestion } from "../types";
+import type { SingleSelectQuestion } from "../../types";
 
-import { SelectOptionCard } from "./select";
+import { SelectOptionCard } from ".";
 
 type SingleSelectQuestionInputProps = {
   question: SingleSelectQuestion;

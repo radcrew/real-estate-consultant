@@ -1,8 +1,8 @@
 "use client";
 
-import type { MultiSelectQuestion } from "../types";
+import type { MultiSelectQuestion } from "../../types";
 
-import { SelectOptionCard } from "./select";
+import { SelectOptionCard } from ".";
 
 type MultiSelectQuestionInputProps = {
   question: MultiSelectQuestion;
