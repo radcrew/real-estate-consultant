@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSearchByProfile } from "@hooks/use-search-by-profile";
 import { mapSearchPropertyMatchesToListings, type ResultCardListing } from "@lib/map-property-match";
@@ -14,11 +14,15 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
   const [criteria, setCriteria] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(() => Boolean(sessionProfileId?.trim()));
   const [error, setError] = useState<string | null>(null);
+  const [filterBarReady, setFilterBarReady] = useState(false);
+  const criteriaSessionRef = useRef<string | undefined>(undefined);
 
-  const reset = () => {
+  const resetAll = () => {
     setListings([]);
     setCriteria({});
     setError(null);
+    setFilterBarReady(false);
+    criteriaSessionRef.current = undefined;
   };
 
   const load = useCallback(
@@ -27,14 +31,19 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
       if (!id) {
         if (!signal?.aborted) {
           setLoading(false);
-          reset();
+          resetAll();
         }
         return;
       }
 
       if (!signal?.aborted) {
         setLoading(true);
-        reset();
+        setError(null);
+        setListings([]);
+        if (criteriaSessionRef.current !== id) {
+          setCriteria({});
+          criteriaSessionRef.current = id;
+        }
       }
 
       try {
@@ -53,11 +62,11 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
           return;
         }
         setListings([]);
-        setCriteria({});
         setError("Could not load search results. Try again later.");
       } finally {
         if (!signal?.aborted) {
           setLoading(false);
+          setFilterBarReady(true);
         }
       }
     },
@@ -84,10 +93,14 @@ export const useSearchSessionResults = (sessionProfileId: string | undefined) =>
   );
 
   useEffect(() => {
+    setFilterBarReady(false);
+  }, [sessionProfileId]);
+
+  useEffect(() => {
     const abortController = new AbortController();
     load(abortController.signal);
     return () => abortController.abort();
   }, [load]);
 
-  return { listings, loading, error, criteria, applyCriteria };
+  return { listings, loading, error, criteria, applyCriteria, filterBarReady };
 };
