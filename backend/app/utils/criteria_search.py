@@ -4,17 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.utils.values import clean_str_or_none, float_or_none
+
 LocationFields = tuple[str | None, str | None, str | None, str | None]
-
-
-def float_or_none(value: Any) -> float | None:
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
 
 def ilike_pattern(term: str) -> str:
     esc = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -42,16 +34,16 @@ def gaussian_target_sigma(lo: float | None, hi: float | None) -> tuple[float | N
 
 def parse_location_fields(criteria: dict[str, Any]) -> LocationFields:
     """Parse ``(label, city, state, country)`` from ``criteria["location"]``."""
-    loc = criteria.get("location")
-    if isinstance(loc, str):
-        t = loc.strip()
-        return (t if t else None), None, None, None
-    if isinstance(loc, dict):
+    location = criteria.get("location")
 
-        def _s(key: str) -> str | None:
-            v = loc.get(key)
-            return v.strip() if isinstance(v, str) and v.strip() else None
+    if isinstance(location, str):
+        stripped = location.strip()
+        return (stripped if stripped else None), None, None, None
 
-        lab = _s("label")
-        return lab, _s("city"), _s("state"), _s("country")
+    if isinstance(location, dict):
+        return tuple(
+            clean_str_or_none(location.get(key))
+            for key in ("label", "city", "state", "country")
+        )
+
     return None, None, None, None

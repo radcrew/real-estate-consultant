@@ -30,39 +30,46 @@ def location_score_expr(
     country: str | None,
 ) -> Any:
     """Tiered location: city 1.0, state 0.7, country 0.4; label uses ILIKE on each tier."""
-    p = PropertyRow
     if city or state or country:
         parts: list[tuple[Any, Any]] = []
         if city:
-            parts.append((_lower_eq(p.city, city), _lit_float(1.0)))
+            parts.append((_lower_eq(PropertyRow.city, city), _lit_float(1.0)))
         if state:
-            parts.append((_lower_eq(p.state, state), _lit_float(0.7)))
+            parts.append((_lower_eq(PropertyRow.state, state), _lit_float(0.7)))
         if country:
-            parts.append((_lower_eq(p.country, country), _lit_float(0.4)))
+            parts.append((_lower_eq(PropertyRow.country, country), _lit_float(0.4)))
         if not parts:
             return _lit_float(1.0)
         return case(*parts, else_=_lit_float(0.0))
+
     if label:
-        pat = ilike_pattern(label)
+        pattern = ilike_pattern(label)
         return case(
-            (p.city.ilike(pat, escape="\\"), _lit_float(1.0)),
-            (p.state.ilike(pat, escape="\\"), _lit_float(0.7)),
-            (p.country.ilike(pat, escape="\\"), _lit_float(0.4)),
+            (PropertyRow.city.ilike(pattern, escape="\\"), _lit_float(1.0)),
+            (PropertyRow.state.ilike(pattern, escape="\\"), _lit_float(0.7)),
+            (PropertyRow.country.ilike(pattern, escape="\\"), _lit_float(0.4)),
             else_=_lit_float(0.0),
         )
+
     return _lit_float(1.0)
 
 
-def gaussian_score(col: Any, target: float | None, sigma: float) -> Any:
-    """Gaussian on ``col``; neutral 1.0 without target; 0 when ``col`` is null."""
+def gaussian_score(column: Any, target: float | None, sigma: float) -> Any:
+    """Gaussian on ``column``; neutral 1.0 without target; 0 when ``column`` is null."""
     if target is None:
         return _lit_float(1.0)
-    s = max(sigma, 1.0)
-    denom = _lit_float(2.0 * s * s)
-    c = cast(col, Float)
-    t = _lit_float(target)
-    inner = -func.pow(c - t, 2) / denom
-    return case((col.is_(None), _lit_float(0.0)), else_=func.exp(inner))
+    effective_sigma = max(sigma, 1.0)
+    denominator = _lit_float(2.0 * effective_sigma * effective_sigma)
+    column_float = cast(column, Float)
+    target_float = _lit_float(target)
+    gaussian_exponent = -func.pow(column_float - target_float, 2) / denominator
+    return case((column.is_(None), _lit_float(0.0)), else_=func.exp(gaussian_exponent))
+
+
+def _gaussian_score_for_criterion(col: Any, bounds: Any) -> Any:
+    lo, hi = parse_range(bounds)
+    target, sigma = gaussian_target_sigma(lo, hi)
+    return gaussian_score(col, target, sigma)
 
 
 def where_property_type(raw: Any) -> Any:
@@ -84,24 +91,23 @@ def where_location(
     state: str | None,
     country: str | None,
 ) -> Any:
-    p = PropertyRow
     if city or state or country:
         clauses: list[Any] = []
         if country:
-            clauses.append(_lower_eq(p.country, country))
+            clauses.append(_lower_eq(PropertyRow.country, country))
         if state:
-            clauses.append(_lower_eq(p.state, state))
+            clauses.append(_lower_eq(PropertyRow.state, state))
         if city:
-            clauses.append(_lower_eq(p.city, city))
+            clauses.append(_lower_eq(PropertyRow.city, city))
         if clauses:
             return and_(*clauses)
     if label:
-        pat = ilike_pattern(label)
+        pattern = ilike_pattern(label)
         return or_(
-            p.city.ilike(pat, escape="\\"),
-            p.state.ilike(pat, escape="\\"),
-            func.coalesce(p.address, "").ilike(pat, escape="\\"),
-            func.coalesce(p.country, "").ilike(pat, escape="\\"),
+            PropertyRow.city.ilike(pattern, escape="\\"),
+            PropertyRow.state.ilike(pattern, escape="\\"),
+            func.coalesce(PropertyRow.address, "").ilike(pattern, escape="\\"),
+            func.coalesce(PropertyRow.country, "").ilike(pattern, escape="\\"),
         )
     return true()
 
@@ -121,31 +127,22 @@ def where_numeric_bounds(col: Any, bounds: Any) -> Any:
 
 
 def where_criteria(criteria: dict[str, Any]) -> Any:
-    c = criteria
-    label, city, state, country = parse_location_fields(c)
+    label, city, state, country = parse_location_fields(criteria)
     loc_clause = where_location(label, city, state, country)
     return and_(
-        where_property_type(c.get("property_type")),
+        where_property_type(criteria.get("property_type")),
         loc_clause,
-        where_numeric_bounds(PropertyRow.price, c.get("price")),
-        where_numeric_bounds(PropertyRow.size_sqft, c.get("size_sqft")),
+        where_numeric_bounds(PropertyRow.price, criteria.get("price")),
+        where_numeric_bounds(PropertyRow.size_sqft, criteria.get("size_sqft")),
     )
 
 
 def match_score_expr(criteria: dict[str, Any]) -> Any:
-    label, city, state, country = parse_location_fields(criteria)
-    loc = location_score_expr(label, city, state, country)
-
-    p_lo, p_hi = parse_range(criteria.get("price"))
-    p_target, p_sigma = gaussian_target_sigma(p_lo, p_hi)
-    price_s = gaussian_score(PropertyRow.price, p_target, p_sigma)
-
-    s_lo, s_hi = parse_range(criteria.get("size_sqft"))
-    s_target, s_sigma = gaussian_target_sigma(s_lo, s_hi)
-    size_s = gaussian_score(PropertyRow.size_sqft, s_target, s_sigma)
-
-    raw = _lit_float(0.4) * loc + _lit_float(0.3) * price_s + _lit_float(0.3) * size_s
-    return func.least(_lit_float(100.0), func.greatest(_lit_float(0.0), _lit_float(100.0) * raw))
+    loc = location_score_expr(*parse_location_fields(criteria))
+    price = _gaussian_score_for_criterion(PropertyRow.price, criteria.get("price"))
+    size = _gaussian_score_for_criterion(PropertyRow.size_sqft, criteria.get("size_sqft"))
+    raw_score_expr = _lit_float(0.4) * loc + _lit_float(0.3) * price + _lit_float(0.3) * size
+    return func.least(_lit_float(100.0), func.greatest(_lit_float(0.0), _lit_float(100.0) * raw_score_expr))
 
 
 def property_row_to_search_dict(row: PropertyRow) -> dict[str, Any]:
