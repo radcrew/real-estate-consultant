@@ -1,0 +1,77 @@
+"""Search ``public.properties`` with intake ``criteria`` + SQLAlchemy scoring."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from supabase import AsyncClient
+
+from app.repositories.questions import load_question_key_metadata
+from app.schemas.search import CriteriaFieldItem
+from app.db.property_row import PropertyRow
+from app.utils.search_sql import (
+    match_score_expr,
+    property_row_to_search_dict,
+    where_criteria,
+)
+
+
+async def search_properties(
+    session: AsyncSession,
+    criteria: Any,
+    *,
+    limit: int,
+    offset: int,
+) -> tuple[list[tuple[dict[str, Any], float]], int]:
+    """Filter by intake criteria; rank by weighted location + Gaussian price + Gaussian size."""
+
+    where_expr = where_criteria(criteria)
+    score_expr = match_score_expr(criteria).label("match_score")
+
+    count_query = select(func.count()).select_from(PropertyRow).where(where_expr)
+    total = int(await session.scalar(count_query) or 0)
+    if total == 0:
+        return [], 0
+
+    search_query = (
+        select(PropertyRow, score_expr)
+        .where(where_expr)
+        .order_by(score_expr.desc(), PropertyRow.id)
+        .limit(limit)
+        .offset(offset)
+    )
+
+    result = await session.execute(search_query)
+    rows: list[tuple[dict[str, Any], float]] = []
+    for property_row, score in result.all():
+        rows.append((property_row_to_search_dict(property_row), float(score or 0.0)))
+
+    return rows, total
+
+
+async def normalize_criteria(
+    client: AsyncClient,
+    criteria: dict[str, Any],
+) -> dict[str, CriteriaFieldItem]:
+    """Merge session ``criteria`` with every configured question key (insertion order preserved)."""
+    normalized: dict[str, CriteriaFieldItem] = {}
+
+    types, titles, units = await load_question_key_metadata(client)
+
+    for key in types:
+        qtype = types[key]
+        label = titles[key]
+        unit = units.get(key)
+        if key in criteria:
+            normalized[key] = CriteriaFieldItem(type=qtype, label=label, unit=unit, data=criteria[key])
+        else:
+            normalized[key] = CriteriaFieldItem(type=qtype, label=label, unit=unit, data=None)
+
+    for key, value in criteria.items():
+        if key not in normalized:
+            normalized[key] = CriteriaFieldItem(type="unknown", label="", unit=None, data=value)
+
+    return normalized
