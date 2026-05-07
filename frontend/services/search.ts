@@ -18,6 +18,7 @@ export type SearchProperty = {
   rent: number | null;
   clear_height: number | null;
   loading_docks: number | null;
+  image?: string | null;
 };
 
 export type SearchPropertyMatch = {

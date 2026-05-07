@@ -14,13 +14,17 @@ export const ResultCard = ({ listing }: ResultCardProps) => {
   return (
     <Link href={`/listings/${listing.id}`} className={STYLES.cardLink}>
       <div className={STYLES.cardImageWrap}>
-        <Image
-          src={listing.imageSrc}
-          alt={listing.imageAlt}
-          fill
-          className={STYLES.cardImage}
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-        />
+        {listing.imageSrc ? (
+          <Image
+            src={listing.imageSrc}
+            alt={listing.imageAlt}
+            fill
+            className={STYLES.cardImage}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-muted" aria-hidden />
+        )}
         <div className={STYLES.badgeLeftWrap}>
           <span className={STYLES.badgeLeft}>{listing.category}</span>
         </div>

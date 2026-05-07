@@ -1,9 +1,6 @@
 import { formatInteger, formatMoney } from "@lib/utils";
 import type { SearchPropertyMatch } from "@services/search";
 
-const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=900&h=560&q=80";
-
 export type ResultCardListing = {
   id: string;
   category: string;
@@ -65,22 +62,22 @@ export const mapSearchPropertyMatchToListing = (
   row: SearchPropertyMatch,
   index: number,
 ): ResultCardListing => {
-  const { property: p, match_score } = row;
-  const id = p.id?.trim() || `match-${index}`;
-  const title = titleFromProperty(p);
+  const { property, match_score } = row;
+  const id = property.id?.trim() || `match-${index}`;
+  const title = titleFromProperty(property);
 
   return {
     id,
-    category: p.property_type?.trim() || "Property",
-    transactionType: p.listing_type?.trim() || "—",
+    category: property.property_type?.trim() || "Property",
+    transactionType: property.listing_type?.trim() || "—",
     title,
-    location: locationFromProperty(p),
-    sqftLabel: formatSqft(p.size_sqft),
-    priceLabel: priceLabelFromProperty(p),
-    imageSrc: PLACEHOLDER_IMAGE,
+    location: locationFromProperty(property),
+    sqftLabel: formatSqft(property.size_sqft),
+    priceLabel: priceLabelFromProperty(property),
+    imageSrc: property.image || "",
     imageAlt: title,
     matchScore: Math.round(match_score),
-    matchBlurb: blurbFromProperty(p),
+    matchBlurb: blurbFromProperty(property),
   };
 };
 
