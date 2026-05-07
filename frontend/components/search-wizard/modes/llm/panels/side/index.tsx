@@ -9,7 +9,7 @@ import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@lib/api-errors";
 import type { LlmInputResponse } from "@services/intake-sessions";
 
-import { styles } from "../styles";
+import { styles } from "../../styles";
 
 type SidePanelProps = {
   lastResponse: LlmInputResponse | null;

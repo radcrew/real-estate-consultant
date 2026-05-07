@@ -2,8 +2,8 @@
 
 import { Bot, Loader2, UserRound } from "lucide-react";
 
-import { styles } from "../styles";
-import type { ChatMessage } from "../types";
+import { styles } from "../../styles";
+import type { ChatMessage } from "../../types";
 
 type MessageListProps = {
   messages: ChatMessage[];

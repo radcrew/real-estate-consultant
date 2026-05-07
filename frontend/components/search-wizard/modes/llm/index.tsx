@@ -4,8 +4,8 @@ import { useState } from "react";
 
 import type { LlmInputResponse } from "@services/intake-sessions";
 
-import { ChatPanel } from "./chat-panel";
-import { SidePanel } from "./side-panel";
+import { ChatPanel } from "./panels/chat";
+import { SidePanel } from "./panels/side";
 import { styles } from "./styles";
 
 export const SmartChat = () => {

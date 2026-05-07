@@ -3,7 +3,7 @@
 import type { RefObject } from "react";
 import { Send } from "lucide-react";
 
-import { styles } from "../styles";
+import { styles } from "../../styles";
 
 type ChatComposerProps = {
   draft: string;

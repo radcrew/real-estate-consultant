@@ -1,7 +1,7 @@
 "use client";
 
 import { SearchWizardProvider } from "../../contexts/search-wizard";
-import { SearchModeSelector } from "./modes/search-mode-selector";
+import { SearchModeSelector } from "./modes/selector";
 
 import { styles } from "./styles";
 

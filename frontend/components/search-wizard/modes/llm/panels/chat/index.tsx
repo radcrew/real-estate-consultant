@@ -8,10 +8,10 @@ import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@lib/api-errors";
 import type { LlmInputResponse } from "@services/intake-sessions";
 
-import type { ChatMessage } from "../types";
-import { ChatComposer } from "./chat-composer";
+import type { ChatMessage } from "../../types";
+import { ChatComposer } from "./composer";
 import { MessageList } from "./message-list";
-import { styles } from "../styles";
+import { styles } from "../../styles";
 
 type ChatPanelProps = {
   onLlmSuccess: (data: LlmInputResponse) => void;

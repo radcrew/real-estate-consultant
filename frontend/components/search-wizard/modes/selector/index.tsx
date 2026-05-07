@@ -12,8 +12,8 @@ import {
 import { Button } from "@components/ui/button";
 
 import { useSearchWizard } from "@contexts/search-wizard";
-import { GuidedQuestionnaire } from "../guided-questionnaire";
-import { SmartChat } from "../smart-chat";
+import { GuidedQuestionnaire } from "../guided";
+import { SmartChat } from "../llm";
 
 import { styles } from "./styles";
 
