@@ -89,25 +89,6 @@ export const SearchWizardProvider = ({
   const canContinue = currentQuestion != null && isQuestionComplete(currentQuestion, currentAnswer);
   const isBusy = isLoadingQuestion || isSubmitting;
 
-  const resetQuestionnaireState = () => {
-    setSessionId(null);
-    setCurrentQuestion(null);
-    setQuestionHistory([]);
-    setSummaryRows([]);
-    setAnswers({});
-    setStepIndex(0);
-    setTotalSteps(1);
-    setLoadingQuestion(false);
-    setSubmitting(false);
-    setErrorMessage(null);
-    setLlmChatBootstrap(null);
-  };
-
-  const resetToChooser = () => {
-    resetQuestionnaireState();
-    setGuidedFormOpen(false);
-    setSmartChatOpen(false);
-  };
 
   const startGuidedForm = async () => {
     if (isLoadingQuestion || isSubmitting) {
@@ -293,6 +274,26 @@ export const SearchWizardProvider = ({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const resetQuestionnaireState = () => {
+    setSessionId(null);
+    setCurrentQuestion(null);
+    setQuestionHistory([]);
+    setSummaryRows([]);
+    setAnswers({});
+    setStepIndex(0);
+    setTotalSteps(1);
+    setLoadingQuestion(false);
+    setSubmitting(false);
+    setErrorMessage(null);
+    setLlmChatBootstrap(null);
+  };
+
+  const resetToChooser = () => {
+    resetQuestionnaireState();
+    setGuidedFormOpen(false);
+    setSmartChatOpen(false);
   };
 
   const value: SearchWizardContextValue = {
