@@ -14,12 +14,7 @@ async def normalize_criteria(
     client: AsyncClient,
     criteria: dict[str, Any],
 ) -> dict[str, CriteriaFieldItem]:
-    """Merge session ``criteria`` with every configured question key (insertion order preserved).
-
-    Keys follow ``key_to_type`` order (same as ``questions.order_index`` fetch order).
-    Missing answers use ``data=None`` (omit from JSON when route uses exclude_none).
-    Session-only keys not in ``questions`` are appended with ``type`` ``unknown``.
-    """
+    """Merge session ``criteria`` with every configured question key (insertion order preserved)."""
     out: dict[str, CriteriaFieldItem] = {}
 
     types, titles, units = await load_question_key_metadata(client)

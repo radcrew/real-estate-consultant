@@ -19,16 +19,10 @@ class CriteriaFieldItem(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    type: str = Field(..., description="``questions.type`` for this key.")
-    label: str = Field(default="", description="``questions.title`` for this key.")
-    unit: str | None = Field(
-        default=None,
-        description="From ``questions.options.unit`` for range-style types only.",
-    )
-    data: Any | None = Field(
-        default=None,
-        description="Stored answer when present; omitted when not set.",
-    )
+    type: str
+    label: str
+    unit: str | None
+    data: Any | None
 
 
 class SearchCriteriaUpdateResponse(BaseModel):
@@ -40,10 +34,7 @@ class SearchCriteriaUpdateResponse(BaseModel):
     status: str = Field(default="in_progress")
     created_at: AwareDatetime | None = None
     search_profile_id: UUID | None = None
-    criteria: dict[str, CriteriaFieldItem] = Field(
-        default_factory=dict,
-        description="Per key: ``type``, ``label``, optional ``unit``; ``data`` if answered.",
-    )
+    criteria: dict[str, CriteriaFieldItem] = Field(default_factory=dict)
 
 
 class PropertyMatch(BaseModel):
@@ -60,14 +51,7 @@ class SearchPropertiesResponse(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    criteria: dict[str, CriteriaFieldItem] = Field(
-        default_factory=dict,
-        description=(
-            "All configured question keys from ``questions``: ``type`` and ``label`` "
-            "always; ``unit`` for range-style types when ``options.unit`` is set; "
-            "``data`` present only when that key exists on the session criteria."
-        ),
-    )
+    criteria: dict[str, CriteriaFieldItem] = Field(default_factory=dict)
     results: list[PropertyMatch]
     total: int
     limit: int

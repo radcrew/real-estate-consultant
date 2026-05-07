@@ -10,8 +10,5 @@ class FilterResponse(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    type: str = Field(..., description="``questions.type``.")
-    label: str = Field(
-        default="",
-        description="``questions.title`` (display label).",
-    )
+    type: str
+    label: str
