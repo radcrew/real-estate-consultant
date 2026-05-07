@@ -14,6 +14,7 @@ import {
 
 import { MultiSelectFilter } from "./filters/multi-select";
 import { CLEAR_RANGE, RangeFilter } from "./filters/range";
+import { FILTER_BAR_ACTION } from "./filters/styles";
 import { isRangeInvalid } from "./filters/utils";
 import { TextFilter } from "./filters/text";
 
@@ -137,7 +138,11 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
       <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-2">
         <button
           type="button"
-          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground")}
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "lg" }),
+            FILTER_BAR_ACTION,
+            "text-muted-foreground",
+          )}
           onClick={handleClear}
           disabled={disabled}
         >
@@ -147,7 +152,11 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
         {onSearch != null && (
           <button
             type="button"
-            className={cn(buttonVariants({ variant: "default", size: "sm" }), "inline-flex gap-1.5")}
+            className={cn(
+              buttonVariants({ variant: "default", size: "lg" }),
+              FILTER_BAR_ACTION,
+              "inline-flex gap-1.5 shadow-sm",
+            )}
             onClick={() => void onSearch(toCriteriaAnswers(draft))}
             disabled={disabled || hasInvalidRange}
           >

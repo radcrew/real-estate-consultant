@@ -7,3 +7,6 @@ export const FILTER_BAR_PILL = cn(
   "hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 ring-offset-background",
   "data-[popup-open]:border-foreground/25 data-[popup-open]:bg-muted/40",
 );
+
+/** Clear / Search: same vertical rhythm and type as FILTER_BAR_PILL triggers. */
+export const FILTER_BAR_ACTION = "h-9 min-h-9 rounded-md px-3 text-sm font-semibold";
