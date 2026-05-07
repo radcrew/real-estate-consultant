@@ -1,6 +1,6 @@
 export const STYLES = {
   summaryGrid: [
-    "mt-5 grid gap-4 items-start",
+    "mt-5 grid gap-4 items-start pt-8 sm:pt-10 lg:pt-12",
     "lg:grid-cols-[minmax(0,1.35fr)_320px]",
   ].join(" "),
   progressRow: "w-full lg:col-span-2",
