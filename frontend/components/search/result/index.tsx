@@ -27,6 +27,12 @@ export const SearchResults = () => {
 
   const showFilterDock = (loading && !error) || Object.keys(criteria).length > 0;
 
+  const showNoResults =
+    !loading &&
+    !error &&
+    listings.length === 0 &&
+    Boolean(sessionProfileId?.trim());
+
   return (
     <div className="min-h-[60vh] bg-muted/20">
       {showFilterDock ? (
@@ -89,14 +95,19 @@ export const SearchResults = () => {
           </div>
         )}
 
-        <div className="mt-12 flex justify-center border-t border-border pt-10">
-          <Link
-            href="/listings"
-            className={cn(buttonVariants({ variant: "outline", size: "lg" }), "inline-flex gap-2")}
-          >
-            <Search className="size-5 shrink-0" aria-hidden />
-            Browse all properties
-          </Link>
+        <div className="mt-12">
+          {showNoResults ? (
+            <p className="mb-8 text-center text-base text-muted-foreground">No search results</p>
+          ) : null}
+          <div className="flex justify-center border-t border-border pt-10">
+            <Link
+              href="/listings"
+              className={cn(buttonVariants({ variant: "outline", size: "lg" }), "inline-flex gap-2")}
+            >
+              <Search className="size-5 shrink-0" aria-hidden />
+              Browse all properties
+            </Link>
+          </div>
         </div>
       </div>
     </div>
