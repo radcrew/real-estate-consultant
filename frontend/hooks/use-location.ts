@@ -64,6 +64,12 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
   const placesHostRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    setQuery(initialQuery);
+    setSuggestions([]);
+    predictionByPlaceIdRef.current = new Map();
+  }, [initialQuery]);
+
+  useEffect(() => {
     let isMounted = true;
 
     const initialize = async () => {

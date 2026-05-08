@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu";
 import { Input } from "@components/ui/input";
+import { useLocation } from "@hooks/use-location";
 import { cn } from "@lib/utils";
 
 import { FILTER_BAR_PILL } from "./styles";
@@ -23,6 +24,20 @@ type TextFilterProps = {
 };
 
 export const TextFilter = ({ fieldKey, label, value, onChange, disabled, className }: TextFilterProps) => {
+  const {
+    query,
+    suggestions,
+    isLoadingSuggestions,
+    loadError,
+    showSuggestionList,
+    placesHostRef,
+    handleQueryChange,
+    selectSuggestion,
+  } = useLocation({
+    initialQuery: value,
+    onChange,
+  });
+
   const hasValue = value.trim().length > 0;
   const display = hasValue ? value.trim() : label;
 
@@ -59,14 +74,39 @@ export const TextFilter = ({ fieldKey, label, value, onChange, disabled, classNa
         <Input
           id={`${fieldKey}-text`}
           type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
+          value={query}
+          onChange={(e) => handleQueryChange(e.target.value)}
           onKeyDownCapture={stopMenuKeyboardCapture}
           disabled={disabled}
           className="mt-2"
           placeholder={label}
           autoFocus
         />
+
+        {loadError ? (
+          <p className="mt-2 text-xs text-muted-foreground">{loadError}</p>
+        ) : null}
+
+        {isLoadingSuggestions ? (
+          <p className="mt-2 text-xs text-muted-foreground">Searching locations...</p>
+        ) : null}
+
+        {showSuggestionList ? (
+          <div className="mt-2 rounded-md border border-border/70 bg-background shadow-sm">
+            {suggestions.map((suggestion) => (
+              <button
+                key={suggestion.placeId}
+                type="button"
+                className="block w-full cursor-pointer px-3 py-2 text-left text-sm hover:bg-muted"
+                onClick={() => selectSuggestion(suggestion)}
+              >
+                {suggestion.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div ref={placesHostRef} className="hidden" />
       </DropdownMenuContent>
     </DropdownMenu>
   );
