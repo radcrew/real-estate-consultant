@@ -189,7 +189,6 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
     setSuggestions([]);
     predictionByPlaceIdRef.current = new Map();
     fetchSuggestions(value);
-    onChange(value);
   };
 
   const selectSuggestion = (suggestion: LocationSuggestion) => {

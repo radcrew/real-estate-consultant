@@ -7,7 +7,7 @@ import { buttonVariants } from "@components/ui/button";
 import { cn } from "@lib/utils";
 import {
   parseSearchCriteriaEntries,
-  toCriteriaAnswers,
+  getCriteriaFromFilters,
   type ParsedCriteriaEntry,
   type SearchCriterionField,
 } from "@lib/search-criteria";
@@ -157,7 +157,7 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
               FILTER_BAR_ACTION,
               "inline-flex gap-1.5 shadow-sm",
             )}
-            onClick={() => onSearch(toCriteriaAnswers(draft))}
+            onClick={() => onSearch(getCriteriaFromFilters(draft))}
             disabled={disabled || hasInvalidRange}
           >
             <Search className="size-4 shrink-0" aria-hidden />
