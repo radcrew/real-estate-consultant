@@ -86,6 +86,7 @@ async def create_intake_session(
 
         next_question = IntakeSessionFirstQuestion(
             key=first_question.key,
+            title=first_question.title,
             text=llm_question_text,
             type=first_question.type,
             options=first_question.options,

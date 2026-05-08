@@ -32,3 +32,6 @@ class Properties(BaseModel):
     # Physical
     clear_height: float | None = None
     loading_docks: int | None = None
+
+    # Media (e.g. first listing image from ``property_images``)
+    image: str | None = None

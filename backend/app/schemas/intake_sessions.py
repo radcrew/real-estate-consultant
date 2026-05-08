@@ -14,6 +14,7 @@ class IntakeSessionFirstQuestion(BaseModel):
     """Minimal first-question payload returned when starting intake."""
 
     key: str
+    title: str
     text: str
     type: str
     options: Any | None = None

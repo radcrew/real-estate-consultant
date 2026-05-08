@@ -11,15 +11,31 @@ from app.core.db_safe import execute_db_safe
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.utils.supabase_response import as_row_list, get_single_row
 
-_FIRST_QUESTION_SELECT = "key, text, type, options, required"
-_QUESTION_SELECT = "key, text, type, options, order_index, required"
+_FIRST_QUESTION_SELECT = "key, title, text, type, options, required"
+_QUESTION_SELECT = "key, title, text, type, options, order_index, required"
 _LOAD_QUESTIONS_ERROR = "No question is configured for intake flow."
+
+_RANGE_QUESTION_TYPES: frozenset[str] = frozenset(
+    {"range", "numeric_range", "sqft_range", "rent_range", "size_range"},
+)
+
+
+def _range_unit_from_options(qtype: str, options: Any) -> str | None:
+    """Return ``options["unit"]`` when ``qtype`` is a range style and unit is present."""
+    if qtype not in _RANGE_QUESTION_TYPES:
+        return None
+    if isinstance(options, dict):
+        raw = options.get("unit")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return None
 
 
 def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
     """Map a PostgREST ``questions`` row into ``IntakeSessionFirstQuestion``."""
     try:
         qkey = question.get("key")
+        qtitle = question.get("title")
         qtext = question.get("text")
         qtype = question.get("type")
         qoptions = question.get("options")
@@ -27,8 +43,10 @@ def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
             raise ValueError("Invalid question key")
         if not isinstance(qtext, str) or not isinstance(qtype, str):
             raise ValueError("Invalid question fields")
+        title = qtitle.strip() if isinstance(qtitle, str) else ""
         return IntakeSessionFirstQuestion(
             key=qkey.strip(),
+            title=title,
             text=qtext,
             type=qtype,
             options=qoptions,
@@ -87,6 +105,49 @@ async def load_first_intake_question(client: AsyncClient) -> IntakeSessionFirstQ
     )
     row = get_single_row(result, detail=_LOAD_QUESTIONS_ERROR)
     return map_question_to_model(row)
+
+
+async def load_intake_question_filters(client: AsyncClient) -> dict[str, dict[str, str]]:
+    """Build ``{ question.key: {\"type\", \"label\"} }`` from ``questions`` for UI filters."""
+    result = await execute_db_safe(
+        client.table("questions").select("key, type, title").order("order_index").execute(),
+    )
+    rows = as_row_list(result.data)
+    out: dict[str, dict[str, str]] = {}
+    for row in rows:
+        raw_key = row.get("key")
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            continue
+        k = raw_key.strip()
+        qtype = row.get("type")
+        qtitle = row.get("title")
+        type_str = qtype.strip() if isinstance(qtype, str) and qtype.strip() else "text"
+        label_str = qtitle.strip() if isinstance(qtitle, str) else ""
+        out[k] = {"type": type_str, "label": label_str}
+    return out
+
+
+async def load_question_key_metadata(
+    client: AsyncClient,
+) -> tuple[dict[str, str], dict[str, str], dict[str, str | None]]:
+    result = await execute_db_safe(
+        client.table("questions")
+        .select("key, type, title, options")
+        .order("order_index")
+        .execute(),
+    )
+    rows = as_row_list(result.data)
+    types: dict[str, str] = {}
+    titles: dict[str, str] = {}
+    units: dict[str, str | None] = {}
+    for row in rows:
+        key = row.get("key")
+        if not isinstance(key, str) or not key.strip():
+            continue
+        types[key] = row.get("type")
+        titles[key] = row.get("title")
+        units[key] = _range_unit_from_options(row.get("type"), row.get("options"))
+    return types, titles, units
 
 
 async def load_intake_questions(client: AsyncClient) -> list[dict[str, Any]]:

@@ -11,7 +11,6 @@ from supabase import AsyncClient
 from app.core.db_safe import execute_db_safe
 from app.models.intake_sessions import IntakeSession
 from app.utils.supabase_response import as_row_list, get_single_row
-from app.utils.values import clean_str_or_none, try_float
 
 INTAKE_SESSION_EMBEDDED_RELATION_KEYS: frozenset[str] = frozenset({"search_profiles"})
 
@@ -56,6 +55,23 @@ async def load_intake_session_row(client: AsyncClient, session_id: UUID) -> dict
         client.table("intake_sessions")
         .select(_INTAKE_SESSION_SELECT)
         .eq("id", str(session_id))
+        .limit(1)
+        .execute(),
+    )
+    if not as_row_list(result.data):
+        raise intake_session_not_found()
+    return get_single_row(result, detail=_LOAD_SESSION_ERROR)
+
+
+async def load_profile_session_row(
+    client: AsyncClient,
+    search_profile_id: UUID,
+) -> dict[str, Any]:
+    result = await execute_db_safe(
+        client.table("intake_sessions")
+        .select(_INTAKE_SESSION_SELECT)
+        .eq("search_profile_id", str(search_profile_id))
+        .order("created_at", desc=True)
         .limit(1)
         .execute(),
     )
