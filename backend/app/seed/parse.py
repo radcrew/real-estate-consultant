@@ -16,7 +16,7 @@ _PROPERTY_ID_NAMESPACE = uuid.UUID("018f3b2e-9c1a-7b3c-8f2d-6a5e4d3c2b1a")
 logger = logging.getLogger(__name__)
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_RAW_DATA_PATH = _BACKEND_ROOT / "dataset" / "raw-data2.json"
+DEFAULT_RAW_DATA_PATH = _BACKEND_ROOT / "dataset" / "raw-data.json"
 
 _ACRE_TO_SQFT = 43_560.0
 
