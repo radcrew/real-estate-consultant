@@ -91,6 +91,16 @@ def where_location(
     state: str | None,
     country: str | None,
 ) -> Any:
+    label_clause: Any | None = None
+    if label:
+        pattern = ilike_pattern(label)
+        label_clause = or_(
+            PropertyRow.city.ilike(pattern, escape="\\"),
+            PropertyRow.state.ilike(pattern, escape="\\"),
+            func.coalesce(PropertyRow.address, "").ilike(pattern, escape="\\"),
+            func.coalesce(PropertyRow.country, "").ilike(pattern, escape="\\"),
+        )
+
     if city or state or country:
         clauses: list[Any] = []
         if country:
@@ -100,15 +110,12 @@ def where_location(
         if city:
             clauses.append(_lower_eq(PropertyRow.city, city))
         if clauses:
-            return and_(*clauses)
-    if label:
-        pattern = ilike_pattern(label)
-        return or_(
-            PropertyRow.city.ilike(pattern, escape="\\"),
-            PropertyRow.state.ilike(pattern, escape="\\"),
-            func.coalesce(PropertyRow.address, "").ilike(pattern, escape="\\"),
-            func.coalesce(PropertyRow.country, "").ilike(pattern, escape="\\"),
-        )
+            structured_clause = and_(*clauses)
+            if label_clause is not None:
+                return or_(structured_clause, label_clause)
+            return structured_clause
+    if label_clause is not None:
+        return label_clause
     return true()
 
 
