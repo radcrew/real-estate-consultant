@@ -221,7 +221,7 @@ export const SearchWizardProvider = ({
         setStepIndex(totalSteps);
         await new Promise((resolve) => setTimeout(resolve, 550));
         onClose();
-        router.push(`/search/results/${profileId}`);
+        router.push(`/search/${profileId}`);
         return;
       }
 
