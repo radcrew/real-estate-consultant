@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@components/ui/button";
 
 const TILE =
-  "relative min-w-0 flex-[0_0_auto] aspect-[4/3] w-[min(260px,calc(100vw-3rem))] sm:w-[280px] lg:w-[300px] overflow-hidden rounded-md bg-muted";
+  "relative min-w-0 flex-[0_0_auto] aspect-[4/3] w-[calc((100%-0.5rem)/2)] overflow-hidden rounded-md bg-muted";
 
 type ListingPhotoCarouselProps = {
   gallery: string[];
@@ -22,7 +22,7 @@ export const ListingPhotoCarousel = ({ gallery, imageTitle }: ListingPhotoCarous
     loop: canLoop,
     align: "start",
     dragFree: false,
-    slidesToScroll: "auto",
+    slidesToScroll: 1,
   });
 
   useEffect(() => {
@@ -79,7 +79,7 @@ export const ListingPhotoCarousel = ({ gallery, imageTitle }: ListingPhotoCarous
                       alt={`${imageTitle} — photo ${i + 1} of ${gallery.length}`}
                       fill
                       className="object-cover"
-                      sizes="300px"
+                      sizes="(max-width: 640px) 50vw, 50vw"
                       priority={i === 0}
                     />
                   </div>
