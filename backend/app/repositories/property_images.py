@@ -30,3 +30,24 @@ async def fetch_first_image_url(
     if not isinstance(raw_url, str) or not raw_url.strip():
         return None
     return raw_url.strip()
+
+
+async def fetch_all_image_urls(
+    client: AsyncClient,
+    property_id: UUID,
+) -> list[str]:
+    """All image ``url`` values for this listing (stable ascending ``url`` order)."""
+    result = await execute_db_safe(
+        client.table("property_images")
+        .select("url")
+        .eq("property_id", str(property_id))
+        .order("url")
+        .execute(),
+    )
+    rows = as_row_list(result.data)
+    out: list[str] = []
+    for row in rows:
+        raw_url = row.get("url")
+        if isinstance(raw_url, str) and raw_url.strip():
+            out.append(raw_url.strip())
+    return out
