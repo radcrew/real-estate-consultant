@@ -1,13 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import type { KeyboardEvent } from "react";
+import { useCallback, useEffect } from "react";
+import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@components/ui/button";
-import { cn } from "@utils/common";
 
-import { useImagesPerSlide } from "./hooks/use-images-per-slide";
-import { useListingPhotoCarousel } from "./hooks/use-listing-photo-carousel";
+const TILE =
+  "relative min-w-0 flex-[0_0_auto] aspect-[4/3] w-[min(260px,calc(100vw-3rem))] sm:w-[280px] lg:w-[300px] overflow-hidden rounded-md bg-muted";
 
 type ListingPhotoCarouselProps = {
   gallery: string[];
@@ -15,15 +17,42 @@ type ListingPhotoCarouselProps = {
 };
 
 export const ListingPhotoCarousel = ({ gallery, imageTitle }: ListingPhotoCarouselProps) => {
-  const perSlide = useImagesPerSlide();
-  const {
-    slides,
-    slideCount,
-    safeSlide,
-    carouselTransition,
-    goPrevious,
-    goNext,
-  } = useListingPhotoCarousel(gallery, perSlide);
+  const canLoop = gallery.length > 1;
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: canLoop,
+    align: "start",
+    dragFree: false,
+    slidesToScroll: "auto",
+  });
+
+  useEffect(() => {
+    emblaApi?.reInit();
+  }, [emblaApi, gallery]);
+
+  const scrollPrev = useCallback(() => {
+    emblaApi?.scrollPrev();
+  }, [emblaApi]);
+
+  const scrollNext = useCallback(() => {
+    emblaApi?.scrollNext();
+  }, [emblaApi]);
+
+  const onViewportKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLDivElement>) => {
+      if (!canLoop) {
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        scrollPrev();
+      }
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        scrollNext();
+      }
+    },
+    [canLoop, scrollPrev, scrollNext],
+  );
 
   return (
     <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -33,87 +62,56 @@ export const ListingPhotoCarousel = ({ gallery, imageTitle }: ListingPhotoCarous
             No photos
           </div>
         ) : (
-          <>
+          <div className="relative rounded-lg">
             <div
-              className="overflow-hidden rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              ref={emblaRef}
               role="region"
-              aria-roledescription="carousel"
               aria-label="Property photos"
-              tabIndex={slideCount > 1 ? 0 : undefined}
+              tabIndex={canLoop ? 0 : undefined}
+              onKeyDown={onViewportKeyDown}
             >
-              <div
-                className={cn(
-                  "flex",
-                  carouselTransition && "transition-transform duration-300 ease-out",
-                )}
-                style={{ transform: `translateX(-${safeSlide * 100}%)` }}
-              >
-                {slides.map((slice, slideIndex) => (
-                  <div
-                    key={slideIndex}
-                    className="min-w-full shrink-0 px-0.5"
-                    aria-hidden={slideIndex !== safeSlide}
-                  >
-                    <div
-                      className={cn(
-                        "grid gap-3 sm:gap-4",
-                        perSlide === 1 && "grid-cols-1",
-                        perSlide === 2 && "grid-cols-2",
-                        perSlide === 3 && "grid-cols-3",
-                      )}
-                    >
-                      {slice.map((src, i) => {
-                        const photoIndex = (slideIndex + i) % gallery.length;
-                        return (
-                          <div
-                            key={`${slideIndex}-${i}-${photoIndex}`}
-                            className="relative aspect-[4/3] w-full overflow-hidden rounded-md bg-muted"
-                          >
-                            <Image
-                              src={src}
-                              alt={`${imageTitle} — photo ${photoIndex + 1} of ${gallery.length}`}
-                              fill
-                              className="object-cover"
-                              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                              priority={slideIndex === 0 && i === 0}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
+              <div className="flex gap-2">
+                {gallery.map((src, i) => (
+                  <div key={`${i}-${src}`} className={TILE}>
+                    <Image
+                      src={src}
+                      alt={`${imageTitle} — photo ${i + 1} of ${gallery.length}`}
+                      fill
+                      className="object-cover"
+                      sizes="300px"
+                      priority={i === 0}
+                    />
                   </div>
                 ))}
               </div>
             </div>
 
-            {slideCount > 1 ? (
-              <div className="mt-4 flex items-center justify-between gap-3">
+            {canLoop ? (
+              <>
                 <Button
                   type="button"
                   size="icon"
                   variant="secondary"
-                  className="size-10 shrink-0 rounded-full border border-border bg-background shadow-sm"
+                  className="absolute left-2 top-1/2 z-[2] size-10 -translate-y-1/2 rounded-full border border-border bg-background/95 shadow-md sm:left-3"
                   aria-label="Previous photos"
-                  onClick={goPrevious}
+                  onClick={scrollPrev}
                 >
                   <ChevronLeft className="size-5" />
                 </Button>
-                <span className="text-xs font-medium tabular-nums text-muted-foreground">
-                  {safeSlide + 1} / {slideCount}
-                </span>
                 <Button
                   type="button"
                   size="icon"
                   variant="secondary"
-                  className="size-10 shrink-0 rounded-full border border-border bg-background shadow-sm"
+                  className="absolute right-2 top-1/2 z-[2] size-10 -translate-y-1/2 rounded-full border border-border bg-background/95 shadow-md sm:right-3"
                   aria-label="Next photos"
-                  onClick={goNext}
+                  onClick={scrollNext}
                 >
                   <ChevronRight className="size-5" />
                 </Button>
-              </div>
+              </>
             ) : null}
-          </>
+          </div>
         )}
       </div>
     </div>
