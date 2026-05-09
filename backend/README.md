@@ -13,10 +13,55 @@ From this directory (`backend/`):
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
+python -m pip install -U pip
+python -m pip install -e ".[dev]"
 ```
 
-On macOS or Linux, use `source .venv/bin/activate` instead of the PowerShell activation line.
+On macOS or Linux, use `source .venv/bin/activate` instead of the PowerShell activation line, then the same `python -m pip` lines.
+
+Use **`python -m pip`** (not plain `pip`) so installs always use this venv’s interpreter. That avoids Windows launcher errors if the project was moved and an old `.venv` still pointed at another path.
+
+## Start the backend
+
+Do this **from `backend/`** (the directory that contains `pyproject.toml`). The app package is `app/`; the ASGI app is **`app.main:app`**.
+
+1. **Python environment** — Create and activate a venv (see [Setup](#setup)), then install deps with `python -m pip install -e ".[dev]"`.
+2. **Environment file** — Copy `.env.example` to `.env` and set at least the variables you need (see [Configuration](#configuration)).
+3. **Run the API** — With the venv activated and cwd still `backend/`:
+
+```powershell
+fastapi dev
+```
+
+This uses `[tool.fastapi]` in `pyproject.toml` (`entrypoint = "app.main:app"`), serves with reload on **http://127.0.0.1:8000** by default.
+
+**If your shell is at the repository root** (parent of `backend/`), point the CLI at `main.py` so imports resolve:
+
+```powershell
+fastapi dev backend/app/main.py
+```
+
+**Production-style** (no reload, binds `0.0.0.0` by default for `fastapi run`):
+
+```powershell
+fastapi run
+```
+
+**Uvicorn directly** (same app, reload on localhost):
+
+```powershell
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Running `fastapi dev` from the repo root **without** the `backend/app/main.py` path often fails with *Could not find a default file to run* because the CLI does not see `[tool.fastapi]` or the `app` package.
+
+### Useful URLs (default port)
+
+| URL | Description |
+|-----|-------------|
+| [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) | Liveness-style check |
+| [http://127.0.0.1:8000/api/v1/ping](http://127.0.0.1:8000/api/v1/ping) | Sample versioned route |
+| [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json) | OpenAPI schema |
 
 ## Configuration
 
@@ -57,47 +102,7 @@ python -m app.seed.main
 
 Each successful run **upserts** properties and replaces **`property_images`** for the seeded property ids. For a clean re-seed in dev, run **`truncate table public.properties;`** (and clear related image rows if needed) in the Supabase SQL editor (or `psql`) before running **`python -m app.seed.main`** again.
 
-## Run the server
-
-With the virtual environment activated.
-
-**Working directory must be `backend/`** (where this `pyproject.toml` lives). If you run `fastapi dev` from the repository root, the CLI shows *Could not find a default file to run* because it does not see `[tool.fastapi]` or the `app` package.
-
-From `backend/`:
-
-**Development** (reload on `127.0.0.1:8000`, uses `[tool.fastapi]` entrypoint in `pyproject.toml`):
-
-```powershell
-fastapi dev
-```
-
-From the **repository root** (path to `main.py` so the CLI can resolve `app` under `backend/`):
-
-```powershell
-fastapi dev backend/app/main.py
-```
-
-**Production-style** (no reload, listens on `0.0.0.0`):
-
-```powershell
-fastapi run
-```
-
-Equivalent with Uvicorn directly:
-
-```powershell
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-## Useful URLs (default port)
-
-| URL | Description |
-|-----|-------------|
-| [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) | Liveness-style check |
-| [http://127.0.0.1:8000/api/v1/ping](http://127.0.0.1:8000/api/v1/ping) | Sample versioned route |
-| [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json) | OpenAPI schema |
-
-### Seeding (`python -m app.seed.main`) troubleshooting
+## Seeding troubleshooting
 
 If seeding fails after [Dataset preparation](#dataset-preparation) and [Seeding](#seeding):
 

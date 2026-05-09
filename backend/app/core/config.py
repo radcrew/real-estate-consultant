@@ -30,5 +30,9 @@ class Settings(BaseSettings):
     # Comma-separated browser origins allowed to call the API directly (e.g. Next.js dev or production web URL).
     frontend_origin: str = "http://localhost:3000"
 
+    hf_token: str = ""
+    hf_model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    hf_base_url: str = "https://router.huggingface.co/v1"
+
 
 settings = Settings()
