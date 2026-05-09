@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
-import { SearchWizard } from "@components/search-wizard";
+import { SearchWizard } from "@components/search/wizard";
 
 export default function QuestionnairePage() {
   const router = useRouter();

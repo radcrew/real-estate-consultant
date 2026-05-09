@@ -40,5 +40,4 @@ export class AuthService {
   }
 }
 
-/** Default app wiring; pass a custom `AxiosInstance` in tests via `new AuthService(mockHttp)`. */
 export const authService = new AuthService(apiClient);

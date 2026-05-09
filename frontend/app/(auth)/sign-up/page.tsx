@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { AuthPageFooter } from "@components/auth/auth-page-footer";
-import { AuthPageTitle } from "@components/auth/auth-page-title";
+import { AuthPageFooter } from "@components/auth/main/footer";
+import { AuthPageTitle } from "@components/auth/main/title";
 import { SignUpForm } from "@components/auth/forms/sign-up";
 
 export const metadata: Metadata = {

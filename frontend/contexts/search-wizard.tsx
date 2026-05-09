@@ -17,13 +17,13 @@ import type {
   SummaryRow,
   WizardAnswers,
   WizardQuestion,
-} from "../components/search-wizard/types";
+} from "../components/search/wizard/types";
 import {
   formatAnswerForSummary,
   getDefaultAnswer,
   isQuestionComplete,
   parseQuestion,
-} from "../components/search-wizard/utils";
+} from "../components/search/wizard/utils";
 
 type SearchWizardContextValue = {
   canContinue: boolean;
@@ -48,7 +48,6 @@ type SearchWizardContextValue = {
   updateCurrentAnswer: (value: AnswerValue) => void;
   toggleCurrentMultiSelect: (value: string) => void;
   sessionId: string | null;
-  /** Assistant bubble texts from ``POST /intake-sessions?mode=llm`` (welcome + next question); cleared after ChatPanel consumes. */
   llmChatBootstrap: string[] | null;
   clearLlmChatBootstrap: () => void;
 };
@@ -81,33 +80,10 @@ export const SearchWizardProvider = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [llmChatBootstrap, setLlmChatBootstrap] = useState<string[] | null>(null);
 
-  const clearLlmChatBootstrap = useCallback(() => {
-    setLlmChatBootstrap(null);
-  }, []);
-
   const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
   const canContinue = currentQuestion != null && isQuestionComplete(currentQuestion, currentAnswer);
   const isBusy = isLoadingQuestion || isSubmitting;
 
-  const resetQuestionnaireState = () => {
-    setSessionId(null);
-    setCurrentQuestion(null);
-    setQuestionHistory([]);
-    setSummaryRows([]);
-    setAnswers({});
-    setStepIndex(0);
-    setTotalSteps(1);
-    setLoadingQuestion(false);
-    setSubmitting(false);
-    setErrorMessage(null);
-    setLlmChatBootstrap(null);
-  };
-
-  const resetToChooser = () => {
-    resetQuestionnaireState();
-    setGuidedFormOpen(false);
-    setSmartChatOpen(false);
-  };
 
   const startGuidedForm = async () => {
     if (isLoadingQuestion || isSubmitting) {
@@ -200,6 +176,74 @@ export const SearchWizardProvider = ({
     setSummaryRows((current) => current.slice(0, -1));
   };
 
+  const goNext = async () => {
+    if (
+      !currentQuestion ||
+      !sessionId ||
+      !canContinue ||
+      isLoadingQuestion ||
+      isSubmitting
+    ) {
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const answerToSubmit = answers[currentQuestion.id];
+
+      if (answerToSubmit === undefined) {
+        return;
+      }
+
+      const response = await submitAnswer(sessionId, {
+        key: currentQuestion.id,
+        answers: answerToSubmit,
+      });
+
+      const newSummaryRow = {
+        id: currentQuestion.id,
+        label: currentQuestion.title,
+        value: formatAnswerForSummary(currentQuestion, answerToSubmit),
+      };
+
+      setSummaryRows((current) => [...current, newSummaryRow]);
+
+      if (response.next_question == null) {
+        const completed = await completeSession(sessionId);
+        const profileId = completed.search_profile_id;
+        if (!profileId) {
+          setErrorMessage("Search profile was not created. Please try again.");
+          return;
+        }
+        
+        setStepIndex(totalSteps);
+        await new Promise((resolve) => setTimeout(resolve, 550));
+        onClose();
+        router.push(`/search/results/${profileId}`);
+        return;
+      }
+
+      const nextQuestion = parseQuestion(response.next_question);
+
+      setCurrentQuestion(nextQuestion);
+      setQuestionHistory((current) => [
+        ...current.slice(0, stepIndex + 1),
+        nextQuestion,
+      ]);
+      setAnswers((current) => ({
+        ...current,
+        [nextQuestion.id]: current[nextQuestion.id] ?? getDefaultAnswer(nextQuestion),
+      }));
+      setStepIndex((current) => current + 1);
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
   const updateCurrentAnswer = (value: AnswerValue) => {
     if (!currentQuestion) {
       return;
@@ -227,68 +271,30 @@ export const SearchWizardProvider = ({
     }));
   };
 
-  const goNext = async () => {
-    if (
-      !currentQuestion ||
-      !sessionId ||
-      !canContinue ||
-      isLoadingQuestion ||
-      isSubmitting
-    ) {
-      return;
-    }
-
-    setSubmitting(true);
+  const resetQuestionnaireState = () => {
+    setSessionId(null);
+    setCurrentQuestion(null);
+    setQuestionHistory([]);
+    setSummaryRows([]);
+    setAnswers({});
+    setStepIndex(0);
+    setTotalSteps(1);
+    setLoadingQuestion(false);
+    setSubmitting(false);
     setErrorMessage(null);
-
-    try {
-      const answerToSubmit = answers[currentQuestion.id];
-
-      if (answerToSubmit === undefined) {
-        return;
-      }
-
-      const response = await submitAnswer(sessionId, {
-        key: currentQuestion.id,
-        answers: answerToSubmit,
-      });
-
-      setSummaryRows((current) => [
-        ...current,
-        {
-          id: currentQuestion.id,
-          label: currentQuestion.title,
-          value: formatAnswerForSummary(currentQuestion, answerToSubmit),
-        },
-      ]);
-
-      if (response.next_question == null) {
-        await completeSession(sessionId);
-        setStepIndex(totalSteps);
-        await new Promise((resolve) => setTimeout(resolve, 550));
-        onClose();
-        router.push("/");
-        return;
-      }
-
-      const nextQuestion = parseQuestion(response.next_question);
-
-      setCurrentQuestion(nextQuestion);
-      setQuestionHistory((current) => [
-        ...current.slice(0, stepIndex + 1),
-        nextQuestion,
-      ]);
-      setAnswers((current) => ({
-        ...current,
-        [nextQuestion.id]: current[nextQuestion.id] ?? getDefaultAnswer(nextQuestion),
-      }));
-      setStepIndex((current) => current + 1);
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error));
-    } finally {
-      setSubmitting(false);
-    }
+    setLlmChatBootstrap(null);
   };
+
+  const resetToChooser = () => {
+    resetQuestionnaireState();
+    setGuidedFormOpen(false);
+    setSmartChatOpen(false);
+  };
+
+  
+  const clearLlmChatBootstrap = useCallback(() => {
+    setLlmChatBootstrap(null);
+  }, []);
 
   const value: SearchWizardContextValue = {
     canContinue,

@@ -4,22 +4,23 @@ import { apiClient } from "@lib/api-client";
 
 export type IntakeSessionQuestion = {
   key: string;
+  title: string;
   text: string;
   type: string;
-  options?: Array<{
-    label: string;
-    value: string;
-    hint?: string;
-  }>;
+  options?:
+    | Array<{
+        label: string;
+        value: string;
+        hint?: string;
+      }>
+    | Record<string, string>;
 };
 
-/** Query param for ``POST /intake-sessions`` (default on API is ``guided``). */
 export type IntakeSessionCreateMode = "guided" | "llm";
 
 export type CreateGuidedIntakeSessionResponse = {
   session_id: string;
   status: string;
-  /** Present when the API returns questionnaire length; otherwise treat as single-step. */
   total_questions?: number;
   first_question?: IntakeSessionQuestion | null;
 };
@@ -39,9 +40,16 @@ export type SubmitIntakeSessionAnswerResponse = {
   next_question: IntakeSessionQuestion | null;
 };
 
-/** Response from `POST /intake-sessions/{session_id}/complete` (matches backend `IntakeSession`). */
 export type CompleteIntakeSessionResponse = {
   id?: string;
+  status?: string;
+  created_at?: string;
+  search_profile_id?: string | null;
+  criteria?: Record<string, unknown> | null;
+};
+
+export type IntakeSessionDto = {
+  id?: string | null;
   status?: string;
   criteria?: Record<string, unknown> | null;
 };
@@ -71,7 +79,6 @@ export type LlmNextQuestion = {
   options?: unknown;
 };
 
-/** Response for ``POST /intake-sessions?mode=llm``. */
 export type CreateLlmIntakeSessionResponse = {
   mode: "llm";
   session_id: string;
@@ -112,12 +119,19 @@ export class IntakeSessionsService {
     return data;
   }
 
+  async getSession(sessionId: string): Promise<IntakeSessionDto> {
+    const { data } = await this.http.get<IntakeSessionDto>(
+      `/intake-sessions/${sessionId}`,
+    );
+    return data;
+  }
+
   async submitAnswer(
     sessionId: string,
     body: SubmitIntakeSessionAnswerBody,
   ): Promise<SubmitIntakeSessionAnswerResponse> {
     const { data } = await this.http.patch<SubmitIntakeSessionAnswerResponse>(
-      `/intake-sessions/${sessionId}/answers`,
+      `/intake-sessions/${sessionId}/answers/guided`,
       body,
     );
     return data;
@@ -137,7 +151,7 @@ export class IntakeSessionsService {
     body: LlmInputBody,
   ): Promise<LlmInputResponse> {
     const { data } = await this.http.post<LlmInputResponse>(
-      `/intake-sessions/${sessionId}/llm-input`,
+      `/intake-sessions/${sessionId}/answers/llm`,
       body,
     );
     return data;

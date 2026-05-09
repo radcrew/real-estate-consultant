@@ -6,11 +6,11 @@ import { type FormEvent, useCallback, useState } from "react";
 import { Button } from "@components/ui/button";
 import { useAuth } from "@contexts/auth";
 
-import { AuthFormError } from "../auth-form-error";
-import { AuthFormDivider } from "../auth-form-divider";
+import { AuthFormError } from "./error";
+import { AuthFormDivider } from "./divider";
 import { EmailField } from "../fields/email";
 import { PasswordField } from "../fields/password";
-import { GoogleAuthButton } from "../google-auth-button";
+import { GoogleAuthButton } from "./button";
 
 export const SignUpForm = () => {
   const router = useRouter();

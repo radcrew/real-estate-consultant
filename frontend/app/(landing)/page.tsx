@@ -1,4 +1,4 @@
-import { ContactUs } from "@components/landing/contact-us";
+import { ContactUs } from "@components/landing/contact";
 import { CreProfessionals } from "@components/landing/cre-professionals";
 import { FeaturedListings } from "@components/landing/featured-listings";
 import { Hero } from "@components/landing/hero";

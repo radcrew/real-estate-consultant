@@ -4,7 +4,7 @@ import { Building2 } from "lucide-react";
 import { AuthNav } from "./auth-nav";
 
 export const Header = () => (
-  <header className="sticky top-0 z-40 border-b border-border bg-background">
+  <header className="sticky top-0 z-40 shrink-0 border-b border-border bg-background">
     <div className="mx-auto flex h-16 max-w-screen-xl items-center justify-between gap-4 px-4">
       <Link
         href="/"

@@ -1,30 +1,30 @@
 import { HERO_STATS } from "@constants";
 
-import { HeroActions } from "./hero-actions";
+import { HeroActions } from "./actions";
 
-import { styles } from "./styles";
+import { STYLES } from "./styles";
 
 export const Hero = () => (
-  <section className={styles.section}>
-    <div className={styles.inner}>
-      <div className={styles.headlineStack}>
-        <span className={styles.headlineStrip}>Find Your Next Commercial</span>
-        <span className={styles.headlineStrip}>Property with AI</span>
+  <section className={STYLES.section}>
+    <div className={STYLES.inner}>
+      <div className={STYLES.headlineStack}>
+        <span className={STYLES.headlineStrip}>Find Your Next Commercial</span>
+        <span className={STYLES.headlineStrip}>Property with AI</span>
       </div>
 
-      <p className={styles.subcopy}>
+      <p className={STYLES.subcopy}>
         Professional-grade CRE platform with AI-powered fit scoring, broker-style
         search, and outreach draft generation.
       </p>
 
       <HeroActions />
     </div>
-    <div className={styles.statsSection}>
-      <div className={styles.statsGrid}>
+    <div className={STYLES.statsSection}>
+      <div className={STYLES.statsGrid}>
         {HERO_STATS.map(({ label, value }) => (
-          <div key={label} className={styles.statCell}>
-            <p className={styles.statValue}>{value}</p>
-            <p className={styles.statLabel}>{label}</p>
+          <div key={label} className={STYLES.statCell}>
+            <p className={STYLES.statValue}>{value}</p>
+            <p className={STYLES.statLabel}>{label}</p>
           </div>
         ))}
       </div>
