@@ -1,10 +1,10 @@
 import { ExternalLink, MapPin } from "lucide-react";
 
-import type { MockListingProperty } from "./mock-data";
+import type { ListingProperty } from "@services/listings";
 import { listingLocationLine, listingTitle, mapsHref } from "@utils/listings";
 
 type ListingMainSectionProps = {
-  property: MockListingProperty;
+  property: ListingProperty;
 };
 
 export const ListingMainSection = ({ property: p }: ListingMainSectionProps) => {

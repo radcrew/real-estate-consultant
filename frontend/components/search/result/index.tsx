@@ -54,7 +54,6 @@ export const SearchResults = () => {
       <div
         className={cn(
           "mx-auto max-w-screen-xl px-4 pb-4 sm:pb-6",
-          /* Matches former ``pt-4`` + filter row + ``mb-4`` below filter while dock is fixed */
           showFilterDock ? "pt-[calc(1rem+3.25rem+1rem)]" : "py-4 sm:py-6",
         )}
       >

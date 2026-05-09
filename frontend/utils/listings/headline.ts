@@ -1,6 +1,6 @@
-import type { MockListingProperty } from "@components/listings/detail/mock-data";
+import type { ListingProperty } from "@services/listings";
 
-export function listingTitle(p: MockListingProperty): string {
+export function listingTitle(p: ListingProperty): string {
   const fromAddress = p.address?.trim();
   if (fromAddress) {
     return fromAddress;
@@ -9,7 +9,7 @@ export function listingTitle(p: MockListingProperty): string {
   return cityState || "Property listing";
 }
 
-export function listingLocationLine(p: MockListingProperty): string | null {
+export function listingLocationLine(p: ListingProperty): string | null {
   const line = [p.city, p.state, p.country].filter(Boolean).join(", ");
   return line || null;
 }

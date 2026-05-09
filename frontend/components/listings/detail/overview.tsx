@@ -1,21 +1,17 @@
 import { formatFeet, formatMoneyOrNull, formatSqft } from "@utils/common";
 
-import type { MockListingProperty } from "./mock-data";
-
-const overviewBorderedRow = "flex flex-col gap-0.5 border-b border-border/70 pb-4 last:border-0 last:pb-0";
-const overviewLabel = "text-xs font-medium text-muted-foreground";
-const overviewGrid = "grid grid-cols-2 gap-4 border-t border-border/70 pt-4";
-const overviewValueCompact = "mt-0.5 text-sm font-semibold tabular-nums";
+import type { ListingProperty } from "@services/listings";
+import { STYLES } from "./styles";
 
 type ListingOverviewCardProps = {
-  property: MockListingProperty;
+  property: ListingProperty;
 };
 
 const InfoItem = ({ label, value }: { label: string; value: string }) => {
   return (
-    <div className={overviewBorderedRow}>
-      <dt className={overviewLabel}>{label}</dt>
-      <dd className={overviewValueCompact}>{value}</dd>
+    <div className={STYLES.overviewBorderedRow}>
+      <dt className={STYLES.overviewLabel}>{label}</dt>
+      <dd className={STYLES.overviewValueCompact}>{value}</dd>
     </div>
   );
 };
@@ -35,17 +31,17 @@ export const ListingOverviewCard = ({ property: p }: ListingOverviewCardProps) =
           <InfoItem label="Rent (est.)" value={rentLabel ?? "—"} />
           <InfoItem label="Size" value={sqftLabel ?? "—"} />
           {(heightLabel || p.loading_docks != null) && (
-            <div className={overviewGrid}>
+            <div className={STYLES.overviewGrid}>
               {heightLabel ? (
                 <div>
-                  <dt className={overviewLabel}>Clear height</dt>
-                  <dd className={overviewValueCompact}>{heightLabel}</dd>
+                  <dt className={STYLES.overviewLabel}>Clear height</dt>
+                  <dd className={STYLES.overviewValueCompact}>{heightLabel}</dd>
                 </div>
               ) : null}
               {p.loading_docks != null ? (
                 <div>
-                  <dt className={overviewLabel}>Loading docks</dt>
-                  <dd className={overviewValueCompact}>{p.loading_docks}</dd>
+                  <dt className={STYLES.overviewLabel}>Loading docks</dt>
+                  <dd className={STYLES.overviewValueCompact}>{p.loading_docks}</dd>
                 </div>
               ) : null}
             </div>
