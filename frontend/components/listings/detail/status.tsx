@@ -17,7 +17,11 @@ export const ListingDetailNotice = ({ message, tone = "neutral" }: ListingDetail
 
 export const ListingDetailSkeleton = () => (
   <div className="space-y-8">
-    <div className="h-[24rem] animate-pulse rounded-xl border border-border bg-muted/70" />
+    <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="relative bg-muted/40 p-3 sm:p-4">
+        <div className="aspect-[8/3] w-full animate-pulse rounded-md bg-muted/70" aria-hidden />
+      </div>
+    </div>
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_22rem]">
       <div className="space-y-3">
         <div className="h-6 w-3/4 animate-pulse rounded bg-muted" />
