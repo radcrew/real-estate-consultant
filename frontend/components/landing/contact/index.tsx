@@ -1,7 +1,7 @@
 import { Mail } from "lucide-react";
 import Link from "next/link";
 
-import { buttonVariants } from "@components/ui/button";
+import { buttonVariants } from "@components/ui/buttons";
 import { cn } from "@utils/common";
 
 const SECTION =

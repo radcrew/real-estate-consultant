@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
-import { Button, buttonVariants } from "@components/ui/button";
+import { Button, buttonVariants } from "@components/ui/buttons";
 import { useAuth } from "@contexts/auth";
 import { cn } from "@utils/common";
 

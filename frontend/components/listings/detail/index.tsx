@@ -1,9 +1,9 @@
 "use client";
 
+import { HistoryBackButton } from "@components/ui/buttons/back";
 import { listingTitle } from "@utils/listings";
 
 import { useListingDetail } from "../../../hooks/use-listing-detail";
-import { ListingBackLink } from "./link";
 import { ListingMainSection } from "./main";
 import { ListingOverviewCard } from "./overview";
 import { ListingPhotoCarousel } from "./photo";
@@ -19,7 +19,7 @@ export const ListingDetailView = () => {
   return (
     <div className="min-h-[60vh] bg-muted/20">
       <div className="mx-auto max-w-screen-xl px-4 py-6 sm:py-10">
-        <ListingBackLink />
+        <HistoryBackButton />
 
         {loading ? (
           <ListingDetailSkeleton />

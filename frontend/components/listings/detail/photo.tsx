@@ -6,7 +6,7 @@ import { useCallback, useEffect } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import { Button } from "@components/ui/button";
+import { Button } from "@components/ui/buttons";
 
 const SLIDE = "min-w-0 shrink-0 basis-[calc(50%-0.25rem)] pr-2";
 const TILE = "relative aspect-[4/3] overflow-hidden rounded-md bg-muted";

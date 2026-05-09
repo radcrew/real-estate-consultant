@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Search } from "lucide-react";
 
-import { buttonVariants } from "@components/ui/button";
+import { buttonVariants } from "@components/ui/buttons";
 import { cn } from "@utils/common";
 import { useSearchSessionResults } from "@hooks/use-search-session-results";
 

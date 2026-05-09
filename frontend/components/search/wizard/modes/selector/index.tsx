@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { Button } from "@components/ui/button";
+import { Button } from "@components/ui/buttons";
 
 import { useSearchWizard } from "@contexts/search-wizard";
 import { GuidedQuestionnaire } from "../guided";
