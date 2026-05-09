@@ -11,6 +11,7 @@ from app.models.properties import Properties
 from app.repositories.property_images import fetch_all_image_urls
 from app.repositories.properties import get_property_by_id
 from app.schemas.listings import ListingDetailResponse
+from app.utils.listings import format_listing_type_label
 
 router = APIRouter(tags=["listings"])
 
@@ -31,6 +32,8 @@ async def get_listing_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Listing not found.")
 
     images = await fetch_all_image_urls(client, property_id)
-    prop = Properties.model_validate({**row, "image": images[0] if images else None})
+    payload = {**row, "image": images[0] if images else None}
+    payload["listing_type"] = format_listing_type_label(row.get("listing_type"))
+    prop = Properties.model_validate(payload)
 
     return ListingDetailResponse(property=prop, images=images)

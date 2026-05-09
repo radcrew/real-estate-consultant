@@ -24,6 +24,7 @@ from app.schemas.search import (
     UpdateSearchCriteriaBody,
 )
 from app.repositories.properties import normalize_criteria
+from app.utils.listings import format_listing_type_label
 
 router = APIRouter(tags=["search"])
 
@@ -57,9 +58,11 @@ async def search_listings(
     for row, score in rows_with_scores:
         property_id = row["id"]
         image_url = await fetch_first_image_url(client, property_id)
+        payload = {**row, "image": image_url}
+        payload["listing_type"] = format_listing_type_label(row.get("listing_type"))
         results.append(
             PropertyMatch(
-                property=Properties.model_validate({**row, "image": image_url}),
+                property=Properties.model_validate(payload),
                 match_score=score,
             ),
         )
