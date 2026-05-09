@@ -2,7 +2,7 @@ import * as React from "react";
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { ChevronRightIcon } from "lucide-react";
 
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 import { DropdownMenuContent } from "./content";
 import { DROPDOWN_MENU_SUB_CONTENT_EXTRA, DROPDOWN_MENU_SUB_TRIGGER } from "./styles";

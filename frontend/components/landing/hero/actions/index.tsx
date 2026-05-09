@@ -6,7 +6,7 @@ import { Search } from "lucide-react";
 
 import { Button, buttonVariants } from "@components/ui/button";
 import { useAuth } from "@contexts/auth";
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 import { STYLES } from "./styles";
 

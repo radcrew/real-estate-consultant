@@ -2,7 +2,7 @@
 
 import { Building2, Factory, Store } from "lucide-react";
 
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 import { STYLES } from "./styles";
 

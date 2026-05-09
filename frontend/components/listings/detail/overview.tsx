@@ -1,5 +1,6 @@
+import { formatFeet, formatMoneyOrNull, formatSqft } from "@utils/common";
+
 import type { MockListingProperty } from "./mock-data";
-import { formatFt, formatSqft, formatUsd } from "./utils/format";
 
 const overviewBorderedRow = "flex flex-col gap-0.5 border-b border-border/70 pb-4 last:border-0 last:pb-0";
 const overviewLabel = "text-xs font-medium text-muted-foreground";
@@ -20,10 +21,10 @@ const InfoItem = ({ label, value }: { label: string; value: string }) => {
 };
 
 export const ListingOverviewCard = ({ property: p }: ListingOverviewCardProps) => {
-  const priceLabel = formatUsd(p.price);
-  const rentLabel = formatUsd(p.rent);
+  const priceLabel = formatMoneyOrNull(p.price);
+  const rentLabel = formatMoneyOrNull(p.rent);
   const sqftLabel = formatSqft(p.size_sqft);
-  const heightLabel = formatFt(p.clear_height);
+  const heightLabel = formatFeet(p.clear_height);
 
   return (
     <aside className="mt-10 lg:mt-0">

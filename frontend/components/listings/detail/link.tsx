@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { buttonVariants } from "@components/ui/button";
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 export const ListingBackLink = () => (
   <div className="mb-6 flex flex-wrap items-center gap-3">

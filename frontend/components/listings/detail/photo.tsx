@@ -4,7 +4,7 @@ import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@components/ui/button";
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 import { useImagesPerSlide } from "./hooks/use-images-per-slide";
 import { useListingPhotoCarousel } from "./hooks/use-listing-photo-carousel";
@@ -23,7 +23,6 @@ export const ListingPhotoCarousel = ({ gallery, imageTitle }: ListingPhotoCarous
     carouselTransition,
     goPrevious,
     goNext,
-    onCarouselKeyDown,
   } = useListingPhotoCarousel(gallery, perSlide);
 
   return (
@@ -41,7 +40,6 @@ export const ListingPhotoCarousel = ({ gallery, imageTitle }: ListingPhotoCarous
               aria-roledescription="carousel"
               aria-label="Property photos"
               tabIndex={slideCount > 1 ? 0 : undefined}
-              onKeyDown={onCarouselKeyDown}
             >
               <div
                 className={cn(

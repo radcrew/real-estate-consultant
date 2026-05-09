@@ -1,4 +1,4 @@
-import { formatInteger, formatMoney } from "@lib/utils";
+import { formatInteger, formatMoney } from "@utils/common";
 import type { SearchPropertyMatch } from "@services/search";
 
 export type ResultCardListing = {

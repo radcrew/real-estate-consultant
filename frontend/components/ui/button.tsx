@@ -2,7 +2,7 @@ import * as React from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 
-import { cn } from "@lib/utils"
+import { cn } from "@utils/common"
 
 const buttonRoot = [
   "group/button inline-flex shrink-0 items-center justify-center gap-1.5",

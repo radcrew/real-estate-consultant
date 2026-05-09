@@ -1,4 +1,4 @@
-import type { MockListingProperty } from "../mock-data";
+import type { MockListingProperty } from "@components/listings/detail/mock-data";
 
 export function listingTitle(p: MockListingProperty): string {
   const fromAddress = p.address?.trim();

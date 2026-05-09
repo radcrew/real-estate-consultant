@@ -3,7 +3,7 @@
 import type { KeyboardEvent } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { circularWindow } from "../utils/circular-window";
+import { circularWindow } from "@utils/listings";
 
 export function useListingPhotoCarousel(gallery: string[], perSlide: number) {
   const slideCount = gallery.length;
@@ -53,23 +53,6 @@ export function useListingPhotoCarousel(gallery: string[], perSlide: number) {
   const goPrevious = useCallback(() => goSlide(-1), [goSlide]);
   const goNext = useCallback(() => goSlide(1), [goSlide]);
 
-  const onCarouselKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLDivElement>) => {
-      if (slideCount <= 1) {
-        return;
-      }
-      if (e.key === "ArrowLeft") {
-        e.preventDefault();
-        goPrevious();
-      }
-      if (e.key === "ArrowRight") {
-        e.preventDefault();
-        goNext();
-      }
-    },
-    [slideCount, goPrevious, goNext],
-  );
-
   return {
     slides,
     slideCount,
@@ -77,6 +60,5 @@ export function useListingPhotoCarousel(gallery: string[], perSlide: number) {
     carouselTransition,
     goPrevious,
     goNext,
-    onCarouselKeyDown,
   };
 }

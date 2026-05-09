@@ -5,7 +5,7 @@ import { ListingMainSection } from "./main";
 import { ListingOverviewCard } from "./overview";
 import { ListingPhotoCarousel } from "./photo";
 import { MOCK_LISTING_DETAIL, type MockListingDetail } from "./mock-data";
-import { listingTitle } from "./utils/headline";
+import { listingTitle } from "@utils/listings";
 
 type ListingDetailViewProps = {
   data?: MockListingDetail;

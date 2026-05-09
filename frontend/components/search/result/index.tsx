@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { Search } from "lucide-react";
 
 import { buttonVariants } from "@components/ui/button";
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 import { useSearchSessionResults } from "@hooks/use-search-session-results";
 
 import { ResultCard } from "./result-card";
