@@ -8,8 +8,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@components/ui/button";
 
-const TILE =
-  "relative min-w-0 flex-[0_0_auto] aspect-[4/3] w-[calc((100%-0.5rem)/2)] overflow-hidden rounded-md bg-muted";
+const SLIDE = "min-w-0 shrink-0 basis-[calc(50%-0.25rem)] pr-2";
+const TILE = "relative aspect-[4/3] overflow-hidden rounded-md bg-muted";
 
 type ListingPhotoCarouselProps = {
   gallery: string[];
@@ -71,17 +71,19 @@ export const ListingPhotoCarousel = ({ gallery, imageTitle }: ListingPhotoCarous
               tabIndex={canLoop ? 0 : undefined}
               onKeyDown={onViewportKeyDown}
             >
-              <div className="flex gap-2">
+              <div className="-mr-2 flex">
                 {gallery.map((src, i) => (
-                  <div key={`${i}-${src}`} className={TILE}>
-                    <Image
-                      src={src}
-                      alt={`${imageTitle} — photo ${i + 1} of ${gallery.length}`}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 50vw, 50vw"
-                      priority={i === 0}
-                    />
+                  <div key={`${i}-${src}`} className={SLIDE}>
+                    <div className={TILE}>
+                      <Image
+                        src={src}
+                        alt={`${imageTitle} — photo ${i + 1} of ${gallery.length}`}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 50vw, 50vw"
+                        priority={i === 0}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
