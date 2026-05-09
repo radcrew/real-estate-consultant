@@ -21,7 +21,7 @@ export const ListingPhotoCarousel = ({ gallery, imageTitle }: ListingPhotoCarous
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: canLoop,
     align: "start",
-    dragFree: false,
+    dragFree: true,
     slidesToScroll: 1,
   });
 
