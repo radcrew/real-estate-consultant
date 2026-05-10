@@ -14,6 +14,7 @@ export type AccountPersonalInfoSectionProps = {
   notice?: string | null;
   noticeVariant?: "error" | "success";
   saving?: boolean;
+  profileLoading?: boolean;
   onEdit: () => void;
   onCancel: () => void;
   onSave: () => void;
@@ -27,12 +28,17 @@ export const AccountPersonalInfoSection = ({
   notice = null,
   noticeVariant = "error",
   saving = false,
+  profileLoading = false,
   onEdit,
   onCancel,
   onSave,
   onChangeField,
 }: AccountPersonalInfoSectionProps) => (
-  <section className={ACCOUNT_SECTION_CARD_CLASS} aria-labelledby="personal-heading">
+  <section
+    className={ACCOUNT_SECTION_CARD_CLASS}
+    aria-labelledby="personal-heading"
+    aria-busy={profileLoading}
+  >
     {notice ? (
       <p
         className={
@@ -54,7 +60,13 @@ export const AccountPersonalInfoSection = ({
       </div>
       <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
         {!editing ? (
-          <Button type="button" variant="outline" size="default" onClick={onEdit}>
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
+            onClick={onEdit}
+            disabled={profileLoading}
+          >
             Edit
           </Button>
         ) : (

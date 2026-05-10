@@ -35,15 +35,6 @@ const emptyProfile = (): ProfileFormValues => ({
   country: "",
 });
 
-const AccountPageSkeleton = () => (
-  <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
-    <div className="h-9 w-48 animate-pulse rounded-md bg-muted" />
-    <div className="mt-2 h-4 w-72 max-w-full animate-pulse rounded-md bg-muted" />
-    <div className="mt-10 h-64 animate-pulse rounded-xl bg-muted/60" />
-    <div className="mt-8 h-72 animate-pulse rounded-xl bg-muted/60" />
-  </main>
-);
-
 export const AccountPage = () => {
   const router = useRouter();
   const { session, ready, refresh } = useAuth();
@@ -260,16 +251,8 @@ export const AccountPage = () => {
     setPasswordSuccess(false);
   }, []);
 
-  if (!ready) {
-    return <AccountPageSkeleton />;
-  }
-
-  if (!session) {
+  if (!ready || !session) {
     return null;
-  }
-
-  if (profileLoading) {
-    return <AccountPageSkeleton />;
   }
 
   if (profileLoadError) {
@@ -299,6 +282,7 @@ export const AccountPage = () => {
           notice={profileNotice}
           noticeVariant={profileNoticeVariant}
           saving={profileSaving}
+          profileLoading={profileLoading}
           onEdit={startEditProfile}
           onCancel={cancelEditProfile}
           onSave={saveProfile}
