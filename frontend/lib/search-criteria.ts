@@ -80,6 +80,15 @@ export const parseCriterionField = (raw: unknown): SearchCriterionField | null =
   return null;
 };
 
+const EMPTY_RANGE_DATA = { min: Number.NaN, max: Number.NaN };
+
+export const buildDefaultSearchCriteriaShell = (): Record<string, unknown> => ({
+  location: { type: "location", label: "Location", data: "" },
+  property_type: { type: "multi-select", label: "Property type", data: [] as string[] },
+  price: { type: "range", label: "Price", unit: "USD", data: { ...EMPTY_RANGE_DATA } },
+  size_sqft: { type: "range", label: "Size", unit: "SF", data: { ...EMPTY_RANGE_DATA } },
+});
+
 export const parseSearchCriteriaEntries = (criteria: Record<string, unknown>): ParsedCriteriaEntry[] =>
   Object.entries(criteria)
     .map(([key, value]) => {

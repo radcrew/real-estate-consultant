@@ -9,23 +9,17 @@ import { cn } from "@utils/common";
 import { useSearchSessionResults } from "@hooks/use-search-session-results";
 
 import { ResultCard } from "./result-card";
-import { SearchFilter, SearchFilterSkeleton } from "./filter-bar";
+import { SearchFilter } from "./filter-bar";
 
 const SKELETON_COUNT = 6;
 
 export const SearchResults = () => {
   const params = useParams<{ id?: string }>();
   const sessionProfileId = typeof params?.id === "string" ? params.id : undefined;
-  const {
-    listings,
-    loading,
-    error,
-    criteria,
-    applyCriteria,
-    filterBarReady,
-  } = useSearchSessionResults(sessionProfileId);
+  const { listings, loading, error, criteria, applyCriteria } = useSearchSessionResults(sessionProfileId);
 
-  const showFilterDock = (loading && !error) || Object.keys(criteria).length > 0;
+  const filtersLoading = loading && !error;
+  const showFilterDock = filtersLoading || Object.keys(criteria).length > 0;
 
   const showNoResults =
     !loading &&
@@ -38,15 +32,7 @@ export const SearchResults = () => {
       {showFilterDock ? (
         <div className="fixed left-0 right-0 top-16 z-30 border-b border-border bg-background shadow-sm">
           <div className="mx-auto max-w-screen-xl px-4 py-2">
-            {loading && !error && !filterBarReady ? (
-              <SearchFilterSkeleton />
-            ) : (
-              <SearchFilter
-                criteria={criteria}
-                disabled={loading}
-                onSearch={applyCriteria}
-              />
-            )}
+            <SearchFilter criteria={criteria} disabled={loading} onSearch={applyCriteria} />
           </div>
         </div>
       ) : null}

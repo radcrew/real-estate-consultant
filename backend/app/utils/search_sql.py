@@ -19,6 +19,12 @@ def _lit_float(x: float) -> Any:
     return cast(literal(x), Float)
 
 
+# Below this, exp(x) is negligible for ranking; skip exp so asyncpg never gets subnormal
+# exp results (NumericValueOutOfRangeError: underflow).
+_GAUSSIAN_EXP_TAIL_CUTOFF = -20.0
+_MAX_GAUSSIAN_DIFF = 1e100
+
+
 def _lower_eq(col: Any, value: str) -> Any:
     return func.lower(func.coalesce(col, "")) == func.lower(literal(value))
 
@@ -62,8 +68,17 @@ def gaussian_score(column: Any, target: float | None, sigma: float) -> Any:
     denominator = _lit_float(2.0 * effective_sigma * effective_sigma)
     column_float = cast(column, Float)
     target_float = _lit_float(target)
-    gaussian_exponent = -func.pow(column_float - target_float, 2) / denominator
-    return case((column.is_(None), _lit_float(0.0)), else_=func.exp(gaussian_exponent))
+    diff = column_float - target_float
+    bounded_diff = func.least(
+        func.greatest(diff, _lit_float(-_MAX_GAUSSIAN_DIFF)),
+        _lit_float(_MAX_GAUSSIAN_DIFF),
+    )
+    gaussian_exponent = -func.pow(bounded_diff, 2) / denominator
+    return case(
+        (column.is_(None), _lit_float(0.0)),
+        (gaussian_exponent <= _lit_float(_GAUSSIAN_EXP_TAIL_CUTOFF), _lit_float(0.0)),
+        else_=func.exp(gaussian_exponent),
+    )
 
 
 def _gaussian_score_for_criterion(col: Any, bounds: Any) -> Any:
