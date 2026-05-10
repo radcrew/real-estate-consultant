@@ -9,7 +9,7 @@ from supabase import AsyncClient
 
 from app.core.db_safe import execute_db_safe
 from app.repositories.intake_sessions import intake_session_not_found
-from app.utils.supabase_response import as_row_list, get_single_row
+from app.utils.supabase.response import as_row_list, get_single_row
 
 _CREATE_PROFILE_ERROR = "Unexpected response from Supabase when creating search profile."
 

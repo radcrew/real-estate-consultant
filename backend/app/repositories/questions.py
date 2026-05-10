@@ -9,7 +9,7 @@ from supabase import AsyncClient
 
 from app.core.db_safe import execute_db_safe
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
-from app.utils.supabase_response import as_row_list, get_single_row
+from app.utils.supabase.response import as_row_list, get_single_row
 
 _FIRST_QUESTION_SELECT = "key, title, text, type, options, required"
 _QUESTION_SELECT = "key, title, text, type, options, order_index, required"
