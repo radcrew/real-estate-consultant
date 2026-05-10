@@ -37,7 +37,7 @@ async def get_account_profile(
 
 
 @router.patch("/profile", response_model=AccountProfileResponse)
-async def patch_account_profile(
+async def update_account_profile(
     body: AccountProfileUpdate,
     current_user: CurrentUser,
     client: SupabaseSdkDep,
