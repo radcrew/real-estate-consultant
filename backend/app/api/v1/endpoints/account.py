@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Response, status
 
@@ -15,10 +14,12 @@ from app.exceptions.account_routes import (
     raise_account_no_fields_to_update,
 )
 from app.models.profile import profile_from_row
-from app.repositories.profiles import (
-    fetch_profile_row,
+from app.repositories.account import (
+    get_auth_user,
+    update_auth_user,
+    update_auth_user_password,
+    verify_current_email_password,
 )
-from app.repositories.account import get_auth_user, update_auth_user, update_auth_user_password
 from app.repositories.profiles import (
     PROFILE_PATCH_DB_COLUMNS,
     fetch_profile_row,
@@ -30,7 +31,6 @@ from app.schemas.account import (
     AccountProfileUpdate,
 )
 from app.utils.account_profile import account_profile_response
-from app.utils.supabase.password_verify import verify_current_email_password
 
 router = APIRouter(prefix="/account", tags=["account"])
 
@@ -86,7 +86,7 @@ async def change_account_password(
     if not email:
         raise_account_no_email_for_password_change()
 
-    await verify_current_email_password(email=email, password=body.current_password)
+    await verify_current_email_password(client, email=email, password=body.current_password)
 
     if body.current_password == body.new_password:
         raise_account_new_password_same_as_current()

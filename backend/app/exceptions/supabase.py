@@ -43,12 +43,6 @@ def raise_profile_service_unavailable(*, cause: BaseException | None = None) -> 
     )
 
 
-def raise_password_change_not_configured() -> NoReturn:
-    raise_service_unavailable(
-        "Password change is not configured (set SUPABASE_ANON_KEY on the API).",
-    )
-
-
 def raise_current_password_incorrect(*, cause: BaseException | None = None) -> NoReturn:
     raise_unauthorized("Current password is incorrect.", cause=cause)
 
