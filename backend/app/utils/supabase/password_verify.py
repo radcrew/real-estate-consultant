@@ -5,11 +5,16 @@ from __future__ import annotations
 import logging
 
 import httpx
-from fastapi import HTTPException, status
 from supabase import AuthApiError, AuthInvalidCredentialsError, acreate_client
 from supabase.lib.client_options import AsyncClientOptions
 
 from app.core.config import settings
+from app.exceptions.supabase import (
+    raise_current_password_incorrect,
+    raise_password_auth_transport_unavailable,
+    raise_password_change_not_configured,
+    raise_password_verification_unavailable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +29,7 @@ async def verify_current_email_password(*, email: str, password: str) -> None:
     """
     anon = settings.supabase_anon_key.strip()
     if not anon:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Password change is not configured (set SUPABASE_ANON_KEY on the API).",
-        )
+        raise_password_change_not_configured()
 
     http = httpx.AsyncClient(
         timeout=_SUPABASE_HTTP_TIMEOUT,
@@ -42,26 +44,14 @@ async def verify_current_email_password(*, email: str, password: str) -> None:
         )
         await client.auth.sign_in_with_password({"email": email, "password": password})
     except AuthInvalidCredentialsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Current password is incorrect.",
-        ) from exc
+        raise_current_password_incorrect(cause=exc)
     except AuthApiError as exc:
         if exc.code in ("invalid_credentials", "invalid_grant"):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Current password is incorrect.",
-            ) from exc
+            raise_current_password_incorrect(cause=exc)
         logger.warning("Supabase auth error while verifying password: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Could not verify password. Try again later.",
-        ) from exc
+        raise_password_verification_unavailable(cause=exc)
     except httpx.HTTPError as exc:
         logger.warning("HTTP error while verifying password: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service is temporarily unavailable.",
-        ) from exc
+        raise_password_auth_transport_unavailable(cause=exc)
     finally:
         await http.aclose()

@@ -6,15 +6,17 @@ import logging
 from typing import Any
 
 import httpx
-from fastapi import HTTPException, status
 from supabase import AsyncClient, AuthApiError, AuthWeakPasswordError
 from supabase_auth.types import User
 
+from app.exceptions.supabase import (
+    raise_could_not_load_profile,
+    raise_profile_service_unavailable,
+    raise_weak_password,
+)
 from app.utils.supabase.admin_auth import http_exception_from_admin_auth_api_error
 
 logger = logging.getLogger(__name__)
-
-_LOAD_ACCOUNT_HTTP_DETAIL = "Profile service is temporarily unavailable."
 
 
 async def admin_get_user(client: AsyncClient, user_id: str) -> User:
@@ -23,16 +25,10 @@ async def admin_get_user(client: AsyncClient, user_id: str) -> User:
         return (await client.auth.admin.get_user_by_id(user_id)).user
     except AuthApiError as exc:
         logger.warning("admin get_user_by_id failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Could not load profile.",
-        ) from exc
+        raise_could_not_load_profile(cause=exc)
     except httpx.HTTPError as exc:
         logger.warning("admin get_user_by_id HTTP error: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Could not load profile.",
-        ) from exc
+        raise_could_not_load_profile(cause=exc)
 
 
 async def admin_update_user(
@@ -47,10 +43,7 @@ async def admin_update_user(
         raise http_exception_from_admin_auth_api_error(exc) from exc
     except httpx.HTTPError as exc:
         logger.warning("admin update_user_by_id HTTP error: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_LOAD_ACCOUNT_HTTP_DETAIL,
-        ) from exc
+        raise_profile_service_unavailable(cause=exc)
 
 
 async def admin_update_user_password(
@@ -63,20 +56,15 @@ async def admin_update_user_password(
     try:
         await client.auth.admin.update_user_by_id(user_id, {"password": new_password})
     except AuthWeakPasswordError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={"message": exc.message, "reasons": exc.reasons},
-        ) from exc
+        raise_weak_password(
+            message=str(exc.message),
+            reasons=getattr(exc, "reasons", None),
+            cause=exc,
+        )
     except AuthApiError as exc:
         if exc.code == "weak_password":
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=exc.message,
-            ) from exc
+            raise_weak_password(message=str(exc.message), cause=exc)
         raise http_exception_from_admin_auth_api_error(exc) from exc
     except httpx.HTTPError as exc:
         logger.warning("admin update password HTTP error: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_LOAD_ACCOUNT_HTTP_DETAIL,
-        ) from exc
+        raise_profile_service_unavailable(cause=exc)
