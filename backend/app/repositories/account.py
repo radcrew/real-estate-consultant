@@ -1,43 +1,77 @@
-"""Orchestrate account profile reads and patches (Auth admin + ``public.profiles``)."""
+"""Supabase Auth admin user I/O with consistent HTTP error mapping."""
 
 from __future__ import annotations
 
+import logging
 from typing import Any
-from uuid import UUID
 
-from supabase import AsyncClient
+import httpx
+from supabase import AsyncClient, AuthApiError, AuthWeakPasswordError
+from supabase_auth.types import User
 
-from app.models.profile import profile_from_row
-from app.repositories.profiles import (
-    PROFILE_PATCH_DB_COLUMNS,
-    fetch_profile_row,
-    upsert_profile_patch,
+from app.exceptions.admin_auth import raise_admin_auth_api_error
+from app.exceptions.supabase import (
+    raise_could_not_load_profile,
+    raise_profile_service_unavailable,
+    raise_weak_password,
 )
-from app.schemas.account import AccountProfileResponse, AccountProfileUpdate
-from app.utils.account_profile import account_profile_response
-from app.utils.supabase.admin_user import admin_get_user, admin_update_user
+
+logger = logging.getLogger(__name__)
 
 
-async def apply_account_profile_patch(
+async def get_auth_user(client: AsyncClient, user_id: str) -> User:
+    """Load a user via the admin API; maps transport/auth failures to HTTP errors."""
+    try:
+        return (await client.auth.admin.get_user_by_id(user_id)).user
+
+    except AuthApiError as exc:
+        logger.warning("admin get_user_by_id failed: %s", exc)
+        raise_could_not_load_profile(cause=exc)
+
+    except httpx.HTTPError as exc:
+        logger.warning("admin get_user_by_id HTTP error: %s", exc)
+        raise_could_not_load_profile(cause=exc)
+
+
+async def update_auth_user(
     client: AsyncClient,
+    user_id: str,
+    attributes: dict[str, Any],
+) -> None:
+    """Update auth user fields (e.g. email, phone) via the admin API."""
+    try:
+        await client.auth.admin.update_user_by_id(user_id, attributes)
+
+    except AuthApiError as exc:
+        raise_admin_auth_api_error(exc)
+
+    except httpx.HTTPError as exc:
+        logger.warning("admin update_user_by_id HTTP error: %s", exc)
+        raise_profile_service_unavailable(cause=exc)
+
+
+async def update_auth_user_password(
+    client: AsyncClient,
+    user_id: str,
     *,
-    user_id: UUID,
-    supabase_user_id: str,
-    body: AccountProfileUpdate,
-    updates: dict[str, Any],
-) -> AccountProfileResponse:
-    touches_profiles_table = bool(set(updates) & PROFILE_PATCH_DB_COLUMNS)
-    auth_attrs: dict[str, Any] = {}
-    if "email" in updates:
-        auth_attrs["email"] = str(updates["email"])
-    if "phone" in updates:
-        auth_attrs["phone"] = updates["phone"]
+    new_password: str,
+) -> None:
+    """Set password via the admin API; maps weak-password and other auth errors."""
+    try:
+        await client.auth.admin.update_user_by_id(user_id, {"password": new_password})
 
-    if touches_profiles_table:
-        await upsert_profile_patch(client, user_id, body)
-    if auth_attrs:
-        await admin_update_user(client, supabase_user_id, auth_attrs)
+    except AuthWeakPasswordError as exc:
+        raise_weak_password(
+            message=str(exc.message),
+            reasons=getattr(exc, "reasons", None),
+            cause=exc,
+        )
 
-    auth_user = await admin_get_user(client, supabase_user_id)
-    raw = await fetch_profile_row(client, user_id)
-    return account_profile_response(user=auth_user, profile=profile_from_row(raw))
+    except AuthApiError as exc:
+        if exc.code == "weak_password":
+            raise_weak_password(message=str(exc.message), cause=exc)
+        raise_admin_auth_api_error(exc)
+
+    except httpx.HTTPError as exc:
+        logger.warning("admin update password HTTP error: %s", exc)
+        raise_profile_service_unavailable(cause=exc)
