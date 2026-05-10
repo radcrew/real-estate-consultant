@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu";
 import { Input } from "@components/ui/input";
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 import type { RangeCriterionData } from "@lib/search-criteria";
 
 import { FILTER_BAR_PILL } from "./styles";

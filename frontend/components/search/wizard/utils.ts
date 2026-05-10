@@ -1,4 +1,4 @@
-import { formatInteger, formatMetricNumber, formatMoney } from "@lib/utils";
+import { formatInteger, formatMetricNumber, formatMoney } from "@utils/common";
 import type { IntakeSessionQuestion } from "@services/intake-sessions";
 
 import {

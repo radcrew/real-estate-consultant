@@ -4,28 +4,22 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Search } from "lucide-react";
 
-import { buttonVariants } from "@components/ui/button";
-import { cn } from "@lib/utils";
+import { buttonVariants } from "@components/ui/buttons";
+import { cn } from "@utils/common";
 import { useSearchSessionResults } from "@hooks/use-search-session-results";
 
 import { ResultCard } from "./result-card";
-import { SearchFilter, SearchFilterSkeleton } from "./filter-bar";
+import { SearchFilter } from "./filter-bar";
 
 const SKELETON_COUNT = 6;
 
 export const SearchResults = () => {
   const params = useParams<{ id?: string }>();
   const sessionProfileId = typeof params?.id === "string" ? params.id : undefined;
-  const {
-    listings,
-    loading,
-    error,
-    criteria,
-    applyCriteria,
-    filterBarReady,
-  } = useSearchSessionResults(sessionProfileId);
+  const { listings, loading, error, criteria, applyCriteria } = useSearchSessionResults(sessionProfileId);
 
-  const showFilterDock = (loading && !error) || Object.keys(criteria).length > 0;
+  const filtersLoading = loading && !error;
+  const showFilterDock = filtersLoading || Object.keys(criteria).length > 0;
 
   const showNoResults =
     !loading &&
@@ -37,16 +31,8 @@ export const SearchResults = () => {
     <div className="min-h-[60vh] bg-muted/20">
       {showFilterDock ? (
         <div className="fixed left-0 right-0 top-16 z-30 border-b border-border bg-background shadow-sm">
-          <div className="mx-auto max-w-screen-xl px-4 pt-4 pb-4">
-            {loading && !error && !filterBarReady ? (
-              <SearchFilterSkeleton />
-            ) : (
-              <SearchFilter
-                criteria={criteria}
-                disabled={loading}
-                onSearch={applyCriteria}
-              />
-            )}
+          <div className="mx-auto max-w-screen-xl px-4 py-2">
+            <SearchFilter criteria={criteria} disabled={loading} onSearch={applyCriteria} />
           </div>
         </div>
       ) : null}
@@ -54,8 +40,7 @@ export const SearchResults = () => {
       <div
         className={cn(
           "mx-auto max-w-screen-xl px-4 pb-4 sm:pb-6",
-          /* Matches former ``pt-4`` + filter row + ``mb-4`` below filter while dock is fixed */
-          showFilterDock ? "pt-[calc(1rem+3.25rem+1rem)]" : "py-4 sm:py-6",
+          showFilterDock ? "pt-[3.75rem]" : "py-4 sm:py-6",
         )}
       >
         {error && <p className="py-6 text-center text-destructive">{error}</p>}
@@ -88,7 +73,12 @@ export const SearchResults = () => {
         )}
 
         {!loading && !error && listings.length > 0 && (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8">
+          <div
+            className={cn(
+              "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8",
+              showFilterDock && "mt-8",
+            )}
+          >
             {listings.map((listing) => (
               <ResultCard key={listing.id} listing={listing} />
             ))}

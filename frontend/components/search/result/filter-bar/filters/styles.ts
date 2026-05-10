@@ -1,4 +1,4 @@
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 export const FILTER_BAR_PILL = cn(
   "inline-flex h-9 min-w-[7.5rem] max-w-[13rem] shrink-0 items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm font-semibold text-foreground shadow-sm",

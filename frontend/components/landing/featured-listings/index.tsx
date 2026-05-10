@@ -4,8 +4,8 @@ import { Search } from "lucide-react";
 
 import type { FeaturedListing } from "@constants";
 import { FEATURED_LISTINGS } from "@constants";
-import { buttonVariants } from "@components/ui/button";
-import { cn } from "@lib/utils";
+import { buttonVariants } from "@components/ui/buttons";
+import { cn } from "@utils/common";
 
 import { STYLES } from "./styles";
 

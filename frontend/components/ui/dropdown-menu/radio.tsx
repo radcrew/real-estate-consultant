@@ -1,7 +1,7 @@
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { CheckIcon } from "lucide-react";
 
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 import {
   DROPDOWN_MENU_CHECKABLE_ITEM,

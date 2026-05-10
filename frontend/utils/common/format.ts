@@ -1,8 +1,3 @@
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs));
-
 export type FormatMoneyOptions = {
   integerThreshold?: number;
 };
@@ -25,4 +20,28 @@ export function formatMetricNumber(value: number): string {
 
 export function formatInteger(value: number): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+}
+
+export function formatMoneyOrNull(
+  value: number | null | undefined,
+  options?: FormatMoneyOptions,
+): string | null {
+  if (value == null || Number.isNaN(value)) {
+    return null;
+  }
+  return formatMoney(value, options);
+}
+
+export function formatSqft(value: number | null | undefined): string | null {
+  if (value == null || Number.isNaN(value)) {
+    return null;
+  }
+  return `${formatInteger(Math.round(value))} sq ft`;
+}
+
+export function formatFeet(value: number | null | undefined): string | null {
+  if (value == null || Number.isNaN(value)) {
+    return null;
+  }
+  return `${value} ft`;
 }

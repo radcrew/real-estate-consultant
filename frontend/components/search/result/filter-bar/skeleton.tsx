@@ -1,4 +1,4 @@
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 type SearchFilterSkeletonProps = {
   className?: string;
@@ -7,7 +7,7 @@ type SearchFilterSkeletonProps = {
 export const SearchFilterSkeleton = ({ className }: SearchFilterSkeletonProps) => (
   <section
     className={cn(
-      "flex flex-nowrap items-center gap-2 overflow-hidden py-2",
+      "flex flex-nowrap items-center gap-2 overflow-hidden py-1",
       className,
     )}
     aria-busy="true"

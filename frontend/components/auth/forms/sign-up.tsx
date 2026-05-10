@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useState } from "react";
 
-import { Button } from "@components/ui/button";
+import { Button } from "@components/ui/buttons";
 import { useAuth } from "@contexts/auth";
 
 import { AuthFormError } from "./error";

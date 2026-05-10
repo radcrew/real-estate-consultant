@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu";
 import { useAuth } from "@contexts/auth";
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 const DEFAULT_AVATAR = "/icons/avatar-default.svg";
 

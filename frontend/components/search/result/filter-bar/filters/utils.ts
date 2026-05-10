@@ -1,6 +1,6 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 
-import { formatMetricNumber, formatMoney } from "@lib/utils";
+import { formatMetricNumber, formatMoney } from "@utils/common";
 import type { RangeCriterionData } from "@lib/search-criteria";
 
 

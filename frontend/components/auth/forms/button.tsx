@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-import { Button } from "@components/ui/button";
+import { Button } from "@components/ui/buttons";
 import { useAuth } from "@contexts/auth";
 
 export const GoogleAuthButton = ({ label = "Continue with Google" }: { label?: string }) => {

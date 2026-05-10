@@ -9,7 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu";
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 import { FILTER_BAR_PILL } from "./styles";
 import { stopMenuTriggerBubble } from "./utils";

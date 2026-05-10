@@ -1,6 +1,6 @@
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 
-import { cn } from "@lib/utils";
+import { cn } from "@utils/common";
 
 import {
   DROPDOWN_MENU_CONTENT_POPUP,

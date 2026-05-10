@@ -38,7 +38,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
         return;
       }
       onClose();
-      router.push(`/search/results/${profileId}`);
+      router.push(`/search/${profileId}`);
     } catch (err) {
       setErrorMessage(getApiErrorMessage(err));
     } finally {

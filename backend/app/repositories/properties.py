@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,6 +51,15 @@ async def search_properties(
         rows.append((property_row_to_search_dict(property_row), float(score or 0.0)))
 
     return rows, total
+
+
+async def get_property_by_id(session: AsyncSession, property_id: UUID) -> dict[str, Any] | None:
+    query = select(PropertyRow).where(PropertyRow.id == property_id).limit(1)
+    result = await session.execute(query)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
+    return property_row_to_search_dict(row)
 
 
 async def normalize_criteria(
