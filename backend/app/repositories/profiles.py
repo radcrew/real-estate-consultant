@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from supabase import AsyncClient
 
 from app.core.db_safe import execute_db_safe
+from app.exceptions.common import raise_bad_gateway
 from app.schemas.account import AccountProfileUpdate
 from app.utils.supabase.response import as_row_list
 
@@ -56,10 +56,7 @@ async def fetch_profile_row(client: AsyncClient, user_id: UUID) -> dict[str, Any
         return None
     row = rows[0]
     if not isinstance(row, dict):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=_LOAD_PROFILE_ERROR,
-        )
+        raise_bad_gateway(_LOAD_PROFILE_ERROR)
     return row
 
 

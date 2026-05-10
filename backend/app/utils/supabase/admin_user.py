@@ -9,12 +9,12 @@ import httpx
 from supabase import AsyncClient, AuthApiError, AuthWeakPasswordError
 from supabase_auth.types import User
 
+from app.exceptions.admin_auth import raise_admin_auth_api_error
 from app.exceptions.supabase import (
     raise_could_not_load_profile,
     raise_profile_service_unavailable,
     raise_weak_password,
 )
-from app.utils.supabase.admin_auth import http_exception_from_admin_auth_api_error
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ async def admin_update_user(
     try:
         await client.auth.admin.update_user_by_id(user_id, attributes)
     except AuthApiError as exc:
-        raise http_exception_from_admin_auth_api_error(exc) from exc
+        raise_admin_auth_api_error(exc)
     except httpx.HTTPError as exc:
         logger.warning("admin update_user_by_id HTTP error: %s", exc)
         raise_profile_service_unavailable(cause=exc)
@@ -64,7 +64,7 @@ async def admin_update_user_password(
     except AuthApiError as exc:
         if exc.code == "weak_password":
             raise_weak_password(message=str(exc.message), cause=exc)
-        raise http_exception_from_admin_auth_api_error(exc) from exc
+        raise_admin_auth_api_error(exc)
     except httpx.HTTPError as exc:
         logger.warning("admin update password HTTP error: %s", exc)
         raise_profile_service_unavailable(cause=exc)

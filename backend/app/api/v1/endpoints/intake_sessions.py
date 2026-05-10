@@ -8,6 +8,10 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, SupabaseSdkDep
+from app.exceptions.intake import (
+    raise_intake_endpoint_no_questions_configured,
+    raise_intake_unknown_question_key,
+)
 from app.llm import (
     INTAKE_OPENING_MESSAGE,
     generate_opening_question,
@@ -34,9 +38,9 @@ from app.repositories.search_profiles import (
     ensure_search_profile_access,
 )
 from app.schemas.intake_sessions import (
-    CreateIntakeSessionResponse,
     CreateIntakeSessionGuidedResponse,
     CreateIntakeSessionLlmResponse,
+    CreateIntakeSessionResponse,
     IntakeSessionFirstQuestion,
     SubmitLlmIntakeInputRequest,
     SubmitLlmIntakeInputResponse,
@@ -66,10 +70,7 @@ async def create_intake_session(
     total_questions = len(questions)
 
     if not questions:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="No questions configured for intake flow.",
-        )
+        raise_intake_endpoint_no_questions_configured()
 
     first_question = map_question_to_model(questions[0])
 
@@ -151,10 +152,7 @@ async def submit_intake_session_answers(
 
     answered_order = order_for_question_key(questions, answer_key)
     if answered_order is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unknown question key for this questionnaire.",
-        )
+        raise_intake_unknown_question_key()
 
     next_row = next_question_row_after_order(questions, after_order=answered_order)
     next_question = map_question_to_model(next_row) if next_row is not None else None

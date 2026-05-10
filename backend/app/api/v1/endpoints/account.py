@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Response, status
 
 from app.core.deps import CurrentUser, SupabaseSdkDep
+from app.exceptions.account_routes import (
+    raise_account_new_password_same_as_current,
+    raise_account_no_email_for_password_change,
+    raise_account_no_fields_to_update,
+)
 from app.models.profile import profile_from_row
 from app.repositories.account import apply_account_profile_patch
 from app.repositories.profiles import (
@@ -44,10 +49,7 @@ async def update_account_profile(
 ) -> AccountProfileResponse:
     updates = body.model_dump(exclude_unset=True)
     if not updates:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No fields to update.",
-        )
+        raise_account_no_fields_to_update()
 
     user_id = UUID(current_user.id)
     return await apply_account_profile_patch(
@@ -67,18 +69,12 @@ async def change_account_password(
 ) -> Response:
     email = (current_user.email or "").strip()
     if not email:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This account has no email; password change is not supported here.",
-        )
+        raise_account_no_email_for_password_change()
 
     await verify_current_email_password(email=email, password=body.current_password)
 
     if body.current_password == body.new_password:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="New password must be different from your current password.",
-        )
+        raise_account_new_password_same_as_current()
 
     await admin_update_user_password(client, current_user.id, new_password=body.new_password)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

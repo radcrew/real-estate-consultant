@@ -5,9 +5,11 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import NoReturn
 
-from fastapi import status
-
-from app.core.exceptions import raise_http_exception
+from app.exceptions.common import (
+    raise_service_unavailable,
+    raise_unauthorized,
+    raise_unprocessable_entity,
+)
 
 
 def _weak_password_detail(message: str, reasons: Iterable[str] | None) -> str:
@@ -27,55 +29,39 @@ def raise_weak_password(
     cause: BaseException,
 ) -> NoReturn:
     """422 when Supabase rejects the password; response ``detail`` is a single string."""
-    raise_http_exception(
-        status.HTTP_422_UNPROCESSABLE_ENTITY,
-        _weak_password_detail(message, reasons),
-        cause=cause,
-    )
+    raise_unprocessable_entity(_weak_password_detail(message, reasons), cause=cause)
 
 
 def raise_could_not_load_profile(*, cause: BaseException | None = None) -> NoReturn:
-    raise_http_exception(
-        status.HTTP_503_SERVICE_UNAVAILABLE,
-        "Could not load profile.",
-        cause=cause,
-    )
+    raise_service_unavailable("Could not load profile.", cause=cause)
 
 
 def raise_profile_service_unavailable(*, cause: BaseException | None = None) -> NoReturn:
-    raise_http_exception(
-        status.HTTP_503_SERVICE_UNAVAILABLE,
+    raise_service_unavailable(
         "Profile service is temporarily unavailable.",
         cause=cause,
     )
 
 
 def raise_password_change_not_configured() -> NoReturn:
-    raise_http_exception(
-        status.HTTP_503_SERVICE_UNAVAILABLE,
+    raise_service_unavailable(
         "Password change is not configured (set SUPABASE_ANON_KEY on the API).",
     )
 
 
 def raise_current_password_incorrect(*, cause: BaseException | None = None) -> NoReturn:
-    raise_http_exception(
-        status.HTTP_401_UNAUTHORIZED,
-        "Current password is incorrect.",
-        cause=cause,
-    )
+    raise_unauthorized("Current password is incorrect.", cause=cause)
 
 
 def raise_password_verification_unavailable(*, cause: BaseException | None = None) -> NoReturn:
-    raise_http_exception(
-        status.HTTP_503_SERVICE_UNAVAILABLE,
+    raise_service_unavailable(
         "Could not verify password. Try again later.",
         cause=cause,
     )
 
 
 def raise_password_auth_transport_unavailable(*, cause: BaseException | None = None) -> NoReturn:
-    raise_http_exception(
-        status.HTTP_503_SERVICE_UNAVAILABLE,
+    raise_service_unavailable(
         "Authentication service is temporarily unavailable.",
         cause=cause,
     )

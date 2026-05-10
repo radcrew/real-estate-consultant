@@ -14,8 +14,9 @@ from app.repositories.profiles import (
     upsert_profile_patch,
 )
 from app.schemas.account import AccountProfileResponse, AccountProfileUpdate
-from app.utils.supabase.admin_user import admin_get_user, admin_update_user
 from app.utils.account_profile import account_profile_response
+from app.utils.supabase.admin_user import admin_get_user, admin_update_user
+
 
 async def apply_account_profile_patch(
     client: AsyncClient,

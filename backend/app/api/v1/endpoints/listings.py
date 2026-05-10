@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 
 from app.core.deps import DbSession, SupabaseSdkDep
+from app.exceptions.listings import raise_listing_not_found
 from app.models.properties import Properties
-from app.repositories.property_images import fetch_all_image_urls
 from app.repositories.properties import get_property_by_id
+from app.repositories.property_images import fetch_all_image_urls
 from app.schemas.listings import ListingDetailResponse
 from app.utils.listings import format_listing_type_label
 
@@ -29,7 +30,7 @@ async def get_listing_detail(
 ) -> ListingDetailResponse:
     row = await get_property_by_id(db, property_id)
     if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Listing not found.")
+        raise_listing_not_found()
 
     images = await fetch_all_image_urls(client, property_id)
     payload = {**row, "image": images[0] if images else None}

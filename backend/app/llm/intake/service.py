@@ -5,8 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import HTTPException, status
-
+from app.exceptions.llm import raise_hf_opening_response_missing_text
 from app.llm.intake.schema import extract_question_keys, render_intake_response_schema
 from app.llm.providers import huggingface_provider
 from app.llm.providers.prompts import (
@@ -99,10 +98,7 @@ async def generate_opening_question(
     )
     text = response_output.text
     if not text:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Hugging Face response missing text field.",
-        )
+        raise_hf_opening_response_missing_text()
     return text.strip()
 
 

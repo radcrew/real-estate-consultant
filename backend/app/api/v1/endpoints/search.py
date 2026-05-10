@@ -14,8 +14,8 @@ from app.repositories.intake_sessions import (
     parse_intake_session,
     save_intake_criteria,
 )
+from app.repositories.properties import normalize_criteria, search_properties
 from app.repositories.property_images import fetch_first_image_url
-from app.repositories.properties import search_properties
 from app.repositories.search_profiles import ensure_search_profile_access
 from app.schemas.search import (
     PropertyMatch,
@@ -23,7 +23,6 @@ from app.schemas.search import (
     SearchPropertiesResponse,
     UpdateSearchCriteriaBody,
 )
-from app.repositories.properties import normalize_criteria
 from app.utils.listings import format_listing_type_label
 
 router = APIRouter(tags=["search"])

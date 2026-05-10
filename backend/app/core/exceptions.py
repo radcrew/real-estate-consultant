@@ -12,5 +12,6 @@ def raise_http_exception(
     detail: str,
     *,
     cause: BaseException | None = None,
+    headers: dict[str, str] | None = None,
 ) -> NoReturn:
-    raise HTTPException(status_code=status_code, detail=detail) from cause
+    raise HTTPException(status_code=status_code, detail=detail, headers=headers) from cause

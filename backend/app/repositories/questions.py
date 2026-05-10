@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import HTTPException, status
 from supabase import AsyncClient
 
 from app.core.db_safe import execute_db_safe
+from app.exceptions.common import raise_bad_gateway
+from app.exceptions.intake import raise_intake_questions_load_empty
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.utils.supabase.response import as_row_list, get_single_row
 
@@ -52,10 +53,10 @@ def map_question_to_model(question: dict) -> IntakeSessionFirstQuestion:
             options=qoptions,
         )
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Unexpected response from Supabase when loading question definition.",
-        ) from exc
+        raise_bad_gateway(
+            "Unexpected response from Supabase when loading question definition.",
+            cause=exc,
+        )
 
 
 def order_for_question_key(questions: list[dict], key: str) -> int | None:
@@ -159,10 +160,7 @@ async def load_intake_questions(client: AsyncClient) -> list[dict[str, Any]]:
     )
     questions = as_row_list(result.data)
     if not questions:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=_LOAD_QUESTIONS_ERROR,
-        )
+        raise_intake_questions_load_empty()
     return questions
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import HTTPException, status
+from app.exceptions.common import raise_bad_gateway
 
 _MISSING = object()
 
@@ -25,12 +25,12 @@ def expect_single_row(raw: object, *, detail: str) -> dict:
         if len(raw) == 1 and isinstance(raw[0], dict):
             return raw[0]
 
-    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
+    raise_bad_gateway(detail)
 
 
 def get_single_row(result: object, *, detail: str) -> dict:
     """Extract exactly one dict row from a Supabase response object."""
     raw = getattr(result, "data", _MISSING)
     if raw is _MISSING:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
+        raise_bad_gateway(detail)
     return expect_single_row(raw, detail=detail)
