@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { LogOut } from "lucide-react";
+import { LogOut, UserRound } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import {
   DropdownMenu,
@@ -23,6 +24,7 @@ const triggerClassName = cn(
 );
 
 export const ProfileDropdown = () => {
+  const router = useRouter();
   const { session, signOut } = useAuth();
   if (!session) {
     return null;
@@ -56,6 +58,15 @@ export const ProfileDropdown = () => {
           <DropdownMenuLabel className="max-w-64 truncate text-sm font-normal text-foreground">
             {label}
           </DropdownMenuLabel>
+        </DropdownMenuGroup>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={() => router.push("/account")}>
+            <UserRound className="size-4" />
+            Account
+          </DropdownMenuItem>
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
