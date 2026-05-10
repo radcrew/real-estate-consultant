@@ -11,6 +11,9 @@ export type AccountPersonalInfoSectionProps = {
   editing: boolean;
   values: ProfileFormValues;
   errors: Partial<Record<ProfileFieldKey, string>>;
+  notice?: string | null;
+  noticeVariant?: "error" | "success";
+  saving?: boolean;
   onEdit: () => void;
   onCancel: () => void;
   onSave: () => void;
@@ -21,12 +24,27 @@ export const AccountPersonalInfoSection = ({
   editing,
   values,
   errors,
+  notice = null,
+  noticeVariant = "error",
+  saving = false,
   onEdit,
   onCancel,
   onSave,
   onChangeField,
 }: AccountPersonalInfoSectionProps) => (
   <section className={ACCOUNT_SECTION_CARD_CLASS} aria-labelledby="personal-heading">
+    {notice ? (
+      <p
+        className={
+          noticeVariant === "error"
+            ? "mb-4 text-sm text-destructive"
+            : "mb-4 text-sm font-medium text-emerald-600 dark:text-emerald-500"
+        }
+        role={noticeVariant === "error" ? "alert" : "status"}
+      >
+        {notice}
+      </p>
+    ) : null}
     <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h2 id="personal-heading" className="text-lg font-semibold text-foreground">
@@ -44,8 +62,8 @@ export const AccountPersonalInfoSection = ({
             <Button type="button" variant="ghost" size="default" onClick={onCancel}>
               Cancel
             </Button>
-            <Button type="button" size="default" onClick={onSave}>
-              Save
+            <Button type="button" size="default" onClick={onSave} disabled={saving}>
+              {saving ? "Saving…" : "Save"}
             </Button>
           </>
         )}

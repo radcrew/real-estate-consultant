@@ -1,16 +1,24 @@
 "use client";
 
+import { isAxiosError } from "axios";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@contexts/auth";
 
+import { getApiErrorMessage } from "@lib/api-errors";
+import { readSession, saveSession } from "@lib/auth-session";
 import {
   type ProfileFieldKey,
   type ProfileFormValues,
   validatePasswordChange,
   validateProfileForm,
 } from "@lib/account-validation";
+import {
+  accountService,
+  buildProfileUpdateBody,
+  mapProfileResponseToForm,
+} from "@services/account";
 
 import { AccountPasswordSection } from "./sections/password";
 import { AccountPersonalInfoSection } from "./sections/personal-info";
@@ -38,12 +46,18 @@ const AccountPageSkeleton = () => (
 
 export const AccountPage = () => {
   const router = useRouter();
-  const { session, ready } = useAuth();
+  const { session, ready, refresh } = useAuth();
 
   const [savedProfile, setSavedProfile] = useState<ProfileFormValues>(emptyProfile);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
+
   const [editingProfile, setEditingProfile] = useState(false);
   const [draftProfile, setDraftProfile] = useState<ProfileFormValues>(emptyProfile);
   const [profileErrors, setProfileErrors] = useState<Partial<Record<ProfileFieldKey, string>>>({});
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileNotice, setProfileNotice] = useState<string | null>(null);
+  const [profileNoticeVariant, setProfileNoticeVariant] = useState<"error" | "success">("error");
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -56,6 +70,35 @@ export const AccountPage = () => {
     if (!ready || session) return;
     router.replace("/sign-in");
   }, [ready, session, router]);
+
+  useEffect(() => {
+    if (!ready || !session) {
+      return;
+    }
+
+    const ac = new AbortController();
+    setProfileLoading(true);
+    setProfileLoadError(null);
+
+    (async () => {
+      try {
+        const data = await accountService.getProfile({ signal: ac.signal });
+        if (ac.signal.aborted) return;
+        const next = mapProfileResponseToForm(data);
+        setSavedProfile(next);
+        setDraftProfile(next);
+      } catch (e) {
+        if (ac.signal.aborted) return;
+        setProfileLoadError(getApiErrorMessage(e));
+      } finally {
+        if (!ac.signal.aborted) {
+          setProfileLoading(false);
+        }
+      }
+    })();
+
+    return () => ac.abort();
+  }, [ready, session]);
 
   const emailFromSession = session?.user.email?.trim() ?? "";
 
@@ -70,25 +113,71 @@ export const AccountPage = () => {
   const startEditProfile = useCallback(() => {
     setDraftProfile({ ...mergedSavedProfile });
     setProfileErrors({});
+    setProfileNotice(null);
     setEditingProfile(true);
   }, [mergedSavedProfile]);
 
   const cancelEditProfile = useCallback(() => {
     setEditingProfile(false);
     setProfileErrors({});
+    setProfileNotice(null);
   }, []);
 
-  const saveProfile = useCallback(() => {
+  const persistSessionEmailIfNeeded = useCallback(
+    (email: string | null) => {
+      if (!session || !email?.trim()) return;
+      const trimmed = email.trim();
+      if (trimmed === (session.user.email ?? "").trim()) return;
+      const stored = readSession();
+      if (!stored) return;
+      saveSession({
+        ...stored,
+        user: { ...stored.user, email: trimmed },
+      });
+      refresh();
+    },
+    [session, refresh],
+  );
+
+  const saveProfile = useCallback(async () => {
     const next = { ...draftProfile };
     const errors = validateProfileForm(next);
     if (Object.keys(errors).length > 0) {
       setProfileErrors(errors);
       return;
     }
-    setSavedProfile(next);
-    setEditingProfile(false);
+
+    const patch = buildProfileUpdateBody(next, mergedSavedProfile);
+    if (Object.keys(patch).length === 0) {
+      setProfileNoticeVariant("error");
+      setProfileNotice("No changes to save.");
+      return;
+    }
+
     setProfileErrors({});
-  }, [draftProfile]);
+    setProfileNotice(null);
+    setProfileSaving(true);
+    try {
+      const data = await accountService.updateProfile(patch);
+      const updated = mapProfileResponseToForm(data);
+      setSavedProfile(updated);
+      setDraftProfile(updated);
+      persistSessionEmailIfNeeded(data.email);
+      setEditingProfile(false);
+      setProfileNoticeVariant("success");
+      setProfileNotice("Profile saved.");
+    } catch (e) {
+      if (isAxiosError(e) && e.response?.status === 409) {
+        setProfileNotice(null);
+        setProfileErrors((prev) => ({ ...prev, email: getApiErrorMessage(e) }));
+      } else {
+        setProfileNoticeVariant("error");
+        setProfileNotice(getApiErrorMessage(e));
+      }
+    } finally {
+      setProfileSaving(false);
+    }
+  }, [draftProfile, mergedSavedProfile, persistSessionEmailIfNeeded]);
 
   const updateDraft = useCallback((key: ProfileFieldKey, value: string) => {
     setDraftProfile((p) => ({ ...p, [key]: value }));
@@ -112,12 +201,25 @@ export const AccountPage = () => {
       }
       setPasswordErrors({});
       setPasswordSubmitting(true);
-      await new Promise((r) => setTimeout(r, 400));
-      setPasswordSubmitting(false);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setPasswordSuccess(true);
+      try {
+        await accountService.changePassword({
+          current_password: currentPassword,
+          new_password: newPassword,
+        });
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setPasswordSuccess(true);
+      } catch (err) {
+        const msg = getApiErrorMessage(err);
+        if (isAxiosError(err) && err.response?.status === 401) {
+          setPasswordErrors({ currentPassword: msg });
+        } else {
+          setPasswordErrors({ form: msg });
+        }
+      } finally {
+        setPasswordSubmitting(false);
+      }
     },
     [currentPassword, newPassword, confirmPassword],
   );
@@ -128,8 +230,10 @@ export const AccountPage = () => {
       if (!e.currentPassword) return e;
       const next = { ...e };
       delete next.currentPassword;
+      delete next.form;
       return next;
     });
+    setPasswordSuccess(false);
   }, []);
 
   const onChangeNewPassword = useCallback((v: string) => {
@@ -138,8 +242,10 @@ export const AccountPage = () => {
       const next = { ...e };
       delete next.newPassword;
       delete next.confirmPassword;
+      delete next.form;
       return next;
     });
+    setPasswordSuccess(false);
   }, []);
 
   const onChangeConfirmPassword = useCallback((v: string) => {
@@ -148,8 +254,10 @@ export const AccountPage = () => {
       if (!e.confirmPassword) return e;
       const next = { ...e };
       delete next.confirmPassword;
+      delete next.form;
       return next;
     });
+    setPasswordSuccess(false);
   }, []);
 
   if (!ready) {
@@ -158,6 +266,20 @@ export const AccountPage = () => {
 
   if (!session) {
     return null;
+  }
+
+  if (profileLoading) {
+    return <AccountPageSkeleton />;
+  }
+
+  if (profileLoadError) {
+    return (
+      <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
+        <p className="text-sm text-destructive" role="alert">
+          {profileLoadError}
+        </p>
+      </main>
+    );
   }
 
   const profileValues = editingProfile ? draftProfile : mergedSavedProfile;
@@ -174,6 +296,9 @@ export const AccountPage = () => {
           editing={editingProfile}
           values={profileValues}
           errors={profileErrors}
+          notice={profileNotice}
+          noticeVariant={profileNoticeVariant}
+          saving={profileSaving}
           onEdit={startEditProfile}
           onCancel={cancelEditProfile}
           onSave={saveProfile}

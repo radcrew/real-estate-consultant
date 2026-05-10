@@ -71,9 +71,15 @@ export const AccountPasswordSection = ({
         error={errors.confirmPassword}
       />
 
+      {errors.form ? (
+        <p className="text-sm text-destructive" role="alert">
+          {errors.form}
+        </p>
+      ) : null}
+
       {success ? (
         <p className="text-sm font-medium text-emerald-600 dark:text-emerald-500" role="status">
-          Password requirements met. (Backend not connected — nothing was saved.)
+          Password updated successfully.
         </p>
       ) : null}
 
