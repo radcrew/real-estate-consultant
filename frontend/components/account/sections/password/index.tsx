@@ -2,9 +2,9 @@
 
 import { Button } from "@components/ui/buttons";
 
-import { AccountField } from "../field";
+import { AccountField } from "../../field";
 import { PasswordStrengthMeter } from "../password-meter";
-import { ACCOUNT_SECTION_CARD_CLASS } from "../styles";
+import { ACCOUNT_SECTION_CARD_CLASS } from "../../styles";
 
 export type AccountPasswordSectionProps = {
   currentPassword: string;
