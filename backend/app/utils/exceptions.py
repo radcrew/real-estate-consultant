@@ -1,12 +1,20 @@
-"""Reusable HTTP error helpers (status + string ``detail`` only)."""
+"""Low-level helper to raise FastAPI ``HTTPException`` with optional exception chaining."""
 
 from __future__ import annotations
 
 from typing import NoReturn
 
-from fastapi import status
+from fastapi import HTTPException, status
 
-from app.core.exceptions import raise_http_exception
+
+def raise_http_exception(
+    status_code: int,
+    detail: str,
+    *,
+    cause: BaseException | None = None,
+    headers: dict[str, str] | None = None,
+) -> NoReturn:
+    raise HTTPException(status_code=status_code, detail=detail, headers=headers) from cause
 
 
 def raise_bad_request(detail: str, *, cause: BaseException | None = None) -> NoReturn:

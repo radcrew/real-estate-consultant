@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import NoReturn
 
-from app.exceptions.common import raise_bad_gateway, raise_bad_request, raise_not_found
+from app.utils.exceptions import raise_bad_gateway, raise_bad_request, raise_not_found
 
 
 def raise_intake_endpoint_no_questions_configured() -> NoReturn:

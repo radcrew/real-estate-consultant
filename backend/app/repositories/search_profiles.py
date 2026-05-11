@@ -7,7 +7,7 @@ from uuid import UUID
 from supabase import AsyncClient
 
 from app.core.db_safe import execute_db_safe
-from app.exceptions.common import raise_bad_gateway
+from app.utils.exceptions import raise_bad_gateway
 from app.exceptions.intake import raise_intake_session_not_found
 from app.utils.supabase.response import as_row_list, get_single_row
 

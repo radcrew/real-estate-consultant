@@ -7,7 +7,7 @@ from typing import NoReturn
 from openai import APITimeoutError, OpenAIError
 from pydantic import ValidationError
 
-from app.exceptions.common import (
+from app.utils.exceptions import (
     raise_bad_gateway,
     raise_gateway_timeout,
     raise_service_unavailable,

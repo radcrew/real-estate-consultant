@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import NoReturn
 
-from app.exceptions.common import raise_bad_request, raise_unprocessable_entity
+from app.utils.exceptions import raise_bad_request, raise_unprocessable_entity
 
 
 def raise_account_no_fields_to_update() -> NoReturn:

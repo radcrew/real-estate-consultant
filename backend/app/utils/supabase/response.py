@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.exceptions.common import raise_bad_gateway
+from app.utils.exceptions import raise_bad_gateway
 
 _MISSING = object()
 

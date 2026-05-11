@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import NoReturn
 
-from app.exceptions.common import (
+from app.utils.exceptions import (
     raise_service_unavailable,
     raise_unauthorized,
     raise_unprocessable_entity,

@@ -7,7 +7,7 @@ from typing import NoReturn
 from fastapi import status
 from supabase import AuthApiError, AuthWeakPasswordError
 
-from app.exceptions.common import (
+from app.utils.exceptions import (
     raise_client_error,
     raise_conflict,
     raise_forbidden,

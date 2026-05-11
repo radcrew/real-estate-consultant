@@ -7,7 +7,7 @@ from typing import NoReturn
 from fastapi import status
 from supabase import AuthApiError
 
-from app.exceptions.common import raise_client_error, raise_conflict, raise_forbidden
+from app.utils.exceptions import raise_client_error, raise_conflict, raise_forbidden
 
 
 def raise_admin_auth_api_error(exc: AuthApiError) -> NoReturn:

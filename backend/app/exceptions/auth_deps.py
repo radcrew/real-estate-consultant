@@ -6,7 +6,7 @@ from typing import NoReturn
 
 from supabase import AuthApiError
 
-from app.exceptions.common import raise_unauthorized
+from app.utils.exceptions import raise_unauthorized
 
 _WWW_BEARER = {"WWW-Authenticate": "Bearer"}
 
