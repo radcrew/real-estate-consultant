@@ -52,6 +52,15 @@ CreateIntakeSessionResponse = (
 )
 
 
+class GetIntakeSessionResponse(IntakeSession):
+    """Stored intake session plus questionnaire position metadata."""
+
+    current_index: int
+    total_questions: int
+    question_history: list[IntakeSessionFirstQuestion] = Field(default_factory=list)
+    next_question: IntakeSessionFirstQuestion | None = None
+
+
 class PatchIntakeSessionStatusRequest(BaseModel):
     """Request body for ``PATCH /api/v1/intake-sessions/{session_id}`` (status only)."""
 
