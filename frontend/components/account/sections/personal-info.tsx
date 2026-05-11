@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@components/ui/buttons";
+import { SaveCancelGroup } from "@components/ui/save-cancel-group";
 
 import type { ProfileFieldKey, ProfileFormValues } from "@lib/account-validation";
 
@@ -70,14 +71,7 @@ export const AccountPersonalInfoSection = ({
             Edit
           </Button>
         ) : (
-          <>
-            <Button type="button" variant="ghost" size="default" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button type="button" size="default" onClick={onSave} disabled={saving}>
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </>
+          <SaveCancelGroup onCancel={onCancel} onSave={onSave} saving={saving} />
         )}
       </div>
     </div>
