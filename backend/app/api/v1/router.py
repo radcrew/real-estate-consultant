@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends
 
 from app.api.v1.endpoints.account.router import router as account_router
 from app.api.v1.endpoints.auth.router import router as auth_router
-from app.api.v1.endpoints.filters.router import router as filters_router
 from app.api.v1.endpoints.intake_sessions.router import router as intake_sessions_router
 from app.api.v1.endpoints.listings.router import router as listings_router
 from app.api.v1.endpoints.ping.router import router as ping_router
@@ -19,6 +18,5 @@ protected.include_router(questions_router)
 protected.include_router(intake_sessions_router)
 protected.include_router(search_router)
 protected.include_router(listings_router)
-protected.include_router(filters_router)
 protected.include_router(account_router)
 router.include_router(protected)
