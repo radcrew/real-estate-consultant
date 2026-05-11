@@ -9,7 +9,7 @@ from openai import APITimeoutError, AsyncOpenAI, OpenAIError
 from pydantic import BaseModel, ValidationError
 
 from app.core.config import Settings, settings
-from app.exceptions.llm import (
+from app.llm.providers.exceptions import (
     raise_hf_api_key_not_configured,
     raise_hf_completion_parse_failed,
     raise_hf_openai_error,

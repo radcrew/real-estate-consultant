@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Response, status
 
-from app.core.deps import CurrentUser, SupabaseSdkDep
-from app.exceptions.account_routes import (
+from app.api.v1.endpoints.account.exceptions import (
     raise_account_new_password_same_as_current,
     raise_account_no_email_for_password_change,
 )
+from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.repositories.account import (
     update_auth_user_password,
     verify_current_email_password,

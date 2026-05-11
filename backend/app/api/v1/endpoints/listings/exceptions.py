@@ -1,4 +1,4 @@
-"""HTTP errors for listing (property) routes."""
+"""HTTP errors for listing routes."""
 
 from __future__ import annotations
 

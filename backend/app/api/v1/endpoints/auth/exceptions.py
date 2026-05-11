@@ -1,7 +1,8 @@
-"""HTTP errors for public auth endpoints (sign-in, sign-up)."""
+"""HTTP errors for public auth endpoints."""
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import NoReturn
 
 from fastapi import status
@@ -13,8 +14,18 @@ from app.utils.exceptions import (
     raise_forbidden,
     raise_service_unavailable,
     raise_unauthorized,
+    raise_unprocessable_entity,
 )
-from app.exceptions.supabase import raise_weak_password
+
+
+def _weak_password_detail(message: str, reasons: Iterable[str] | None) -> str:
+    base = (message or "Password does not meet requirements.").strip()
+    if not reasons:
+        return base
+    parts = [str(r).strip() for r in reasons if str(r).strip()]
+    if not parts:
+        return base
+    return f"{base} ({'; '.join(parts)})"
 
 
 def raise_sign_in_invalid_credentials(*, cause: BaseException) -> NoReturn:
@@ -53,12 +64,11 @@ def raise_sign_up_auth_api_error(exc: AuthApiError) -> NoReturn:
 
 
 def raise_sign_up_weak_password_sdk(*, exc: AuthWeakPasswordError) -> NoReturn:
-    raise_weak_password(
-        message=str(exc.message),
-        reasons=getattr(exc, "reasons", None),
+    raise_unprocessable_entity(
+        _weak_password_detail(str(exc.message), getattr(exc, "reasons", None)),
         cause=exc,
     )
 
 
 def raise_sign_up_weak_password_api(*, exc: AuthApiError) -> NoReturn:
-    raise_weak_password(message=str(exc.message), cause=exc)
+    raise_unprocessable_entity(_weak_password_detail(str(exc.message), None), cause=exc)

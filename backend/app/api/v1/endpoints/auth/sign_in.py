@@ -2,14 +2,14 @@ import httpx
 from fastapi import APIRouter
 from supabase import AuthApiError, AuthInvalidCredentialsError
 
-from app.core.deps import SupabaseSdkDep
-from app.exceptions.auth_routes import (
+from app.api.v1.endpoints.auth.exceptions import (
     raise_sign_in_auth_api_error,
     raise_sign_in_email_not_confirmed,
     raise_sign_in_invalid_credentials,
     raise_sign_in_no_session,
     raise_sign_in_transport_unavailable,
 )
+from app.core.deps import SupabaseSdkDep
 from app.schemas.auth import SignInRequest, SignInResponse, SignInUser
 
 router = APIRouter()

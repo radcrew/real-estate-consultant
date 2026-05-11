@@ -6,8 +6,10 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
+from app.api.v1.endpoints.intake_sessions.answers.exceptions import (
+    raise_intake_unknown_question_key,
+)
 from app.core.deps import SupabaseSdkDep
-from app.exceptions.intake import raise_intake_unknown_question_key
 from app.repositories.intake_sessions import (
     append_intake_criteria_answer,
     load_intake_session_row,

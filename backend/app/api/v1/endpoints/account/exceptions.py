@@ -1,4 +1,4 @@
-"""HTTP errors for authenticated ``/account`` routes (validation only)."""
+"""HTTP errors for authenticated account routes."""
 
 from __future__ import annotations
 

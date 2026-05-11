@@ -1,4 +1,4 @@
-"""HTTP errors for LLM / Hugging Face providers and intake LLM helpers."""
+"""HTTP errors for LLM providers."""
 
 from __future__ import annotations
 
@@ -42,7 +42,3 @@ def raise_hf_structured_reply_incomplete() -> NoReturn:
         "The assistant's reply didn't come through completely. "
         "Please try again in a moment.",
     )
-
-
-def raise_hf_opening_response_missing_text() -> NoReturn:
-    raise_bad_gateway("Hugging Face response missing text field.")

@@ -1,14 +1,14 @@
 from fastapi import APIRouter, status
 from supabase import AuthApiError, AuthWeakPasswordError
 
-from app.core.config import settings
-from app.core.deps import SupabaseSdkDep
-from app.exceptions.auth_routes import (
+from app.api.v1.endpoints.auth.exceptions import (
     raise_sign_up_auth_api_error,
     raise_sign_up_email_already_exists,
     raise_sign_up_weak_password_api,
     raise_sign_up_weak_password_sdk,
 )
+from app.core.config import settings
+from app.core.deps import SupabaseSdkDep
 from app.schemas.auth import SignUpRequest, SignUpResponse
 
 router = APIRouter()

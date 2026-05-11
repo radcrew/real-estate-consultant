@@ -6,8 +6,8 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
+from app.api.v1.endpoints.listings.exceptions import raise_listing_not_found
 from app.core.deps import DbSession, SupabaseSdkDep
-from app.exceptions.listings import raise_listing_not_found
 from app.models.properties import Properties
 from app.repositories.properties import get_property_by_id
 from app.repositories.property_images import fetch_all_image_urls

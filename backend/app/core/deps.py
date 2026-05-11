@@ -7,12 +7,12 @@ from supabase import AsyncClient, AuthApiError
 from supabase_auth.types import User
 
 from app.core.database import get_session
-from app.core.supabase_sdk import get_supabase_sdk_client
-from app.exceptions.auth_deps import (
+from app.core.exceptions import (
     raise_auth_invalid_access_token,
     raise_auth_missing_bearer,
     raise_auth_user_not_returned,
 )
+from app.core.supabase_sdk import get_supabase_sdk_client
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 

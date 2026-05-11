@@ -13,8 +13,8 @@ from supabase import (
 )
 from supabase_auth.types import User
 
-from app.exceptions.admin_auth import raise_admin_auth_api_error
-from app.exceptions.supabase import (
+from app.repositories.exceptions import (
+    raise_admin_auth_api_error,
     raise_could_not_load_profile,
     raise_current_password_incorrect,
     raise_password_auth_transport_unavailable,
@@ -22,6 +22,7 @@ from app.exceptions.supabase import (
     raise_profile_service_unavailable,
     raise_weak_password,
 )
+
 
 async def verify_current_email_password(
     client: AsyncClient,

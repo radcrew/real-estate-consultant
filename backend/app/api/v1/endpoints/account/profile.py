@@ -5,10 +5,10 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from app.core.deps import CurrentUser, SupabaseSdkDep
-from app.exceptions.account_routes import (
+from app.api.v1.endpoints.account.exceptions import (
     raise_account_no_fields_to_update,
 )
+from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.models.profile import profile_from_row
 from app.repositories.account import (
     get_auth_user,
