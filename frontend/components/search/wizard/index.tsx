@@ -6,15 +6,16 @@ import { SearchModeSelector } from "./modes/selector";
 import { STYLES } from "./styles";
 
 type SearchWizardProps = {
+  sessionId?: string | null;
   onClose: () => void;
 };
 
-export const SearchWizard = ({ onClose }: SearchWizardProps) => {
+export const SearchWizard = ({ sessionId, onClose }: SearchWizardProps) => {
   return (
     <div className={STYLES.overlay}>
       <div className={STYLES.panel}>
         <div className={STYLES.content}>
-          <SearchWizardProvider onClose={onClose}>
+          <SearchWizardProvider initialSessionId={sessionId} onClose={onClose}>
             <SearchModeSelector />
           </SearchWizardProvider>
         </div>
