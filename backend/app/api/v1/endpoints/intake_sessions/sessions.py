@@ -15,7 +15,6 @@ from app.llm import (
     INTAKE_OPENING_MESSAGE,
     generate_opening_question,
 )
-from app.models.intake_sessions import IntakeSession
 from app.repositories.intake_sessions import (
     create_intake_session_row,
     load_intake_session_row,
@@ -30,8 +29,10 @@ from app.schemas.intake_sessions import (
     CreateIntakeSessionGuidedResponse,
     CreateIntakeSessionLlmResponse,
     CreateIntakeSessionResponse,
+    GetIntakeSessionResponse,
     IntakeSessionFirstQuestion,
 )
+from app.utils.intake_validation import compute_current_index, has_answer
 
 router = APIRouter()
 
@@ -97,17 +98,38 @@ async def create_intake_session(
 
 @router.get(
     "/{session_id}",
-    response_model=IntakeSession,
+    response_model=GetIntakeSessionResponse,
 )
 async def get_intake_session(
     session_id: UUID,
     client: SupabaseSdkDep,
     current_user: CurrentUser,
-) -> IntakeSession:
+) -> GetIntakeSessionResponse:
     session_row = await load_intake_session_row(client, session_id)
     await ensure_search_profile_access(
         client,
         session_row.get("search_profile_id"),
         current_user.id,
     )
-    return parse_intake_session(session_row)
+    session = parse_intake_session(session_row)
+    questions = await load_intake_questions(client)
+    criteria = session.criteria if isinstance(session.criteria, dict) else {}
+
+    question_history: list[IntakeSessionFirstQuestion] = []
+    next_question: IntakeSessionFirstQuestion | None = None
+
+    for question in questions:
+        question_key = question.get("key")
+        is_answered = isinstance(question_key, str) and has_answer(criteria.get(question_key))
+        if is_answered:
+            question_history.append(map_question_to_model(question))
+        elif next_question is None:
+            next_question = map_question_to_model(question)
+
+    return GetIntakeSessionResponse(
+        **session.model_dump(),
+        current_index=compute_current_index(questions, criteria),
+        total_questions=len(questions),
+        question_history=question_history,
+        next_question=next_question,
+    )
