@@ -14,11 +14,11 @@ from app.repositories.property_images import fetch_all_image_urls
 from app.schemas.listings import ListingDetailResponse
 from app.utils.listings import format_listing_type_label
 
-router = APIRouter(tags=["listings"])
+router = APIRouter(prefix="/listings", tags=["listings"])
 
 
 @router.get(
-    "/listings/{property_id}",
+    "/{property_id}",
     response_model=ListingDetailResponse,
     response_model_exclude_none=True,
     summary="Listing detail",

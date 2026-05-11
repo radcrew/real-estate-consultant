@@ -25,11 +25,11 @@ from app.schemas.search import (
 )
 from app.utils.listings import format_listing_type_label
 
-router = APIRouter(tags=["search"])
+router = APIRouter(prefix="/search", tags=["search"])
 
 
 @router.get(
-    "/search/{session_profile_id}",
+    "/{session_profile_id}",
     response_model=SearchPropertiesResponse,
     response_model_exclude_none=True,
     summary="Search properties for a session profile",
@@ -78,7 +78,7 @@ async def search_listings(
 
 
 @router.put(
-    "/search/{session_profile_id}",
+    "/{session_profile_id}",
     response_model=SearchCriteriaUpdateResponse,
     response_model_exclude_none=True,
     summary="Replace search criteria on the linked intake session",
