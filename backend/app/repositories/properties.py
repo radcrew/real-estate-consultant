@@ -7,12 +7,11 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from supabase import AsyncClient
 
+from app.db.property_row import PropertyRow
 from app.repositories.questions import load_question_key_metadata
 from app.schemas.search import CriteriaFieldItem
-from app.db.property_row import PropertyRow
 from app.utils.search_sql import (
     match_score_expr,
     property_row_to_search_dict,

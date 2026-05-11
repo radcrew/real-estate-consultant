@@ -5,24 +5,17 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from supabase import AsyncClient
 
 from app.core.db_safe import execute_db_safe
 from app.models.intake_sessions import IntakeSession
-from app.utils.supabase_response import as_row_list, get_single_row
+from app.repositories.exceptions import raise_intake_session_not_found
+from app.utils.supabase.response import as_row_list, get_single_row
 
 INTAKE_SESSION_EMBEDDED_RELATION_KEYS: frozenset[str] = frozenset({"search_profiles"})
 
 _INTAKE_SESSION_SELECT = "id, status, created_at, search_profile_id, criteria"
 _LOAD_SESSION_ERROR = "Unexpected response from Supabase when loading intake session."
-
-
-def intake_session_not_found() -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="Intake session not found.",
-    )
 
 
 def strip_intake_session_row(
@@ -59,7 +52,7 @@ async def load_intake_session_row(client: AsyncClient, session_id: UUID) -> dict
         .execute(),
     )
     if not as_row_list(result.data):
-        raise intake_session_not_found()
+        raise_intake_session_not_found()
     return get_single_row(result, detail=_LOAD_SESSION_ERROR)
 
 
@@ -76,7 +69,7 @@ async def load_profile_session_row(
         .execute(),
     )
     if not as_row_list(result.data):
-        raise intake_session_not_found()
+        raise_intake_session_not_found()
     return get_single_row(result, detail=_LOAD_SESSION_ERROR)
 
 

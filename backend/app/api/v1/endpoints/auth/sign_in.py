@@ -1,7 +1,14 @@
 import httpx
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 from supabase import AuthApiError, AuthInvalidCredentialsError
 
+from app.api.v1.endpoints.auth.exceptions import (
+    raise_sign_in_auth_api_error,
+    raise_sign_in_email_not_confirmed,
+    raise_sign_in_invalid_credentials,
+    raise_sign_in_no_session,
+    raise_sign_in_transport_unavailable,
+)
 from app.core.deps import SupabaseSdkDep
 from app.schemas.auth import SignInRequest, SignInResponse, SignInUser
 
@@ -17,41 +24,24 @@ async def sign_in(body: SignInRequest, client: SupabaseSdkDep) -> SignInResponse
                 "password": body.password,
             }
         )
+
     except AuthInvalidCredentialsError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password.",
-        ) from exc
+        raise_sign_in_invalid_credentials(cause=exc)
 
     except AuthApiError as exc:
         if exc.code in ("invalid_credentials", "invalid_grant"):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password.",
-            ) from exc
+            raise_sign_in_invalid_credentials(cause=exc)
 
         if exc.code in ("email_not_confirmed", "provider_email_needs_verification"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=exc.message,
-            ) from exc
+            raise_sign_in_email_not_confirmed(message=str(exc.message), cause=exc)
 
-        raise HTTPException(
-            status_code=exc.status if 400 <= exc.status < 600 else status.HTTP_400_BAD_REQUEST,
-            detail=exc.message,
-        ) from exc
+        raise_sign_in_auth_api_error(exc)
     except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service is temporarily unavailable. Please try again.",
-        ) from exc
+        raise_sign_in_transport_unavailable(cause=exc)
 
     session = result.session
     if session is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No session returned. Confirm your email if your project requires it.",
-        )
+        raise_sign_in_no_session()
 
     user = session.user
     return SignInResponse(

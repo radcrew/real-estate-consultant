@@ -7,7 +7,7 @@ from uuid import UUID
 from supabase import AsyncClient
 
 from app.core.db_safe import execute_db_safe
-from app.utils.supabase_response import as_row_list
+from app.utils.supabase.response import as_row_list
 
 
 async def fetch_first_image_url(

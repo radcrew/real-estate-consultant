@@ -1,0 +1,27 @@
+"""HTTP errors for core dependencies."""
+
+from __future__ import annotations
+
+from typing import NoReturn
+
+from supabase import AuthApiError
+
+from app.utils.exceptions import raise_unauthorized
+
+_WWW_BEARER = {"WWW-Authenticate": "Bearer"}
+
+
+def raise_auth_missing_bearer() -> NoReturn:
+    raise_unauthorized("Not authenticated", headers=_WWW_BEARER)
+
+
+def raise_auth_invalid_access_token(*, cause: AuthApiError | None = None) -> NoReturn:
+    raise_unauthorized(
+        "Invalid or expired access token.",
+        cause=cause,
+        headers=_WWW_BEARER,
+    )
+
+
+def raise_auth_user_not_returned() -> NoReturn:
+    raise_unauthorized("Invalid or expired access token.", headers=_WWW_BEARER)

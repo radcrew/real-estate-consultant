@@ -5,11 +5,18 @@ from __future__ import annotations
 from typing import Any, TypeVar
 
 import httpx
-from fastapi import HTTPException, status
 from openai import APITimeoutError, AsyncOpenAI, OpenAIError
 from pydantic import BaseModel, ValidationError
 
 from app.core.config import Settings, settings
+from app.llm.providers.exceptions import (
+    raise_hf_api_key_not_configured,
+    raise_hf_completion_parse_failed,
+    raise_hf_openai_error,
+    raise_hf_request_timeout,
+    raise_hf_structured_refusal,
+    raise_hf_structured_reply_incomplete,
+)
 
 HF_CONNECT_TIMEOUT = 20.0
 HF_READ_TIMEOUT = 75.0
@@ -56,10 +63,7 @@ class HuggingFaceProvider:
     ) -> StructuredOutputT:
         """Request a typed structured output from the Hugging Face router."""
         if not self.settings.hf_token.strip():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Hugging Face API key is not configured.",
-            )
+            raise_hf_api_key_not_configured()
 
         try:
             completion = await self.client.beta.chat.completions.parse(
@@ -70,44 +74,18 @@ class HuggingFaceProvider:
                 response_format=response_format,
             )
         except ValidationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=(
-                    "We couldn't process the assistant's reply. "
-                    "Please try again in a moment."
-                ),
-            ) from exc
+            raise_hf_completion_parse_failed(cause=exc)
         except APITimeoutError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail="Timed out while calling Hugging Face API.",
-            ) from exc
+            raise_hf_request_timeout(cause=exc)
         except OpenAIError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Hugging Face request failed: {exc}",
-            ) from exc
+            raise_hf_openai_error(cause=exc)
 
         message = completion.choices[0].message
         if message.parsed is not None:
             return message.parsed
         if message.refusal:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Hugging Face refused the structured request: {message.refusal}",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=(
-                "The assistant's reply didn't come through completely. "
-                "Please try again in a moment."
-            ),
-        )
+            raise_hf_structured_refusal(refusal=str(message.refusal))
+        raise_hf_structured_reply_incomplete()
 
 
 huggingface_provider = HuggingFaceProvider(settings=settings)
-
-
-__all__ = [
-    "huggingface_provider",
-]

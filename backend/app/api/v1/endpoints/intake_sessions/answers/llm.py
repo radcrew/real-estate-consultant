@@ -1,0 +1,71 @@
+"""``public.intake_sessions`` (Supabase)."""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+from fastapi import APIRouter
+
+from app.core.deps import SupabaseSdkDep
+from app.llm import (
+    parse_user_input,
+    resolve_next_intake_question,
+)
+from app.repositories.intake_sessions import (
+    load_intake_session_row,
+    save_intake_criteria,
+)
+from app.repositories.questions import load_intake_questions
+from app.schemas.intake_sessions import (
+    SubmitLlmIntakeInputRequest,
+    SubmitLlmIntakeInputResponse,
+)
+from app.utils.intake_validation import compute_current_index
+
+router = APIRouter()
+
+
+@router.post(
+    "/llm",
+    response_model=SubmitLlmIntakeInputResponse,
+)
+async def submit_llm_intake_input(
+    session_id: UUID,
+    body: SubmitLlmIntakeInputRequest,
+    client: SupabaseSdkDep,
+) -> SubmitLlmIntakeInputResponse:
+    session_row = await load_intake_session_row(client, session_id)
+    questions = await load_intake_questions(client)
+
+    current_criteria = session_row.get("criteria")
+    current_criteria_dict = dict(current_criteria) if isinstance(current_criteria, dict) else {}
+
+    llm_result = await parse_user_input(
+        user_input=body.input,
+        current_criteria=current_criteria_dict,
+        questions=questions,
+    )
+
+    extracted = llm_result["extracted"]
+    merged_criteria = llm_result["merged_criteria"]
+    missing_fields = llm_result["missing_fields"]
+    is_complete = bool(llm_result["is_complete"])
+
+    next_question = resolve_next_intake_question(
+        questions,
+        llm_result["next_question"],
+        missing_fields,
+    )
+
+    current_index = compute_current_index(questions, merged_criteria)
+
+    await save_intake_criteria(client, session_id, merged_criteria)
+    return SubmitLlmIntakeInputResponse(
+        extracted=extracted,
+        criteria=merged_criteria,
+        current_index=current_index,
+        total_questions=len(questions),
+        missing_fields=missing_fields,
+        next_question=next_question,
+        is_complete=is_complete,
+    )
