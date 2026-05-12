@@ -37,11 +37,7 @@ const SearchWizardContent = () => {
   }
 
   if (activeMode === "llm") {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <SmartChat />
-      </div>
-    );
+    return <SmartChat />;
   }
 
   return <SearchModeSelector />;
