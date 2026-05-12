@@ -79,7 +79,7 @@ export const SignUpForm = () => {
 
       <AuthFormDivider />
 
-      <GoogleAuthButton label="Sign up with Google" />
+      <GoogleAuthButton type="sign-up" label="Sign up with Google" />
     </div>
   );
 };
