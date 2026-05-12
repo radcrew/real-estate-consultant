@@ -170,7 +170,6 @@ export const SearchWizardProvider = ({
       return;
     }
 
-    setActiveMode("guided");
     setLoadingQuestion(true);
     setErrorMessage(null);
 
@@ -183,16 +182,8 @@ export const SearchWizardProvider = ({
         setActiveMode("selector");
         return;
       }
-      const firstQuestion = parseQuestion(response.first_question);
 
       setSessionId(response.session_id);
-      setTotalSteps(Math.max(response.total_questions ?? 1, 1));
-      setCurrentQuestion(firstQuestion);
-      setQuestionHistory([firstQuestion]);
-      setAnswers({
-        [firstQuestion.id]: getDefaultAnswer(firstQuestion),
-      });
-      setStepIndex(0);
       router.push(`/questionnaire/${response.session_id}`);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
@@ -207,7 +198,6 @@ export const SearchWizardProvider = ({
       return;
     }
 
-    setActiveMode("llm");
     setLoadingQuestion(true);
     setErrorMessage(null);
 
@@ -224,6 +214,7 @@ export const SearchWizardProvider = ({
         parts.push(followUp);
       }
       setLlmChatBootstrap(parts.length > 0 ? parts : null);
+      setActiveMode("llm");
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
       setActiveMode("selector");
