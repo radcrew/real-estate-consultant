@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
   type PropsWithChildren,
 } from "react";
@@ -25,16 +26,17 @@ import {
   parseQuestion,
 } from "../components/search/wizard/utils";
 
+export type SearchWizardMode = "selector" | "guided" | "llm";
+
 type SearchWizardContextValue = {
+  activeMode: SearchWizardMode;
   canContinue: boolean;
   currentAnswer: AnswerValue | undefined;
   currentQuestion: WizardQuestion | null;
   errorMessage: string | null;
   goNext: () => Promise<void>;
   isBusy: boolean;
-  isGuidedFormOpen: boolean;
   isLoadingQuestion: boolean;
-  isSmartChatOpen: boolean;
   isSubmitting: boolean;
   onClose: () => void;
   goPrev: () => void;
@@ -55,19 +57,23 @@ type SearchWizardContextValue = {
 const SearchWizardContext = createContext<SearchWizardContextValue | null>(null);
 
 type SearchWizardProviderProps = PropsWithChildren<{
+  initialSessionId?: string | null;
   onClose: () => void;
 }>;
 
 export const SearchWizardProvider = ({
   children,
+  initialSessionId,
   onClose,
 }: SearchWizardProviderProps) => {
   const router = useRouter();
-  const { createSession, submitAnswer, completeSession } = useIntakeSessions();
-  const [isGuidedFormOpen, setGuidedFormOpen] = useState(false);
-  const [isSmartChatOpen, setSmartChatOpen] = useState(false);
+  const { createSession, getSession, submitAnswer, completeSession } =
+    useIntakeSessions();
+  const [activeMode, setActiveMode] = useState<SearchWizardMode>(() =>
+    initialSessionId ? "guided" : "selector",
+  );
   const [stepIndex, setStepIndex] = useState(0);
-  const [totalSteps, setTotalSteps] = useState(1);
+  const [totalSteps, setTotalSteps] = useState<number>(1);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<WizardQuestion | null>(
     null,
@@ -75,23 +81,96 @@ export const SearchWizardProvider = ({
   const [questionHistory, setQuestionHistory] = useState<WizardQuestion[]>([]);
   const [summaryRows, setSummaryRows] = useState<SummaryRow[]>([]);
   const [answers, setAnswers] = useState<WizardAnswers>({});
-  const [isLoadingQuestion, setLoadingQuestion] = useState(false);
+  const [isLoadingQuestion, setLoadingQuestion] = useState(() =>
+    Boolean(initialSessionId),
+  );
   const [isSubmitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [llmChatBootstrap, setLlmChatBootstrap] = useState<string[] | null>(null);
+  const [llmChatBootstrap, setLlmChatBootstrap] = useState<string[] | null>(
+    null,
+  );
 
   const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
-  const canContinue = currentQuestion != null && isQuestionComplete(currentQuestion, currentAnswer);
+  const canContinue =
+    currentQuestion != null && isQuestionComplete(currentQuestion, currentAnswer);
   const isBusy = isLoadingQuestion || isSubmitting;
 
+  useEffect(() => {
+    if (!initialSessionId) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const hydrateSession = async () => {
+      setActiveMode("guided");
+      setLoadingQuestion(true);
+      setSubmitting(false);
+      setErrorMessage(null);
+
+      try {
+        const response = await getSession(initialSessionId);
+
+        if (isCancelled) {
+          return;
+        }
+
+        const criteria = response.criteria ?? {};
+        const answeredQuestions = (response.question_history ?? []).map(parseQuestion);
+        const nextQuestion = response.next_question ? parseQuestion(response.next_question) : null;
+        const visibleHistory = nextQuestion ? [...answeredQuestions, nextQuestion] : answeredQuestions;
+        const currentQuestionToShow =
+          nextQuestion ??
+          answeredQuestions[answeredQuestions.length - 1] ??
+          null;
+        const summaryQuestions = nextQuestion ? answeredQuestions : answeredQuestions.slice(0, -1);
+        const hydratedAnswers = Object.fromEntries(
+          visibleHistory.map((question) => [
+            question.id,
+            criteria[question.id] ?? getDefaultAnswer(question),
+          ]),
+        );
+        const total = response.total_questions ?? 1;
+        const hydratedStepIndex = response.current_index ?? answeredQuestions.length;
+
+        setSessionId(response.id ?? initialSessionId);
+        setTotalSteps(total);
+        setCurrentQuestion(currentQuestionToShow);
+        setQuestionHistory(visibleHistory);
+        setAnswers(hydratedAnswers);
+        setSummaryRows(
+          summaryQuestions.map((question) => ({
+            id: question.id,
+            label: question.title,
+            value: formatAnswerForSummary(question, criteria[question.id]),
+          })),
+        );
+        setStepIndex(hydratedStepIndex);
+      } catch (error) {
+        if (!isCancelled) {
+          setErrorMessage(getApiErrorMessage(error));
+          setCurrentQuestion(null);
+        }
+      } finally {
+        if (!isCancelled) {
+          setLoadingQuestion(false);
+        }
+      }
+    };
+
+    hydrateSession();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [getSession, initialSessionId]);
 
   const startGuidedForm = async () => {
     if (isLoadingQuestion || isSubmitting) {
       return;
     }
 
-    setGuidedFormOpen(true);
-    setSmartChatOpen(false);
+    setActiveMode("guided");
     setLoadingQuestion(true);
     setErrorMessage(null);
 
@@ -101,7 +180,7 @@ export const SearchWizardProvider = ({
         setErrorMessage(
           "The server is temporarily unavailable. Please try again later.",
         );
-        setGuidedFormOpen(false);
+        setActiveMode("selector");
         return;
       }
       const firstQuestion = parseQuestion(response.first_question);
@@ -114,9 +193,10 @@ export const SearchWizardProvider = ({
         [firstQuestion.id]: getDefaultAnswer(firstQuestion),
       });
       setStepIndex(0);
+      router.push(`/questionnaire/${response.session_id}`);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
-      setGuidedFormOpen(false);
+      setActiveMode("selector");
     } finally {
       setLoadingQuestion(false);
     }
@@ -127,8 +207,7 @@ export const SearchWizardProvider = ({
       return;
     }
 
-    setGuidedFormOpen(false);
-    setSmartChatOpen(true);
+    setActiveMode("llm");
     setLoadingQuestion(true);
     setErrorMessage(null);
 
@@ -147,7 +226,7 @@ export const SearchWizardProvider = ({
       setLlmChatBootstrap(parts.length > 0 ? parts : null);
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
-      setSmartChatOpen(false);
+      setActiveMode("selector");
     } finally {
       setLoadingQuestion(false);
     }
@@ -234,7 +313,8 @@ export const SearchWizardProvider = ({
       ]);
       setAnswers((current) => ({
         ...current,
-        [nextQuestion.id]: current[nextQuestion.id] ?? getDefaultAnswer(nextQuestion),
+        [nextQuestion.id]:
+          current[nextQuestion.id] ?? getDefaultAnswer(nextQuestion),
       }));
       setStepIndex((current) => current + 1);
     } catch (error) {
@@ -287,8 +367,7 @@ export const SearchWizardProvider = ({
 
   const resetToChooser = () => {
     resetQuestionnaireState();
-    setGuidedFormOpen(false);
-    setSmartChatOpen(false);
+    setActiveMode("selector");
   };
 
   
@@ -297,15 +376,14 @@ export const SearchWizardProvider = ({
   }, []);
 
   const value: SearchWizardContextValue = {
+    activeMode,
     canContinue,
     currentAnswer,
     currentQuestion,
     errorMessage,
     goNext,
     isBusy,
-    isGuidedFormOpen,
     isLoadingQuestion,
-    isSmartChatOpen,
     isSubmitting,
     onClose,
     goPrev,

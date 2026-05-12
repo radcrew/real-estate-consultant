@@ -1,6 +1,11 @@
 "use client";
 
-import { SearchWizardProvider } from "../../../contexts/search-wizard";
+import {
+  SearchWizardProvider,
+  useSearchWizard,
+} from "@contexts/search-wizard";
+import { GuidedQuestionnaire } from "./modes/guided";
+import { SmartChat } from "./modes/llm";
 import { SearchModeSelector } from "./modes/selector";
 
 import { STYLES } from "./styles";
@@ -16,10 +21,28 @@ export const SearchWizard = ({ sessionId, onClose }: SearchWizardProps) => {
       <div className={STYLES.panel}>
         <div className={STYLES.content}>
           <SearchWizardProvider initialSessionId={sessionId} onClose={onClose}>
-            <SearchModeSelector />
+            <SearchWizardContent />
           </SearchWizardProvider>
         </div>
       </div>
     </div>
   );
+};
+
+const SearchWizardContent = () => {
+  const { activeMode } = useSearchWizard();
+
+  if (activeMode === "guided") {
+    return <GuidedQuestionnaire />;
+  }
+
+  if (activeMode === "llm") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <SmartChat />
+      </div>
+    );
+  }
+
+  return <SearchModeSelector />;
 };
