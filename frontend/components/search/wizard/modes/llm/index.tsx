@@ -12,9 +12,11 @@ export const SmartChat = () => {
   const [lastResponse, setLastResponse] = useState<LlmInputResponse | null>(null);
 
   return (
-    <div className={STYLES.layout}>
-      <ChatPanel onLlmSuccess={setLastResponse} />
-      <SidePanel lastResponse={lastResponse} />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className={STYLES.layout}>
+        <ChatPanel onLlmSuccess={setLastResponse} />
+        <SidePanel lastResponse={lastResponse} />
+      </div>
     </div>
   );
 };

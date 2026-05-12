@@ -9,7 +9,7 @@ import {
   type SubmitIntakeSessionAnswerBody,
   type SubmitIntakeSessionAnswerResponse,
   type CompleteIntakeSessionResponse,
-  type IntakeSessionDto,
+  type GetIntakeSessionResponse,
 } from "@services/intake-sessions";
 
 export const useIntakeSessions = () => {
@@ -19,7 +19,7 @@ export const useIntakeSessions = () => {
   );
 
   const getSession = useCallback(
-    (sessionId: string): Promise<IntakeSessionDto> => {
+    (sessionId: string): Promise<GetIntakeSessionResponse> => {
       return intakeSessionsService.getSession(sessionId);
     },
     [],

@@ -19,8 +19,10 @@ export type IntakeSessionQuestion = {
 export type IntakeSessionCreateMode = "guided" | "llm";
 
 export type CreateGuidedIntakeSessionResponse = {
+  mode: "guided";
   session_id: string;
   status: string;
+  current_index: number;
   total_questions?: number;
   first_question?: IntakeSessionQuestion | null;
 };
@@ -48,10 +50,14 @@ export type CompleteIntakeSessionResponse = {
   criteria?: Record<string, unknown> | null;
 };
 
-export type IntakeSessionDto = {
+export type GetIntakeSessionResponse = {
   id?: string | null;
   status?: string;
   criteria?: Record<string, unknown> | null;
+  current_index?: number;
+  total_questions?: number;
+  question_history?: IntakeSessionQuestion[];
+  next_question?: IntakeSessionQuestion | null;
 };
 
 export type LlmExtractedLocation = {
@@ -119,8 +125,8 @@ export class IntakeSessionsService {
     return data;
   }
 
-  async getSession(sessionId: string): Promise<IntakeSessionDto> {
-    const { data } = await this.http.get<IntakeSessionDto>(
+  async getSession(sessionId: string): Promise<GetIntakeSessionResponse> {
+    const { data } = await this.http.get<GetIntakeSessionResponse>(
       `/intake-sessions/${sessionId}`,
     );
     return data;

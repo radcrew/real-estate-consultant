@@ -12,8 +12,6 @@ import {
 import { Button } from "@components/ui/buttons";
 
 import { useSearchWizard } from "@contexts/search-wizard";
-import { GuidedQuestionnaire } from "../guided";
-import { SmartChat } from "../llm";
 
 import { STYLES } from "./styles";
 
@@ -21,24 +19,10 @@ export const SearchModeSelector = () => {
   const {
     errorMessage,
     isBusy,
-    isGuidedFormOpen,
-    isSmartChatOpen,
     onClose,
     startSmartChat,
     startGuidedForm,
   } = useSearchWizard();
-
-  if (isGuidedFormOpen) {
-    return <GuidedQuestionnaire />;
-  }
-
-  if (isSmartChatOpen) {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <SmartChat />
-      </div>
-    );
-  }
 
   return (
     <div className={STYLES.chooserWrapper}>
@@ -70,7 +54,7 @@ export const SearchModeSelector = () => {
           </div>
 
           <div className={STYLES.choiceBullets}>
-            <ChoiceBullet>Guided 5-step process</ChoiceBullet>
+            <ChoiceBullet>Guided step-by-step process</ChoiceBullet>
             <ChoiceBullet>All criteria are explicit</ChoiceBullet>
             <ChoiceBullet>Easy to refine each field</ChoiceBullet>
           </div>

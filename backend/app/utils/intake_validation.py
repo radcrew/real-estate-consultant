@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 
-def _has_answer(value: object) -> bool:
+def has_answer(value: object) -> bool:
     if value is None:
         return False
     if isinstance(value, str):
@@ -25,7 +25,7 @@ def compute_current_index(questions: list[dict], criteria: object) -> int:
         question_key = row.get("key")
         if not isinstance(question_key, str):
             continue
-        if _has_answer(criteria.get(question_key)):
+        if has_answer(criteria.get(question_key)):
             count += 1
     return count
 
