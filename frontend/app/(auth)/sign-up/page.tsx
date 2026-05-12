@@ -13,7 +13,7 @@ const SignUpPage = () => (
   <div className="flex flex-col gap-6">
     <AuthPageTitle
       title="Create account"
-      description="Create an account with Google or your work email. You can sign in on the next screen."
+      description="Create an account with your work email, then sign in on the next screen."
     />
     <SignUpForm />
     <AuthPageFooter

@@ -5,7 +5,13 @@ import Image from "next/image";
 import { Button } from "@components/ui/buttons";
 import { useAuth } from "@contexts/auth";
 
-export const GoogleAuthButton = ({ label = "Continue with Google" }: { label?: string }) => {
+type GoogleAuthButtonProps = {
+  label?: string;
+};
+
+export const GoogleAuthButton = ({
+  label = "Continue with Google",
+}: GoogleAuthButtonProps) => {
   const { signInWithGoogle, isSubmitting } = useAuth();
 
   return (
