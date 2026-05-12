@@ -6,17 +6,13 @@ import { Button } from "@components/ui/buttons";
 import { useAuth } from "@contexts/auth";
 
 type GoogleAuthButtonProps = {
-  type?: "sign-in" | "sign-up";
   label?: string;
 };
 
 export const GoogleAuthButton = ({
-  type = "sign-in",
   label = "Continue with Google",
 }: GoogleAuthButtonProps) => {
-  const { signInWithGoogle, signUpWithGoogle, isSubmitting } = useAuth();
-  const handleClick =
-    type === "sign-up" ? signUpWithGoogle : signInWithGoogle;
+  const { signInWithGoogle, isSubmitting } = useAuth();
 
   return (
     <Button
@@ -24,7 +20,7 @@ export const GoogleAuthButton = ({
       variant="outline"
       className="w-full"
       disabled={isSubmitting}
-      onClick={handleClick}
+      onClick={signInWithGoogle}
     >
       <Image
         src="/icons/google.svg"

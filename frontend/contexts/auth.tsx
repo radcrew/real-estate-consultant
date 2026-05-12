@@ -37,7 +37,6 @@ export type AuthContextValue = {
   signIn: (credentials: AuthCredentials, onSuccess: () => void) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signUp: (credentials: AuthCredentials, onSuccess: () => void) => Promise<void>;
-  signUpWithGoogle: () => Promise<void>;
   error: string | null;
   isSubmitting: boolean;
 };
@@ -91,7 +90,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     [],
   );
 
-  const startGoogleOAuth = useCallback(async (type: "sign-in" | "sign-up") => {
+  const startGoogleOAuth = useCallback(async () => {
     if (googleOAuthInFlightRef.current) {
       return;
     }
@@ -106,12 +105,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}${OAUTH_CALLBACK_PATH}`,
-          queryParams:
-            type === "sign-up"
-              ? {
-                  prompt: "select_account",
-                }
-              : undefined,
         },
       });
 
@@ -127,11 +120,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         return;
       }
 
-      setError(
-        type === "sign-up"
-          ? "Could not start Google sign-up."
-          : "Could not start Google sign-in.",
-      );
+      setError("Could not start Google sign-in.");
       setSubmitting(false);
       googleOAuthInFlightRef.current = false;
     } catch (err) {
@@ -162,15 +151,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     [],
   );
 
-  const signInWithGoogle = useCallback(
-    () => startGoogleOAuth("sign-in"),
-    [startGoogleOAuth],
-  );
-
-  const signUpWithGoogle = useCallback(
-    () => startGoogleOAuth("sign-up"),
-    [startGoogleOAuth],
-  );
+  const signInWithGoogle = useCallback(() => startGoogleOAuth(), [startGoogleOAuth]);
 
   const signOut = useCallback(() => {
     clearSession();
@@ -199,7 +180,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         signIn,
         signInWithGoogle,
         signUp,
-        signUpWithGoogle,
         signOut,
         refresh,
         error,

@@ -7,10 +7,8 @@ import { Button } from "@components/ui/buttons";
 import { useAuth } from "@contexts/auth";
 
 import { AuthFormError } from "./error";
-import { AuthFormDivider } from "./divider";
 import { EmailField } from "../fields/email";
 import { PasswordField } from "../fields/password";
-import { GoogleAuthButton } from "./button";
 
 export const SignUpForm = () => {
   const router = useRouter();
@@ -76,10 +74,6 @@ export const SignUpForm = () => {
           {isSubmitting ? "Creating account…" : "Create account"}
         </Button>
       </form>
-
-      <AuthFormDivider />
-
-      <GoogleAuthButton type="sign-up" label="Sign up with Google" />
     </div>
   );
 };
