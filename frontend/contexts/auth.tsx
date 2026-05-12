@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -52,6 +53,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
+  const googleOAuthInFlightRef = useRef(false);
 
   const signIn = useCallback(
     async ({ email, password }: AuthCredentials, onSuccess: () => void) => {
@@ -89,6 +91,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   );
 
   const signInWithGoogle = useCallback(async () => {
+    if (googleOAuthInFlightRef.current) {
+      return;
+    }
+
+    googleOAuthInFlightRef.current = true;
     setError(null);
     setSubmitting(true);
 
@@ -102,6 +109,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (oauthError) {
         setError(oauthError.message);
         setSubmitting(false);
+        googleOAuthInFlightRef.current = false;
         return;
       }
 
@@ -112,9 +120,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       setError("Could not start Google sign-in.");
       setSubmitting(false);
+      googleOAuthInFlightRef.current = false;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setSubmitting(false);
+      googleOAuthInFlightRef.current = false;
     }
   }, []);
 
