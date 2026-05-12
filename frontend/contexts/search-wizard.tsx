@@ -116,7 +116,7 @@ export const SearchWizardProvider = ({
         }
 
         const criteria = response.criteria ?? {};
-        const answeredQuestions = (response.question_history ?? []).map(parseQuestion);
+        const answeredQuestions = response.question_history?.map(parseQuestion) ?? [];
         const nextQuestion = response.next_question ? parseQuestion(response.next_question) : null;
         const visibleHistory = nextQuestion ? [...answeredQuestions, nextQuestion] : answeredQuestions;
         const currentQuestionToShow =
