@@ -9,7 +9,8 @@ class EmailPasswordRequest(BaseModel):
 
 
 class SignUpRequest(EmailPasswordRequest):
-    pass
+    first_name: str = Field(min_length=1, max_length=120)
+    last_name: str = Field(min_length=1, max_length=120)
 
 
 class SignInRequest(EmailPasswordRequest):

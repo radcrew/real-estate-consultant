@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { StoredSession } from "@lib/auth-session";
+import { syncProfileNamesAfterOAuth } from "@lib/oauth-google-names";
 import { getSupabaseServerClient } from "@lib/supabase-server";
 
 const APP_SESSION_COOKIE = "radestate.session";
@@ -35,6 +36,8 @@ export async function GET(request: Request) {
       const message = error?.message || "No session returned. Try signing in again.";
       return NextResponse.redirect(buildSignInErrorUrl(requestUrl.origin, message));
     }
+
+    await syncProfileNamesAfterOAuth(supabase, data.session.user);
 
     const session: StoredSession = {
       accessToken: data.session.access_token,
