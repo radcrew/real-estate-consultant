@@ -185,4 +185,7 @@ def property_row_to_search_dict(row: PropertyRow) -> dict[str, Any]:
         "rent": row.rent,
         "clear_height": row.clear_height,
         "loading_docks": row.loading_docks,
+        "listing_broker_name": row.listing_broker_name,
+        "listing_broker_email": row.listing_broker_email,
+        "listing_broker_phone": row.listing_broker_phone,
     }

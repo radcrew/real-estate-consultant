@@ -33,5 +33,10 @@ class Properties(BaseModel):
     clear_height: float | None = None
     loading_docks: int | None = None
 
+    # Listing party (for outreach drafts; optional until ingestion fills them)
+    listing_broker_name: str | None = None
+    listing_broker_email: str | None = None
+    listing_broker_phone: str | None = None
+
     # Media (e.g. first listing image from ``property_images``)
     image: str | None = None
