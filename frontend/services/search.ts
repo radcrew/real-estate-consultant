@@ -18,6 +18,9 @@ export type SearchProperty = {
   rent: number | null;
   clear_height: number | null;
   loading_docks: number | null;
+  listing_broker_name?: string | null;
+  listing_broker_email?: string | null;
+  listing_broker_phone?: string | null;
   image?: string | null;
 };
 
