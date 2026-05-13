@@ -11,7 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import { useIntakeSessions } from "@hooks/use-intake-sessions";
-import { getApiErrorMessage } from "@lib/api-errors";
+import { getApiErrorMessage } from "@utils/common";
 
 import type {
   AnswerValue,

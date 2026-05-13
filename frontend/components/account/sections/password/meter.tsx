@@ -2,7 +2,7 @@
 
 import { cn } from "@utils/common";
 
-import { passwordStrengthLabel, scorePasswordStrength } from "@lib/account-validation";
+import { passwordStrengthLabel, scorePasswordStrength } from "@utils/account/validation";
 
 type PasswordStrengthMeterProps = {
   password: string;

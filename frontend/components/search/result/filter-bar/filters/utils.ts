@@ -1,7 +1,7 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { formatMetricNumber, formatMoney } from "@utils/common";
-import type { RangeCriterionData } from "@lib/search-criteria";
+import type { RangeCriterionData } from "@utils/search/criteria";
 
 
 export function stopMenuTriggerBubble(e: { preventDefault: () => void; stopPropagation: () => void }): void {

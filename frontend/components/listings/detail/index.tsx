@@ -1,7 +1,7 @@
 "use client";
 
 import { HistoryBackButton } from "@components/ui/buttons/back";
-import { listingTitle } from "@utils/listings";
+import { listingTitle } from "@utils/listings/headline";
 
 import { useListingDetail } from "../../../hooks/use-listing-detail";
 import { ListingMainSection } from "./main";

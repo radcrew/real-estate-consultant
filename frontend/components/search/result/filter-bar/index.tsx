@@ -10,7 +10,7 @@ import {
   getCriteriaFromFilters,
   type ParsedCriteriaEntry,
   type SearchCriterionField,
-} from "@lib/search-criteria";
+} from "@utils/search/criteria";
 
 import { MultiSelectFilter } from "./filters/multi-select";
 import { CLEAR_RANGE, RangeFilter } from "./filters/range";

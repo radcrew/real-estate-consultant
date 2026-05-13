@@ -3,7 +3,7 @@
 import { Button } from "@components/ui/buttons";
 import { SaveCancelGroup } from "@components/ui/save-cancel-group";
 
-import type { ProfileFieldKey, ProfileFormValues } from "@lib/account-validation";
+import type { ProfileFieldKey, ProfileFormValues } from "@utils/account/validation";
 
 import { AccountField } from "../field";
 import { ACCOUNT_SECTION_CARD_CLASS } from "../styles";

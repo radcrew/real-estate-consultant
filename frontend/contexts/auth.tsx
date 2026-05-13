@@ -12,7 +12,7 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 
-import { getApiErrorMessage } from "@lib/api-errors";
+import { getApiErrorMessage } from "@utils/common";
 import {
   AUTH_SESSION_CHANGED_EVENT,
   clearSession,

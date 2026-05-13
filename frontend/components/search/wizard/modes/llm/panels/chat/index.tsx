@@ -5,7 +5,7 @@ import { Bot, Loader2 } from "lucide-react";
 
 import { useSearchWizard } from "@contexts/search-wizard";
 import { useIntakeSessions } from "@hooks/use-intake-sessions";
-import { getApiErrorMessage } from "@lib/api-errors";
+import { getApiErrorMessage } from "@utils/common";
 import type { LlmInputResponse } from "@services/intake-sessions";
 
 import type { ChatMessage } from "../../types";

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import type { StoredSession } from "@lib/auth-session";
-import { syncProfileNamesAfterOAuth } from "@lib/oauth-google-names";
+import { syncProfileNamesAfterOAuth } from "@lib/oauth-profile-sync";
 import { getSupabaseServerClient } from "@lib/supabase-server";
 
 const APP_SESSION_COOKIE = "radestate.session";
