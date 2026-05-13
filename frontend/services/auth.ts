@@ -18,6 +18,8 @@ export type SignInResponse = {
 export type SignUpBody = {
   email: string;
   password: string;
+  first_name: string;
+  last_name: string;
 };
 
 export type SignUpResponse = {

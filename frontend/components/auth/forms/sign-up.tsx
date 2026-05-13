@@ -9,9 +9,12 @@ import { useAuth } from "@contexts/auth";
 import { AuthFormError } from "./error";
 import { EmailField } from "../fields/email";
 import { PasswordField } from "../fields/password";
+import { TextField } from "../fields/text";
 
 export const SignUpForm = () => {
   const router = useRouter();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -33,7 +36,14 @@ export const SignUpForm = () => {
       return;
     }
 
-    await signUp({ email, password }, handleSuccess);
+    const fn = firstName.trim();
+    const ln = lastName.trim();
+    if (!fn || !ln) {
+      setValidationError("First name and last name are required.");
+      return;
+    }
+
+    await signUp({ email, password, firstName: fn, lastName: ln }, handleSuccess);
   };
 
   return (
@@ -42,6 +52,26 @@ export const SignUpForm = () => {
         <AuthFormError message={validationError ?? requestError} />
 
         <div className="flex flex-col gap-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <TextField
+              id="sign-up-firstName"
+              label="First name"
+              name="firstName"
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              disabled={isSubmitting}
+            />
+            <TextField
+              id="sign-up-lastName"
+              label="Last name"
+              name="lastName"
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
           <EmailField
             id="sign-up-email"
             value={email}
