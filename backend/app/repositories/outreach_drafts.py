@@ -95,8 +95,6 @@ async def update_outreach_draft_email(
         .update({"draft_email": draft_email})
         .eq("id", str(draft_id))
         .eq("user_id", str(user_id))
-        .select(_SELECT)
-        .limit(1)
         .execute(),
     )
     rows = as_row_list(result.data)
