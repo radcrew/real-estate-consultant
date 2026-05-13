@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
-import { getApiErrorMessage } from "@lib/api-errors";
+import { getApiErrorMessage } from "@utils/common";
 import { listingsService, type ListingDetailResponse } from "@services/listings";
 
 type UseListingDetailResult = {

@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSearchByProfile } from "@hooks/use-search-by-profile";
-import { mapSearchPropertyMatchesToListings, type ResultCardListing } from "@lib/map-property-match";
-import { buildDefaultSearchCriteriaShell } from "@lib/search-criteria";
+import { mapSearchPropertyMatchesToListings, type ResultCardListing } from "@utils/search/property";
+import { buildDefaultSearchCriteriaShell } from "@utils/search/criteria";
 import type { UpdateSearchCriteriaBody } from "@services/search";
 
 const DEFAULT_PAGE = { limit: 20, offset: 0 } as const;

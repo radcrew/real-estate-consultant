@@ -9,7 +9,7 @@ import {
 } from "@components/ui/dropdown-menu";
 import { Input } from "@components/ui/input";
 import { cn } from "@utils/common";
-import type { RangeCriterionData } from "@lib/search-criteria";
+import type { RangeCriterionData } from "@utils/search/criteria";
 
 import { FILTER_BAR_PILL } from "./styles";
 import {

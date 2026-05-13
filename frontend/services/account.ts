@@ -1,6 +1,6 @@
 import type { AxiosInstance } from "axios";
 
-import type { ProfileFormValues } from "@lib/account-validation";
+import type { ProfileFormValues } from "@utils/account/validation";
 import { apiClient } from "@lib/api-client";
 
 export type AccountProfileResponse = {

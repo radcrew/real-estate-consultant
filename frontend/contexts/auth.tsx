@@ -12,7 +12,7 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 
-import { getApiErrorMessage } from "@lib/api-errors";
+import { getApiErrorMessage } from "@utils/common";
 import {
   AUTH_SESSION_CHANGED_EVENT,
   clearSession,
@@ -29,6 +29,13 @@ export type AuthCredentials = {
   password: string;
 };
 
+export type SignUpCredentials = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+};
+
 export type AuthContextValue = {
   session: StoredSession | null;
   ready: boolean;
@@ -36,7 +43,7 @@ export type AuthContextValue = {
   signOut: () => void;
   signIn: (credentials: AuthCredentials, onSuccess: () => void) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  signUp: (credentials: AuthCredentials, onSuccess: () => void) => Promise<void>;
+  signUp: (credentials: SignUpCredentials, onSuccess: () => void) => Promise<void>;
   error: string | null;
   isSubmitting: boolean;
 };
@@ -131,7 +138,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const signUp = useCallback(
-    async ({ email, password }: AuthCredentials, onSuccess: () => void) => {
+    async ({ email, password, firstName, lastName }: SignUpCredentials, onSuccess: () => void) => {
       setError(null);
       setSubmitting(true);
 
@@ -139,6 +146,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         await authService.signUp({
           email: email.trim(),
           password,
+          first_name: firstName,
+          last_name: lastName,
         });
 
         onSuccess();

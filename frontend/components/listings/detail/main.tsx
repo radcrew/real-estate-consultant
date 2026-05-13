@@ -1,7 +1,8 @@
 import { ExternalLink, MapPin } from "lucide-react";
 
 import type { ListingProperty } from "@services/listings";
-import { listingLocationLine, listingTitle, mapsHref } from "@utils/listings";
+import { listingLocationLine, listingTitle } from "@utils/listings/headline";
+import { mapsHref } from "@utils/listings/maps";
 
 type ListingMainSectionProps = {
   property: ListingProperty;

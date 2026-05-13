@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import type { ResultCardListing } from "@lib/map-property-match";
+import type { ResultCardListing } from "@utils/search/property";
 
 import { STYLES } from "@components/landing/featured-listings/styles";
 

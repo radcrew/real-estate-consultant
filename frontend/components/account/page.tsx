@@ -6,14 +6,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@contexts/auth";
 
-import { getApiErrorMessage } from "@lib/api-errors";
+import { getApiErrorMessage } from "@utils/common";
 import { readSession, saveSession } from "@lib/auth-session";
 import {
   type ProfileFieldKey,
   type ProfileFormValues,
   validatePasswordChange,
   validateProfileForm,
-} from "@lib/account-validation";
+} from "@utils/account/validation";
 import {
   accountService,
   buildProfileUpdateBody,
