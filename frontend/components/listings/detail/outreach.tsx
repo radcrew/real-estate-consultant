@@ -90,7 +90,7 @@ export const ListingOutreachSection = ({ property }: ListingOutreachSectionProps
             variant="outline"
             size="sm"
             disabled={generating || loadingLatest}
-            onClick={() => void onGenerate()}
+            onClick={onGenerate}
           >
             {generating ? (
               <>
@@ -101,7 +101,7 @@ export const ListingOutreachSection = ({ property }: ListingOutreachSectionProps
               "Generate draft"
             )}
           </Button>
-          <Button type="button" variant="default" size="sm" disabled={!canSave} onClick={() => void onSave()}>
+          <Button type="button" variant="default" size="sm" disabled={!canSave} onClick={onSave}>
             {saving ? (
               <>
                 <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -127,7 +127,7 @@ export const ListingOutreachSection = ({ property }: ListingOutreachSectionProps
           role="alert"
         >
           <p>{error}</p>
-          <Button type="button" variant="ghost" size="xs" className="mt-2 h-auto px-0" onClick={() => void refreshLatest()}>
+          <Button type="button" variant="ghost" size="xs" className="mt-2 h-auto px-0" onClick={refreshLatest}>
             Retry load
           </Button>
         </div>
