@@ -10,9 +10,18 @@ from app.llm.outreach.schema import OutreachDraftEmailLLM
 from app.llm.providers import huggingface_provider
 
 
-async def generate_broker_outreach_draft(*, property_row: dict[str, Any]) -> str:
+async def generate_broker_outreach_draft(
+    *,
+    property_row: dict[str, Any],
+    profile_row: dict[str, Any] | None = None,
+    auth_email: str | None = None,
+) -> str:
     """Return a plain-text broker outreach email draft (not persisted)."""
-    user_content = build_outreach_user_message(property_row=property_row)
+    user_content = build_outreach_user_message(
+        property_row=property_row,
+        profile_row=profile_row,
+        auth_email=auth_email,
+    )
     messages = [
         {"role": "system", "content": OUTREACH_EMAIL_SYSTEM_PROMPT},
         {"role": "user", "content": user_content},

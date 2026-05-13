@@ -16,6 +16,7 @@ from app.repositories.outreach_drafts import (
     insert_outreach_draft,
     update_outreach_draft_email,
 )
+from app.repositories.profiles import fetch_profile_row
 from app.repositories.properties import get_property_by_id
 from app.schemas.outreach import (
     CreateOutreachDraftRequest,
@@ -43,7 +44,18 @@ async def create_outreach_draft(
     if row is None:
         raise_listing_not_found()
 
-    draft_text = await generate_broker_outreach_draft(property_row=row)
+    profile = await fetch_profile_row(client, user_id)
+    auth_email = getattr(current_user, "email", None)
+    if isinstance(auth_email, str):
+        auth_email = auth_email.strip() or None
+    else:
+        auth_email = None
+
+    draft_text = await generate_broker_outreach_draft(
+        property_row=row,
+        profile_row=profile,
+        auth_email=auth_email,
+    )
     saved = await insert_outreach_draft(
         client,
         user_id=user_id,
