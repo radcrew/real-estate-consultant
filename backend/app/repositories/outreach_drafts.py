@@ -31,8 +31,6 @@ async def insert_outreach_draft(
                 "draft_email": draft_email,
             },
         )
-        .select(_SELECT)
-        .single()
         .execute(),
     )
     return get_single_row(result, detail=_UNEXPECTED)

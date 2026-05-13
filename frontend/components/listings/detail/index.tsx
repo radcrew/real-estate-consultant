@@ -6,6 +6,7 @@ import { listingTitle } from "@utils/listings/headline";
 import { useListingDetail } from "../../../hooks/use-listing-detail";
 import { ListingMainSection } from "./main";
 import { ListingOverviewCard } from "./overview";
+import { ListingOutreachSection } from "./outreach";
 import { ListingPhotoCarousel } from "./photo";
 import { ListingDetailNotice, ListingDetailSkeleton } from "./status";
 
@@ -35,6 +36,7 @@ export const ListingDetailView = () => {
               <ListingMainSection property={property} />
               <ListingOverviewCard property={property} />
             </div>
+            <ListingOutreachSection property={property} />
           </>
         )}
       </div>
