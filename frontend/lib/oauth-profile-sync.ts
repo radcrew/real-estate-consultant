@@ -1,6 +1,6 @@
 import type { SupabaseClient, User as AuthUser } from "@supabase/supabase-js";
 
-import { extractGoogleDisplayNames } from "@utils/auth/google-profile-names";
+import { extractGoogleDisplayNames } from "@utils/auth/google-names";
 
 const coalesceName = (
   existing: string | null | undefined,
