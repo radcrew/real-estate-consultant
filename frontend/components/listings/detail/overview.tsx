@@ -47,6 +47,31 @@ export const ListingOverviewCard = ({ property: p }: ListingOverviewCardProps) =
             </div>
           )}
         </dl>
+        {p.listing_broker_name || p.listing_broker_email || p.listing_broker_phone ? (
+          <div className="mt-4 border-t border-border/70 pt-4">
+            <h3 className={STYLES.overviewLabel}>Listing broker</h3>
+            <div className="mt-2 space-y-3">
+              {p.listing_broker_name ? (
+                <div className={STYLES.overviewBorderedRow}>
+                  <div className={STYLES.overviewLabel}>Name</div>
+                  <div className={STYLES.overviewValueCompact}>{p.listing_broker_name}</div>
+                </div>
+              ) : null}
+              {p.listing_broker_email ? (
+                <div className={STYLES.overviewBorderedRow}>
+                  <div className={STYLES.overviewLabel}>Email</div>
+                  <div className={STYLES.overviewValueCompact}>{p.listing_broker_email}</div>
+                </div>
+              ) : null}
+              {p.listing_broker_phone ? (
+                <div className={STYLES.overviewBorderedRow}>
+                  <div className={STYLES.overviewLabel}>Phone</div>
+                  <div className={STYLES.overviewValueCompact}>{p.listing_broker_phone}</div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </div>
     </aside>
   );

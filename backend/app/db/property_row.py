@@ -29,3 +29,6 @@ class PropertyRow(Base):
     rent: Mapped[float | None] = mapped_column(Float, nullable=True)
     clear_height: Mapped[float | None] = mapped_column(Float, nullable=True)
     loading_docks: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    listing_broker_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    listing_broker_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    listing_broker_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
