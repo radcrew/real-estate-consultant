@@ -1,0 +1,49 @@
+yamlname: Deploy Frontend
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'frontend/**'
+
+# 1. Grant permissions required to deploy to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment to prevent conflicts
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy-frontend:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }} # Automatically shows the URL in GitHub
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./frontend 
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install and Build
+        run: |
+          npm install
+          npm run build
+
+      # 2. Upload your compiled folder (Change 'dist' if your build folder is named 'build' or 'out')
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './frontend/dist' 
+
+      # 3. Deploy the files to the built-in GitHub domain
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
