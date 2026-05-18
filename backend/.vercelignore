@@ -1,13 +1,13 @@
 .venv/
 __pycache__/
 *.py[cod]
-*$py.class
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .env
+.env.*
+!.env.example
 dist/
 *.egg-info/
-.python-version
-.vercel/
-.vercel
+dataset/
+scripts/

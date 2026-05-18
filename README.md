@@ -62,6 +62,23 @@ Production deploys use **[Vercel](https://vercel.com)** via `.github/workflows/f
 
 **CI:** On pull requests, the workflow runs `next build` only. On push to `main`, it builds and deploys with `vercel deploy --prebuilt --prod`.
 
+Set `NEXT_PUBLIC_BACKEND_API_URL` in Vercel (frontend project) to the backend production URL below.
+
+---
+
+## Deploy backend (Vercel)
+
+The FastAPI API deploys as a **second Vercel project** via `.github/workflows/backend.yml`.
+
+1. In Vercel, create/import a project with **Root Directory** = `backend` (or `cd backend && npx vercel link`).
+2. Add GitHub secret **`VERCEL_BACKEND_PROJECT_ID`** (this project's ID). Reuse **`VERCEL_TOKEN`** and **`VERCEL_ORG_ID`** from the frontend project.
+3. In the **backend** Vercel project → **Environment Variables** (Production), set variables from `backend/.env.example` (at minimum `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `FRONTEND_ORIGIN` = your frontend Vercel URL).
+4. Merge to **`main`** to run production deploy (`vercel deploy --prebuilt --prod`).
+
+**URL:** `https://<backend-project-name>.vercel.app` — use this as `NEXT_PUBLIC_BACKEND_API_URL` on the frontend. Routes are unchanged (`/health`, `/api/v1/...`, `/docs`).
+
+**Note:** Serverless cold starts run `init_db()` per instance; keep DB connections pool-friendly. Large seed datasets are excluded via `backend/.vercelignore`.
+
 ---
 
 ## Local frontend (Next.js)
