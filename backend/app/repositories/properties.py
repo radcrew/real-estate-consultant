@@ -75,7 +75,12 @@ async def normalize_criteria(
         label = titles[key]
         unit = units.get(key)
         if key in criteria:
-            normalized[key] = CriteriaFieldItem(type=qtype, label=label, unit=unit, data=criteria[key])
+            normalized[key] = CriteriaFieldItem(
+                type=qtype,
+                label=label,
+                unit=unit,
+                data=criteria[key]
+            )
         else:
             normalized[key] = CriteriaFieldItem(type=qtype, label=label, unit=unit, data=None)
 
