@@ -1,49 +1,75 @@
-yamlname: Deploy Frontend
+# Next.js frontend: CI on every change; production deploy to Vercel on push to main.
+#
+# Required GitHub repository secrets (Vercel → Project → Settings → General):
+#   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+# Link the project once from frontend/: npx vercel link
+name: Frontend
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
     paths:
-      - 'frontend/**'
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
 
-# 1. Grant permissions required to deploy to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-# Allow only one concurrent deployment to prevent conflicts
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+defaults:
+  run:
+    working-directory: frontend
 
 jobs:
-  deploy-frontend:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }} # Automatically shows the URL in GitHub
+  build:
+    name: Build
     runs-on: ubuntu-latest
-    
-    defaults:
-      run:
-        working-directory: ./frontend 
-
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install and Build
-        run: |
-          npm install
-          npm run build
-
-      # 2. Upload your compiled folder (Change 'dist' if your build folder is named 'build' or 'out')
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          path: './frontend/dist' 
+          node-version: "20"
 
-      # 3. Deploy the files to the built-in GitHub domain
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_BACKEND_API_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_API_URL || 'https://ci-placeholder.example.com' }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://ci-placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
+
+  deploy:
+    name: Deploy to Vercel
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build for Vercel
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        id: deploy
+        run: |
+          url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"

@@ -42,6 +42,37 @@ Running `fastapi dev` with no path from the repo root fails because the CLI does
 
 ---
 
-## Repository status
+## Deploy frontend (Vercel)
 
-Specification and planning docs are in place; application source is not added yet. When the app exists, this README should gain **local setup**, **environment variables**, and **deployment** sections (as outlined under “Project artifacts” in [docs/spec.md](docs/spec.md)).
+Production deploys use **[Vercel](https://vercel.com)** via `.github/workflows/frontend.yml` (not GitHub Pages).
+
+1. In Vercel, import the repo and set **Root Directory** to `frontend` (or link locally: `cd frontend && npx vercel link`).
+2. Add **GitHub repository secrets** for the workflow:
+   - `VERCEL_TOKEN` — [Vercel account tokens](https://vercel.com/account/tokens)
+   - `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` — from the linked project settings
+3. In the Vercel project (or GitHub secrets for CI builds), set env vars from `frontend/.env.example`:
+   - `NEXT_PUBLIC_BACKEND_API_URL` — public URL of the FastAPI backend
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. In **Supabase → Authentication → URL configuration**, add redirect URLs:
+   - `https://<your-project>.vercel.app/auth/callback`
+   - Preview URLs if you test OAuth on PR deployments.
+
+**URLs:** Production is `https://<project-name>.vercel.app` (shown in the workflow deploy step and Vercel dashboard). PRs run **build only**; previews can use Vercel’s Git integration or add a preview deploy job later.
+
+**CI:** On pull requests, the workflow runs `next build` only. On push to `main`, it builds and deploys with `vercel deploy --prebuilt --prod`.
+
+---
+
+## Local frontend (Next.js)
+
+From `frontend/`:
+
+```bash
+cp .env.example .env.local
+# edit .env.local, then:
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
