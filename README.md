@@ -49,7 +49,7 @@ Production deploys use **[Vercel](https://vercel.com)** via `.github/workflows/f
 1. In Vercel, import the repo and set **Root Directory** to `frontend` (or link locally: `cd frontend && npx vercel link`).
 2. Add **GitHub repository secrets** for the workflow:
    - `VERCEL_TOKEN` — [Vercel account tokens](https://vercel.com/account/tokens)
-   - `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` — from the linked project settings
+   - `VERCEL_ORG_ID`, `VERCEL_FRONTEND_PROJECT_ID` — from the linked frontend project settings
 3. In the Vercel project (or GitHub secrets for CI builds), set env vars from `frontend/.env.example`:
    - `NEXT_PUBLIC_BACKEND_API_URL` — public URL of the FastAPI backend
    - `NEXT_PUBLIC_SUPABASE_URL`
@@ -71,7 +71,7 @@ Set `NEXT_PUBLIC_BACKEND_API_URL` in Vercel (frontend project) to the backend pr
 The FastAPI API deploys as a **second Vercel project** via `.github/workflows/backend.yml`.
 
 1. In Vercel, create/import a project with **Root Directory** = `backend` (or `cd backend && npx vercel link`).
-2. Add GitHub secret **`VERCEL_BACKEND_PROJECT_ID`** (this project's ID). Reuse **`VERCEL_TOKEN`** and **`VERCEL_ORG_ID`** from the frontend project.
+2. Add GitHub secrets **`VERCEL_BACKEND_PROJECT_ID`** (backend project ID) and reuse **`VERCEL_TOKEN`** / **`VERCEL_ORG_ID`**. The frontend workflow uses **`VERCEL_FRONTEND_PROJECT_ID`**.
 3. In the **backend** Vercel project → **Environment Variables** (Production), set variables from `backend/.env.example` (at minimum `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `FRONTEND_ORIGIN` = your frontend Vercel URL).
 4. Merge to **`main`** to run production deploy (`vercel deploy --prebuilt --prod`).
 

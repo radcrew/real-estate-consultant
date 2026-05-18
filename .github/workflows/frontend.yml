@@ -1,7 +1,7 @@
 # Next.js frontend: CI on every change; production deploy to Vercel on push to main.
 #
 # Required GitHub repository secrets (Vercel → Project → Settings → General):
-#   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+#   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_FRONTEND_PROJECT_ID
 # Link the project once from frontend/: npx vercel link
 name: Frontend
 
@@ -18,7 +18,7 @@ on:
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
 
 defaults:
   run:
