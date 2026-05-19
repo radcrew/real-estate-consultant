@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 
-from . import sessions
-from . import actions
+from . import actions, sessions
 from .answers.router import router as answers_router
 
 router = APIRouter(prefix="/intake-sessions", tags=["intake-sessions"])

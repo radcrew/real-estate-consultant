@@ -118,3 +118,15 @@ With dev dependencies installed:
 ```powershell
 ruff check app
 ```
+
+## Deploy on Vercel
+
+Use a **separate Vercel project** from the Next.js frontend (Root Directory = `backend/`).
+
+1. `cd backend && npx vercel link`
+2. Set **Production** env vars in Vercel from `.env.example` (`DATABASE_URL`, Supabase keys, `FRONTEND_ORIGIN`, `HF_TOKEN`, …).
+3. Push to `main` — `.github/workflows/backend.yml` deploys with `VERCEL_BACKEND_PROJECT_ID`, or deploy locally with `vercel deploy --prod`.
+
+Entrypoint for the serverless bundle: `api/index.py` → `app.main:app` (see `vercel.json`).
+
+See the repo root [README](../README.md#deploy-backend-vercel) for GitHub secrets and wiring `NEXT_PUBLIC_BACKEND_API_URL` on the frontend.

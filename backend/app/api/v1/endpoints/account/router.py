@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from . import profile, password
+from . import password, profile
 
 router = APIRouter(prefix="/account", tags=["account"])
 router.include_router(profile.router)

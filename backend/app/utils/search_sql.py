@@ -164,7 +164,10 @@ def match_score_expr(criteria: dict[str, Any]) -> Any:
     price = _gaussian_score_for_criterion(PropertyRow.price, criteria.get("price"))
     size = _gaussian_score_for_criterion(PropertyRow.size_sqft, criteria.get("size_sqft"))
     raw_score_expr = _lit_float(0.4) * loc + _lit_float(0.3) * price + _lit_float(0.3) * size
-    return func.least(_lit_float(100.0), func.greatest(_lit_float(0.0), _lit_float(100.0) * raw_score_expr))
+    return func.least(
+        _lit_float(100.0),
+        func.greatest(_lit_float(0.0), _lit_float(100.0) * raw_score_expr)
+    )
 
 
 def property_row_to_search_dict(row: PropertyRow) -> dict[str, Any]:

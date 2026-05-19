@@ -11,10 +11,10 @@ from app.api.v1.endpoints.auth.exceptions import (
 )
 from app.core.config import settings
 from app.core.deps import SupabaseSdkDep
-from app.utils.exceptions import raise_bad_request
 from app.repositories.profiles import upsert_profile_patch
 from app.schemas.account import AccountProfileUpdate
 from app.schemas.auth import SignUpRequest, SignUpResponse
+from app.utils.exceptions import raise_bad_request
 
 router = APIRouter()
 
