@@ -1,16 +1,10 @@
-# FastAPI backend: lint on PR/push; production deploy to Vercel on push to main.
+# FastAPI backend: lint on PR/push; preview deploy on PR; production deploy on push to main.
 #
-# Create a separate Vercel project with Root Directory = backend, then link:
-#   cd backend && npx vercel link
+# Separate Vercel project with Root Directory = backend (Settings → General).
+# Deploy runs from backend/ (repo-root .vercelignore excludes backend for the frontend project).
 #
-# GitHub repository secrets:
-#   VERCEL_TOKEN          — shared with frontend
-#   VERCEL_ORG_ID         — shared with frontend
-#   VERCEL_BACKEND_PROJECT_ID — this project's ID (not the frontend project ID)
-#
-# Set runtime env in Vercel (Production), from backend/.env.example:
-#   DATABASE_URL, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY,
-#   FRONTEND_ORIGIN, HF_TOKEN, etc.
+# GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_BACKEND_PROJECT_ID
+# Production env in Vercel: see backend/.env.example
 name: Backend
 
 on:
@@ -28,14 +22,13 @@ env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
 
-defaults:
-  run:
-    working-directory: backend
-
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +49,9 @@ jobs:
     needs: lint
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     environment:
       name: production
       url: ${{ steps.deploy.outputs.url }}
@@ -69,11 +65,35 @@ jobs:
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Build for Vercel
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
       - name: Deploy to Vercel
         id: deploy
         run: |
-          url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          url=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
+
+  deploy-preview:
+    name: Deploy preview to Vercel
+    needs: lint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy preview to Vercel
+        id: deploy
+        run: |
+          url=$(vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Preview URL
+        run: echo "### Preview deployment\n${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"

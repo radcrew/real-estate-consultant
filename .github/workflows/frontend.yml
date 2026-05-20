@@ -1,8 +1,8 @@
-# Next.js frontend: CI on every change; production deploy to Vercel on push to main.
+# Next.js frontend: CI build on every change; Vercel deploy on PR (preview) and main (production).
 #
-# Required GitHub repository secrets (Vercel → Project → Settings → General):
-#   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_FRONTEND_PROJECT_ID
-# Link the project once from frontend/: npx vercel link
+# Required GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_FRONTEND_PROJECT_ID
+# Monorepo: vercel pull/deploy run from the repo root (not frontend/) so pnpm-lock.yaml is included.
+# Vercel project Root Directory must be "frontend" (Settings → General).
 name: Frontend
 
 on:
@@ -10,19 +10,21 @@ on:
     branches: [main]
     paths:
       - "frontend/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
       - ".github/workflows/frontend.yml"
   pull_request:
     paths:
       - "frontend/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "package.json"
       - ".github/workflows/frontend.yml"
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
-
-defaults:
-  run:
-    working-directory: frontend
 
 jobs:
   build:
@@ -32,16 +34,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: npm run build
+        run: pnpm --filter radestate build
         env:
           NEXT_PUBLIC_BACKEND_API_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_API_URL || 'https://ci-placeholder.example.com' }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://ci-placeholder.supabase.co' }}
@@ -65,11 +74,32 @@ jobs:
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Build for Vercel
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
       - name: Deploy to Vercel
         id: deploy
         run: |
-          url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          url=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
+
+  deploy-preview:
+    name: Deploy preview to Vercel
+    needs: build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy preview to Vercel
+        id: deploy
+        run: |
+          url=$(vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Preview URL
+        run: echo "### Preview deployment\n${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"

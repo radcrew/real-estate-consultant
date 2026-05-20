@@ -1,6 +1,11 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Dev-only: pnpm workspace hoists deps to the repo root; avoids Turbopack resolving from app/.
+  turbopack: {
+    root: path.join(__dirname, ".."),
+  },
   images: {
     remotePatterns: [
       {
