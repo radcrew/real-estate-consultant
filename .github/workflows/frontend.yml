@@ -1,8 +1,8 @@
 # Next.js frontend: CI build on every change; Vercel deploy on PR (preview) and main (production).
 #
 # Required GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_FRONTEND_PROJECT_ID
-# Vercel project Root Directory must be "frontend". Deploy uses source upload (not --prebuilt)
-# because pnpm monorepo prebuilt bundles reference paths that fail on Vercel's builders.
+# Monorepo: vercel pull/deploy run from the repo root (not frontend/) so pnpm-lock.yaml is included.
+# Vercel project Root Directory must be "frontend" (Settings → General).
 name: Frontend
 
 on:
@@ -72,12 +72,10 @@ jobs:
         run: npm install --global vercel@latest
 
       - name: Pull Vercel environment
-        working-directory: frontend
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy to Vercel
         id: deploy
-        working-directory: frontend
         run: |
           url=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
@@ -95,12 +93,10 @@ jobs:
         run: npm install --global vercel@latest
 
       - name: Pull Vercel environment
-        working-directory: frontend
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy preview to Vercel
         id: deploy
-        working-directory: frontend
         run: |
           url=$(vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
