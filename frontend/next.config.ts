@@ -1,12 +1,10 @@
 import path from "path";
 import type { NextConfig } from "next";
 
-const monorepoRoot = path.join(__dirname, "..");
-
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: monorepoRoot,
+  // Dev-only: pnpm workspace hoists deps to the repo root; avoids Turbopack resolving from app/.
   turbopack: {
-    root: monorepoRoot,
+    root: path.join(__dirname, ".."),
   },
   images: {
     remotePatterns: [
