@@ -1,30 +1,19 @@
 export const STYLES = {
-  section: "border-b border-border/60 bg-muted/30 px-4 py-14 sm:py-16",
+  section: "px-4 py-16 lg:py-20",
   inner: "mx-auto max-w-screen-xl",
-  title:
-    "text-center text-2xl font-bold tracking-tight text-foreground sm:text-3xl",
-  grid:
-    "mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8",
-  browseRow: "mt-10 flex justify-center sm:mt-12",
-  browseButton: "inline-flex items-center gap-2 px-6 font-semibold shadow-none",
-  cardLink:
-    "group block overflow-hidden rounded-lg border border-border bg-card shadow-sm transition-shadow hover:shadow-md",
-  cardImageWrap: "relative aspect-[16/10] bg-muted",
-  cardImage:
-    "object-cover transition-transform duration-300 group-hover:scale-[1.02]",
-  badgeLeftWrap: "absolute left-2 top-2 sm:left-3 sm:top-3",
-  badgeLeft:
-    "rounded-md bg-background px-2 py-0.5 text-xs font-semibold text-foreground shadow-sm",
-  badgeRightWrap: "absolute right-2 top-2 sm:right-3 sm:top-3",
-  badgeRight:
-    "rounded-md bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground shadow-sm",
-  cardBody: "p-4 sm:p-5",
-  cardTitle:
-    "line-clamp-2 text-base font-bold leading-snug text-foreground sm:text-lg",
-  cardLocation: "mt-1.5 text-sm text-muted-foreground",
-  cardFooter:
-    "mt-4 flex items-end justify-between gap-3 border-t border-border/60 pt-4",
-  cardSqft: "text-sm font-bold tabular-nums text-foreground",
-  cardPrice: "shrink-0 text-xs font-medium text-muted-foreground",
-  cardPriceEmpty: "text-xs text-muted-foreground",
+  grid: "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3",
+  browseRow: "mt-14 flex justify-center",
+  card: "group relative flex flex-col overflow-hidden rounded-2xl border border-neutral-100 bg-white transition-shadow hover:shadow-xl dark:border-neutral-800 dark:bg-neutral-900",
+  imageWrap:
+    "relative aspect-[4/3] w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800",
+  image: "object-cover transition-transform duration-300 group-hover:scale-105",
+  body: "flex flex-1 flex-col space-y-3 p-4",
+  meta: "text-sm text-neutral-500 dark:text-neutral-400",
+  title: "text-base font-semibold text-neutral-900 capitalize dark:text-white",
+  location:
+    "flex items-center space-x-1.5 text-sm text-neutral-500 dark:text-neutral-400",
+  divider: "w-14 border-b border-neutral-100 dark:border-neutral-800",
+  footer: "mt-auto flex items-center justify-between pt-1",
+  sqft: "text-base font-semibold text-neutral-900 dark:text-white",
+  price: "text-sm font-medium text-neutral-500 dark:text-neutral-400",
 } as const;

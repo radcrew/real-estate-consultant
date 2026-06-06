@@ -1,54 +1,44 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { MapPin } from "lucide-react";
 
 import type { FeaturedListing } from "@constants";
 import { FEATURED_LISTINGS } from "@constants";
-import { buttonVariants } from "@components/ui/buttons";
-import { cn } from "@utils/common";
+import { Badge } from "@components/ui/voyager/badge";
+import { ButtonSecondary } from "@components/ui/voyager/button-secondary";
+import { Heading2 } from "@components/ui/voyager/heading2";
 
 import { STYLES } from "./styles";
 
 const ListingCard = ({ listing }: { listing: FeaturedListing }) => (
-  <Link
-    href={`/listings/${listing.id}`}
-    className={STYLES.cardLink}
-  >
-    <div className={STYLES.cardImageWrap}>
+  <Link href={`/listings/${listing.id}`} className={STYLES.card}>
+    <div className={STYLES.imageWrap}>
       <Image
         src={listing.imageSrc}
         alt={listing.imageAlt}
         fill
-        className={STYLES.cardImage}
+        className={STYLES.image}
         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
       />
-      <div className={STYLES.badgeLeftWrap}>
-        <span className={STYLES.badgeLeft}>
-          {listing.category}
-        </span>
-      </div>
-      <div className={STYLES.badgeRightWrap}>
-        <span className={STYLES.badgeRight}>
-          {listing.transactionType}
-        </span>
-      </div>
+      <Badge
+        name={listing.transactionType}
+        color={listing.transactionType === "Sale" ? "green" : "blue"}
+        className="absolute top-3 left-3"
+      />
     </div>
-    <div className={STYLES.cardBody}>
-      <h3 className={STYLES.cardTitle}>
-        {listing.title}
+    <div className={STYLES.body}>
+      <span className={STYLES.meta}>{listing.category}</span>
+      <h3 className={STYLES.title}>
+        <span className="line-clamp-1">{listing.title}</span>
       </h3>
-      <p className={STYLES.cardLocation}>{listing.location}</p>
-      <div className={STYLES.cardFooter}>
-        <span className={STYLES.cardSqft}>
-          {listing.sqftLabel}
-        </span>
-        {listing.priceLabel ? (
-          <span className={STYLES.cardPrice}>
-            {listing.priceLabel}
-          </span>
-        ) : (
-          <span className={STYLES.cardPriceEmpty}>—</span>
-        )}
+      <div className={STYLES.location}>
+        <MapPin className="h-4 w-4 shrink-0" aria-hidden />
+        <span className="line-clamp-1">{listing.location}</span>
+      </div>
+      <div className={STYLES.divider} />
+      <div className={STYLES.footer}>
+        <span className={STYLES.sqft}>{listing.sqftLabel}</span>
+        <span className={STYLES.price}>{listing.priceLabel ?? "—"}</span>
       </div>
     </div>
   </Link>
@@ -57,9 +47,14 @@ const ListingCard = ({ listing }: { listing: FeaturedListing }) => (
 export const FeaturedListings = () => (
   <section className={STYLES.section} aria-labelledby="featured-listings-heading">
     <div className={STYLES.inner}>
-      <h2 id="featured-listings-heading" className={STYLES.title}>
-        Featured Listings
-      </h2>
+      <Heading2
+        heading={<span id="featured-listings-heading">Featured listings</span>}
+        subHeading={
+          <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
+            Curated commercial properties across categories and markets.
+          </span>
+        }
+      />
       <div className={STYLES.grid}>
         {FEATURED_LISTINGS.map((listing) => (
           <ListingCard key={listing.id} listing={listing} />
@@ -67,16 +62,7 @@ export const FeaturedListings = () => (
       </div>
 
       <div className={STYLES.browseRow}>
-        <Link
-          href="/listings"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "lg" }),
-            STYLES.browseButton,
-          )}
-        >
-          <Search className="size-5 shrink-0" aria-hidden />
-          Browse All Properties
-        </Link>
+        <ButtonSecondary href="/listings">Browse all properties</ButtonSecondary>
       </div>
     </div>
   </section>
