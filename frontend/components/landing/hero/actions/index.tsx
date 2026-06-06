@@ -1,12 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 
-import { Button, buttonVariants } from "@components/ui/buttons";
+import { ButtonPrimary } from "@components/ui/voyager/button-primary";
+import { ButtonThird } from "@components/ui/voyager/button-third";
 import { useAuth } from "@contexts/auth";
-import { cn } from "@utils/common";
 
 import { STYLES } from "./styles";
 
@@ -17,25 +16,23 @@ export const HeroActions = () => {
 
   return (
     <div className={STYLES.row}>
-      <Button
-        size="lg"
+      <ButtonPrimary
         onClick={() => router.push("/questionnaire")}
-        className={cn(STYLES.primaryAction)}
+        sizeClass="px-7 py-3.5"
+        fontSize="text-base font-medium"
       >
-        <Search className="size-5 shrink-0" aria-hidden />
+        <Search className="mr-2.5 size-5 shrink-0" aria-hidden />
         Start Searching
-      </Button>
+      </ButtonPrimary>
 
       {showSignIn && (
-        <Link
+        <ButtonThird
           href="/sign-in"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "lg" }),
-            STYLES.outlineAction,
-          )}
+          sizeClass="px-7 py-3.5"
+          fontSize="text-base font-medium"
         >
           Sign In
-        </Link>
+        </ButtonThird>
       )}
     </div>
   );

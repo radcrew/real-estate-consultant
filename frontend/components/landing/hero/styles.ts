@@ -1,19 +1,18 @@
 export const STYLES = {
-  section:
-    "relative border-b border-border/60 bg-gradient-to-br from-amber-200/25 via-background to-background px-4 pt-16 pb-10 sm:py-16",
-  inner: "mx-auto flex max-w-3xl flex-col items-center text-center",
-  headlineStack: "flex flex-col items-center gap-1 sm:gap-1.5",
-  headlineStrip:
-    "px-3 py-1.5 text-2xl font-bold text-foreground sm:px-4 sm:py-2 sm:text-4xl sm:leading-tight md:text-5xl",
-  subcopy:
-    "mt-6 max-w-xl text-pretty text-base text-muted-foreground sm:text-lg",
+  section: "relative px-4 pt-10 pb-16 sm:pt-14 lg:pt-20",
+  inner:
+    "mx-auto flex max-w-screen-xl flex-col-reverse items-center gap-10 lg:flex-row lg:gap-14",
+  left: "flex w-full flex-col items-start space-y-7 sm:space-y-9 lg:w-1/2",
+  headline:
+    "text-4xl font-medium leading-[114%] text-neutral-900 md:text-5xl xl:text-6xl dark:text-neutral-100",
+  subcopy: "text-base text-neutral-500 md:text-lg dark:text-neutral-400",
+  imageWrap: "relative aspect-[4/3] w-full overflow-hidden rounded-3xl lg:w-1/2",
   statsSection:
-    "mx-auto mt-14 flex w-full max-w-3xl flex-col items-center justify-center border-t border-border/60 px-4 pt-10",
+    "mx-auto mt-16 w-full max-w-screen-xl border-t border-neutral-200 px-4 pt-10 dark:border-neutral-700",
   statsGrid:
-    "grid w-full grid-cols-2 place-items-center gap-x-14 gap-y-16 text-center sm:grid-cols-4 sm:gap-x-16 sm:gap-y-14",
-  statCell:
-    "flex flex-col items-center justify-center gap-1 text-center",
-  statValue: "text-2xl font-bold tabular-nums text-primary sm:text-3xl",
+    "grid w-full grid-cols-2 place-items-center gap-x-14 gap-y-12 text-center sm:grid-cols-4",
+  statCell: "flex flex-col items-center justify-center gap-1 text-center",
+  statValue: "text-2xl font-bold tabular-nums text-primary-600 sm:text-3xl",
   statLabel:
-    "text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground sm:text-xs",
+    "text-[0.65rem] font-medium tracking-wider text-neutral-500 uppercase sm:text-xs dark:text-neutral-400",
 } as const;
