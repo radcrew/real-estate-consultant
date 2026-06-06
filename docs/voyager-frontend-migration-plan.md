@@ -9,10 +9,16 @@
 
 | Decision | Choice |
 |---|---|
-| **Strategy** | **Option A** — port Voyager's UI *into* `frontend/`; keep all current functionality. The existing app is the source of truth; Voyager is a **visual-only** donor. |
-| **Scope** | **Everything at once** — landing, listings, search, detail, account, auth, questionnaire all re-skinned. |
+| **Strategy** | **Full architecture + flow** (updated 2026-06-06) — adopt Voyager's page composition, component organization, and user flows, **wired to the existing data layer**. Goes beyond the earlier visual-reskin reading of "Option A". See §11 for the active plan. |
+| **Scope / flows** | All four flows: **Home/discovery, Listings+map, Listing detail, Account workspace**. |
+| **Data layer** | **Unchanged** — `services/`, `hooks/`, `contexts/`, `lib/` stay the source of truth; a thin adapter maps real data → Voyager component props. |
 | **Theme** | **Light + dark** toggle, ported from Voyager. |
 | **Animation** | **framer-motion** allowed (added to `frontend/`). |
+
+> **Pivot note:** Steps 1–24 built the Voyager atom library (`components/ui/voyager/*`)
+> and reskinned header/footer/hero/featured cards. Those atoms are the foundation
+> for the architecture work; the reskinned sections may be recomposed into Voyager
+> page sections during Phase B.
 
 > **Non-negotiable:** No change to `services/`, `hooks/`, `contexts/`, `lib/`
 > (Supabase + FastAPI), or the intake→search→outreach behavior. Only presentation
@@ -270,3 +276,53 @@ look must be reproduced and how many card/detail field variations exist.
    workflow.
 4. Proceed through **all** phases (1–7); since scope is "everything," every page
    group is in-scope before final cleanup. PR per phase.
+
+---
+
+## 11. Architecture & flow migration (ACTIVE PLAN — supersedes the reskin approach)
+
+Decision (2026-06-06): adopt Voyager's **architecture, page composition, and user
+flow**, wired to the existing data layer. This supersedes §6's section-by-section
+reskin as the primary approach. Priority flows: Home/discovery, Listings+map,
+Listing detail, Account workspace. Voyager's travel-only flows (flights, cars,
+experiences) are skipped.
+
+### 11.1 Architecture decisions
+- **Routes:** keep Next `app/` routes (they own URLs + backend/auth coupling), but
+  **rebuild each page as a composition of Voyager section components** instead of
+  the existing ad-hoc sections.
+- **Components:**
+  - `components/ui/voyager/` — atoms (DONE: buttons, form controls, badge/tag/
+    avatar, heading, pagination, nav, modal, dark-mode).
+  - `components/voyager/` — Voyager's larger building blocks: property cards,
+    image gallery, sliders, section blocks, hero search form, filter tabs, map.
+  - Page-level sections colocated per route (Voyager style, e.g.
+    `SectionGridFilterCard`) or under `components/voyager/sections/`.
+- **Data layer (UNCHANGED):** `services/`, `hooks/`, `contexts/`, `lib/` stay the
+  single source of truth. A thin **adapter** maps `SearchProperty` /
+  `ListingDetailResponse` → the view-model that Voyager cards/detail expect
+  (replaces Voyager's `data/*` demo + `StayDataType`).
+- **Config:** add `config/brand.ts` (RadEstate brand/copy) mirroring Voyager's
+  centralized config.
+- **Types:** define a RadEstate **listing view-model** (e.g. `PropertyCardModel`)
+  decoupled from Voyager's travel `StayDataType`.
+
+### 11.2 Roadmap (phased; each phase shippable)
+- **Phase A — Foundations:** `config/brand.ts`; listing view-model type +
+  `SearchProperty → model` adapter; port core big components (PropertyCard,
+  image gallery, specs row replacing StartRating, save/like → no-op or saved-list).
+- **Phase B — Home/discovery:** Voyager home composition (SectionHero + search,
+  category tabs, `SectionGridFeatureProperty`) wired to listings/search services.
+- **Phase C — Listings + map:** `SectionGridFilterCard`, `TabFilters`,
+  `SectionGridHasMap` (grid+map split) wired to the search service + existing
+  maps util (`utils/listings/maps.ts`, `use-location`).
+- **Phase D — Listing detail:** `(listing-detail)` layout (gallery, spec table,
+  broker/outreach sidebar) wired to `use-listing-detail` + `outreach` (draft only).
+- **Phase E — Account workspace:** `(account-pages)` layout (profile, collections,
+  security) wired to the `account` service.
+- **Phase F — Auth, questionnaire polish, cleanup, remove dead reskin code.**
+
+### 11.3 Notes
+- Earlier header/footer reskins stay; the home page (Phase B) may recompose the
+  hero/featured sections into Voyager's section components.
+- Keep the small-step + manual-commit + delete-`.tmp` workflow throughout.
