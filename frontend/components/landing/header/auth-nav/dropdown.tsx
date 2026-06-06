@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { LogOut, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -13,15 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu";
+import { Avatar } from "@components/ui/voyager/avatar";
 import { useAuth } from "@contexts/auth";
-import { cn } from "@utils/common";
-
-const DEFAULT_AVATAR = "/icons/avatar-default.svg";
-
-const triggerClassName = cn(
-  "flex size-8 shrink-0 items-center justify-center rounded-full p-0",
-  "outline-none focus-visible:outline-none",
-);
 
 export const ProfileDropdown = () => {
   const router = useRouter();
@@ -32,22 +24,20 @@ export const ProfileDropdown = () => {
 
   const label = session.user.email?.trim() || "Account";
   const avatarUrl = session.user.avatarUrl?.trim();
-  const src = avatarUrl && avatarUrl.length > 0 ? avatarUrl : DEFAULT_AVATAR;
 
   return (
     <DropdownMenu modal={false}>
 
       <DropdownMenuTrigger
         aria-label="Account menu"
-        className={triggerClassName}
+        className="shrink-0 rounded-full outline-none focus-visible:outline-none"
       >
-        <Image
-          src={src}
-          alt=""
-          width={32}
-          height={32}
+        <Avatar
+          imgUrl={avatarUrl || undefined}
+          userName={label}
+          sizeClass="h-9 w-9 text-base"
+          containerClassName="ring-1 ring-neutral-200 dark:ring-neutral-700"
           unoptimized
-          className="size-8 rounded-full object-cover"
           referrerPolicy="no-referrer"
         />
       </DropdownMenuTrigger>

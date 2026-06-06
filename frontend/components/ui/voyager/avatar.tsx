@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Check } from "lucide-react";
+import type { HTMLAttributeReferrerPolicy } from "react";
 
 import { cn } from "@utils/common";
 
@@ -33,6 +34,10 @@ export interface AvatarProps {
   userName?: string;
   hasChecked?: boolean;
   hasCheckedClass?: string;
+  /** Skip the image optimizer (needed for arbitrary remote hosts not in next.config). */
+  unoptimized?: boolean;
+  /** Forwarded to the image (e.g. "no-referrer" for OAuth provider avatars). */
+  referrerPolicy?: HTMLAttributeReferrerPolicy;
 }
 
 export const Avatar = ({
@@ -43,6 +48,8 @@ export const Avatar = ({
   userName = "User",
   hasChecked,
   hasCheckedClass = "w-4 h-4 -top-0.5 -right-0.5",
+  unoptimized,
+  referrerPolicy,
 }: AvatarProps) => {
   const name = userName || "User";
   const bgColor =
@@ -65,6 +72,8 @@ export const Avatar = ({
           alt={name}
           fill
           sizes="64px"
+          unoptimized={unoptimized}
+          referrerPolicy={referrerPolicy}
         />
       )}
       <span>{name[0]}</span>
