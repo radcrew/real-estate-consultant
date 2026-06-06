@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+import { brand } from "@config/brand";
 import { HERO_STATS } from "@constants";
 
 import { HeroActions } from "./actions";
@@ -10,13 +11,8 @@ export const Hero = () => (
   <section className={STYLES.section}>
     <div className={STYLES.inner}>
       <div className={STYLES.left}>
-        <h1 className={STYLES.headline}>
-          Find your next commercial property with AI
-        </h1>
-        <p className={STYLES.subcopy}>
-          Professional-grade CRE platform with AI-powered fit scoring,
-          broker-style search, and outreach draft generation.
-        </p>
+        <h1 className={STYLES.headline}>{brand.hero.title}</h1>
+        <p className={STYLES.subcopy}>{brand.hero.subtitle}</p>
         <HeroActions />
       </div>
 
