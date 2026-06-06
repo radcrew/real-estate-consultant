@@ -27,7 +27,8 @@
       "@constants": ["./constants/index.ts"],
       "@constants/*": ["./constants/*"],
       "@hooks/*": ["./hooks/*"],
-      "@contexts/*": ["./contexts/*"]
+      "@contexts/*": ["./contexts/*"],
+      "@config/*": ["./config/*"]
     }
   },
   "include": [
