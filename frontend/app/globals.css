@@ -53,8 +53,9 @@
 /*
  * Voyager design tokens (default "indigo-coolGrey" palette).
  * Ported from Voyager's tailwind.config.js + styles/__theme_colors.scss so that
- * ported Voyager components keep working with primary-*/secondary-*/neutral-*
- * utilities. These are additive: shadcn's singular --color-primary / -secondary
+ * ported Voyager components keep working with their primary, secondary and
+ * neutral color utilities. These are additive: shadcn's singular
+ * --color-primary / --color-secondary
  * (used by the existing app) are untouched; only the default `neutral` scale is
  * replaced with Voyager's coolGrey, which Voyager components rely on.
  * Works in light and dark via the `dark:` variant (.dark class) already defined.
