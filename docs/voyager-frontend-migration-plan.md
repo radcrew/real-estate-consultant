@@ -326,3 +326,20 @@ experiences) are skipped.
 - Earlier header/footer reskins stay; the home page (Phase B) may recompose the
   hero/featured sections into Voyager's section components.
 - Keep the small-step + manual-commit + delete-`.tmp` workflow throughout.
+
+### 11.4 Phase C breakdown (Listings + map) — from the Step 33 investigation
+Flow today: `/search/[id]` → `useSearchSessionResults` (wraps `useSearchByProfile`
+= `searchService.search`/`updateCriteria`) → `ResultCardListing[]` + criteria +
+`applyCriteria`; rendered as a filter dock (`SearchFilter`, tied to the criteria
+schema in `utils/search/criteria`) + `ResultCard` grid. `/listings` is a
+placeholder; there is **no public catalog** (listings exist only within a search
+session). `ResultCardListing` lacks lat/lng, so the map needs `PropertyModel`.
+
+- **C1** — `useVoyagerSearchResults` presentation hook (wraps `useSearchByProfile`,
+  returns `PropertyModel[]` + criteria + `applyCriteria`); existing hooks untouched.
+- **C2** — Rebuild `/search/[id]` in Voyager style: `Heading2` count + reused
+  `SearchFilter` (lightly restyled) + `SectionGridFeatureProperty`/`PropertyCard`.
+- **C3** — `/listings` → Voyager entry page (featured grid + "Start searching" CTA).
+- **C4** — Map split (`SectionGridHasMap`) using **`google-map-react`** (decision
+  2026-06-06; verify React 19 compat on install), markers from `PropertyModel.map`.
+- **C5 (optional)** — Port Voyager `TabFilters` look over `SearchFilter`.
