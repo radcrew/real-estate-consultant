@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Voyager form atoms are designed against @tailwindcss/forms (base strategy:
+   styles native inputs/selects/textareas/checkboxes globally). */
+@plugin "@tailwindcss/forms";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
