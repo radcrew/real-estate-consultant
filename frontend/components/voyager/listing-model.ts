@@ -113,6 +113,12 @@ export const detailToModel = (detail: ListingDetailResponse): PropertyModel => {
  * Map a curated `FeaturedListing` (static home data) to the view-model, so the
  * home grid renders through the same `PropertyCard` as live results. CRE specs
  * beyond size aren't part of the curated data, so only the size chip is built.
+ *
+ * These are illustrative samples with non-UUID ids and no backend record (there
+ * is no public catalog — real listings live behind a search session). So they
+ * funnel into the search flow (`/questionnaire`) rather than a detail page that
+ * would fail the backend's UUID validation. Live results (`toPropertyModel`)
+ * keep their real `/listings/<uuid>` links.
  */
 export const featuredToModel = (listing: FeaturedListing): PropertyModel => ({
   id: listing.id,
@@ -126,7 +132,7 @@ export const featuredToModel = (listing: FeaturedListing): PropertyModel => ({
   imageAlt: listing.imageAlt,
   matchScore: 0,
   matchBlurb: "",
-  href: `/listings/${listing.id}`,
+  href: "/questionnaire",
   description: null,
   galleryImgs: listing.imageSrc ? [listing.imageSrc] : [],
   specs: [{ label: "Size", value: listing.sqftLabel }],

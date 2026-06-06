@@ -1,24 +1,28 @@
 "use client";
 
+import { useState } from "react";
+import { LayoutGrid, Map as MapIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 
-import { Heading2 } from "@components/ui/voyager/heading2";
 import type { PropertyModel } from "@components/voyager/listing-model";
 import { PropertyCard } from "@components/voyager/property-card";
+import { SectionGridHasMap } from "@components/voyager/section-grid-has-map";
 import { useVoyagerSearchResults } from "@components/voyager/use-voyager-search-results";
 import { cn } from "@utils/common";
 
 import { SearchFilter } from "./filter-bar";
 
+type View = "grid" | "map";
+
 const SKELETON_COUNT = 6;
 const GRID = "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3";
+const TOGGLE_BTN =
+  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors";
 
-const resultCountLabel = (models: PropertyModel[], loading: boolean) => {
-  if (loading) {
-    return "Searching…";
-  }
-  return `${models.length} ${models.length === 1 ? "property" : "properties"}`;
-};
+const resultCountLabel = (models: PropertyModel[], loading: boolean) =>
+  loading
+    ? "Searching…"
+    : `${models.length} ${models.length === 1 ? "property" : "properties"}`;
 
 export const SearchResults = () => {
   const params = useParams<{ id?: string }>();
@@ -26,11 +30,13 @@ export const SearchResults = () => {
     typeof params?.id === "string" ? params.id : undefined;
   const { models, loading, error, criteria, applyCriteria } =
     useVoyagerSearchResults(sessionProfileId);
+  const [view, setView] = useState<View>("grid");
 
   const showFilterDock =
     (loading && !error) || Object.keys(criteria).length > 0;
   const showNoResults =
     !loading && !error && models.length === 0 && Boolean(sessionProfileId?.trim());
+  const hasResults = !loading && !error && models.length > 0;
 
   return (
     <div className="min-h-[60vh]">
@@ -48,7 +54,8 @@ export const SearchResults = () => {
 
       <div
         className={cn(
-          "mx-auto max-w-screen-xl px-4 pb-12",
+          "mx-auto px-4 pb-12",
+          view === "map" ? "max-w-[1600px]" : "max-w-screen-xl",
           showFilterDock ? "pt-16" : "pt-10",
         )}
       >
@@ -59,14 +66,49 @@ export const SearchResults = () => {
         )}
 
         {!error && (
-          <Heading2
-            heading="Properties"
-            subHeading={
-              <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-3xl font-semibold text-neutral-900 sm:text-4xl dark:text-neutral-100">
+                Properties
+              </h2>
+              <span className="mt-2 block text-neutral-500 dark:text-neutral-400">
                 {resultCountLabel(models, loading)}
               </span>
-            }
-          />
+            </div>
+
+            {hasResults && (
+              <div className="inline-flex shrink-0 rounded-full border border-neutral-200 p-1 dark:border-neutral-700">
+                <button
+                  type="button"
+                  onClick={() => setView("grid")}
+                  className={cn(
+                    TOGGLE_BTN,
+                    view === "grid"
+                      ? "bg-primary-600 text-white"
+                      : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white",
+                  )}
+                  aria-pressed={view === "grid"}
+                >
+                  <LayoutGrid className="h-4 w-4" aria-hidden />
+                  Grid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView("map")}
+                  className={cn(
+                    TOGGLE_BTN,
+                    view === "map"
+                      ? "bg-primary-600 text-white"
+                      : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white",
+                  )}
+                  aria-pressed={view === "map"}
+                >
+                  <MapIcon className="h-4 w-4" aria-hidden />
+                  Map
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {loading && !error && (
@@ -92,13 +134,16 @@ export const SearchResults = () => {
           </div>
         )}
 
-        {!loading && !error && models.length > 0 && (
-          <div className={GRID}>
-            {models.map((model) => (
-              <PropertyCard key={model.id} data={model} />
-            ))}
-          </div>
-        )}
+        {hasResults &&
+          (view === "grid" ? (
+            <div className={GRID}>
+              {models.map((model) => (
+                <PropertyCard key={model.id} data={model} />
+              ))}
+            </div>
+          ) : (
+            <SectionGridHasMap data={models} />
+          ))}
 
         {showNoResults && (
           <p className="py-16 text-center text-neutral-500 dark:text-neutral-400">
