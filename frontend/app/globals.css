@@ -50,6 +50,50 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * Voyager design tokens (default "indigo-coolGrey" palette).
+ * Ported from Voyager's tailwind.config.js + styles/__theme_colors.scss so that
+ * ported Voyager components keep working with primary-*/secondary-*/neutral-*
+ * utilities. These are additive: shadcn's singular --color-primary / -secondary
+ * (used by the existing app) are untouched; only the default `neutral` scale is
+ * replaced with Voyager's coolGrey, which Voyager components rely on.
+ * Works in light and dark via the `dark:` variant (.dark class) already defined.
+ */
+@theme {
+  --color-primary-50: rgb(238 242 255);
+  --color-primary-100: rgb(224 231 255);
+  --color-primary-200: rgb(199 210 254);
+  --color-primary-300: rgb(165 180 252);
+  --color-primary-400: rgb(129 140 248);
+  --color-primary-500: rgb(99 102 241);
+  --color-primary-600: rgb(79 70 229);
+  --color-primary-700: rgb(67 56 202);
+  --color-primary-800: rgb(55 48 163);
+  --color-primary-900: rgb(49 46 129);
+
+  --color-secondary-50: rgb(240 253 250);
+  --color-secondary-100: rgb(204 251 241);
+  --color-secondary-200: rgb(153 246 228);
+  --color-secondary-300: rgb(153 246 228);
+  --color-secondary-400: rgb(45 212 191);
+  --color-secondary-500: rgb(20 184 166);
+  --color-secondary-600: rgb(13 148 136);
+  --color-secondary-700: rgb(15 118 110);
+  --color-secondary-800: rgb(17 94 89);
+  --color-secondary-900: rgb(19 78 74);
+
+  --color-neutral-50: rgb(249 250 251);
+  --color-neutral-100: rgb(243 244 246);
+  --color-neutral-200: rgb(229 231 235);
+  --color-neutral-300: rgb(209 213 219);
+  --color-neutral-400: rgb(156 163 175);
+  --color-neutral-500: rgb(107 114 128);
+  --color-neutral-600: rgb(75 85 99);
+  --color-neutral-700: rgb(55 65 81);
+  --color-neutral-800: rgb(31 41 55);
+  --color-neutral-900: rgb(17 24 39);
+}
+
 :root {
   /* RadEstate header: slate-50 canvas, amber-400 brand, slate-900 text */
   --background: oklch(0.984 0.003 247.858);
