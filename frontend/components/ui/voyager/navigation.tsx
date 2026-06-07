@@ -13,6 +13,7 @@ import {
 export const DEFAULT_NAV: NavItemType[] = [
   { id: "home", name: "Home", href: "/" },
   { id: "listings", name: "Listings", href: "/listings" },
+  { id: "about", name: "About", href: "/about" },
   { id: "contact", name: "Contact", href: "/contact" },
 ];
 
