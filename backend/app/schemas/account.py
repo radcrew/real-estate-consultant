@@ -16,6 +16,7 @@ class AccountProfileResponse(BaseModel):
     state: str | None = None
     zip_code: str | None = None
     country: str | None = None
+    avatar_url: str | None = None
 
 
 class AccountProfileUpdate(BaseModel):

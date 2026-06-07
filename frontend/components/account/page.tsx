@@ -42,6 +42,8 @@ export const AccountPage = () => {
   const { session, ready, refresh } = useAuth();
 
   const [savedProfile, setSavedProfile] = useState<ProfileFormValues>(emptyProfile);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
 
@@ -80,6 +82,7 @@ export const AccountPage = () => {
         const next = mapProfileResponseToForm(data);
         setSavedProfile(next);
         setDraftProfile(next);
+        setAvatarUrl(data.avatar_url ?? null);
       } catch (e) {
         if (ac.signal.aborted) return;
         setProfileLoadError(getApiErrorMessage(e));
@@ -114,6 +117,22 @@ export const AccountPage = () => {
     setEditingProfile(false);
     setProfileErrors({});
     setProfileNotice(null);
+  }, []);
+
+  const uploadAvatar = useCallback(async (file: File) => {
+    setAvatarUploading(true);
+    setProfileNotice(null);
+    try {
+      const data = await accountService.uploadAvatar(file);
+      setAvatarUrl(data.avatar_url ?? null);
+      setProfileNoticeVariant("success");
+      setProfileNotice("Photo updated.");
+    } catch (e) {
+      setProfileNoticeVariant("error");
+      setProfileNotice(getApiErrorMessage(e));
+    } finally {
+      setAvatarUploading(false);
+    }
   }, []);
 
   const persistSessionEmailIfNeeded = useCallback(
@@ -295,6 +314,9 @@ export const AccountPage = () => {
                 noticeVariant={profileNoticeVariant}
                 saving={profileSaving}
                 profileLoading={profileLoading}
+                avatarUrl={avatarUrl}
+                avatarUploading={avatarUploading}
+                onUploadAvatar={uploadAvatar}
                 onEdit={startEditProfile}
                 onCancel={cancelEditProfile}
                 onSave={saveProfile}

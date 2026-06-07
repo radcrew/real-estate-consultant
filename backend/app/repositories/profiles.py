@@ -38,6 +38,7 @@ _PROFILE_SELECT = ",".join(
         "country",
         "city",
         "state",
+        "avatar_url",
     ),
 )
 _LOAD_PROFILE_ERROR = "Unexpected response from Supabase when loading profile."
@@ -83,4 +84,27 @@ async def upsert_profile_patch(
 
     await execute_db_safe(
         client.table("profiles").update(patch).eq("id", str(user_id)).execute(),
+    )
+
+
+async def set_profile_avatar_url(
+    client: AsyncClient,
+    user_id: UUID,
+    avatar_url: str,
+) -> None:
+    """Insert or update only the ``avatar_url`` column for a profile."""
+    existing = await fetch_profile_row(client, user_id)
+    if existing is None:
+        await execute_db_safe(
+            client.table("profiles")
+            .insert({"id": str(user_id), "avatar_url": avatar_url})
+            .execute(),
+        )
+        return
+
+    await execute_db_safe(
+        client.table("profiles")
+        .update({"avatar_url": avatar_url})
+        .eq("id", str(user_id))
+        .execute(),
     )

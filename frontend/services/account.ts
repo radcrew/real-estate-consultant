@@ -14,6 +14,7 @@ export type AccountProfileResponse = {
   state: string | null;
   zip_code: string | null;
   country: string | null;
+  avatar_url: string | null;
 };
 
 export type AccountProfileUpdateBody = Partial<{
@@ -97,6 +98,20 @@ export class AccountService {
     options?: { signal?: AbortSignal },
   ): Promise<void> {
     await this.http.post("/account/password", body, { signal: options?.signal });
+  }
+
+  async uploadAvatar(
+    file: File,
+    options?: { signal?: AbortSignal },
+  ): Promise<AccountProfileResponse> {
+    const form = new FormData();
+    form.append("file", file);
+    const { data } = await this.http.post<AccountProfileResponse>("/account/avatar", form, {
+      signal: options?.signal,
+      // Null the JSON default so the browser sets multipart/form-data + boundary.
+      headers: { "Content-Type": null },
+    });
+    return data;
   }
 }
 
