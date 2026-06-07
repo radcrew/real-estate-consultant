@@ -10,11 +10,13 @@ import Link from "next/link";
 
 import { ButtonClose } from "@components/ui/voyager/button-close";
 import { ButtonPrimary } from "@components/ui/voyager/button-primary";
+import { ButtonThird } from "@components/ui/voyager/button-third";
 import { Logo } from "@components/ui/voyager/logo";
 import type { NavItemType } from "@components/ui/voyager/nav-item";
 import { DEFAULT_NAV } from "@components/ui/voyager/navigation";
 import { SocialsList } from "@components/ui/voyager/socials-list";
 import { SwitchDarkMode } from "@components/ui/voyager/switch-dark-mode";
+import { useAuth } from "@contexts/auth";
 
 /**
  * Voyager-styled mobile nav drawer contents.
@@ -34,6 +36,8 @@ export const NavMobile = ({
   data = DEFAULT_NAV,
   onClickClose,
 }: NavMobileProps) => {
+  const { session, signOut } = useAuth();
+
   const renderItem = (item: NavItemType) => {
     if (!item.children?.length) {
       return (
@@ -102,8 +106,36 @@ export const NavMobile = ({
 
       <ul className="flex flex-col space-y-1 px-2 py-6">{data.map(renderItem)}</ul>
 
-      <div className="flex items-center justify-between px-5 py-6">
-        <ButtonPrimary href="/sign-up">Sign up</ButtonPrimary>
+      <div className="px-5 py-6">
+        {session ? (
+          <div className="flex flex-col space-y-3">
+            <ButtonPrimary href="/account" onClick={onClickClose}>
+              Your account
+            </ButtonPrimary>
+            <ButtonThird href="/saved" onClick={onClickClose}>
+              Saved properties
+            </ButtonThird>
+            <button
+              type="button"
+              onClick={() => {
+                onClickClose?.();
+                void signOut();
+              }}
+              className="py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white"
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <ButtonThird href="/sign-in" onClick={onClickClose}>
+              Sign in
+            </ButtonThird>
+            <ButtonPrimary href="/sign-up" onClick={onClickClose}>
+              Sign up
+            </ButtonPrimary>
+          </div>
+        )}
       </div>
     </div>
   );
