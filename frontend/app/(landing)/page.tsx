@@ -3,6 +3,7 @@ import { CreProfessionals } from "@components/landing/cre-professionals";
 import { FeaturedListings } from "@components/landing/featured-listings";
 import { SectionHero2 } from "@components/landing/hero2";
 import { HowItWorks } from "@components/landing/how-it-works";
+import { OurFeatures } from "@components/landing/our-features";
 import { PartnerLogos } from "@components/landing/partner-logos";
 import { BackgroundSection } from "@components/voyager/background-section";
 
@@ -17,6 +18,8 @@ const HomePage = () => (
         <BackgroundSection />
         <FeaturedListings />
       </div>
+
+      <OurFeatures />
     </div>
     <CreProfessionals />
     <ContactUs />
