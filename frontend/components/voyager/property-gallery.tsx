@@ -1,31 +1,31 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import { Building2, Images } from "lucide-react";
 
 import { cn } from "@utils/common";
 
+import { PropertyGalleryModal } from "./property-gallery-modal";
+
 /**
- * Voyager-style listing gallery — a lean version of Voyager's
- * `listing-image-gallery`: one large cover plus a 2x2 thumbnail grid, rounded,
- * with an optional "Show all photos" affordance. Driven by
- * `PropertyModel.galleryImgs`; no lightbox/slider deps (the "show all" handler
- * can open an NcModal later). Falls back to a placeholder when there are no
- * images, and shows only the cover on small screens.
+ * Voyager-style listing gallery — one large cover plus a 2x2 thumbnail grid.
+ * Clicking any tile (or "Show all photos") opens a full-screen photo modal
+ * (`PropertyGalleryModal`). Falls back to a placeholder when there are no images.
  */
 export interface PropertyGalleryProps {
   images: string[];
   alt?: string;
-  onShowAll?: () => void;
   className?: string;
 }
 
 export const PropertyGallery = ({
   images,
   alt = "Listing photo",
-  onShowAll,
   className,
 }: PropertyGalleryProps) => {
+  const [open, setOpen] = useState(false);
+
   if (!images.length) {
     return (
       <div
@@ -41,43 +41,62 @@ export const PropertyGallery = ({
 
   const [cover, ...rest] = images;
   const thumbs = rest.slice(0, 4);
+  const openModal = () => setOpen(true);
 
   return (
     <div className={cn("relative", className)}>
       <div className="grid h-80 grid-cols-2 grid-rows-2 gap-1 overflow-hidden rounded-2xl sm:h-[460px] sm:grid-cols-4 sm:gap-2">
-        <div className="relative col-span-2 row-span-2">
+        <button
+          type="button"
+          onClick={openModal}
+          aria-label="Open photo gallery"
+          className="group relative col-span-2 row-span-2 cursor-pointer focus:outline-none"
+        >
           <Image
             src={cover}
             alt={alt}
             fill
             priority
             sizes="(max-width: 640px) 100vw, 50vw"
-            className="object-cover"
+            className="object-cover transition-opacity group-hover:opacity-90"
           />
-        </div>
+        </button>
         {thumbs.map((img, index) => (
-          <div key={index} className="relative hidden sm:block">
+          <button
+            type="button"
+            key={index}
+            onClick={openModal}
+            aria-label="Open photo gallery"
+            className="group relative hidden cursor-pointer focus:outline-none sm:block"
+          >
             <Image
               src={img}
               alt={alt}
               fill
               sizes="25vw"
-              className="object-cover"
+              className="object-cover transition-opacity group-hover:opacity-90"
             />
-          </div>
+          </button>
         ))}
       </div>
 
-      {onShowAll && images.length > 1 && (
+      {images.length > 1 && (
         <button
           type="button"
-          onClick={onShowAll}
+          onClick={openModal}
           className="absolute right-3 bottom-3 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-md hover:bg-neutral-100 focus:outline-none dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
         >
           <Images className="h-4 w-4" aria-hidden />
           Show all photos
         </button>
       )}
+
+      <PropertyGalleryModal
+        images={images}
+        alt={alt}
+        isOpen={open}
+        onClose={() => setOpen(false)}
+      />
     </div>
   );
 };
