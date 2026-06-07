@@ -54,16 +54,17 @@ export const ListingMainSection = ({ property: p }: ListingMainSectionProps) => 
 
       {p.description ? (
         <section
-          className="mt-8 border-t border-neutral-100 pt-8 dark:border-neutral-800"
+          className="mt-8 rounded-2xl border border-neutral-200 p-6 sm:p-8 dark:border-neutral-700"
           aria-labelledby="listing-description"
         >
           <h2
             id="listing-description"
-            className="text-sm font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400"
+            className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100"
           >
-            Description
+            Property description
           </h2>
-          <p className="mt-3 max-w-3xl text-base leading-relaxed text-neutral-700 dark:text-neutral-300">
+          <div className="my-5 w-14 border-b border-neutral-200 dark:border-neutral-700" />
+          <p className="max-w-3xl text-base leading-relaxed text-neutral-600 dark:text-neutral-300">
             {p.description}
           </p>
         </section>

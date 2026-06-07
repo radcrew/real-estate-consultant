@@ -11,7 +11,7 @@ import { Input } from "@components/ui/input";
 import { cn } from "@utils/common";
 import type { RangeCriterionData } from "@utils/search/criteria";
 
-import { FILTER_BAR_PILL } from "./styles";
+import { FILTER_BAR_PILL, FILTER_BAR_PILL_ACTIVE } from "./styles";
 import {
   isRangeInvalid,
   rangeNormalSummaryForAria,
@@ -73,7 +73,11 @@ export const RangeFilter = ({
         <DropdownMenuTrigger
           disabled={disabled}
           aria-label={`${label}: ${summary}`}
-          className={cn(FILTER_BAR_PILL, "disabled:pointer-events-none disabled:opacity-50")}
+          className={cn(
+            FILTER_BAR_PILL,
+            hasValue && FILTER_BAR_PILL_ACTIVE,
+            "disabled:pointer-events-none disabled:opacity-50",
+          )}
         >
           <span className="min-w-0 flex-1 truncate text-left">{triggerText}</span>
           {hasValue ? (

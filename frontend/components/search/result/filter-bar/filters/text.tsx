@@ -11,7 +11,7 @@ import { Input } from "@components/ui/input";
 import { useLocation } from "@hooks/use-location";
 import { cn } from "@utils/common";
 
-import { FILTER_BAR_PILL } from "./styles";
+import { FILTER_BAR_PILL, FILTER_BAR_PILL_ACTIVE } from "./styles";
 import { stopMenuKeyboardCapture, stopMenuTriggerBubble } from "./utils";
 
 type TextFilterProps = {
@@ -51,7 +51,12 @@ export const TextFilter = ({ fieldKey, label, value, onChange, disabled, classNa
       <DropdownMenuTrigger
         disabled={disabled}
         aria-label={hasValue ? `${label}: ${display}` : label}
-        className={cn(FILTER_BAR_PILL, "disabled:pointer-events-none disabled:opacity-50", className)}
+        className={cn(
+          FILTER_BAR_PILL,
+          hasValue && FILTER_BAR_PILL_ACTIVE,
+          "disabled:pointer-events-none disabled:opacity-50",
+          className,
+        )}
       >
         <span className="min-w-0 flex-1 truncate text-left">{display}</span>
         {hasValue ? (

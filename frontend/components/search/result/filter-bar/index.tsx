@@ -155,7 +155,7 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
             className={cn(
               buttonVariants({ variant: "default", size: "lg" }),
               FILTER_BAR_ACTION,
-              "inline-flex gap-1.5 shadow-sm",
+              "inline-flex gap-1.5 border-transparent shadow-sm",
             )}
             onClick={() => onSearch(getCriteriaFromFilters(draft))}
             disabled={disabled || hasInvalidRange}
