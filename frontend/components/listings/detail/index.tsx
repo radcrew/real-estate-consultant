@@ -6,6 +6,7 @@ import { detailToModel } from "@components/voyager/listing-model";
 import { PropertyGallery } from "@components/voyager/property-gallery";
 
 import { useListingDetail } from "../../../hooks/use-listing-detail";
+import { ListingActions } from "./actions";
 import { ListingMainSection } from "./main";
 import { ListingOverviewCard } from "./overview";
 import { ListingLocationSection } from "./location";
@@ -33,6 +34,10 @@ export const ListingDetailView = () => {
             />
           ) : (
             <>
+              <div className="mb-4 flex justify-end">
+                <ListingActions />
+              </div>
+
               <PropertyGallery images={model.galleryImgs} alt={model.title} />
 
               <div className="mt-10 lg:grid lg:grid-cols-[1fr_22rem] lg:items-start lg:gap-10 xl:gap-12">
