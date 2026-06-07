@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, UserRound } from "lucide-react";
+import { Heart, LogOut, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -56,6 +56,10 @@ export const ProfileDropdown = () => {
           <DropdownMenuItem onClick={() => router.push("/account")}>
             <UserRound className="size-4" />
             Account
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push("/saved")}>
+            <Heart className="size-4" />
+            Saved
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
