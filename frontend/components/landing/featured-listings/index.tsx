@@ -6,18 +6,15 @@ import { SectionGridFeatureProperty } from "@components/voyager/section-grid-fea
 const FEATURED_MODELS = FEATURED_LISTINGS.map(featuredToModel);
 
 export const FeaturedListings = () => (
-  <div className="px-4 py-16 lg:py-20">
-    <div className="mx-auto max-w-screen-xl">
-      <SectionGridFeatureProperty
-        heading={brand.sections.featured.heading}
-        subHeading={
-          <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
-            {brand.sections.featured.subHeading}
-          </span>
-        }
-        data={FEATURED_MODELS}
-        cta={{ label: "Browse all properties", href: "/listings" }}
-      />
-    </div>
-  </div>
+  <SectionGridFeatureProperty
+    className="relative"
+    heading={brand.sections.featured.heading}
+    subHeading={
+      <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
+        {brand.sections.featured.subHeading}
+      </span>
+    }
+    data={FEATURED_MODELS}
+    cta={{ label: "Browse all properties", href: "/listings" }}
+  />
 );
