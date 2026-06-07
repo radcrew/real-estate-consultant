@@ -1,12 +1,3 @@
-export const HERO_STATS = [
-  { label: "Total Listings", value: "8" },
-  { label: "Active Listings", value: "8" },
-  { label: "Total SF Available", value: "1,318,500" },
-  { label: "Avg Rent/PSF", value: "$18.75" },
-] as const
-
-export type HeroStat = (typeof HERO_STATS)[number]
-
 export type FeaturedListingCategory = "Industrial" | "Flex" | "Retail"
 
 export type FeaturedListingTransaction = "Lease" | "Sale"
@@ -93,58 +84,5 @@ export const FEATURED_LISTINGS: FeaturedListing[] = [
     imageSrc:
       "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=900&h=560&q=80",
     imageAlt: "Modern flex office and warehouse",
-  },
-]
-
-export type CreProfessionalFeatureId =
-  | "ai-fit-scoring"
-  | "saved-search-profiles"
-  | "shortlist-status"
-  | "ai-outreach-drafts"
-  | "market-intelligence"
-  | "clear-height-transparency"
-
-export type CreProfessionalFeature = {
-  id: CreProfessionalFeatureId
-  title: string
-  description: string
-}
-
-export const CRE_PROFESSIONAL_FEATURES: CreProfessionalFeature[] = [
-  {
-    id: "ai-fit-scoring",
-    title: "AI Fit Scoring",
-    description:
-      "Every property ranked 0-100 against your specific requirements. No more manual filtering.",
-  },
-  {
-    id: "saved-search-profiles",
-    title: "Saved Search Profiles",
-    description:
-      "Save your criteria and re-run ranked searches instantly. Track new inventory automatically.",
-  },
-  {
-    id: "shortlist-status",
-    title: "Shortlist with Status",
-    description:
-      "Track properties through your pipeline — reviewing, touring, LOI, passed.",
-  },
-  {
-    id: "ai-outreach-drafts",
-    title: "AI Outreach Drafts",
-    description:
-      "Generate broker outreach emails in seconds. Edit before sending — you stay in control.",
-  },
-  {
-    id: "market-intelligence",
-    title: "Market Intelligence",
-    description:
-      "Dashboard analytics on inventory, pricing, and market trends across submarkets.",
-  },
-  {
-    id: "clear-height-transparency",
-    title: "Clear Height Transparency",
-    description:
-      "We flag when clear height is inferred vs. explicitly confirmed. No surprises on tour.",
   },
 ]

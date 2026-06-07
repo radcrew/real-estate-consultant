@@ -4,14 +4,13 @@ import {
   DISCOVERY_CATEGORIES,
   PROPERTY_TYPE_CATEGORIES,
 } from "@components/landing/category-slider/data";
-import { ContactUs } from "@components/landing/contact";
-import { CreProfessionals } from "@components/landing/cre-professionals";
 import { DownloadApp } from "@components/landing/download-app";
 import { FeaturedListings } from "@components/landing/featured-listings";
 import { SectionHero2 } from "@components/landing/hero2";
 import { HowItWorks } from "@components/landing/how-it-works";
 import { OurFeatures } from "@components/landing/our-features";
 import { PartnerLogos } from "@components/landing/partner-logos";
+import { Subscribe } from "@components/landing/subscribe";
 import { BackgroundSection } from "@components/voyager/background-section";
 
 const HomePage = () => (
@@ -50,9 +49,9 @@ const HomePage = () => (
         cardType="card5"
         slideClassName="basis-1/2 sm:basis-1/3 lg:basis-1/4 xl:basis-1/5"
       />
+
+      <Subscribe />
     </div>
-    <CreProfessionals />
-    <ContactUs />
   </main>
 )
 
