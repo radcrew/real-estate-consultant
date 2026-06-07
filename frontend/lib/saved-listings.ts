@@ -28,6 +28,8 @@ const write = (ids: Set<string>): void => {
   }
 };
 
+export const getSavedListingIds = (): string[] => [...read()];
+
 export const isSavedListing = (id: string): boolean => read().has(id);
 
 /** Toggle a listing's saved state; returns the new saved value. */

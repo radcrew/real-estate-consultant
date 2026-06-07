@@ -33,6 +33,7 @@ const FOOTER_COLUMNS: FooterColumn[] = [
       { label: "Sign in", href: "/sign-in" },
       { label: "Get started", href: "/sign-up" },
       { label: "Your account", href: "/account" },
+      { label: "Saved", href: "/saved" },
     ],
   },
   {
