@@ -35,7 +35,7 @@ export const ListingDetailView = () => {
           ) : (
             <>
               <div className="mb-4 flex justify-end">
-                <ListingActions />
+                <ListingActions id={model.id} />
               </div>
 
               <PropertyGallery images={model.galleryImgs} alt={model.title} />
