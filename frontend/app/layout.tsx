@@ -20,7 +20,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RadEstate",
+  title: {
+    default: "RadEstate",
+    template: "%s · RadEstate",
+  },
   description: "RadEstate real estate consultant platform",
 };
 

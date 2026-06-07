@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
+
 import { ButtonPrimary } from "@components/ui/voyager/button-primary";
 import { featuredToModel } from "@components/voyager/listing-model";
 import { SectionGridFeatureProperty } from "@components/voyager/section-grid-feature-property";
 import { brand } from "@config/brand";
 import { FEATURED_LISTINGS } from "@constants";
+
+export const metadata: Metadata = {
+  title: "Browse properties",
+  description: "Browse and search commercial real estate listings on RadEstate.",
+};
 
 const FEATURED_MODELS = FEATURED_LISTINGS.map(featuredToModel);
 
