@@ -11,7 +11,7 @@ export const AuthPageFooter = ({ prompt, linkHref, linkLabel }: AuthPageFooterPr
     {prompt}{" "}
     <Link
       href={linkHref}
-      className="font-semibold text-primary underline-offset-4 hover:underline"
+      className="font-semibold text-primary-600 underline-offset-4 hover:underline"
     >
       {linkLabel}
     </Link>
