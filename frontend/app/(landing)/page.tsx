@@ -6,7 +6,7 @@ import {
 } from "@components/landing/category-slider/data";
 import { DownloadApp } from "@components/landing/download-app";
 import { FeaturedListings } from "@components/landing/featured-listings";
-import { SectionHero2 } from "@components/landing/hero2";
+import { SectionHero } from "@components/landing/hero";
 import { HowItWorks } from "@components/landing/how-it-works";
 import { OurFeatures } from "@components/landing/our-features";
 import { PartnerLogos } from "@components/landing/partner-logos";
@@ -16,7 +16,7 @@ import { BackgroundSection } from "@components/voyager/background-section";
 const HomePage = () => (
   <main className="relative flex flex-1 flex-col overflow-hidden bg-background">
     <div className="mx-auto w-full max-w-screen-xl space-y-24 px-4 pb-24 lg:space-y-28 lg:pb-28 2xl:max-w-screen-2xl 2xl:px-32">
-      <SectionHero2 />
+      <SectionHero className="pt-10 lg:pt-16" />
       <PartnerLogos />
       <HowItWorks />
 
