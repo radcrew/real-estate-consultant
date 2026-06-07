@@ -5,6 +5,6 @@ export const STYLES = {
   stepLabel: "font-medium tabular-nums text-foreground",
   percentLabel: "tabular-nums",
   track:
-    "h-1.5 w-full overflow-hidden rounded-full bg-border/70",
-  fill: "h-full rounded-full bg-primary transition-[width] duration-300 ease-out",
+    "h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800",
+  fill: "h-full rounded-full bg-primary-600 transition-[width] duration-300 ease-out",
 } as const;

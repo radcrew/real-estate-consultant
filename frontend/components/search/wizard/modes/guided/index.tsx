@@ -2,7 +2,8 @@
 
 import { ArrowRight, ChevronLeft } from "lucide-react";
 
-import { Button } from "@components/ui/buttons";
+import { ButtonPrimary } from "@components/ui/voyager/button-primary";
+import { ButtonThird } from "@components/ui/voyager/button-third";
 
 import { useSearchWizard } from "@contexts/search-wizard";
 import { ProgressBar } from "../../progress-bar";
@@ -68,20 +69,19 @@ export const GuidedQuestionnaire = () => {
           )}
 
           <div className={STYLES.actionsRow}>
-            <Button
-              variant="outline"
-              size="default"
-              className={STYLES.buttonDefault}
+            <ButtonThird
+              sizeClass="px-5 py-2.5"
+              fontSize="text-sm font-medium"
               onClick={goPrev}
               disabled={isBusy}
             >
-              <ChevronLeft className="size-4" aria-hidden />
+              <ChevronLeft className="mr-2 size-4" aria-hidden />
               Back
-            </Button>
+            </ButtonThird>
 
-            <Button
-              size="default"
-              className={STYLES.buttonDefault}
+            <ButtonPrimary
+              sizeClass="px-5 py-2.5"
+              fontSize="text-sm font-medium"
               onClick={goNext}
               disabled={!canContinue || isBusy}
             >
@@ -92,8 +92,8 @@ export const GuidedQuestionnaire = () => {
                 : isLastStep
                   ? "Search"
                   : "Continue"}
-              <ArrowRight className="size-4" aria-hidden />
-            </Button>
+              <ArrowRight className="ml-2 size-4" aria-hidden />
+            </ButtonPrimary>
           </div>
         </section>
       </div>

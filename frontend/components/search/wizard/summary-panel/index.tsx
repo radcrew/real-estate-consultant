@@ -11,7 +11,7 @@ export const SummaryPanel = ({ rows }: SummaryPanelProps) => (
   <aside className={STYLES.panel}>
     <div className={STYLES.header}>
       <div className={STYLES.headerLeft}>
-        <ListChecks className="size-4 text-amber-500" aria-hidden />
+        <ListChecks className="size-4 text-primary-600" aria-hidden />
         <h3 className={STYLES.title}>Your Answers</h3>
       </div>
       <span className={STYLES.badge}>{rows.length}</span>
