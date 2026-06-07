@@ -7,7 +7,7 @@ import { cn } from "@utils/common";
  * Voyager-styled secondary button (white surface, neutral border).
  * Ported from Voyager's `shared/ButtonSecondary.tsx` as a wrapper over `Button`.
  */
-export interface ButtonSecondaryProps extends ButtonProps {}
+export type ButtonSecondaryProps = ButtonProps;
 
 export const ButtonSecondary = ({
   className,

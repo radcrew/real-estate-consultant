@@ -7,7 +7,7 @@ import { cn } from "@utils/common";
  * Voyager-styled "third" button (transparent surface, neutral border/text).
  * Ported from Voyager's `shared/ButtonThird.tsx` as a wrapper over `Button`.
  */
-export interface ButtonThirdProps extends ButtonProps {}
+export type ButtonThirdProps = ButtonProps;
 
 export const ButtonThird = ({ className, ...props }: ButtonThirdProps) => (
   <Button

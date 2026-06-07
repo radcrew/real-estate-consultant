@@ -10,7 +10,7 @@ import { cn } from "@utils/common";
  * base `Button`. Voyager's `bg-primary-6000` typo is corrected to
  * `bg-primary-600`. Uses the `primary-*` tokens added in globals.css.
  */
-export interface ButtonPrimaryProps extends ButtonProps {}
+export type ButtonPrimaryProps = ButtonProps;
 
 export const ButtonPrimary = ({ className, ...props }: ButtonPrimaryProps) => (
   <Button
