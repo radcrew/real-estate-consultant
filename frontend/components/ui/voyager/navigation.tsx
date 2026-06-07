@@ -11,7 +11,7 @@ import {
  * real routes; pass `menu` to override.
  */
 export const DEFAULT_NAV: NavItemType[] = [
-  { id: "home", name: "Home", href: "/" },
+  // No "Home" item — the header Logo already links to "/".
   { id: "listings", name: "Listings", href: "/listings" },
   { id: "insights", name: "Insights", href: "/blog" },
   { id: "about", name: "About", href: "/about" },
