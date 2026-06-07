@@ -60,7 +60,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
       <div className={STYLES.card}>
         <div className={STYLES.cardHeader}>
           <div className={STYLES.cardTitleRow}>
-            <SlidersHorizontal className="size-4 text-amber-600" aria-hidden />
+            <SlidersHorizontal className="size-4 text-primary-600" aria-hidden />
             <h3 className={STYLES.cardTitle}>Extracted Criteria</h3>
           </div>
         </div>

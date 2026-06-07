@@ -1,5 +1,5 @@
 import type { ChangeEvent } from "react";
-import { Input } from "@components/ui/input";
+import { Input } from "@components/ui/voyager/input";
 
 type NumberFieldProps = {
   id: string;
@@ -27,7 +27,6 @@ export const NumberField = ({
       value={value ?? ""}
       onChange={onChange}
       autoFocus={autoFocus}
-      className="h-9 border-border/80 bg-background px-3 text-sm"
     />
   </div>
 );

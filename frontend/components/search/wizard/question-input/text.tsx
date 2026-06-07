@@ -1,6 +1,6 @@
 "use client";
 
-import { Input } from "@components/ui/input";
+import { Input } from "@components/ui/voyager/input";
 
 import type { TextQuestion } from "../types";
 
@@ -21,7 +21,6 @@ export const TextQuestionInput = ({
       value={answer}
       onChange={(event) => onChange(event.target.value)}
       autoFocus
-      className="h-9 border-border/80 bg-background px-3 text-sm"
     />
   </div>
 );
