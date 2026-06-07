@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-import { Button } from "@components/ui/buttons";
+import { ButtonSecondary } from "@components/ui/voyager/button-secondary";
 import { useAuth } from "@contexts/auth";
 
 type GoogleAuthButtonProps = {
@@ -15,9 +15,8 @@ export const GoogleAuthButton = ({
   const { signInWithGoogle, isSubmitting } = useAuth();
 
   return (
-    <Button
+    <ButtonSecondary
       type="button"
-      variant="outline"
       className="w-full"
       disabled={isSubmitting}
       onClick={signInWithGoogle}
@@ -27,11 +26,11 @@ export const GoogleAuthButton = ({
         alt=""
         width={16}
         height={16}
-        className="size-4 shrink-0"
+        className="mr-2.5 size-4 shrink-0"
         aria-hidden
         unoptimized
       />
       {label}
-    </Button>
+    </ButtonSecondary>
   );
 };

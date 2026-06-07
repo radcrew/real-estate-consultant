@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useState } from "react";
 
-import { Button } from "@components/ui/buttons";
+import { ButtonPrimary } from "@components/ui/voyager/button-primary";
 
 import { useAuth } from "@contexts/auth";
 
@@ -51,9 +51,9 @@ export const SignInForm = () => {
           />
         </div>
 
-        <Button type="submit" disabled={isSubmitting} className="mt-6 w-full">
+        <ButtonPrimary type="submit" disabled={isSubmitting} className="mt-6 w-full">
           {isSubmitting ? "Signing in…" : "Sign in"}
-        </Button>
+        </ButtonPrimary>
       </form>
 
       <AuthFormDivider />

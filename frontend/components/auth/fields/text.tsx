@@ -2,9 +2,7 @@
 
 import type { ChangeEvent } from "react";
 
-import { Input } from "@components/ui/input";
-
-import { FIELD_INPUT_CLASS } from "./styles";
+import { Input } from "@components/ui/voyager/input";
 
 export type TextFieldProps = {
   id: string;
@@ -40,7 +38,6 @@ export const TextField = ({
       value={value}
       onChange={onChange}
       disabled={disabled}
-      className={FIELD_INPUT_CLASS}
     />
   </div>
 );

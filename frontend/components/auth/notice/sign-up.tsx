@@ -11,7 +11,7 @@ export const SignUpNotice = () => {
   return (
     <p
       role="status"
-      className="rounded-none border border-border bg-muted px-3 py-2 text-sm text-foreground"
+      className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
     >
       Account created. Sign in with your email and password.
     </p>
