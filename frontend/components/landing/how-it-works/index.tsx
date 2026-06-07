@@ -1,5 +1,7 @@
 import Image from "next/image";
 
+import { SectionHeading } from "@components/landing/section-heading";
+
 /**
  * "How it works" section, ported from Voyager's `SectionHowItWork` (home-2
  * variant). Uses the real-estate step copy and the `HIW2-*` light/dark art,
@@ -31,12 +33,9 @@ const STEPS = [
 
 export const HowItWorks = () => (
   <div>
-    <div className="mx-auto mb-4 max-w-2xl text-center">
-      <h2 className="text-3xl font-semibold md:text-4xl">How it works</h2>
-      <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
-        From smart search to broker outreach
-      </span>
-    </div>
+    <SectionHeading isCenter desc="From smart search to broker outreach" className="text-neutral-900 dark:text-neutral-50">
+      How it works
+    </SectionHeading>
 
     <div className="relative mt-20 grid gap-20 md:grid-cols-3">
       <Image

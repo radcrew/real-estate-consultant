@@ -28,7 +28,7 @@ export const SectionHero2 = ({ className }: SectionHero2Props) => (
     <div className="relative py-14 lg:py-20">
       <div className="relative inline-flex">
         <div className="absolute inset-y-0 right-20 w-screen bg-primary-500 md:right-52" />
-        <div className="relative inline-flex max-w-3xl flex-shrink-0 flex-col items-start space-y-8 py-16 text-white sm:space-y-10 sm:py-20 lg:py-24">
+        <div className="relative inline-flex max-w-3xl flex-shrink-0 flex-col items-start space-y-8 py-16 pr-20 text-white sm:space-y-10 sm:py-20 md:pr-52 lg:py-24">
           <h2 className="text-4xl font-semibold !leading-[110%] md:text-5xl xl:text-7xl">
             Find your next <br /> commercial property
           </h2>

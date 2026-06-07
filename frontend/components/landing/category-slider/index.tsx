@@ -2,6 +2,7 @@
 
 import useEmblaCarousel from "embla-carousel-react";
 
+import { SectionHeading } from "@components/landing/section-heading";
 import { NextPrev } from "@components/ui/voyager/next-prev";
 import { cn } from "@utils/common";
 
@@ -36,19 +37,19 @@ export const CategorySlider = ({
 
   return (
     <div className="relative">
-      <div className="flex flex-col justify-between sm:flex-row sm:items-end">
-        <div className="max-w-2xl">
-          <h2 className="text-3xl font-semibold md:text-4xl">{heading}</h2>
-          <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
-            {subHeading}
-          </span>
-        </div>
-        <NextPrev
-          className="mt-4 hidden sm:mt-0 sm:flex"
-          onClickPrev={() => emblaApi?.scrollPrev()}
-          onClickNext={() => emblaApi?.scrollNext()}
-        />
-      </div>
+      <SectionHeading
+        desc={subHeading}
+        className="mb-0"
+        actions={
+          <NextPrev
+            className="hidden sm:flex"
+            onClickPrev={() => emblaApi?.scrollPrev()}
+            onClickNext={() => emblaApi?.scrollNext()}
+          />
+        }
+      >
+        {heading}
+      </SectionHeading>
 
       <div className="mt-10 overflow-hidden" ref={emblaRef}>
         <div className="-ml-3 flex xl:-ml-5">

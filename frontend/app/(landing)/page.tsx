@@ -15,7 +15,7 @@ import { BackgroundSection } from "@components/voyager/background-section";
 
 const HomePage = () => (
   <main className="relative flex flex-1 flex-col overflow-hidden bg-background">
-    <div className="mx-auto w-full max-w-screen-xl space-y-24 px-4 pb-24 lg:space-y-28 lg:pb-28">
+    <div className="mx-auto w-full max-w-screen-xl space-y-24 px-4 pb-24 lg:space-y-28 lg:pb-28 2xl:max-w-screen-2xl 2xl:px-32">
       <SectionHero2 />
       <PartnerLogos />
       <HowItWorks />

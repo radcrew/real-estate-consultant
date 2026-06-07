@@ -1,3 +1,4 @@
+import { SectionHeading } from "@components/landing/section-heading";
 import { ButtonPrimary } from "@components/ui/voyager/button-primary";
 import { ButtonSecondary } from "@components/ui/voyager/button-secondary";
 import { cn } from "@utils/common";
@@ -15,12 +16,9 @@ type BrokerBoxProps = {
 
 export const BrokerBox = ({ className }: BrokerBoxProps) => (
   <div className={cn("relative", className)}>
-    <div className="mx-auto mb-12 max-w-2xl text-center">
-      <h2 className="text-3xl font-semibold md:text-4xl">Top brokers this month</h2>
-      <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
-        Ranked by active commercial listings
-      </span>
-    </div>
+    <SectionHeading isCenter desc="Ranked by active commercial listings">
+      Top brokers this month
+    </SectionHeading>
 
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:gap-8 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {TOP_BROKERS.map((broker) => (

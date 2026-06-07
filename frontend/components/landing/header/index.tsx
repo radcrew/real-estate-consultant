@@ -13,7 +13,7 @@ import { AuthNav } from "./auth-nav";
  */
 export const Header = () => (
   <header className="sticky top-0 right-0 left-0 z-40 w-full border-b border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900">
-    <div className="relative mx-auto flex h-20 max-w-screen-xl items-center justify-between px-4">
+    <div className="relative mx-auto flex h-20 max-w-screen-xl items-center justify-between px-4 2xl:max-w-screen-2xl 2xl:px-32">
       <div className="flex flex-1 items-center justify-start space-x-4 sm:space-x-10">
         <Logo className="shrink-0 self-center" />
         <Navigation />

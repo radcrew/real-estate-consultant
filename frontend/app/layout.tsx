@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Inter } from "next/font/google";
+import { Geist_Mono, Poppins } from "next/font/google";
 
 import { Header } from "@components/landing/header";
 import { AuthProvider } from "@contexts/auth";
 
 import "./globals.css";
 
-const inter = Inter({
+// Voyager's typeface — Poppins (weights 300–700) — for visual parity.
+const poppins = Poppins({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600", "700"],
   variable: "--font-sans",
   display: "swap",
 });
@@ -30,7 +31,7 @@ const RootLayout = ({
 }>) => (
   <html
     lang="en"
-    className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
+    className={`${poppins.variable} ${geistMono.variable} h-full antialiased`}
   >
     <body className="flex min-h-full flex-col font-sans">
       <AuthProvider>
