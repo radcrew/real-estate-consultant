@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Building2, MapPin } from "lucide-react";
 
 import { Badge } from "@components/ui/voyager/badge";
+import { BtnLikeIcon } from "@components/ui/voyager/btn-like-icon";
 import type { PropertyModel } from "@components/voyager/listing-model";
 import { cn } from "@utils/common";
 
@@ -48,20 +49,19 @@ export const PropertyCard = ({ data, className }: PropertyCardProps) => {
           </div>
         )}
 
-        {hasTransaction && (
-          <Badge
-            name={data.transactionType}
-            color={transactionColor(data.transactionType)}
-            className="absolute top-3 left-3"
-          />
-        )}
-        {data.matchScore > 0 && (
-          <Badge
-            name={`${data.matchScore}% match`}
-            color="green"
-            className="absolute top-3 right-3"
-          />
-        )}
+        <div className="absolute left-3 top-3 flex flex-col items-start gap-2">
+          {hasTransaction && (
+            <Badge
+              name={data.transactionType}
+              color={transactionColor(data.transactionType)}
+            />
+          )}
+          {data.matchScore > 0 && (
+            <Badge name={`${data.matchScore}% match`} color="green" />
+          )}
+        </div>
+
+        <BtnLikeIcon className="absolute right-3 top-3" />
       </div>
 
       <div className="flex flex-1 flex-col space-y-3 p-4">
