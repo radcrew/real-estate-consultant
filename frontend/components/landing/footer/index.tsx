@@ -41,7 +41,7 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     items: [
       { label: "About", href: "/about" },
       { label: "Privacy", href: "/privacy" },
-      { label: "Terms", href: "#" },
+      { label: "Terms", href: "/terms" },
     ],
   },
 ];
