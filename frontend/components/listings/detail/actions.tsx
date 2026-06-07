@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Heart, Share2 } from "lucide-react";
 
-import { isSavedListing, toggleSavedListing } from "@lib/saved-listings";
+import { useSavedListings } from "@components/saved/provider";
 import { cn } from "@utils/common";
 
 /**
  * Listing detail Share + Save row, ported from Voyager's `LikeSaveBtns`.
- * Share uses the Web Share API (falls back to copying the URL); Save persists in
- * localStorage keyed by listing id, staying in sync with the card hearts.
+ * Share uses the Web Share API (falls back to copying the URL); Save is backed
+ * by the per-user saved-listings API, in sync with the card hearts.
  */
 const BTN =
   "flex cursor-pointer items-center rounded-lg px-3 py-1.5 hover:bg-neutral-100 focus:outline-none dark:hover:bg-neutral-800";
@@ -19,13 +18,8 @@ type ListingActionsProps = {
 };
 
 export const ListingActions = ({ id }: ListingActionsProps) => {
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    if (id) {
-      setSaved(isSavedListing(id));
-    }
-  }, [id]);
+  const { isSaved, toggle } = useSavedListings();
+  const saved = id ? isSaved(id) : false;
 
   const onShare = async () => {
     if (typeof window === "undefined") {
@@ -53,7 +47,7 @@ export const ListingActions = ({ id }: ListingActionsProps) => {
         type="button"
         className={BTN}
         aria-pressed={saved}
-        onClick={() => setSaved(id ? toggleSavedListing(id) : !saved)}
+        onClick={() => id && toggle(id)}
       >
         <Heart
           className={cn("size-5", saved && "fill-red-500 text-red-500")}

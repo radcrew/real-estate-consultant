@@ -2,20 +2,26 @@
 
 import { useEffect, useState } from "react";
 
+import { useSavedListings } from "@components/saved/provider";
 import { ButtonPrimary } from "@components/ui/voyager/button-primary";
 import { detailToModel, type PropertyModel } from "@components/voyager/listing-model";
 import { PropertyCard } from "@components/voyager/property-card";
-import { getSavedListingIds } from "@lib/saved-listings";
 import { listingsService } from "@services/listings";
 
 const GRID = "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3";
 
 export const SavedView = () => {
+  const { savedIds, isSaved, ready, signedIn } = useSavedListings();
   const [models, setModels] = useState<PropertyModel[] | null>(null);
 
   useEffect(() => {
-    const ids = getSavedListingIds();
-    if (ids.length === 0) {
+    if (!ready || !signedIn) {
+      return;
+    }
+    if (models !== null) {
+      return; // fetch listing details only once
+    }
+    if (savedIds.length === 0) {
       setModels([]);
       return;
     }
@@ -23,11 +29,9 @@ export const SavedView = () => {
     let cancelled = false;
     void (async () => {
       const results = await Promise.allSettled(
-        ids.map((id) => listingsService.getListing(id)),
+        savedIds.map((id) => listingsService.getListing(id)),
       );
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
       const loaded = results
         .filter((r): r is PromiseFulfilledResult<Awaited<ReturnType<typeof listingsService.getListing>>> =>
           r.status === "fulfilled",
@@ -39,9 +43,11 @@ export const SavedView = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [ready, signedIn, savedIds, models]);
 
-  const loading = models === null;
+  const loading = signedIn && (!ready || models === null);
+  // Reflect un-saves immediately without refetching.
+  const visible = (models ?? []).filter((m) => isSaved(m.id));
 
   return (
     <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
@@ -50,11 +56,24 @@ export const SavedView = () => {
           Saved properties
         </h1>
         <p className="mt-3 text-neutral-500 dark:text-neutral-400">
-          {loading
-            ? "Loading your saved properties…"
-            : `${models.length} ${models.length === 1 ? "property" : "properties"} saved.`}
+          {!signedIn
+            ? "Sign in to view and save properties."
+            : loading
+              ? "Loading your saved properties…"
+              : `${visible.length} ${visible.length === 1 ? "property" : "properties"} saved.`}
         </p>
       </div>
+
+      {ready && !signedIn ? (
+        <div className="mt-12 rounded-2xl border border-neutral-200 p-10 text-center dark:border-neutral-700">
+          <p className="text-neutral-600 dark:text-neutral-300">
+            Sign in to save properties and see them here.
+          </p>
+          <div className="mt-6 flex justify-center">
+            <ButtonPrimary href="/sign-in">Sign in</ButtonPrimary>
+          </div>
+        </div>
+      ) : null}
 
       {loading ? (
         <div className={`mt-10 ${GRID}`} role="status" aria-label="Loading saved properties">
@@ -74,7 +93,7 @@ export const SavedView = () => {
         </div>
       ) : null}
 
-      {!loading && models.length === 0 ? (
+      {signedIn && !loading && visible.length === 0 ? (
         <div className="mt-12 rounded-2xl border border-neutral-200 p-10 text-center dark:border-neutral-700">
           <p className="text-neutral-600 dark:text-neutral-300">
             You haven&rsquo;t saved any properties yet. Tap the heart on a listing
@@ -86,9 +105,9 @@ export const SavedView = () => {
         </div>
       ) : null}
 
-      {!loading && models.length > 0 ? (
+      {signedIn && !loading && visible.length > 0 ? (
         <div className={`mt-10 ${GRID}`}>
-          {models.map((model) => (
+          {visible.map((model) => (
             <PropertyCard key={model.id} data={model} />
           ))}
         </div>

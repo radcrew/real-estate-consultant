@@ -1,21 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { isSavedListing, toggleSavedListing } from "@lib/saved-listings";
+import { useSavedListings } from "@components/saved/provider";
 import { cn } from "@utils/common";
 
 /**
  * Voyager `BtnLikeIcon` — a heart "save" toggle shown on property cards. Ported
- * from Voyager's component. When `id` is provided the saved state persists in
- * localStorage (no saved-listings backend yet); otherwise it's purely local.
- * Stops click propagation so it works inside a card-wide link.
+ * from Voyager's component. When `id` is provided the saved state is backed by
+ * the per-user saved-listings API (via `SavedListingsProvider`); otherwise it's
+ * purely local. Stops click propagation so it works inside a card-wide link.
  */
 export interface BtnLikeIconProps {
   className?: string;
   colorClass?: string;
   isLiked?: boolean;
-  /** Listing id — when set, the saved state persists across navigation. */
+  /** Listing id — when set, the saved state persists per user via the API. */
   id?: string;
 }
 
@@ -25,13 +25,9 @@ export const BtnLikeIcon = ({
   isLiked = false,
   id,
 }: BtnLikeIconProps) => {
-  const [liked, setLiked] = useState(isLiked);
-
-  useEffect(() => {
-    if (id) {
-      setLiked(isSavedListing(id));
-    }
-  }, [id]);
+  const { isSaved, toggle } = useSavedListings();
+  const [localLiked, setLocalLiked] = useState(isLiked);
+  const liked = id ? isSaved(id) : localLiked;
 
   return (
     <button
@@ -42,7 +38,11 @@ export const BtnLikeIcon = ({
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        setLiked(id ? toggleSavedListing(id) : !liked);
+        if (id) {
+          toggle(id);
+        } else {
+          setLocalLiked((v) => !v);
+        }
       }}
       className={cn(
         "flex size-8 items-center justify-center rounded-full transition-colors focus:outline-none",

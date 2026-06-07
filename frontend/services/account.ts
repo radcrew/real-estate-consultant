@@ -100,6 +100,23 @@ export class AccountService {
     await this.http.post("/account/password", body, { signal: options?.signal });
   }
 
+  async getSavedIds(options?: { signal?: AbortSignal }): Promise<string[]> {
+    const { data } = await this.http.get<{ property_ids: string[] }>("/account/saved", {
+      signal: options?.signal,
+    });
+    return data.property_ids;
+  }
+
+  async addSaved(propertyId: string, options?: { signal?: AbortSignal }): Promise<void> {
+    await this.http.post("/account/saved", { property_id: propertyId }, { signal: options?.signal });
+  }
+
+  async removeSaved(propertyId: string, options?: { signal?: AbortSignal }): Promise<void> {
+    await this.http.delete(`/account/saved/${encodeURIComponent(propertyId)}`, {
+      signal: options?.signal,
+    });
+  }
+
   async uploadAvatar(
     file: File,
     options?: { signal?: AbortSignal },
