@@ -24,7 +24,7 @@ export const FEATURED_LISTINGS: FeaturedListing[] = [
     sqftLabel: "250,000 SF",
     priceLabel: "$6.5/psf",
     imageSrc:
-      "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=900&h=560&q=80",
+      "https://images.pexels.com/photos/1268871/pexels-photo-1268871.jpeg?auto=compress&cs=tinysrgb&w=800",
     imageAlt: "Industrial warehouse exterior",
   },
   {
@@ -36,7 +36,7 @@ export const FEATURED_LISTINGS: FeaturedListing[] = [
     sqftLabel: "12,400 SF",
     priceLabel: "$28/psf",
     imageSrc:
-      "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=900&h=560&q=80",
+      "https://images.pexels.com/photos/1179156/pexels-photo-1179156.jpeg?auto=compress&cs=tinysrgb&w=800",
     imageAlt: "Retail storefront",
   },
   {
@@ -47,7 +47,8 @@ export const FEATURED_LISTINGS: FeaturedListing[] = [
     location: "Gary, IN · Northwest Indiana",
     sqftLabel: "410,000 SF",
     priceLabel: "$5.25/psf",
-    imageSrc: "https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=800",
+    imageSrc:
+      "https://images.pexels.com/photos/2506988/pexels-photo-2506988.jpeg?auto=compress&cs=tinysrgb&w=800",
     imageAlt: "Loading docks at distribution center",
   },
   {
@@ -59,7 +60,7 @@ export const FEATURED_LISTINGS: FeaturedListing[] = [
     sqftLabel: "185,000 SF",
     priceLabel: "$42.5M",
     imageSrc:
-      "https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=900&h=560&q=80",
+      "https://images.pexels.com/photos/2373201/pexels-photo-2373201.jpeg?auto=compress&cs=tinysrgb&w=800",
     imageAlt: "Cold storage facility interior",
   },
   {
@@ -70,7 +71,8 @@ export const FEATURED_LISTINGS: FeaturedListing[] = [
     location: "Schaumburg, IL · O'Hare Corridor",
     sqftLabel: "38,500 SF",
     priceLabel: "$12.2M",
-    imageSrc: "https://images.unsplash.com/photo-1553413077-190dd305871c?w=800",
+    imageSrc:
+      "https://images.pexels.com/photos/6434634/pexels-photo-6434634.jpeg?auto=compress&cs=tinysrgb&w=800",
     imageAlt: "Shopping plaza aerial",
   },
   {
@@ -82,7 +84,7 @@ export const FEATURED_LISTINGS: FeaturedListing[] = [
     sqftLabel: "28,000 SF",
     priceLabel: "$16.5/psf",
     imageSrc:
-      "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=900&h=560&q=80",
+      "https://images.pexels.com/photos/3201735/pexels-photo-3201735.jpeg?auto=compress&cs=tinysrgb&w=800",
     imageAlt: "Modern flex office and warehouse",
   },
 ]
