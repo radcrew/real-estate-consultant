@@ -35,6 +35,23 @@ export type AgentProfileResponse = {
   properties: ListingProperty[];
 };
 
+export type ListingSubmissionStatus = "pending" | "approved" | "rejected";
+
+export type ListingSubmissionItem = {
+  id: string;
+  status: ListingSubmissionStatus;
+  property_type?: string | null;
+  listing_type?: string | null;
+  title?: string | null;
+  city?: string | null;
+  state?: string | null;
+  size_sqft?: number | null;
+  price?: number | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  created_at?: string | null;
+};
+
 export class ListingsService {
   constructor(private readonly http: AxiosInstance) {}
 
@@ -66,6 +83,26 @@ export class ListingsService {
   ): Promise<AgentProfileResponse> {
     const { data } = await this.http.get<AgentProfileResponse>(
       `/agents/${encodeURIComponent(broker)}`,
+      { signal: options?.signal },
+    );
+    return data;
+  }
+
+  async listSubmissions(options?: { signal?: AbortSignal }): Promise<ListingSubmissionItem[]> {
+    const { data } = await this.http.get<ListingSubmissionItem[]>("/listing-submissions", {
+      signal: options?.signal,
+    });
+    return data;
+  }
+
+  async updateSubmission(
+    id: string,
+    status: ListingSubmissionStatus,
+    options?: { signal?: AbortSignal },
+  ): Promise<ListingSubmissionItem> {
+    const { data } = await this.http.patch<ListingSubmissionItem>(
+      `/listing-submissions/${encodeURIComponent(id)}`,
+      { status },
       { signal: options?.signal },
     );
     return data;

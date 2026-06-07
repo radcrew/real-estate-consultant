@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.properties import Properties
@@ -33,6 +35,29 @@ class ListingSubmissionCreate(BaseModel):
 class ListingSubmissionResponse(BaseModel):
     id: str
     status: str
+
+
+class ListingSubmissionItem(BaseModel):
+    """Admin view of a submitted listing (extra DB columns ignored)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    status: str
+    property_type: str | None = None
+    listing_type: str | None = None
+    title: str | None = None
+    city: str | None = None
+    state: str | None = None
+    size_sqft: float | None = None
+    price: float | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    created_at: str | None = None
+
+
+class ListingSubmissionStatusUpdate(BaseModel):
+    status: Literal["pending", "approved", "rejected"]
 
 
 class AgentProfileResponse(BaseModel):
