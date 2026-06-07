@@ -1,4 +1,5 @@
 import { BrokerBox } from "@components/landing/author-box";
+import { BecomePartner } from "@components/landing/become-partner";
 import { CategorySlider } from "@components/landing/category-slider";
 import {
   DISCOVERY_CATEGORIES,
@@ -49,6 +50,8 @@ const HomePage = () => (
         cardType="card5"
         slideClassName="basis-1/2 sm:basis-1/3 lg:basis-1/4 xl:basis-1/5"
       />
+
+      <BecomePartner />
 
       <Subscribe />
     </div>
