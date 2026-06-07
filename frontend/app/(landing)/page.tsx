@@ -1,3 +1,4 @@
+import { BrokerBox } from "@components/landing/author-box";
 import { CategorySlider } from "@components/landing/category-slider";
 import {
   DISCOVERY_CATEGORIES,
@@ -36,6 +37,11 @@ const HomePage = () => (
         cardType="card4"
         slideClassName="basis-1/2 sm:basis-1/3 lg:basis-1/4"
       />
+
+      <div className="relative py-16">
+        <BackgroundSection className="bg-neutral-100 dark:bg-black/20" />
+        <BrokerBox />
+      </div>
 
       <CategorySlider
         heading="Explore by property type"
