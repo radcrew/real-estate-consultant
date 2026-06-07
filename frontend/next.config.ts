@@ -18,6 +18,11 @@ const nextConfig: NextConfig = {
         hostname: "api.apify.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "images.pexels.com",
+        pathname: "/**",
+      },
     ],
   },
 };
