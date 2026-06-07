@@ -146,9 +146,14 @@ export const SearchResults = () => {
           ))}
 
         {showNoResults && (
-          <p className="py-16 text-center text-neutral-500 dark:text-neutral-400">
-            No properties match your search.
-          </p>
+          <div className="mt-4 rounded-2xl border border-neutral-200 p-10 text-center dark:border-neutral-700">
+            <p className="text-neutral-700 dark:text-neutral-200">
+              No properties match your search.
+            </p>
+            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+              Try widening your filters — adjust price, size, or property type above.
+            </p>
+          </div>
         )}
       </div>
     </div>
