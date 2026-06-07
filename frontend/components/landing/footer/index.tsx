@@ -39,7 +39,7 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     id: "company",
     title: "Company",
     items: [
-      { label: "About", href: "#" },
+      { label: "About", href: "/about" },
       { label: "Privacy", href: "#" },
       { label: "Terms", href: "#" },
     ],
