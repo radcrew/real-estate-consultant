@@ -23,8 +23,7 @@ export const CardCategory = ({ category, cardType }: CardCategoryProps) => {
     <Link href={category.href} className="flex flex-col">
       <div
         className={cn(
-          "group relative w-full flex-shrink-0 overflow-hidden rounded-2xl",
-          isCard4 ? "aspect-square sm:aspect-[5/6]" : "aspect-[4/3]",
+          "group relative aspect-[4/3] w-full flex-shrink-0 overflow-hidden rounded-2xl",
         )}
       >
         <Image
