@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, KeyRound, UserCircle } from "lucide-react";
+import { Building2, Heart, KeyRound, UserCircle } from "lucide-react";
 
 import { Avatar } from "@components/ui/voyager/avatar";
 import { brand } from "@config/brand";
@@ -25,6 +25,12 @@ const NAV_ITEMS = [
     label: "Security",
     description: "Change your password",
     icon: KeyRound,
+  },
+  {
+    href: "/saved",
+    label: "Saved",
+    description: "Properties you've saved",
+    icon: Heart,
   },
 ] as const;
 
