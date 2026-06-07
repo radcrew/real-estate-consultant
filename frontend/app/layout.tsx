@@ -3,6 +3,7 @@ import { Geist_Mono, Poppins } from "next/font/google";
 
 import { Header } from "@components/landing/header";
 import { SavedListingsProvider } from "@components/saved/provider";
+import { brand } from "@config/brand";
 import { AuthProvider } from "@contexts/auth";
 
 import "./globals.css";
@@ -21,11 +22,33 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  applicationName: brand.name,
   title: {
-    default: "RadEstate",
-    template: "%s · RadEstate",
+    default: `${brand.name} · ${brand.tagline}`,
+    template: `%s · ${brand.name}`,
   },
-  description: "RadEstate real estate consultant platform",
+  description: brand.hero.subtitle,
+  keywords: [
+    "commercial real estate",
+    "CRE",
+    "AI property search",
+    "fit scoring",
+    "broker outreach",
+    "real estate consultant",
+  ],
+  authors: [{ name: brand.name }],
+  creator: brand.name,
+  openGraph: {
+    type: "website",
+    siteName: brand.name,
+    title: `${brand.name} · ${brand.tagline}`,
+    description: brand.hero.subtitle,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${brand.name} · ${brand.tagline}`,
+    description: brand.hero.subtitle,
+  },
 };
 
 const RootLayout = ({
