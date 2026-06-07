@@ -4,39 +4,17 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter
 
 from app.api.v1.endpoints.listings.exceptions import raise_listing_not_found
 from app.core.deps import DbSession, SupabaseSdkDep
 from app.models.properties import Properties
-from app.repositories.listing_submissions import create_listing_submission
 from app.repositories.properties import get_property_by_id
 from app.repositories.property_images import fetch_all_image_urls
-from app.schemas.listings import (
-    ListingDetailResponse,
-    ListingSubmissionCreate,
-    ListingSubmissionResponse,
-)
+from app.schemas.listings import ListingDetailResponse
 from app.utils.listings import format_listing_type_label
 
 router = APIRouter(prefix="/listings", tags=["listings"])
-
-
-@router.post(
-    "/submissions",
-    response_model=ListingSubmissionResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Submit a property listing (public)",
-)
-async def submit_listing(
-    body: ListingSubmissionCreate,
-    client: SupabaseSdkDep,
-) -> ListingSubmissionResponse:
-    row = await create_listing_submission(client, body.model_dump(mode="json"))
-    return ListingSubmissionResponse(
-        id=str(row.get("id", "")),
-        status=str(row.get("status", "pending")),
-    )
 
 
 @router.get(

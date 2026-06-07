@@ -33,3 +33,12 @@ class ListingSubmissionCreate(BaseModel):
 class ListingSubmissionResponse(BaseModel):
     id: str
     status: str
+
+
+class AgentProfileResponse(BaseModel):
+    """A listing broker/agent and the properties they have listed."""
+
+    name: str
+    email: str | None = None
+    phone: str | None = None
+    properties: list[Properties]

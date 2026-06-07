@@ -28,6 +28,13 @@ export type ListingSubmissionPayload = {
 
 export type ListingSubmissionResult = { id: string; status: string };
 
+export type AgentProfileResponse = {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  properties: ListingProperty[];
+};
+
 export class ListingsService {
   constructor(private readonly http: AxiosInstance) {}
 
@@ -46,8 +53,19 @@ export class ListingsService {
     options?: { signal?: AbortSignal },
   ): Promise<ListingSubmissionResult> {
     const { data } = await this.http.post<ListingSubmissionResult>(
-      "/listings/submissions",
+      "/listing-submissions",
       payload,
+      { signal: options?.signal },
+    );
+    return data;
+  }
+
+  async getAgent(
+    broker: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<AgentProfileResponse> {
+    const { data } = await this.http.get<AgentProfileResponse>(
+      `/agents/${encodeURIComponent(broker)}`,
       { signal: options?.signal },
     );
     return data;

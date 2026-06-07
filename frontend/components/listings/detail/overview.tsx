@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { formatFeet, formatMoneyOrNull, formatSqft } from "@utils/common";
 
 import type { ListingProperty } from "@services/listings";
@@ -59,7 +61,12 @@ export const ListingOverviewCard = ({ property: p }: ListingOverviewCardProps) =
                 <div className={STYLES.overviewBorderedRow}>
                   <div className={STYLES.overviewLabel}>Name</div>
                   <div className={STYLES.overviewValueCompact}>
-                    {p.listing_broker_name}
+                    <Link
+                      href={`/agents/${encodeURIComponent(p.listing_broker_name)}`}
+                      className="text-primary-600 underline-offset-4 hover:underline"
+                    >
+                      {p.listing_broker_name}
+                    </Link>
                   </div>
                 </div>
               ) : null}
