@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LayoutGrid, Map as MapIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 
 import type { PropertyModel } from "@components/voyager/listing-model";
 import { PropertyCard } from "@components/voyager/property-card";
+import { Pagination } from "@components/ui/voyager/pagination";
 import { SectionGridHasMap } from "@components/voyager/section-grid-has-map";
 import { useVoyagerSearchResults } from "@components/voyager/use-voyager-search-results";
 import { cn } from "@utils/common";
@@ -15,6 +16,7 @@ import { SearchFilter } from "./filter-bar";
 type View = "grid" | "map";
 
 const SKELETON_COUNT = 6;
+const PAGE_SIZE = 9;
 const GRID = "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3";
 const TOGGLE_BTN =
   "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors";
@@ -31,6 +33,18 @@ export const SearchResults = () => {
   const { models, loading, error, criteria, applyCriteria } =
     useVoyagerSearchResults(sessionProfileId);
   const [view, setView] = useState<View>("grid");
+  const [page, setPage] = useState(0);
+
+  // Reset to the first page whenever the result set changes.
+  useEffect(() => {
+    setPage(0);
+  }, [models]);
+
+  const pageCount = Math.ceil(models.length / PAGE_SIZE);
+  const pagedModels = useMemo(
+    () => models.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [models, page],
+  );
 
   const showFilterDock =
     (loading && !error) || Object.keys(criteria).length > 0;
@@ -136,11 +150,28 @@ export const SearchResults = () => {
 
         {hasResults &&
           (view === "grid" ? (
-            <div className={GRID}>
-              {models.map((model) => (
-                <PropertyCard key={model.id} data={model} />
-              ))}
-            </div>
+            <>
+              <div className={GRID}>
+                {pagedModels.map((model) => (
+                  <PropertyCard key={model.id} data={model} />
+                ))}
+              </div>
+
+              {pageCount > 1 && (
+                <div className="mt-12 flex justify-center">
+                  <Pagination
+                    items={Array.from({ length: pageCount }, (_, i) => ({
+                      label: String(i + 1),
+                    }))}
+                    activeIndex={page}
+                    onPageClick={(i) => {
+                      setPage(i);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <SectionGridHasMap data={models} />
           ))}
