@@ -9,7 +9,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { Button } from "@components/ui/buttons";
+import { ButtonPrimary } from "@components/ui/voyager/button-primary";
+import { ButtonThird } from "@components/ui/voyager/button-third";
 
 import { useSearchWizard } from "@contexts/search-wizard";
 
@@ -59,15 +60,14 @@ export const SearchModeSelector = () => {
             <ChoiceBullet>Easy to refine each field</ChoiceBullet>
           </div>
 
-          <Button
-            variant="outline"
+          <ButtonThird
             className={STYLES.choiceFormCta}
             onClick={startGuidedForm}
             disabled={isBusy}
           >
             {isBusy ? "Loading form..." : "Use Form"}
-            <ArrowRight className="size-4" aria-hidden />
-          </Button>
+            <ArrowRight className="ml-2 size-4" aria-hidden />
+          </ButtonThird>
         </section>
 
         <section className={STYLES.choiceCard}>
@@ -91,14 +91,14 @@ export const SearchModeSelector = () => {
             <ChoiceBullet>Asks for missing info</ChoiceBullet>
           </div>
 
-          <Button
+          <ButtonPrimary
             className={STYLES.choiceAiCta}
             onClick={startSmartChat}
             disabled={isBusy}
           >
             Use AI Chat
-            <Sparkles className="size-4" aria-hidden />
-          </Button>
+            <Sparkles className="ml-2 size-4" aria-hidden />
+          </ButtonPrimary>
         </section>
       </div>
 
