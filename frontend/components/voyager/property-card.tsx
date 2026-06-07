@@ -61,7 +61,7 @@ export const PropertyCard = ({ data, className }: PropertyCardProps) => {
           )}
         </div>
 
-        <BtnLikeIcon className="absolute right-3 top-3" />
+        <BtnLikeIcon id={data.id} className="absolute right-3 top-3" />
       </div>
 
       <div className="flex flex-1 flex-col space-y-3 p-4">
