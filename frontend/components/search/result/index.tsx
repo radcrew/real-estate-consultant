@@ -60,9 +60,9 @@ export const SearchResults = () => {
         )}
       >
         {error && (
-          <p className="py-6 text-center text-red-600 dark:text-red-400">
+          <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
             {error}
-          </p>
+          </div>
         )}
 
         {!error && (
