@@ -27,7 +27,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "May 28, 2026",
     readingTime: "5 min read",
     image:
-      "https://images.pexels.com/photos/1267338/pexels-photo-1267338.jpeg?auto=compress&cs=tinysrgb&w=900",
+      "https://images.pexels.com/photos/2506988/pexels-photo-2506988.jpeg?auto=compress&cs=tinysrgb&w=900",
   },
   {
     slug: "clear-height-matters",
@@ -44,7 +44,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "May 14, 2026",
     readingTime: "4 min read",
     image:
-      "https://images.pexels.com/photos/4481259/pexels-photo-4481259.jpeg?auto=compress&cs=tinysrgb&w=900",
+      "https://images.pexels.com/photos/4577673/pexels-photo-4577673.jpeg?auto=compress&cs=tinysrgb&w=900",
   },
   {
     slug: "retail-corners-comeback",
@@ -61,7 +61,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "April 30, 2026",
     readingTime: "6 min read",
     image:
-      "https://images.pexels.com/photos/264507/pexels-photo-264507.jpeg?auto=compress&cs=tinysrgb&w=900",
+      "https://images.pexels.com/photos/6474535/pexels-photo-6474535.jpeg?auto=compress&cs=tinysrgb&w=900",
   },
   {
     slug: "broker-outreach-that-works",
@@ -78,7 +78,7 @@ export const BLOG_POSTS: BlogPost[] = [
     date: "April 12, 2026",
     readingTime: "3 min read",
     image:
-      "https://images.pexels.com/photos/3760067/pexels-photo-3760067.jpeg?auto=compress&cs=tinysrgb&w=900",
+      "https://images.pexels.com/photos/3201735/pexels-photo-3201735.jpeg?auto=compress&cs=tinysrgb&w=900",
   },
 ];
 
