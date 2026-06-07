@@ -8,6 +8,7 @@ import { PropertyGallery } from "@components/voyager/property-gallery";
 import { useListingDetail } from "../../../hooks/use-listing-detail";
 import { ListingMainSection } from "./main";
 import { ListingOverviewCard } from "./overview";
+import { ListingLocationSection } from "./location";
 import { ListingOutreachSection } from "./outreach";
 import { ListingDetailNotice, ListingDetailSkeleton } from "./status";
 
@@ -38,6 +39,8 @@ export const ListingDetailView = () => {
                 <ListingMainSection property={property} />
                 <ListingOverviewCard property={property} />
               </div>
+
+              <ListingLocationSection model={model} />
 
               <ListingOutreachSection property={property} />
             </>
