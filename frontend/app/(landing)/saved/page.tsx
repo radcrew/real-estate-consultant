@@ -56,6 +56,24 @@ const SavedPage = () => {
         </p>
       </div>
 
+      {loading ? (
+        <div className={`mt-10 ${GRID}`} role="status" aria-label="Loading saved properties">
+          {Array.from({ length: 3 }, (_, i) => (
+            <div
+              key={i}
+              className="overflow-hidden rounded-2xl border border-neutral-100 dark:border-neutral-800"
+            >
+              <div className="aspect-[4/3] animate-pulse bg-neutral-100 dark:bg-neutral-800" />
+              <div className="space-y-3 p-4">
+                <div className="h-4 w-1/3 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
+                <div className="h-5 w-4/5 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
+                <div className="h-4 w-2/3 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       {!loading && models.length === 0 ? (
         <div className="mt-12 rounded-2xl border border-neutral-200 p-10 text-center dark:border-neutral-700">
           <p className="text-neutral-600 dark:text-neutral-300">
