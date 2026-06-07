@@ -13,10 +13,12 @@ import { OurFeatures } from "@components/landing/our-features";
 import { PartnerLogos } from "@components/landing/partner-logos";
 import { Subscribe } from "@components/landing/subscribe";
 import { BackgroundSection } from "@components/voyager/background-section";
+import { BgGlassmorphism } from "@components/voyager/bg-glassmorphism";
 
 const HomePage = () => (
   <main className="relative flex flex-1 flex-col overflow-hidden bg-background">
-    <div className="mx-auto w-full max-w-screen-xl space-y-24 px-4 pb-24 lg:space-y-28 lg:pb-28 2xl:max-w-screen-2xl 2xl:px-32">
+    <BgGlassmorphism />
+    <div className="relative z-10 mx-auto w-full max-w-screen-xl space-y-24 px-4 pb-24 lg:space-y-28 lg:pb-28 2xl:max-w-screen-2xl 2xl:px-32">
       <SectionHero className="pt-10 lg:pt-16" />
       <PartnerLogos />
       <HowItWorks />
