@@ -3,6 +3,7 @@
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { cn } from "@utils/common";
 
@@ -25,11 +26,20 @@ export interface NavItemType {
 const mainLinkClass =
   "inline-flex items-center rounded-full px-4 py-2 text-sm font-normal text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 xl:px-5 xl:text-base dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-200";
 
+const activeLinkClass =
+  "bg-neutral-100 font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100";
+
 export interface NavigationItemProps {
   menuItem: NavItemType;
 }
 
 export const NavigationItem = ({ menuItem }: NavigationItemProps) => {
+  const pathname = usePathname();
+  const isActive =
+    menuItem.href === "/"
+      ? pathname === "/"
+      : pathname === menuItem.href || pathname.startsWith(`${menuItem.href}/`);
+
   if (menuItem.children?.length) {
     return (
       <Popover as="li" className="menu-item relative flex items-center">
@@ -70,7 +80,8 @@ export const NavigationItem = ({ menuItem }: NavigationItemProps) => {
         href={menuItem.href}
         target={menuItem.targetBlank ? "_blank" : undefined}
         rel={menuItem.targetBlank ? "noopener noreferrer" : undefined}
-        className={mainLinkClass}
+        aria-current={isActive ? "page" : undefined}
+        className={cn(mainLinkClass, isActive && activeLinkClass)}
       >
         {menuItem.name}
       </Link>
