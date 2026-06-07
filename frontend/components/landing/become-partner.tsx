@@ -23,8 +23,8 @@ export const BecomePartner = ({ className }: BecomePartnerProps) => (
         Reach qualified tenants and buyers searching with AI-powered fit scoring.
         Put your commercial listings in front of the right people, faster.
       </span>
-      <ButtonPrimary href="/sign-up" className="mt-6 sm:mt-11">
-        Become a partner
+      <ButtonPrimary href="/list-property" className="mt-6 sm:mt-11">
+        List your property
       </ButtonPrimary>
     </div>
     <div className="flex-grow">
