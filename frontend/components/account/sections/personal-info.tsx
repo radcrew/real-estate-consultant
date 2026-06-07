@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@components/ui/buttons";
+import { Avatar } from "@components/ui/voyager/avatar";
 import { SaveCancelGroup } from "@components/ui/save-cancel-group";
 
 import type { ProfileFieldKey, ProfileFormValues } from "@utils/account/validation";
@@ -34,7 +35,14 @@ export const AccountPersonalInfoSection = ({
   onCancel,
   onSave,
   onChangeField,
-}: AccountPersonalInfoSectionProps) => (
+}: AccountPersonalInfoSectionProps) => {
+  const displayName =
+    `${values.firstName} ${values.lastName}`.trim() || values.email.trim() || "User";
+  const locationLine =
+    [values.city, values.state].filter((v) => v.trim()).join(", ") ||
+    values.country.trim();
+
+  return (
   <section
     className={ACCOUNT_SECTION_CARD_CLASS}
     aria-labelledby="personal-heading"
@@ -76,7 +84,22 @@ export const AccountPersonalInfoSection = ({
       </div>
     </div>
 
-    <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+    <div className="mt-6 flex flex-col gap-10 lg:flex-row">
+      <div className="flex flex-shrink-0 flex-col items-center lg:items-start">
+        <Avatar
+          sizeClass="w-28 h-28 sm:w-32 sm:h-32"
+          radius="rounded-2xl"
+          userName={displayName}
+          containerClassName="ring-1 ring-neutral-200 dark:ring-neutral-700"
+        />
+        {locationLine ? (
+          <p className="mt-3 text-center text-sm text-neutral-500 lg:text-left dark:text-neutral-400">
+            {locationLine}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="grid min-w-0 flex-grow grid-cols-1 gap-5 sm:grid-cols-2">
       <AccountField
         id="account-firstName"
         label="First name"
@@ -159,6 +182,8 @@ export const AccountPersonalInfoSection = ({
         error={editing ? errors.country : null}
         readOnly={!editing}
       />
+      </div>
     </div>
   </section>
-);
+  );
+};
