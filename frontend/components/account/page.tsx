@@ -19,6 +19,7 @@ import {
   buildProfileUpdateBody,
   mapProfileResponseToForm,
 } from "@services/account";
+import { brand } from "@config/brand";
 
 import { AccountPasswordSection } from "./sections/password";
 import { AccountPersonalInfoSection } from "./sections/personal-info";
@@ -270,8 +271,13 @@ export const AccountPage = () => {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
       <header className="border-b border-border pb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Account</h1>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">Manage your profile and security.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+          {brand.account.workspaceLabel}
+        </p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          {brand.account.title}
+        </h1>
+        <p className="mt-2 max-w-xl text-sm text-muted-foreground">{brand.account.subtitle}</p>
       </header>
 
       <div className="mt-10 flex flex-col gap-10">
