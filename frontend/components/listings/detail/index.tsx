@@ -9,6 +9,7 @@ import { useListingDetail } from "../../../hooks/use-listing-detail";
 import { ListingActions } from "./actions";
 import { ListingMainSection } from "./main";
 import { ListingOverviewCard } from "./overview";
+import { ListingSpecsSection } from "./specs";
 import { ListingLocationSection } from "./location";
 import { ListingOutreachSection } from "./outreach";
 import { ListingDetailNotice, ListingDetailSkeleton } from "./status";
@@ -44,6 +45,8 @@ export const ListingDetailView = () => {
                 <ListingMainSection property={property} />
                 <ListingOverviewCard property={property} />
               </div>
+
+              <ListingSpecsSection property={property} />
 
               <ListingLocationSection model={model} />
 
