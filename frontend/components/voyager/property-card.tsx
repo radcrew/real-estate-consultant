@@ -99,5 +99,3 @@ export const PropertyCard = ({ data, className }: PropertyCardProps) => {
     </Link>
   );
 };
-
-export default PropertyCard;

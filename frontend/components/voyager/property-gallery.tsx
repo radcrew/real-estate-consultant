@@ -100,5 +100,3 @@ export const PropertyGallery = ({
     </div>
   );
 };
-
-export default PropertyGallery;

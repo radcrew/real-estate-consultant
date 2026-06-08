@@ -117,4 +117,3 @@ export const SocialsList = ({
   );
 };
 
-export default SocialsList;

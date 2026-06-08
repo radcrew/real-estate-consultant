@@ -89,4 +89,3 @@ export const NavigationItem = ({ menuItem }: NavigationItemProps) => {
   );
 };
 
-export default NavigationItem;

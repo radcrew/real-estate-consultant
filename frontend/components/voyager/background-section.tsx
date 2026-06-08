@@ -25,5 +25,3 @@ export const BackgroundSection = ({
     {children}
   </div>
 );
-
-export default BackgroundSection;

@@ -22,4 +22,3 @@ export const ButtonPrimary = ({ className, ...props }: ButtonPrimaryProps) => (
   />
 );
 
-export default ButtonPrimary;

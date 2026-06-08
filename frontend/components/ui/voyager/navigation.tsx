@@ -30,4 +30,3 @@ export const Navigation = ({ menu = DEFAULT_NAV }: NavigationProps) => (
   </ul>
 );
 
-export default Navigation;

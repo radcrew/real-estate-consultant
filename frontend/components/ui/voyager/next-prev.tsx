@@ -66,4 +66,3 @@ export const NextPrev = ({
   );
 };
 
-export default NextPrev;

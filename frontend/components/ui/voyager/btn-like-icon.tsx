@@ -69,5 +69,3 @@ export const BtnLikeIcon = ({
     </button>
   );
 };
-
-export default BtnLikeIcon;

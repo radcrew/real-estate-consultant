@@ -82,4 +82,3 @@ export const Badge = ({
   return <span className={base}>{name}</span>;
 };
 
-export default Badge;

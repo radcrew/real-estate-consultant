@@ -39,4 +39,3 @@ export const SwitchDarkMode = ({ className }: SwitchDarkModeProps) => {
   );
 };
 
-export default SwitchDarkMode;

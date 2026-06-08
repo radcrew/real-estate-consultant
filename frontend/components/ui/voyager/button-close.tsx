@@ -31,4 +31,3 @@ export const ButtonClose = ({ className, onClick }: ButtonCloseProps) => (
   </button>
 );
 
-export default ButtonClose;

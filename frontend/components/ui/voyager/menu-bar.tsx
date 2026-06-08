@@ -72,4 +72,3 @@ export const MenuBar = ({
   );
 };
 
-export default MenuBar;

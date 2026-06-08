@@ -91,5 +91,3 @@ export const PropertyMap = ({
     </div>
   );
 };
-
-export default PropertyMap;

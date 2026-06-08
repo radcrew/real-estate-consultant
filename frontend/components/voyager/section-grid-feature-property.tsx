@@ -47,5 +47,3 @@ export const SectionGridFeatureProperty = ({
     )}
   </section>
 );
-
-export default SectionGridFeatureProperty;

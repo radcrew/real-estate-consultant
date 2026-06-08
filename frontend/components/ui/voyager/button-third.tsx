@@ -20,4 +20,3 @@ export const ButtonThird = ({ className, ...props }: ButtonThirdProps) => (
   />
 );
 
-export default ButtonThird;

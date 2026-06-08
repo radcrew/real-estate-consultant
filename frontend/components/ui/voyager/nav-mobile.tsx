@@ -141,4 +141,3 @@ export const NavMobile = ({
   );
 };
 
-export default NavMobile;

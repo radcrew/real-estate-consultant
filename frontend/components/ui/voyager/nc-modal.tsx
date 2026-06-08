@@ -113,4 +113,3 @@ export const NcModal = ({
   );
 };
 
-export default NcModal;

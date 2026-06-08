@@ -16,5 +16,3 @@ export const BgGlassmorphism = ({
     <span className="-ml-20 mt-40 block size-72 rounded-full bg-[#14b8a6] opacity-10 mix-blend-multiply blur-3xl lg:size-96" />
   </div>
 );
-
-export default BgGlassmorphism;

@@ -32,4 +32,3 @@ export const ButtonCircle = ({
   />
 );
 
-export default ButtonCircle;

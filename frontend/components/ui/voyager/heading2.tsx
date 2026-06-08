@@ -20,4 +20,3 @@ export const Heading2 = ({ className, heading, subHeading }: Heading2Props) => (
   </div>
 );
 
-export default Heading2;

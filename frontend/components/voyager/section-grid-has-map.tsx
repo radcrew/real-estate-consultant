@@ -61,5 +61,3 @@ export const SectionGridHasMap = ({
     </div>
   );
 };
-
-export default SectionGridHasMap;
