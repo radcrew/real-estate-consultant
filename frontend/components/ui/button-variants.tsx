@@ -9,7 +9,7 @@ const buttonRoot = [
   "cursor-pointer",
   "rounded-none border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap",
   "outline-none transition-colors select-none disabled:pointer-events-none disabled:opacity-50",
-  "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 ring-offset-background",
+  "focus-visible:ring-2 focus-visible:ring-primary-200/60 dark:focus-visible:ring-primary-600/40",
   "aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/30",
   "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
 ].join(" ")
@@ -18,16 +18,16 @@ export const buttonVariants = cva(buttonRoot, {
   variants: {
     variant: {
       default:
-        "border-foreground bg-primary text-primary-foreground hover:bg-primary/90 [a]:hover:bg-primary/90",
+        "bg-primary-600 text-white hover:bg-primary-700 [a]:hover:bg-primary-700",
       outline:
-        "border-border bg-background text-foreground hover:bg-muted aria-expanded:bg-muted dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
+        "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100 aria-expanded:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800",
       secondary:
-        "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+        "bg-neutral-100 text-neutral-900 hover:bg-neutral-200 aria-expanded:bg-neutral-100 dark:bg-neutral-800 dark:text-neutral-100 dark:hover:bg-neutral-700",
       ghost:
-        "border-transparent hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+        "border-transparent hover:bg-neutral-100 hover:text-neutral-900 aria-expanded:bg-neutral-100 aria-expanded:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100",
       destructive:
         "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-      link: "border-transparent text-primary underline-offset-4 hover:underline",
+      link: "border-transparent text-primary-600 underline-offset-4 hover:underline dark:text-primary-400",
     },
     size: {
       default:
