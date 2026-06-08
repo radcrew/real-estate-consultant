@@ -12,6 +12,7 @@ import { HowItWorks } from "@components/landing/how-it-works";
 import { OurFeatures } from "@components/landing/our-features";
 import { PartnerLogos } from "@components/landing/partner-logos";
 import { Subscribe } from "@components/landing/subscribe";
+import { Testimonials } from "@components/landing/testimonials";
 import { BackgroundSection } from "@components/voyager/background-section";
 import { BgGlassmorphism } from "@components/voyager/bg-glassmorphism";
 
@@ -52,6 +53,8 @@ const HomePage = () => (
         cardType="card5"
         slideClassName="basis-1/2 sm:basis-1/3 lg:basis-1/4 xl:basis-1/5"
       />
+
+      <Testimonials />
 
       <BecomePartner />
 
