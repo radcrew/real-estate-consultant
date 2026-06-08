@@ -92,14 +92,14 @@ export const MultiSelectFilter = ({ label, value, onChange, disabled, className 
           {hasValue ? (
             <span
               title={`Clear ${label}`}
-              className="-mr-1 flex size-8 shrink-0 cursor-default items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="-mr-1 flex size-8 shrink-0 cursor-default items-center justify-center rounded-sm text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
               onPointerDown={stopMenuTriggerBubble}
               onClick={handleClear}
             >
               <X className="size-4 shrink-0" aria-hidden />
             </span>
           ) : (
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground pointer-events-none" aria-hidden />
+            <ChevronDown className="size-4 shrink-0 text-neutral-500 dark:text-neutral-400 pointer-events-none" aria-hidden />
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="bottom" sideOffset={6} className="max-h-72 min-w-[12rem] overflow-y-auto p-1">

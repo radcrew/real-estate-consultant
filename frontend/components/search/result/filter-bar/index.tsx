@@ -145,7 +145,7 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
           className={cn(
             buttonVariants({ variant: "ghost", size: "lg" }),
             FILTER_BAR_ACTION,
-            "text-muted-foreground",
+            "text-neutral-500 dark:text-neutral-400",
           )}
           onClick={handleClear}
           disabled={disabled}

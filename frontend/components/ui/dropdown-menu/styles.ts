@@ -5,8 +5,8 @@ export const DROPDOWN_MENU_POSITIONER = "isolate z-50 outline-none";
 
 export const DROPDOWN_MENU_CONTENT_POPUP = [
   "z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin)",
-  "overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground",
-  "shadow-md ring-1 ring-foreground/10 duration-100 outline-none",
+  "overflow-x-hidden overflow-y-auto rounded-lg bg-white p-1 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200",
+  "shadow-md ring-1 ring-neutral-900/10 duration-100 outline-none dark:ring-white/10",
   "data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2",
   "data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2",
   "data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
@@ -41,7 +41,7 @@ export const DROPDOWN_MENU_SUB_TRIGGER = [
 
 export const DROPDOWN_MENU_CHECKABLE_ITEM = [
   "relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm",
-  "outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground",
+  "outline-hidden select-none focus:bg-neutral-100 focus:text-neutral-900 dark:focus:bg-neutral-700 dark:focus:text-neutral-100",
   "data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50",
   MENU_ITEM_SVG,
 ].join(" ");

@@ -83,27 +83,27 @@ export const RangeFilter = ({
           {hasValue ? (
             <span
               title={`Clear ${label}`}
-              className="-mr-1 flex size-8 shrink-0 cursor-default items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="-mr-1 flex size-8 shrink-0 cursor-default items-center justify-center rounded-sm text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
               onPointerDown={stopMenuTriggerBubble}
               onClick={handleClear}
             >
               <X className="size-4 shrink-0" aria-hidden />
             </span>
           ) : (
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground pointer-events-none" aria-hidden />
+            <ChevronDown className="size-4 shrink-0 text-neutral-500 dark:text-neutral-400 pointer-events-none" aria-hidden />
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="bottom" sideOffset={6} className="min-w-[16rem] p-3">
           <div className="space-y-3">
-            <div className="text-xs font-medium text-muted-foreground">
+            <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
               {label}
               {unit != null && unit.trim().length > 0 ? (
-                <span className="font-normal text-muted-foreground"> ({unit.trim()})</span>
+                <span className="font-normal text-neutral-500 dark:text-neutral-400"> ({unit.trim()})</span>
               ) : null}
             </div>
             <div className="flex gap-3">
               <div className="min-w-0 flex-1 space-y-1">
-                <label className="text-xs text-muted-foreground" htmlFor={`${fieldKey}-min`}>
+                <label className="text-xs text-neutral-500 dark:text-neutral-400" htmlFor={`${fieldKey}-min`}>
                   Min
                 </label>
                 <Input
@@ -117,7 +117,7 @@ export const RangeFilter = ({
                 />
               </div>
               <div className="min-w-0 flex-1 space-y-1">
-                <label className="text-xs text-muted-foreground" htmlFor={`${fieldKey}-max`}>
+                <label className="text-xs text-neutral-500 dark:text-neutral-400" htmlFor={`${fieldKey}-max`}>
                   Max
                 </label>
                 <Input
