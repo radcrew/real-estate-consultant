@@ -37,6 +37,7 @@ export const Checkbox = ({
       onChange={(e) => onChange?.(e.target.checked)}
       className={cn(
         "h-6 w-6 rounded border-neutral-500 bg-white text-primary-500",
+        "checked:border-primary-500 checked:bg-primary-500",
         "focus:ring-primary-500 dark:bg-neutral-700 dark:checked:bg-primary-500",
       )}
     />
