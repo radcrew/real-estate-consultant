@@ -14,6 +14,22 @@ import { cn } from "@utils/common";
  * placeholder when a listing has no image, and shows a match-score badge when
  * the model carries one (search results).
  */
+/** Responsive 3-up grid that PropertyCard / PropertyCardSkeleton render into. */
+export const PROPERTY_GRID =
+  "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3";
+
+/** Loading placeholder mirroring PropertyCard's shape. */
+export const PropertyCardSkeleton = () => (
+  <div className="overflow-hidden rounded-2xl border border-neutral-100 dark:border-neutral-800">
+    <div className="aspect-[4/3] animate-pulse bg-neutral-100 dark:bg-neutral-800" />
+    <div className="space-y-3 p-4">
+      <div className="h-4 w-1/3 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
+      <div className="h-5 w-4/5 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
+      <div className="h-4 w-2/3 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
+    </div>
+  </div>
+);
+
 export interface PropertyCardProps {
   data: PropertyModel;
   className?: string;

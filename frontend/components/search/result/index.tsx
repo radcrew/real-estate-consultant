@@ -5,7 +5,11 @@ import { LayoutGrid, Map as MapIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 
 import type { PropertyModel } from "@components/voyager/listing-model";
-import { PropertyCard } from "@components/voyager/property-card";
+import {
+  PropertyCard,
+  PropertyCardSkeleton,
+  PROPERTY_GRID,
+} from "@components/voyager/property-card";
 import { Pagination } from "@components/ui/voyager/pagination";
 import { SectionGridHasMap } from "@components/voyager/section-grid-has-map";
 import { useVoyagerSearchResults } from "@components/voyager/use-voyager-search-results";
@@ -17,7 +21,6 @@ type View = "grid" | "map";
 
 const SKELETON_COUNT = 6;
 const PAGE_SIZE = 9;
-const GRID = "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3";
 const TOGGLE_BTN =
   "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors";
 
@@ -129,23 +132,13 @@ export const SearchResults = () => {
 
         {loading && !error && (
           <div
-            className={GRID}
+            className={PROPERTY_GRID}
             role="status"
             aria-live="polite"
             aria-label="Loading search results"
           >
             {Array.from({ length: SKELETON_COUNT }, (_, i) => (
-              <div
-                key={i}
-                className="overflow-hidden rounded-2xl border border-neutral-100 dark:border-neutral-800"
-              >
-                <div className="aspect-[4/3] animate-pulse bg-neutral-100 dark:bg-neutral-800" />
-                <div className="space-y-3 p-4">
-                  <div className="h-4 w-1/3 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
-                  <div className="h-5 w-4/5 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
-                  <div className="h-4 w-2/3 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
-                </div>
-              </div>
+              <PropertyCardSkeleton key={i} />
             ))}
           </div>
         )}
@@ -153,7 +146,7 @@ export const SearchResults = () => {
         {hasResults &&
           (view === "grid" ? (
             <>
-              <div className={GRID}>
+              <div className={PROPERTY_GRID}>
                 {pagedModels.map((model) => (
                   <PropertyCard key={model.id} data={model} />
                 ))}

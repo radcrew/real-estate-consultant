@@ -5,10 +5,12 @@ import { useEffect, useState } from "react";
 import { useSavedListings } from "@components/saved/provider";
 import { ButtonPrimary } from "@components/ui/voyager/button-primary";
 import { detailToModel, type PropertyModel } from "@components/voyager/listing-model";
-import { PropertyCard } from "@components/voyager/property-card";
+import {
+  PropertyCard,
+  PropertyCardSkeleton,
+  PROPERTY_GRID,
+} from "@components/voyager/property-card";
 import { listingsService } from "@services/listings";
-
-const GRID = "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3";
 
 export const SavedView = () => {
   const { savedIds, isSaved, ready, signedIn } = useSavedListings();
@@ -76,19 +78,9 @@ export const SavedView = () => {
       ) : null}
 
       {loading ? (
-        <div className={`mt-10 ${GRID}`} role="status" aria-label="Loading saved properties">
+        <div className={`mt-10 ${PROPERTY_GRID}`} role="status" aria-label="Loading saved properties">
           {Array.from({ length: 3 }, (_, i) => (
-            <div
-              key={i}
-              className="overflow-hidden rounded-2xl border border-neutral-100 dark:border-neutral-800"
-            >
-              <div className="aspect-[4/3] animate-pulse bg-neutral-100 dark:bg-neutral-800" />
-              <div className="space-y-3 p-4">
-                <div className="h-4 w-1/3 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
-                <div className="h-5 w-4/5 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
-                <div className="h-4 w-2/3 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
-              </div>
-            </div>
+            <PropertyCardSkeleton key={i} />
           ))}
         </div>
       ) : null}
@@ -106,7 +98,7 @@ export const SavedView = () => {
       ) : null}
 
       {signedIn && !loading && visible.length > 0 ? (
-        <div className={`mt-10 ${GRID}`}>
+        <div className={`mt-10 ${PROPERTY_GRID}`}>
           {visible.map((model) => (
             <PropertyCard key={model.id} data={model} />
           ))}

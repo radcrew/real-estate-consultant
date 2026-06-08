@@ -5,11 +5,9 @@ import { Mail, Phone } from "lucide-react";
 
 import { Avatar } from "@components/ui/voyager/avatar";
 import { propertyToModel } from "@components/voyager/listing-model";
-import { PropertyCard } from "@components/voyager/property-card";
+import { PropertyCard, PROPERTY_GRID } from "@components/voyager/property-card";
 import { listingsService, type AgentProfileResponse } from "@services/listings";
 import { getApiErrorMessage } from "@utils/common";
-
-const GRID = "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3";
 
 type AgentViewProps = {
   broker: string;
@@ -82,7 +80,7 @@ export const AgentView = ({ broker }: AgentViewProps) => {
             {data.properties.length}{" "}
             {data.properties.length === 1 ? "listing" : "listings"}
           </h2>
-          <div className={`mt-6 ${GRID}`}>
+          <div className={`mt-6 ${PROPERTY_GRID}`}>
             {data.properties.map((property, i) => (
               <PropertyCard
                 key={property.id ?? i}

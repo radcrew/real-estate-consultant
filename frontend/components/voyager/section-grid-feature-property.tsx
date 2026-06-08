@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { ButtonSecondary } from "@components/ui/voyager/button-secondary";
 import { Heading2 } from "@components/ui/voyager/heading2";
 import type { PropertyModel } from "@components/voyager/listing-model";
-import { PropertyCard } from "@components/voyager/property-card";
+import { PropertyCard, PROPERTY_GRID } from "@components/voyager/property-card";
 import { cn } from "@utils/common";
 
 /**
@@ -26,7 +26,7 @@ export const SectionGridFeatureProperty = ({
   subHeading,
   data,
   cta,
-  gridClassName = "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-8 lg:grid-cols-3",
+  gridClassName = PROPERTY_GRID,
   className,
 }: SectionGridFeaturePropertyProps) => (
   <section className={cn("relative", className)}>
