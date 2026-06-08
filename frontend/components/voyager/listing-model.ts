@@ -72,7 +72,7 @@ const buildMap = (p: SearchProperty) =>
     : null;
 
 /** Map a scored search result to the Voyager view-model. */
-export const toPropertyModel = (
+const toPropertyModel = (
   match: SearchPropertyMatch,
   index = 0,
 ): PropertyModel => {
