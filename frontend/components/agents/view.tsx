@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Mail, Phone } from "lucide-react";
 
 import { Avatar } from "@components/ui/voyager/avatar";
+import { NoticeCard } from "@components/ui/notice-card";
 import { propertyToModel } from "@components/voyager/listing-model";
 import { PropertyCard, PROPERTY_GRID } from "@components/voyager/property-card";
 import { listingsService, type AgentProfileResponse } from "@services/listings";
@@ -40,11 +41,11 @@ export const AgentView = ({ broker }: AgentViewProps) => {
       {loading ? (
         <p className="text-neutral-500 dark:text-neutral-400">Loading agent…</p>
       ) : error || !data ? (
-        <div className="rounded-2xl border border-neutral-200 p-10 text-center dark:border-neutral-700">
+        <NoticeCard>
           <p className="text-neutral-600 dark:text-neutral-300">
             {error ?? "Agent not found."}
           </p>
-        </div>
+        </NoticeCard>
       ) : (
         <>
           <header className="flex flex-col items-start gap-5 border-b border-neutral-200 pb-10 sm:flex-row sm:items-center dark:border-neutral-700">

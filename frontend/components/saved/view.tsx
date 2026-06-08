@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useSavedListings } from "@components/saved/provider";
+import { NoticeCard } from "@components/ui/notice-card";
 import { ButtonPrimary } from "@components/ui/voyager/button-primary";
 import { detailToModel, type PropertyModel } from "@components/voyager/listing-model";
 import {
@@ -67,14 +68,14 @@ export const SavedView = () => {
       </div>
 
       {ready && !signedIn ? (
-        <div className="mt-12 rounded-2xl border border-neutral-200 p-10 text-center dark:border-neutral-700">
+        <NoticeCard className="mt-12">
           <p className="text-neutral-600 dark:text-neutral-300">
             Sign in to save properties and see them here.
           </p>
           <div className="mt-6 flex justify-center">
             <ButtonPrimary href="/sign-in">Sign in</ButtonPrimary>
           </div>
-        </div>
+        </NoticeCard>
       ) : null}
 
       {loading ? (
@@ -86,7 +87,7 @@ export const SavedView = () => {
       ) : null}
 
       {signedIn && !loading && visible.length === 0 ? (
-        <div className="mt-12 rounded-2xl border border-neutral-200 p-10 text-center dark:border-neutral-700">
+        <NoticeCard className="mt-12">
           <p className="text-neutral-600 dark:text-neutral-300">
             You haven&rsquo;t saved any properties yet. Tap the heart on a listing
             to save it here.
@@ -94,7 +95,7 @@ export const SavedView = () => {
           <div className="mt-6 flex justify-center">
             <ButtonPrimary href="/listings">Browse properties</ButtonPrimary>
           </div>
-        </div>
+        </NoticeCard>
       ) : null}
 
       {signedIn && !loading && visible.length > 0 ? (

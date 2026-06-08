@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { LayoutGrid, Map as MapIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 
+import { NoticeCard } from "@components/ui/notice-card";
 import type { PropertyModel } from "@components/voyager/listing-model";
 import {
   PropertyCard,
@@ -172,14 +173,14 @@ export const SearchResults = () => {
           ))}
 
         {showNoResults && (
-          <div className="mt-4 rounded-2xl border border-neutral-200 p-10 text-center dark:border-neutral-700">
+          <NoticeCard className="mt-4">
             <p className="text-neutral-700 dark:text-neutral-200">
               No properties match your search.
             </p>
             <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
               Try widening your filters — adjust price, size, or property type above.
             </p>
-          </div>
+          </NoticeCard>
         )}
       </div>
     </div>

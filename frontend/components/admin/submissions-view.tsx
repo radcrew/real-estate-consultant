@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { NoticeCard } from "@components/ui/notice-card";
 import { Badge } from "@components/ui/voyager/badge";
 import { ButtonPrimary } from "@components/ui/voyager/button-primary";
 import { ButtonThird } from "@components/ui/voyager/button-third";
@@ -72,9 +73,9 @@ export const AdminSubmissionsView = () => {
       ) : null}
 
       {items && items.length === 0 ? (
-        <div className="mt-10 rounded-2xl border border-neutral-200 p-10 text-center text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
+        <NoticeCard className="mt-10 text-neutral-600 dark:text-neutral-300">
           No submissions yet.
-        </div>
+        </NoticeCard>
       ) : null}
 
       {items && items.length > 0 ? (
