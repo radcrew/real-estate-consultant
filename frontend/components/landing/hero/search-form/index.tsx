@@ -35,8 +35,8 @@ export const HeroRealEstateSearchForm = ({
   const [priceRange, setPriceRange] = useState<[number, number]>([100000, 4000000]);
 
   return (
-    <div className={cn("w-full max-w-6xl py-5 lg:py-0", className)}>
-      <ul className="ml-6 inline-flex space-x-4 rounded-t-3xl bg-white pb-6 pl-0 dark:bg-neutral-900 sm:space-x-8 md:ml-16 md:p-6 lg:space-x-10 xl:ml-20 xl:p-0">
+    <div className={cn("mx-auto w-full max-w-6xl py-5 lg:py-0", className)}>
+      <ul className="ml-5 inline-flex space-x-5 rounded-t-3xl bg-white px-4 pt-2 pb-6 dark:bg-neutral-800 md:ml-10 md:space-x-8 md:px-7 md:pt-3 lg:space-x-11 xl:px-8">
         {TABS.map((tab) => {
           const active = tab === tabActive;
           return (
@@ -44,14 +44,17 @@ export const HeroRealEstateSearchForm = ({
               key={tab}
               onClick={() => setTabActive(tab)}
               className={cn(
-                "flex cursor-pointer items-center text-sm font-medium lg:text-base",
+                "flex cursor-pointer items-center text-sm font-medium leading-none lg:text-base",
                 !active &&
                   "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-100",
               )}
             >
-              {active && (
-                <span className="mr-2 block size-2.5 rounded-full bg-neutral-800 dark:bg-neutral-100" />
-              )}
+              <span
+                className={cn(
+                  "mr-2 block size-2.5 rounded-full bg-neutral-800 dark:bg-neutral-100",
+                  !active && "invisible",
+                )}
+              />
               <span>{tab}</span>
             </li>
           );
