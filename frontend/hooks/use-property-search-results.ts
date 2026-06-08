@@ -10,16 +10,16 @@ import { searchService, type UpdateSearchCriteriaBody } from "@services/search";
 import { buildDefaultSearchCriteriaShell } from "@utils/search/criteria";
 
 /**
- * Voyager search-results hook.
+ * Property search-results hook.
  *
  * Loads results on session change (with abort handling, a default criteria
  * shell, and `applyCriteria`) and maps the raw `SearchPropertyMatch[]` to the
- * richer `PropertyModel[]` (via `toPropertyModels`) so the Voyager grid AND map
- * (which needs lat/lng) share one source.
+ * richer `PropertyModel[]` (via `toPropertyModels`) so the grid AND map (which
+ * needs lat/lng) share one source.
  */
 const DEFAULT_PAGE = { limit: 20, offset: 0 } as const;
 
-export const useVoyagerSearchResults = (
+export const usePropertySearchResults = (
   sessionProfileId: string | undefined,
 ) => {
   const [models, setModels] = useState<PropertyModel[]>([]);
