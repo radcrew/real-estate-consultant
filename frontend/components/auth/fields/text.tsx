@@ -2,7 +2,7 @@
 
 import type { ChangeEvent } from "react";
 
-import { Input } from "@components/ui/voyager/input";
+import { Input } from "@components/ui/input";
 
 export type TextFieldProps = {
   id: string;

@@ -5,7 +5,7 @@ import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-import { NavMobile } from "@components/ui/voyager/nav-mobile";
+import { NavMobile } from "@components/ui/nav-mobile";
 import { cn } from "@utils/common";
 
 /**

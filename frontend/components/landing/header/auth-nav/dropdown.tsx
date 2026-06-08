@@ -5,7 +5,7 @@ import { Popover, Transition } from "@headlessui/react";
 import { Heart, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
 
-import { Avatar } from "@components/ui/voyager/avatar";
+import { Avatar } from "@components/ui/avatar";
 import { useAuth } from "@contexts/auth";
 
 /**

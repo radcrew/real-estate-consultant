@@ -1,4 +1,4 @@
-import { Logo } from "@components/ui/voyager/logo";
+import { Logo } from "@components/ui/logo";
 
 const AuthLayout = ({
   children,

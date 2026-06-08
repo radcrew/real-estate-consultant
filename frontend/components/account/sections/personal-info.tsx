@@ -3,8 +3,8 @@
 import { useRef } from "react";
 import { Camera, Loader2 } from "lucide-react";
 
-import { Button } from "@components/ui/buttons";
-import { Avatar } from "@components/ui/voyager/avatar";
+import { Button } from "@components/ui/button-variants";
+import { Avatar } from "@components/ui/avatar";
 import { SaveCancelGroup } from "@components/ui/save-cancel-group";
 
 import type { ProfileFieldKey, ProfileFormValues } from "@utils/account/validation";

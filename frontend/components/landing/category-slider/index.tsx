@@ -3,7 +3,7 @@
 import useEmblaCarousel from "embla-carousel-react";
 
 import { SectionHeading } from "@components/landing/section-heading";
-import { NextPrev } from "@components/ui/voyager/next-prev";
+import { NextPrev } from "@components/ui/next-prev";
 import { cn } from "@utils/common";
 
 import { CardCategory, type CardType } from "./card-category";

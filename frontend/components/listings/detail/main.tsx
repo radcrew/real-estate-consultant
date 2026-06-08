@@ -1,6 +1,6 @@
 import { ExternalLink, MapPin } from "lucide-react";
 
-import { Badge } from "@components/ui/voyager/badge";
+import { Badge } from "@components/ui/badge";
 import type { ListingProperty } from "@services/listings";
 import { listingLocationLine, listingTitle } from "@utils/listings/headline";
 import { mapsHref } from "@utils/listings/maps";

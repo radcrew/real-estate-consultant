@@ -4,9 +4,9 @@ import { useState } from "react";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 
-import { Badge } from "@components/ui/voyager/badge";
-import { ButtonCircle } from "@components/ui/voyager/button-circle";
-import { Input } from "@components/ui/voyager/input";
+import { Badge } from "@components/ui/badge";
+import { ButtonCircle } from "@components/ui/button-circle";
+import { Input } from "@components/ui/input";
 import { cn } from "@utils/common";
 
 /**

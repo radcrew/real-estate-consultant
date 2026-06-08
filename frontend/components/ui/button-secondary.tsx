@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, type ButtonProps } from "@components/ui/voyager/button";
+import { Button, type ButtonProps } from "@components/ui/button";
 import { cn } from "@utils/common";
 
 /**

@@ -2,7 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 
-import { Avatar } from "@components/ui/voyager/avatar";
+import { Avatar } from "@components/ui/avatar";
 
 import type { AuthorBox } from "./data";
 

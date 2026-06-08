@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Mail, Phone } from "lucide-react";
 
-import { Avatar } from "@components/ui/voyager/avatar";
+import { Avatar } from "@components/ui/avatar";
 import { NoticeCard } from "@components/ui/notice-card";
 import { propertyToModel } from "@components/voyager/listing-model";
 import { PropertyCard, PROPERTY_GRID } from "@components/voyager/property-card";

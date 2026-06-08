@@ -4,7 +4,7 @@ import { Fragment } from "react";
 import { Popover, Transition } from "@headlessui/react";
 import { Building2 } from "lucide-react";
 
-import { Checkbox } from "@components/ui/voyager/checkbox";
+import { Checkbox } from "@components/ui/checkbox";
 import { cn } from "@utils/common";
 
 import { FIELD_FOCUSED, FIELD_PADDING } from "./styles";

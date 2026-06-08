@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-import { ButtonSecondary } from "@components/ui/voyager/button-secondary";
+import { ButtonSecondary } from "@components/ui/button-secondary";
 import { useAuth } from "@contexts/auth";
 
 type GoogleAuthButtonProps = {

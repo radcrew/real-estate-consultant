@@ -1,7 +1,7 @@
 import { Quote } from "lucide-react";
 
 import { SectionHeading } from "@components/landing/section-heading";
-import { Avatar } from "@components/ui/voyager/avatar";
+import { Avatar } from "@components/ui/avatar";
 
 /**
  * "What clients say" testimonials, adapted from Voyager's `SectionClientSay`.

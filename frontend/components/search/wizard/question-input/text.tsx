@@ -1,6 +1,6 @@
 "use client";
 
-import { Input } from "@components/ui/voyager/input";
+import { Input } from "@components/ui/input";
 
 import type { TextQuestion } from "../types";
 

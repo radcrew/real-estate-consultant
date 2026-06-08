@@ -1,6 +1,6 @@
 "use client";
 
-import { Input } from "@components/ui/voyager/input";
+import { Input } from "@components/ui/input";
 
 import type { LocationQuestion } from "../types";
 import { useLocation } from "../../../../hooks/use-location";

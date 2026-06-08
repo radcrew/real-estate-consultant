@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
+import { ButtonPrimary } from "@components/ui/button-primary";
 import { brand } from "@config/brand";
 import { cn } from "@utils/common";
 

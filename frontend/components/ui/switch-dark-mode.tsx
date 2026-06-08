@@ -2,7 +2,7 @@
 
 import { Moon, Sun } from "lucide-react";
 
-import { useThemeMode } from "@components/ui/voyager/use-theme-mode";
+import { useThemeMode } from "@components/ui/use-theme-mode";
 import { cn } from "@utils/common";
 
 /**

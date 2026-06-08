@@ -2,8 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { Building2, MapPin } from "lucide-react";
 
-import { Badge } from "@components/ui/voyager/badge";
-import { BtnLikeIcon } from "@components/ui/voyager/btn-like-icon";
+import { Badge } from "@components/ui/badge";
+import { BtnLikeIcon } from "@components/ui/btn-like-icon";
 import type { PropertyModel } from "@components/voyager/listing-model";
 import { cn } from "@utils/common";
 

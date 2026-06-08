@@ -4,7 +4,7 @@ import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
-import { buttonVariants } from "@components/ui/buttons";
+import { buttonVariants } from "@components/ui/button-variants";
 import { cn } from "@utils/common";
 
 type HistoryBackButtonProps = {
@@ -31,7 +31,7 @@ export const HistoryBackButton = ({
         onClick={handleClick}
         className={cn(
           buttonVariants({ variant: "ghost", size: "sm" }),
-          "gap-1.5 pl-0 text-muted-foreground hover:text-foreground",
+          "gap-1.5 pl-0 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100",
           className,
         )}
       >

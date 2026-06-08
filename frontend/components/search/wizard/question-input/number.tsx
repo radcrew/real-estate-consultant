@@ -1,5 +1,5 @@
 import type { ChangeEvent } from "react";
-import { Input } from "@components/ui/voyager/input";
+import { Input } from "@components/ui/input";
 
 type NumberFieldProps = {
   id: string;

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Building2, Heart, KeyRound, UserCircle } from "lucide-react";
 
-import { Avatar } from "@components/ui/voyager/avatar";
+import { Avatar } from "@components/ui/avatar";
 import { brand } from "@config/brand";
 import { useAuth } from "@contexts/auth";
 import { cn } from "@utils/common";

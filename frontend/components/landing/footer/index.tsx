@@ -1,7 +1,7 @@
 import Link from "next/link";
 
-import { Logo } from "@components/ui/voyager/logo";
-import { SocialsList } from "@components/ui/voyager/socials-list";
+import { Logo } from "@components/ui/logo";
+import { SocialsList } from "@components/ui/socials-list";
 import { brand } from "@config/brand";
 
 /**

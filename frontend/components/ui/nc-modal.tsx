@@ -8,8 +8,8 @@ import {
 } from "@headlessui/react";
 import { useState, type ReactNode } from "react";
 
-import { Button } from "@components/ui/voyager/button";
-import { ButtonClose } from "@components/ui/voyager/button-close";
+import { Button } from "@components/ui/button";
+import { ButtonClose } from "@components/ui/button-close";
 import { cn } from "@utils/common";
 
 /**

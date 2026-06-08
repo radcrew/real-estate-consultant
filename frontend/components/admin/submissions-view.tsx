@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 
 import { NoticeCard } from "@components/ui/notice-card";
-import { Badge } from "@components/ui/voyager/badge";
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
-import { ButtonThird } from "@components/ui/voyager/button-third";
+import { Badge } from "@components/ui/badge";
+import { ButtonPrimary } from "@components/ui/button-primary";
+import { ButtonThird } from "@components/ui/button-third";
 import {
   listingsService,
   type ListingSubmissionItem,

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-import { NcModal } from "@components/ui/voyager/nc-modal";
+import { NcModal } from "@components/ui/nc-modal";
 
 /**
  * Full-screen photo modal for the listing gallery — a scrollable column of all

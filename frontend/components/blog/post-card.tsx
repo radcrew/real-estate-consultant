@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { Avatar } from "@components/ui/voyager/avatar";
-import { Badge } from "@components/ui/voyager/badge";
+import { Avatar } from "@components/ui/avatar";
+import { Badge } from "@components/ui/badge";
 
 import type { BlogPost } from "./data";
 

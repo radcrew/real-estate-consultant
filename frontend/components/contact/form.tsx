@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
-import { Input } from "@components/ui/voyager/input";
-import { Textarea } from "@components/ui/voyager/textarea";
+import { ButtonPrimary } from "@components/ui/button-primary";
+import { Input } from "@components/ui/input";
+import { Textarea } from "@components/ui/textarea";
 
 const LABEL = "text-sm font-medium text-neutral-700 dark:text-neutral-300";
 

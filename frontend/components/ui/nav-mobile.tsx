@@ -8,15 +8,15 @@ import {
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 
-import { ButtonClose } from "@components/ui/voyager/button-close";
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
-import { ButtonSecondary } from "@components/ui/voyager/button-secondary";
-import { ButtonThird } from "@components/ui/voyager/button-third";
-import { Logo } from "@components/ui/voyager/logo";
-import type { NavItemType } from "@components/ui/voyager/nav-item";
-import { DEFAULT_NAV } from "@components/ui/voyager/navigation";
-import { SocialsList } from "@components/ui/voyager/socials-list";
-import { SwitchDarkMode } from "@components/ui/voyager/switch-dark-mode";
+import { ButtonClose } from "@components/ui/button-close";
+import { ButtonPrimary } from "@components/ui/button-primary";
+import { ButtonSecondary } from "@components/ui/button-secondary";
+import { ButtonThird } from "@components/ui/button-third";
+import { Logo } from "@components/ui/logo";
+import type { NavItemType } from "@components/ui/nav-item";
+import { DEFAULT_NAV } from "@components/ui/navigation";
+import { SocialsList } from "@components/ui/socials-list";
+import { SwitchDarkMode } from "@components/ui/switch-dark-mode";
 import { useAuth } from "@contexts/auth";
 
 /**

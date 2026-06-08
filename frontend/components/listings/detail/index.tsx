@@ -1,7 +1,7 @@
 "use client";
 
-import { HistoryBackButton } from "@components/ui/buttons/back";
-import { ButtonThird } from "@components/ui/voyager/button-third";
+import { HistoryBackButton } from "@components/ui/button-back";
+import { ButtonThird } from "@components/ui/button-third";
 import { detailToModel } from "@components/voyager/listing-model";
 import { PropertyGallery } from "@components/voyager/property-gallery";
 

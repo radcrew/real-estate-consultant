@@ -9,8 +9,8 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
-import { ButtonThird } from "@components/ui/voyager/button-third";
+import { ButtonPrimary } from "@components/ui/button-primary";
+import { ButtonThird } from "@components/ui/button-third";
 
 import { useSearchWizard } from "@contexts/search-wizard";
 

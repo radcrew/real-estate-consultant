@@ -7,8 +7,8 @@ import { ArrowLeft } from "lucide-react";
 import { BLOG_POSTS, getBlogAuthor, getBlogPost } from "@components/blog/data";
 import { BlogAuthorBox } from "@components/blog/author-box";
 import { BlogPostCard } from "@components/blog/post-card";
-import { Avatar } from "@components/ui/voyager/avatar";
-import { Badge } from "@components/ui/voyager/badge";
+import { Avatar } from "@components/ui/avatar";
+import { Badge } from "@components/ui/badge";
 
 type BlogPostPageProps = {
   params: Promise<{ slug: string }>;

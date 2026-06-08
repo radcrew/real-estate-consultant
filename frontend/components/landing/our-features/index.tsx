@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import { Badge } from "@components/ui/voyager/badge";
+import { Badge } from "@components/ui/badge";
 import { cn } from "@utils/common";
 
 /**

@@ -1,8 +1,8 @@
-import { ButtonSecondary } from "@components/ui/voyager/button-secondary";
-import { Logo } from "@components/ui/voyager/logo";
-import { MenuBar } from "@components/ui/voyager/menu-bar";
-import { Navigation } from "@components/ui/voyager/navigation";
-import { SwitchDarkMode } from "@components/ui/voyager/switch-dark-mode";
+import { ButtonSecondary } from "@components/ui/button-secondary";
+import { Logo } from "@components/ui/logo";
+import { MenuBar } from "@components/ui/menu-bar";
+import { Navigation } from "@components/ui/navigation";
+import { SwitchDarkMode } from "@components/ui/switch-dark-mode";
 
 import { AuthNav } from "./auth-nav";
 import { SearchDropdown } from "./search-dropdown";

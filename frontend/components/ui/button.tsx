@@ -12,7 +12,6 @@ import { cn } from "@utils/common";
  * instead of template strings, `string` hrefs (typedRoutes is off here), React
  * 19 conventions, and no `Route<string>` import. All other Voyager button
  * variants (Primary, Secondary, Third, Circle, Close) wrap this component.
- * Kept in `ui/voyager/` so it doesn't disturb the existing shadcn `Button`.
  */
 export interface ButtonProps {
   className?: string;

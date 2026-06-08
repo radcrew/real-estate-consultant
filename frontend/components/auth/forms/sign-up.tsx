@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useState } from "react";
 
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
+import { ButtonPrimary } from "@components/ui/button-primary";
 import { useAuth } from "@contexts/auth";
 
 import { AuthFormError } from "./error";

@@ -11,7 +11,7 @@ import {
   PropertyCardSkeleton,
   PROPERTY_GRID,
 } from "@components/voyager/property-card";
-import { Pagination } from "@components/ui/voyager/pagination";
+import { Pagination } from "@components/ui/pagination";
 import { SectionGridHasMap } from "@components/voyager/section-grid-has-map";
 import { useVoyagerSearchResults } from "@components/voyager/use-voyager-search-results";
 import { cn } from "@utils/common";

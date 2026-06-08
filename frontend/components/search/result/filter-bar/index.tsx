@@ -3,7 +3,7 @@
 import { createElement, useMemo, useState, type ComponentType } from "react";
 import { Search } from "lucide-react";
 
-import { buttonVariants } from "@components/ui/buttons";
+import { buttonVariants } from "@components/ui/button-variants";
 import { cn } from "@utils/common";
 import {
   parseSearchCriteriaEntries,

@@ -2,9 +2,9 @@
 
 import { Loader2 } from "lucide-react";
 
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
-import { ButtonThird } from "@components/ui/voyager/button-third";
-import { Textarea } from "@components/ui/voyager/textarea";
+import { ButtonPrimary } from "@components/ui/button-primary";
+import { ButtonThird } from "@components/ui/button-third";
+import { Textarea } from "@components/ui/textarea";
 import { useAuth } from "@contexts/auth";
 import { useOutreachDraft } from "@hooks/use-outreach-draft";
 import type { ListingProperty } from "@services/listings";

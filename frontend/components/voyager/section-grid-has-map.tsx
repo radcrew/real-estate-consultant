@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
-import { Heading2 } from "@components/ui/voyager/heading2";
+import { Heading2 } from "@components/ui/heading2";
 import type { PropertyModel } from "@components/voyager/listing-model";
 import { PropertyCard } from "@components/voyager/property-card";
 import { PropertyMap } from "@components/voyager/property-map";

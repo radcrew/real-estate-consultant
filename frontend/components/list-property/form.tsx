@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
-import { Input } from "@components/ui/voyager/input";
-import { Select } from "@components/ui/voyager/select";
-import { Textarea } from "@components/ui/voyager/textarea";
+import { ButtonPrimary } from "@components/ui/button-primary";
+import { Input } from "@components/ui/input";
+import { Select } from "@components/ui/select";
+import { Textarea } from "@components/ui/textarea";
 import { listingsService } from "@services/listings";
 import { getApiErrorMessage } from "@utils/common";
 

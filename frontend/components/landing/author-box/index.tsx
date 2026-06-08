@@ -1,6 +1,6 @@
 import { SectionHeading } from "@components/landing/section-heading";
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
-import { ButtonSecondary } from "@components/ui/voyager/button-secondary";
+import { ButtonPrimary } from "@components/ui/button-primary";
+import { ButtonSecondary } from "@components/ui/button-secondary";
 import { cn } from "@utils/common";
 
 import { CardBroker } from "./card";

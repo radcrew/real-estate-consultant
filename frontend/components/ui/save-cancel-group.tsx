@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@components/ui/buttons";
+import { Button } from "@components/ui/button-variants";
 
 export type SaveCancelGroupProps = {
   onSave: () => void;

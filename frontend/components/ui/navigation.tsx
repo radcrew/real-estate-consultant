@@ -1,7 +1,7 @@
 import {
   NavigationItem,
   type NavItemType,
-} from "@components/ui/voyager/nav-item";
+} from "@components/ui/nav-item";
 
 /**
  * Voyager-styled desktop navigation.

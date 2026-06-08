@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { useSavedListings } from "@components/saved/provider";
 import { NoticeCard } from "@components/ui/notice-card";
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
+import { ButtonPrimary } from "@components/ui/button-primary";
 import { detailToModel, type PropertyModel } from "@components/voyager/listing-model";
 import {
   PropertyCard,

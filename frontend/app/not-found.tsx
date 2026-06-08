@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
+import { ButtonPrimary } from "@components/ui/button-primary";
 
 /**
  * 404 page, ported from Voyager's `not-found.tsx`: centered 404 art, a message,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ButtonPrimary } from "@components/ui/voyager/button-primary";
+import { ButtonPrimary } from "@components/ui/button-primary";
 
 /**
  * Logged-out header actions, styled to match the Voyager header: a plain

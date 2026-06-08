@@ -1,4 +1,4 @@
-import { Avatar } from "@components/ui/voyager/avatar";
+import { Avatar } from "@components/ui/avatar";
 import type { BlogAuthor } from "@components/blog/data";
 
 /**
