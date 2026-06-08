@@ -13,8 +13,8 @@ import { OurFeatures } from "@components/landing/our-features";
 import { PartnerLogos } from "@components/landing/partner-logos";
 import { Subscribe } from "@components/landing/subscribe";
 import { Testimonials } from "@components/landing/testimonials";
-import { BackgroundSection } from "@components/voyager/background-section";
-import { BgGlassmorphism } from "@components/voyager/bg-glassmorphism";
+import { BackgroundSection } from "@components/ui/background-section";
+import { BgGlassmorphism } from "@components/ui/bg-glassmorphism";
 
 const HomePage = () => (
   <main className="relative flex flex-1 flex-col overflow-hidden bg-background">

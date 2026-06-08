@@ -4,7 +4,7 @@ import { Building2, MapPin } from "lucide-react";
 
 import { Badge } from "@components/ui/badge";
 import { BtnLikeIcon } from "@components/ui/btn-like-icon";
-import type { PropertyModel } from "@components/voyager/listing-model";
+import type { PropertyModel } from "@components/property/listing-model";
 import { cn } from "@utils/common";
 
 /**

@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import { BackgroundSection } from "@components/voyager/background-section";
+import { BackgroundSection } from "@components/ui/background-section";
 
 /**
  * "Mobile apps" CTA, ported from Voyager's `SectionDowloadApp`. Uses Voyager's

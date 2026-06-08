@@ -5,12 +5,12 @@ import { useEffect, useState } from "react";
 import { useSavedListings } from "@components/saved/provider";
 import { NoticeCard } from "@components/ui/notice-card";
 import { ButtonPrimary } from "@components/ui/button-primary";
-import { detailToModel, type PropertyModel } from "@components/voyager/listing-model";
+import { detailToModel, type PropertyModel } from "@components/property/listing-model";
 import {
   PropertyCard,
   PropertyCardSkeleton,
   PROPERTY_GRID,
-} from "@components/voyager/property-card";
+} from "@components/property/property-card";
 import { listingsService } from "@services/listings";
 
 export const SavedView = () => {

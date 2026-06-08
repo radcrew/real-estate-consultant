@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 
 import { ButtonSecondary } from "@components/ui/button-secondary";
 import { Heading2 } from "@components/ui/heading2";
-import type { PropertyModel } from "@components/voyager/listing-model";
-import { PropertyCard, PROPERTY_GRID } from "@components/voyager/property-card";
+import type { PropertyModel } from "@components/property/listing-model";
+import { PropertyCard, PROPERTY_GRID } from "@components/property/property-card";
 import { cn } from "@utils/common";
 
 /**

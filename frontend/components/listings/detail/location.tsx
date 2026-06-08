@@ -1,5 +1,5 @@
-import type { PropertyModel } from "@components/voyager/listing-model";
-import { PropertyMap } from "@components/voyager/property-map";
+import type { PropertyModel } from "@components/property/listing-model";
+import { PropertyMap } from "@components/property/property-map";
 
 /**
  * Voyager-style "Location" section card for the listing detail: heading +

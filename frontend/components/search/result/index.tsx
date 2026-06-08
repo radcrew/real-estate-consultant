@@ -5,15 +5,15 @@ import { LayoutGrid, Map as MapIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 
 import { NoticeCard } from "@components/ui/notice-card";
-import type { PropertyModel } from "@components/voyager/listing-model";
+import type { PropertyModel } from "@components/property/listing-model";
 import {
   PropertyCard,
   PropertyCardSkeleton,
   PROPERTY_GRID,
-} from "@components/voyager/property-card";
+} from "@components/property/property-card";
 import { Pagination } from "@components/ui/pagination";
-import { SectionGridHasMap } from "@components/voyager/section-grid-has-map";
-import { useVoyagerSearchResults } from "@components/voyager/use-voyager-search-results";
+import { SectionGridHasMap } from "@components/property/section-grid-has-map";
+import { useVoyagerSearchResults } from "@hooks/use-voyager-search-results";
 import { cn } from "@utils/common";
 
 import { SearchFilter } from "./filter-bar";

@@ -1,7 +1,7 @@
 import { brand } from "@config/brand";
 import { FEATURED_LISTINGS } from "@constants";
-import { featuredToModel } from "@components/voyager/listing-model";
-import { SectionGridFeatureProperty } from "@components/voyager/section-grid-feature-property";
+import { featuredToModel } from "@components/property/listing-model";
+import { SectionGridFeatureProperty } from "@components/property/section-grid-feature-property";
 
 const FEATURED_MODELS = FEATURED_LISTINGS.map(featuredToModel);
 

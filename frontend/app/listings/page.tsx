@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 import { ButtonPrimary } from "@components/ui/button-primary";
-import { featuredToModel } from "@components/voyager/listing-model";
-import { SectionGridFeatureProperty } from "@components/voyager/section-grid-feature-property";
+import { featuredToModel } from "@components/property/listing-model";
+import { SectionGridFeatureProperty } from "@components/property/section-grid-feature-property";
 import { brand } from "@config/brand";
 import { FEATURED_LISTINGS } from "@constants";
 

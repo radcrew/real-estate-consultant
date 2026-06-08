@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   toPropertyModels,
   type PropertyModel,
-} from "@components/voyager/listing-model";
+} from "@components/property/listing-model";
 import { searchService, type UpdateSearchCriteriaBody } from "@services/search";
 import { buildDefaultSearchCriteriaShell } from "@utils/search/criteria";
 

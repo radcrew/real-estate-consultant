@@ -4,7 +4,7 @@ import Image from "next/image";
 import { SectionHeading } from "@components/landing/section-heading";
 import { Subscribe } from "@components/landing/subscribe";
 import { Testimonials } from "@components/landing/testimonials";
-import { BgGlassmorphism } from "@components/voyager/bg-glassmorphism";
+import { BgGlassmorphism } from "@components/ui/bg-glassmorphism";
 
 export const metadata: Metadata = {
   title: "About",
