@@ -10,6 +10,7 @@ import Link from "next/link";
 
 import { ButtonClose } from "@components/ui/voyager/button-close";
 import { ButtonPrimary } from "@components/ui/voyager/button-primary";
+import { ButtonSecondary } from "@components/ui/voyager/button-secondary";
 import { ButtonThird } from "@components/ui/voyager/button-third";
 import { Logo } from "@components/ui/voyager/logo";
 import type { NavItemType } from "@components/ui/voyager/nav-item";
@@ -106,7 +107,11 @@ export const NavMobile = ({
 
       <ul className="flex flex-col space-y-1 px-2 py-6">{data.map(renderItem)}</ul>
 
-      <div className="px-5 py-6">
+      <div className="space-y-3 px-5 py-6">
+        <ButtonSecondary href="/list-property" onClick={onClickClose}>
+          List your property
+        </ButtonSecondary>
+
         {session ? (
           <div className="flex flex-col space-y-3">
             <ButtonPrimary href="/account" onClick={onClickClose}>
