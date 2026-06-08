@@ -6,35 +6,45 @@ import { Building2, Heart, KeyRound, UserCircle } from "lucide-react";
 import { Avatar } from "@components/ui/voyager/avatar";
 import { brand } from "@config/brand";
 import { useAuth } from "@contexts/auth";
+import { cn } from "@utils/common";
 
 /**
  * Voyager `AccountSidebar` adapted to this app: dark workspace rail with the
- * brand block, the signed-in user's avatar, and nav to the account sections.
- * Only Profile + Security exist here (no saved-lists/billing backend), so nav
- * items are in-page anchors rather than separate routes.
+ * brand block, the signed-in user's avatar, and a tabbed nav for the account
+ * sections. Profile + Security are in-page tabs (switch the visible panel);
+ * Saved is a real route since it lives on its own page.
  */
-const NAV_ITEMS = [
+export type AccountTab = "profile" | "security";
+
+const TAB_ITEMS: {
+  tab: AccountTab;
+  label: string;
+  description: string;
+  icon: typeof UserCircle;
+}[] = [
   {
-    href: "#profile",
+    tab: "profile",
     label: "Personal info",
     description: "Name, contact and address",
     icon: UserCircle,
   },
   {
-    href: "#security",
+    tab: "security",
     label: "Security",
     description: "Change your password",
     icon: KeyRound,
   },
-  {
-    href: "/saved",
-    label: "Saved",
-    description: "Properties you've saved",
-    icon: Heart,
-  },
-] as const;
+];
 
-export const AccountSidebar = () => {
+const ITEM_CLASS =
+  "group flex flex-shrink-0 items-center gap-3 rounded-lg border-l-2 px-3 py-3 text-left transition-colors";
+
+type AccountSidebarProps = {
+  activeTab: AccountTab;
+  onSelectTab: (tab: AccountTab) => void;
+};
+
+export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) => {
   const { session } = useAuth();
   const email = session?.user.email?.trim() ?? "";
 
@@ -68,21 +78,53 @@ export const AccountSidebar = () => {
         className="flex gap-1 overflow-x-auto px-4 py-5 lg:flex-col lg:overflow-visible"
         aria-label="Account navigation"
       >
-        {NAV_ITEMS.map(({ href, label, description, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className="group flex flex-shrink-0 items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-3 text-neutral-400 transition-colors hover:bg-neutral-900 hover:text-neutral-100"
-          >
-            <Icon className="size-5 flex-shrink-0 text-neutral-500 group-hover:text-primary-400" aria-hidden />
-            <span className="min-w-0">
-              <span className="block text-sm font-medium">{label}</span>
-              <span className="hidden text-xs text-neutral-500 group-hover:text-neutral-400 lg:block">
-                {description}
+        {TAB_ITEMS.map(({ tab, label, description, icon: Icon }) => {
+          const active = tab === activeTab;
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => onSelectTab(tab)}
+              aria-current={active ? "page" : undefined}
+              className={cn(
+                ITEM_CLASS,
+                active
+                  ? "border-primary-500 bg-neutral-900 text-white"
+                  : "border-transparent text-neutral-400 hover:bg-neutral-900 hover:text-neutral-100",
+              )}
+            >
+              <Icon
+                className={cn(
+                  "size-5 flex-shrink-0",
+                  active ? "text-primary-400" : "text-neutral-500 group-hover:text-primary-400",
+                )}
+                aria-hidden
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">{label}</span>
+                <span className="hidden text-xs text-neutral-500 group-hover:text-neutral-400 lg:block">
+                  {description}
+                </span>
               </span>
+            </button>
+          );
+        })}
+
+        <Link
+          href="/saved"
+          className={cn(ITEM_CLASS, "border-transparent text-neutral-400 hover:bg-neutral-900 hover:text-neutral-100")}
+        >
+          <Heart
+            className="size-5 flex-shrink-0 text-neutral-500 group-hover:text-primary-400"
+            aria-hidden
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">Saved</span>
+            <span className="hidden text-xs text-neutral-500 group-hover:text-neutral-400 lg:block">
+              Properties you&rsquo;ve saved
             </span>
-          </Link>
-        ))}
+          </span>
+        </Link>
       </nav>
     </aside>
   );

@@ -36,52 +36,79 @@ export const AgentView = ({ broker }: AgentViewProps) => {
     return () => ac.abort();
   }, [broker]);
 
-  return (
-    <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
-      {loading ? (
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
         <p className="text-neutral-500 dark:text-neutral-400">Loading agent…</p>
-      ) : error || !data ? (
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
         <NoticeCard>
           <p className="text-neutral-600 dark:text-neutral-300">
             {error ?? "Agent not found."}
           </p>
         </NoticeCard>
-      ) : (
-        <>
-          <header className="flex flex-col items-start gap-5 border-b border-neutral-200 pb-10 sm:flex-row sm:items-center dark:border-neutral-700">
-            <Avatar userName={data.name} sizeClass="h-20 w-20 text-2xl" radius="rounded-2xl" />
-            <div className="min-w-0">
-              <h1 className="text-3xl font-semibold text-neutral-900 md:text-4xl dark:text-neutral-100">
-                {data.name}
-              </h1>
-              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm text-neutral-500 dark:text-neutral-400">
+      </div>
+    );
+  }
+
+  const count = data.properties.length;
+
+  return (
+    <div className="mx-auto max-w-screen-xl px-4 py-16 lg:flex lg:gap-10 lg:py-20 xl:gap-14">
+      <div className="lg:w-80 lg:shrink-0">
+        <div className="flex flex-col items-center space-y-6 rounded-2xl border border-neutral-200 p-6 text-center sm:p-8 lg:sticky lg:top-24 dark:border-neutral-700">
+          <Avatar userName={data.name} sizeClass="h-28 w-28 text-3xl" radius="rounded-full" />
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">
+              {data.name}
+            </h1>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">Listing broker</p>
+          </div>
+
+          {data.email || data.phone ? (
+            <>
+              <div className="w-14 border-b border-neutral-200 dark:border-neutral-700" />
+              <div className="w-full space-y-3 text-left">
                 {data.email ? (
                   <a
                     href={`mailto:${data.email}`}
-                    className="inline-flex items-center gap-1.5 hover:text-primary-600"
+                    className="flex items-center gap-3 text-sm text-neutral-600 hover:text-primary-600 dark:text-neutral-300"
                   >
-                    <Mail className="size-4" aria-hidden />
-                    {data.email}
+                    <Mail className="size-5 shrink-0 text-neutral-400" aria-hidden />
+                    <span className="truncate">{data.email}</span>
                   </a>
                 ) : null}
                 {data.phone ? (
                   <a
                     href={`tel:${data.phone}`}
-                    className="inline-flex items-center gap-1.5 hover:text-primary-600"
+                    className="flex items-center gap-3 text-sm text-neutral-600 hover:text-primary-600 dark:text-neutral-300"
                   >
-                    <Phone className="size-4" aria-hidden />
-                    {data.phone}
+                    <Phone className="size-5 shrink-0 text-neutral-400" aria-hidden />
+                    <span className="truncate">{data.phone}</span>
                   </a>
                 ) : null}
               </div>
-            </div>
-          </header>
+            </>
+          ) : null}
+        </div>
+      </div>
 
-          <h2 className="mt-10 text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-            {data.properties.length}{" "}
-            {data.properties.length === 1 ? "listing" : "listings"}
-          </h2>
-          <div className={`mt-6 ${PROPERTY_GRID}`}>
+      <div className="mt-10 min-w-0 flex-1 lg:mt-0">
+        <h2 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">
+          {data.name}&rsquo;s listings
+        </h2>
+        <span className="mt-2 block text-neutral-500 dark:text-neutral-400">
+          {count} {count === 1 ? "listing" : "listings"}
+        </span>
+        <div className="my-6 w-14 border-b border-neutral-200 dark:border-neutral-700" />
+
+        {count > 0 ? (
+          <div className={PROPERTY_GRID}>
             {data.properties.map((property, i) => (
               <PropertyCard
                 key={property.id ?? i}
@@ -89,8 +116,14 @@ export const AgentView = ({ broker }: AgentViewProps) => {
               />
             ))}
           </div>
-        </>
-      )}
+        ) : (
+          <NoticeCard>
+            <p className="text-neutral-600 dark:text-neutral-300">
+              This broker has no active listings right now.
+            </p>
+          </NoticeCard>
+        )}
+      </div>
     </div>
   );
 };

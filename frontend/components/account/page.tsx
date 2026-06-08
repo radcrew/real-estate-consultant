@@ -21,7 +21,7 @@ import {
 } from "@services/account";
 import { brand } from "@config/brand";
 
-import { AccountSidebar } from "./sidebar";
+import { AccountSidebar, type AccountTab } from "./sidebar";
 import { AccountPasswordSection } from "./sections/password";
 import { AccountPersonalInfoSection } from "./sections/personal-info";
 
@@ -40,6 +40,8 @@ const emptyProfile = (): ProfileFormValues => ({
 export const AccountPage = () => {
   const router = useRouter();
   const { session, ready, refresh } = useAuth();
+
+  const [activeTab, setActiveTab] = useState<AccountTab>("profile");
 
   const [savedProfile, setSavedProfile] = useState<ProfileFormValues>(emptyProfile);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -290,7 +292,7 @@ export const AccountPage = () => {
 
   return (
     <div className="flex flex-col lg:flex-row">
-      <AccountSidebar />
+      <AccountSidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 
       <main className="min-w-0 flex-1 px-4 py-10 sm:px-6 lg:px-10">
         <div className="mx-auto w-full max-w-3xl">
@@ -304,8 +306,8 @@ export const AccountPage = () => {
             <p className="mt-2 max-w-xl text-sm text-muted-foreground">{brand.account.subtitle}</p>
           </header>
 
-          <div className="mt-10 flex flex-col gap-10">
-            <div id="profile" className="scroll-mt-24">
+          <div className="mt-10">
+            {activeTab === "profile" ? (
               <AccountPersonalInfoSection
                 editing={editingProfile}
                 values={profileValues}
@@ -322,9 +324,7 @@ export const AccountPage = () => {
                 onSave={saveProfile}
                 onChangeField={updateDraft}
               />
-            </div>
-
-            <div id="security" className="scroll-mt-24">
+            ) : (
               <AccountPasswordSection
                 currentPassword={currentPassword}
                 newPassword={newPassword}
@@ -337,7 +337,7 @@ export const AccountPage = () => {
                 onChangeConfirm={onChangeConfirmPassword}
                 onSubmit={submitPasswordChange}
               />
-            </div>
+            )}
           </div>
         </div>
       </main>
