@@ -6,8 +6,7 @@ import {
   toPropertyModels,
   type PropertyModel,
 } from "@components/voyager/listing-model";
-import { useSearchByProfile } from "@hooks/use-search-by-profile";
-import type { UpdateSearchCriteriaBody } from "@services/search";
+import { searchService, type UpdateSearchCriteriaBody } from "@services/search";
 import { buildDefaultSearchCriteriaShell } from "@utils/search/criteria";
 
 /**
@@ -16,15 +15,13 @@ import { buildDefaultSearchCriteriaShell } from "@utils/search/criteria";
  * Loads results on session change (with abort handling, a default criteria
  * shell, and `applyCriteria`) and maps the raw `SearchPropertyMatch[]` to the
  * richer `PropertyModel[]` (via `toPropertyModels`) so the Voyager grid AND map
- * (which needs lat/lng) share one source. Built on the `useSearchByProfile`
- * primitive.
+ * (which needs lat/lng) share one source.
  */
 const DEFAULT_PAGE = { limit: 20, offset: 0 } as const;
 
 export const useVoyagerSearchResults = (
   sessionProfileId: string | undefined,
 ) => {
-  const { search, updateCriteria } = useSearchByProfile();
   const [models, setModels] = useState<PropertyModel[]>([]);
   const [criteria, setCriteria] = useState<Record<string, unknown>>(() =>
     sessionProfileId?.trim() ? buildDefaultSearchCriteriaShell() : {},
@@ -64,7 +61,7 @@ export const useVoyagerSearchResults = (
       }
 
       try {
-        const res = await search(id, { ...DEFAULT_PAGE });
+        const res = await searchService.search(id, { ...DEFAULT_PAGE });
         if (signal?.aborted) {
           return;
         }
@@ -88,7 +85,7 @@ export const useVoyagerSearchResults = (
         }
       }
     },
-    [search, sessionProfileId],
+    [sessionProfileId],
   );
 
   const applyCriteria = useCallback(
@@ -100,14 +97,14 @@ export const useVoyagerSearchResults = (
       setLoading(true);
       setError(null);
       try {
-        await updateCriteria(id, nextCriteria);
+        await searchService.updateCriteria(id, nextCriteria);
         await load();
       } catch {
         setLoading(false);
         setError("Could not update criteria. Try again later.");
       }
     },
-    [load, sessionProfileId, updateCriteria],
+    [load, sessionProfileId],
   );
 
   useEffect(() => {
