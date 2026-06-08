@@ -80,6 +80,3 @@ export const mapSearchPropertyMatchToListing = (
     matchBlurb: blurbFromProperty(property),
   };
 };
-
-export const mapSearchPropertyMatchesToListings = (rows: SearchPropertyMatch[]): ResultCardListing[] =>
-  rows.map(mapSearchPropertyMatchToListing);

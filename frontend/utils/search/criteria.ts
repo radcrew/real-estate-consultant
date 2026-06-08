@@ -42,7 +42,7 @@ const parseCriterionUnit = (raw: Record<string, unknown>): string | undefined =>
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : undefined;
 };
 
-export const parseCriterionField = (raw: unknown): SearchCriterionField | null => {
+const parseCriterionField = (raw: unknown): SearchCriterionField | null => {
   if (!isRecord(raw)) {
     return null;
   }
