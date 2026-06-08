@@ -1,6 +1,6 @@
 "use client";
 
-import { createElement, useEffect, useMemo, useState, type ComponentType } from "react";
+import { createElement, useMemo, useState, type ComponentType } from "react";
 import { Search } from "lucide-react";
 
 import { buttonVariants } from "@components/ui/buttons";
@@ -65,17 +65,21 @@ export const SearchFilter = ({ criteria, disabled, className, onSearch }: Search
   const parsed = useMemo(() => parseSearchCriteriaEntries(criteria), [criteria]);
   const sortedParsed = useMemo(() => sortEntries(parsed), [parsed]);
 
-  const [draft, setDraft] = useState<Record<string, SearchCriterionField>>({});
+  const [draft, setDraft] = useState<Record<string, SearchCriterionField>>(() =>
+    cloneCriteriaRecord(entriesToDraft(parsed)),
+  );
 
   const hasInvalidRange = useMemo(
     () => Object.values(draft).some((f) => f.type === "range" && isRangeInvalid(f.data)),
     [draft],
   );
 
-  useEffect(() => {
-    const next = entriesToDraft(parsed);
-    setDraft(cloneCriteriaRecord(next));
-  }, [parsed]);
+  // Re-seed the draft from incoming criteria when they change (adjust during render).
+  const [prevParsed, setPrevParsed] = useState(parsed);
+  if (parsed !== prevParsed) {
+    setPrevParsed(parsed);
+    setDraft(cloneCriteriaRecord(entriesToDraft(parsed)));
+  }
 
   const updateField = (key: string, field: SearchCriterionField) => {
     setDraft((prev) => ({ ...prev, [key]: field }));

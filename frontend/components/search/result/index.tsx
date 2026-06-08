@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { LayoutGrid, Map as MapIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 
@@ -35,10 +35,12 @@ export const SearchResults = () => {
   const [view, setView] = useState<View>("grid");
   const [page, setPage] = useState(0);
 
-  // Reset to the first page whenever the result set changes.
-  useEffect(() => {
+  // Reset to the first page whenever the result set changes (adjust during render).
+  const [prevModels, setPrevModels] = useState(models);
+  if (models !== prevModels) {
+    setPrevModels(models);
     setPage(0);
-  }, [models]);
+  }
 
   const pageCount = Math.ceil(models.length / PAGE_SIZE);
   const pagedModels = useMemo(

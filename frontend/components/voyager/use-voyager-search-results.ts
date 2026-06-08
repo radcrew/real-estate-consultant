@@ -13,12 +13,11 @@ import { buildDefaultSearchCriteriaShell } from "@utils/search/criteria";
 /**
  * Voyager search-results hook.
  *
- * Mirrors the existing `useSearchSessionResults` orchestration (load on session
- * change, abort handling, default criteria shell, `applyCriteria`) but maps the
- * raw `SearchPropertyMatch[]` to the richer `PropertyModel[]` (via
- * `toPropertyModels`) so the Voyager grid AND map (which needs lat/lng) share
- * one source. Reuses the primitive `useSearchByProfile`; existing hooks/services
- * are untouched.
+ * Loads results on session change (with abort handling, a default criteria
+ * shell, and `applyCriteria`) and maps the raw `SearchPropertyMatch[]` to the
+ * richer `PropertyModel[]` (via `toPropertyModels`) so the Voyager grid AND map
+ * (which needs lat/lng) share one source. Built on the `useSearchByProfile`
+ * primitive.
  */
 const DEFAULT_PAGE = { limit: 20, offset: 0 } as const;
 

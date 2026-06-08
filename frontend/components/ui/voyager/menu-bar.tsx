@@ -3,7 +3,7 @@
 import { Dialog, DialogBackdrop, DialogPanel } from "@headlessui/react";
 import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { NavMobile } from "@components/ui/voyager/nav-mobile";
 import { cn } from "@utils/common";
@@ -28,9 +28,12 @@ export const MenuBar = ({
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
 
-  useEffect(() => {
+  // Close the drawer on route change (adjust state during render, no effect).
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
     setIsOpen(false);
-  }, [pathname]);
+  }
 
   return (
     <>

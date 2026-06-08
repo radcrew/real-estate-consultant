@@ -21,13 +21,13 @@ export const SavedView = () => {
     if (models !== null) {
       return; // fetch listing details only once
     }
-    if (savedIds.length === 0) {
-      setModels([]);
-      return;
-    }
 
     let cancelled = false;
     void (async () => {
+      if (savedIds.length === 0) {
+        if (!cancelled) setModels([]);
+        return;
+      }
       const results = await Promise.allSettled(
         savedIds.map((id) => listingsService.getListing(id)),
       );

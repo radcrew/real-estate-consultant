@@ -1,59 +1,19 @@
 "use client";
 
-import { useCallback } from "react";
+import { intakeSessionsService } from "@services/intake-sessions";
 
-import {
-  intakeSessionsService,
-  type LlmInputBody,
-  type LlmInputResponse,
-  type SubmitIntakeSessionAnswerBody,
-  type SubmitIntakeSessionAnswerResponse,
-  type CompleteIntakeSessionResponse,
-  type GetIntakeSessionResponse,
-} from "@services/intake-sessions";
+// Bind once so callers get stable references (and `createSession` keeps its
+// overload signatures) that are safe to list in effect/callback deps.
+const createSession = intakeSessionsService.createSession.bind(intakeSessionsService);
+const getSession = intakeSessionsService.getSession.bind(intakeSessionsService);
+const submitAnswer = intakeSessionsService.submitAnswer.bind(intakeSessionsService);
+const completeSession = intakeSessionsService.completeSession.bind(intakeSessionsService);
+const submitLlmInput = intakeSessionsService.submitLlmInput.bind(intakeSessionsService);
 
-export const useIntakeSessions = () => {
-  const createSession = useCallback(
-    intakeSessionsService.createSession.bind(intakeSessionsService),
-    [],
-  );
-
-  const getSession = useCallback(
-    (sessionId: string): Promise<GetIntakeSessionResponse> => {
-      return intakeSessionsService.getSession(sessionId);
-    },
-    [],
-  );
-
-  const submitAnswer = useCallback(
-    (
-      sessionId: string,
-      body: SubmitIntakeSessionAnswerBody,
-    ): Promise<SubmitIntakeSessionAnswerResponse> => {
-      return intakeSessionsService.submitAnswer(sessionId, body);
-    },
-    [],
-  );
-
-  const completeSession = useCallback(
-    (sessionId: string): Promise<CompleteIntakeSessionResponse> => {
-      return intakeSessionsService.completeSession(sessionId);
-    },
-    [],
-  );
-
-  const submitLlmInput = useCallback(
-    (sessionId: string, body: LlmInputBody): Promise<LlmInputResponse> => {
-      return intakeSessionsService.submitLlmInput(sessionId, body);
-    },
-    [],
-  );
-
-  return {
-    createSession,
-    getSession,
-    submitAnswer,
-    completeSession,
-    submitLlmInput,
-  };
-};
+export const useIntakeSessions = () => ({
+  createSession,
+  getSession,
+  submitAnswer,
+  completeSession,
+  submitLlmInput,
+});

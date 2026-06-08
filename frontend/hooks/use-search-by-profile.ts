@@ -1,19 +1,9 @@
 "use client";
 
-import { useCallback } from "react";
-
 import { searchService } from "@services/search";
 
-export const useSearchByProfile = () => {
-  const search = useCallback(
-    searchService.search.bind(searchService),
-    [],
-  );
+// Bind once so callers get stable references they can safely list in deps.
+const search = searchService.search.bind(searchService);
+const updateCriteria = searchService.updateCriteria.bind(searchService);
 
-  const updateCriteria = useCallback(
-    searchService.updateCriteria.bind(searchService),
-    [],
-  );
-
-  return { search, updateCriteria };
-};
+export const useSearchByProfile = () => ({ search, updateCriteria });

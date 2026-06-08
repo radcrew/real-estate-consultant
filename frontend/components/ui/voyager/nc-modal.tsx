@@ -6,7 +6,7 @@ import {
   DialogPanel,
   DialogTitle,
 } from "@headlessui/react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Button } from "@components/ui/voyager/button";
 import { ButtonClose } from "@components/ui/voyager/button-close";
@@ -59,9 +59,12 @@ export const NcModal = ({
     }
   };
 
-  useEffect(() => {
+  // Mirror the controlled prop into local state (adjust during render, no effect).
+  const [prevIsOpenProp, setPrevIsOpenProp] = useState(isOpenProp);
+  if (isOpenProp !== prevIsOpenProp) {
+    setPrevIsOpenProp(isOpenProp);
     setIsOpen(!!isOpenProp);
-  }, [isOpenProp]);
+  }
 
   return (
     <div>
