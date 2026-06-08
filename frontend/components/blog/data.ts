@@ -84,3 +84,35 @@ export const BLOG_POSTS: BlogPost[] = [
 
 export const getBlogPost = (slug: string): BlogPost | undefined =>
   BLOG_POSTS.find((p) => p.slug === slug);
+
+export type BlogAuthor = {
+  name: string;
+  role: string;
+  bio: string;
+};
+
+const BLOG_AUTHORS: Record<string, BlogAuthor> = {
+  "Alex Morgan": {
+    name: "Alex Morgan",
+    role: "Industrial Market Analyst",
+    bio: "Tracks last-mile logistics and distribution trends across primary and secondary markets, translating supply data into actionable tenant strategy.",
+  },
+  "Tom Whitfield": {
+    name: "Tom Whitfield",
+    role: "Tenant Advisory Lead",
+    bio: "Advises occupiers on site selection and lease structure, with a focus on verifying the building specs that actually drive operations.",
+  },
+  "Priya Patel": {
+    name: "Priya Patel",
+    role: "Capital Markets Strategist",
+    bio: "Connects macro capital flows to local pricing, helping investors and owners read where commercial demand is heading next.",
+  },
+  "Emily Carter": {
+    name: "Emily Carter",
+    role: "Retail & Mixed-Use Specialist",
+    bio: "Covers storefront, shopping-center and pad-site dynamics, with an eye for the corners and corridors poised for a comeback.",
+  },
+};
+
+export const getBlogAuthor = (name: string): BlogAuthor =>
+  BLOG_AUTHORS[name] ?? { name, role: "Contributor", bio: "" };

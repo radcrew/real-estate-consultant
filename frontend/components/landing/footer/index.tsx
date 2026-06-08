@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Logo } from "@components/ui/voyager/logo";
 import { SocialsList } from "@components/ui/voyager/socials-list";
+import { brand } from "@config/brand";
 
 /**
  * Site footer in Voyager's multi-column layout (logo + socials block plus link
@@ -58,6 +59,9 @@ export const Footer = () => {
         <div className="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 md:grid-cols-4 lg:gap-x-10">
           <div className="col-span-2 flex flex-col gap-5 md:col-span-4 lg:col-span-1">
             <Logo />
+            <p className="max-w-xs text-sm text-neutral-500 dark:text-neutral-400">
+              {brand.tagline}
+            </p>
             <SocialsList
               showNames
               className="flex items-center space-x-3 lg:flex-col lg:items-start lg:space-y-2.5 lg:space-x-0"

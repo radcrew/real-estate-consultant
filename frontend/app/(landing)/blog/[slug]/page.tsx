@@ -4,7 +4,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
-import { BLOG_POSTS, getBlogPost } from "@components/blog/data";
+import { BLOG_POSTS, getBlogAuthor, getBlogPost } from "@components/blog/data";
+import { BlogAuthorBox } from "@components/blog/author-box";
 import { BlogPostCard } from "@components/blog/post-card";
 import { Avatar } from "@components/ui/voyager/avatar";
 import { Badge } from "@components/ui/voyager/badge";
@@ -81,6 +82,10 @@ const BlogPostPage = async ({ params }: BlogPostPageProps) => {
           <p key={i}>{paragraph}</p>
         ))}
       </article>
+
+      <div className="mx-auto mt-14 max-w-3xl px-4">
+        <BlogAuthorBox author={getBlogAuthor(post.author)} />
+      </div>
 
       {related.length > 0 && (
         <section className="mx-auto mt-20 max-w-screen-xl px-4">
