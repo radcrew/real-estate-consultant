@@ -3,51 +3,45 @@
 import { useEffect, useState } from "react";
 
 import { brand } from "@config/brand";
-import { detailToModel } from "@components/property/listing-model";
-import { SectionGridFeatureProperty } from "@components/property/section-grid-feature-property";
-import { PropertyCardSkeleton, PROPERTY_GRID } from "@components/property/property-card";
+import { detailToModel, type PropertyModel } from "@components/property/listing-model";
+import { PropertyCard, PropertyCardSkeleton, PROPERTY_GRID } from "@components/property/property-card";
+import { ButtonSecondary } from "@components/ui/button-secondary";
+import { Heading2 } from "@components/ui/heading2";
 import { listingsService } from "@services/listings";
-import type { PropertyModel } from "@components/property/listing-model";
 
+const HEADING = brand.sections.featured.heading;
+const SUB_HEADING = (
+  <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
+    {brand.sections.featured.subHeading}
+  </span>
+);
 export const FeaturedListings = () => {
-  const [models, setModels] = useState<PropertyModel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [models, setModels] = useState<PropertyModel[] | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-
     listingsService
       .getFeaturedListings({ signal: controller.signal })
       .then((res) => setModels(res.listings.map(detailToModel)))
-      .catch(() => {/* silently hide the section on error */})
-      .finally(() => setLoading(false));
-
+      .catch(() => setModels([]));
     return () => controller.abort();
   }, []);
 
-  if (loading) {
-    return (
-      <div className={`${PROPERTY_GRID} px-4 py-8`}>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <PropertyCardSkeleton key={i} />
-        ))}
-      </div>
-    );
-  }
-
-  if (!models.length) return null;
+  const loading = models === null;
 
   return (
-    <SectionGridFeatureProperty
-      className="relative"
-      heading={brand.sections.featured.heading}
-      subHeading={
-        <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
-          {brand.sections.featured.subHeading}
-        </span>
-      }
-      data={models}
-      cta={{ label: "Browse all properties", href: "/listings" }}
-    />
+    <section className="relative">
+      <Heading2 heading={HEADING} subHeading={SUB_HEADING} />
+
+      <div className={PROPERTY_GRID}>
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => <PropertyCardSkeleton key={i} />)
+          : models.map((item) => <PropertyCard key={item.id} data={item} />)}
+      </div>
+
+      <div className="mt-14 flex justify-center">
+        <ButtonSecondary href="/listings">Browse all properties</ButtonSecondary>
+      </div>
+    </section>
   );
 };
