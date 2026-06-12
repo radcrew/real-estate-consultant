@@ -24,12 +24,12 @@ export const PROPERTY_GRID =
 
 /** Loading placeholder mirroring PropertyCard's shape. */
 export const PropertyCardSkeleton = () => (
-  <div className="overflow-hidden rounded-2xl border border-neutral-100 dark:border-neutral-800">
-    <div className="aspect-[4/3] animate-pulse bg-neutral-100 dark:bg-neutral-800" />
+  <div className="overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-700">
+    <div className="aspect-[4/3] animate-pulse bg-neutral-200 dark:bg-neutral-700" />
     <div className="space-y-3 p-4">
-      <div className="h-4 w-1/3 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
-      <div className="h-5 w-4/5 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
-      <div className="h-4 w-2/3 animate-pulse rounded bg-neutral-100 dark:bg-neutral-800" />
+      <div className="h-4 w-1/3 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+      <div className="h-5 w-4/5 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+      <div className="h-4 w-2/3 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
     </div>
   </div>
 );
