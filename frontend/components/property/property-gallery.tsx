@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Building2, Images } from "lucide-react";
+import { Images } from "lucide-react";
 
 import { cn } from "@utils/common";
 
+import { ImagePlaceholder } from "./image-placeholder";
 import { PropertyGalleryModal } from "./property-gallery-modal";
 
 /**
@@ -25,16 +26,19 @@ export const PropertyGallery = ({
   className,
 }: PropertyGalleryProps) => {
   const [open, setOpen] = useState(false);
+  const [failedIndexes, setFailedIndexes] = useState<Set<number>>(new Set());
+  const markFailed = (i: number) =>
+    setFailedIndexes((prev) => new Set(prev).add(i));
 
   if (!images.length) {
     return (
       <div
         className={cn(
-          "flex aspect-[16/9] w-full items-center justify-center rounded-2xl bg-neutral-100 text-neutral-300 dark:bg-neutral-800 dark:text-neutral-600",
+          "relative aspect-[16/9] w-full overflow-hidden rounded-2xl",
           className,
         )}
       >
-        <Building2 className="h-12 w-12" aria-hidden />
+        <ImagePlaceholder label={alt !== "Listing photo" ? alt : undefined} />
       </div>
     );
   }
@@ -52,14 +56,19 @@ export const PropertyGallery = ({
           aria-label="Open photo gallery"
           className="group relative col-span-2 row-span-2 cursor-pointer focus:outline-none"
         >
-          <Image
-            src={cover}
-            alt={alt}
-            fill
-            priority
-            sizes="(max-width: 640px) 100vw, 50vw"
-            className="object-cover transition-opacity group-hover:opacity-90"
-          />
+          {failedIndexes.has(0) ? (
+            <ImagePlaceholder label={alt !== "Listing photo" ? alt : undefined} />
+          ) : (
+            <Image
+              src={cover}
+              alt={alt}
+              fill
+              priority
+              sizes="(max-width: 640px) 100vw, 50vw"
+              className="object-cover transition-opacity group-hover:opacity-90"
+              onError={() => markFailed(0)}
+            />
+          )}
         </button>
         {thumbs.map((img, index) => (
           <button
@@ -69,13 +78,18 @@ export const PropertyGallery = ({
             aria-label="Open photo gallery"
             className="group relative hidden cursor-pointer focus:outline-none sm:block"
           >
-            <Image
-              src={img}
-              alt={alt}
-              fill
-              sizes="25vw"
-              className="object-cover transition-opacity group-hover:opacity-90"
-            />
+            {failedIndexes.has(index + 1) ? (
+              <ImagePlaceholder />
+            ) : (
+              <Image
+                src={img}
+                alt={alt}
+                fill
+                sizes="25vw"
+                className="object-cover transition-opacity group-hover:opacity-90"
+                onError={() => markFailed(index + 1)}
+              />
+            )}
           </button>
         ))}
       </div>
