@@ -27,6 +27,6 @@ async def get_featured_property_rows(
     if not rows:
         return []
 
-    today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    today = datetime.datetime.now(datetime.UTC).date().isoformat()
     random.Random(today).shuffle(rows)
     return rows[:_FEATURED_COUNT]
