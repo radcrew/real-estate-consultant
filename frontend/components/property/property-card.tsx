@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { MapPin } from "lucide-react";
@@ -42,6 +45,7 @@ const transactionColor = (transactionType: string) =>
 export const PropertyCard = ({ data, className }: PropertyCardProps) => {
   const cover = data.galleryImgs[0] || data.imageSrc;
   const hasTransaction = data.transactionType && data.transactionType !== "—";
+  const [imgFailed, setImgFailed] = useState(false);
 
   return (
     <Link
@@ -52,13 +56,14 @@ export const PropertyCard = ({ data, className }: PropertyCardProps) => {
       )}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-neutral-100 dark:bg-neutral-800">
-        {cover ? (
+        {cover && !imgFailed ? (
           <Image
             src={cover}
             alt={data.imageAlt}
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             className="object-cover transition-transform duration-300 group-hover:scale-105"
+            onError={() => setImgFailed(true)}
           />
         ) : (
           <ImagePlaceholder label={data.title} />

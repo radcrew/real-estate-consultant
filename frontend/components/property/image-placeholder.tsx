@@ -12,12 +12,12 @@ interface ImagePlaceholderProps {
 export const ImagePlaceholder = ({ label, className }: ImagePlaceholderProps) => (
   <div
     className={cn(
-      "flex h-full w-full items-center justify-center bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700",
+      "absolute inset-0 flex items-center justify-center bg-gradient-to-br from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-700",
       className,
     )}
   >
     {label && (
-      <span className="px-4 text-center text-sm font-medium text-neutral-400 dark:text-neutral-500 line-clamp-3">
+      <span className="px-6 text-center text-base font-semibold text-neutral-500 dark:text-neutral-400 line-clamp-3 leading-snug">
         {label}
       </span>
     )}
