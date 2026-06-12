@@ -9,6 +9,7 @@ from app.api.router import api_router
 from app.api.system import router as system_router
 from app.core.config import settings
 from app.core.database import close_db, init_db
+from app.core.supabase_sdk import close_supabase, init_supabase
 from app.core.db_safe import SupabaseRequestError
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await init_db()
+    await init_supabase()
     yield
+    await close_supabase()
     await close_db()
 
 

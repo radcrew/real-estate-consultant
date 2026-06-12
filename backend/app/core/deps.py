@@ -19,6 +19,8 @@ from app.utils.exceptions import raise_forbidden
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 
+# get_supabase_sdk_client is a plain sync function returning the singleton client —
+# FastAPI handles both sync and async callables as dependencies.
 SupabaseSdkDep = Annotated[AsyncClient, Depends(get_supabase_sdk_client)]
 
 _http_bearer = HTTPBearer(auto_error=False)

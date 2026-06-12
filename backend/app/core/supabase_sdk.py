@@ -4,22 +4,35 @@ from supabase.lib.client_options import AsyncClientOptions
 
 from app.core.config import settings
 
-# Without a custom client, supabase-auth uses httpx's default timeouts (~5s), which
-# often surfaces as intermittent ConnectTimeout on slow DNS/TLS or busy networks.
 _SUPABASE_HTTP_TIMEOUT = httpx.Timeout(connect=30.0, read=120.0, write=30.0, pool=15.0)
 
+_supabase_client: AsyncClient | None = None
+_supabase_http: httpx.AsyncClient | None = None
 
-async def get_supabase_sdk_client() -> AsyncClient:
-    # Important: return a fresh client per request.
-    # Supabase auth calls can mutate in-memory auth state; sharing one global client
-    # across requests may leak user session state into unrelated DB operations.
-    http = httpx.AsyncClient(
+
+async def init_supabase() -> None:
+    global _supabase_client, _supabase_http
+    _supabase_http = httpx.AsyncClient(
         timeout=_SUPABASE_HTTP_TIMEOUT,
         follow_redirects=True,
         http2=True,
     )
-    return await acreate_client(
+    _supabase_client = await acreate_client(
         settings.supabase_url,
         settings.supabase_service_role_key,
-        options=AsyncClientOptions(httpx_client=http),
+        options=AsyncClientOptions(httpx_client=_supabase_http),
     )
+
+
+async def close_supabase() -> None:
+    global _supabase_client, _supabase_http
+    if _supabase_http is not None:
+        await _supabase_http.aclose()
+    _supabase_client = None
+    _supabase_http = None
+
+
+def get_supabase_sdk_client() -> AsyncClient:
+    if _supabase_client is None:
+        raise RuntimeError("Supabase client requested before init_supabase()")
+    return _supabase_client
