@@ -1,19 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { Images } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import useEmblaCarousel from "embla-carousel-react";
 
 import { cn } from "@utils/common";
-
 import { ImagePlaceholder } from "./image-placeholder";
-import { PropertyGalleryModal } from "./property-gallery-modal";
 
-/**
- * Voyager-style listing gallery — one large cover plus a 2x2 thumbnail grid.
- * Clicking any tile (or "Show all photos") opens a full-screen photo modal
- * (`PropertyGalleryModal`). Falls back to a placeholder when there are no images.
- */
 export interface PropertyGalleryProps {
   images: string[];
   alt?: string;
@@ -25,94 +19,87 @@ export const PropertyGallery = ({
   alt = "Listing photo",
   className,
 }: PropertyGalleryProps) => {
-  const [open, setOpen] = useState(false);
-  const [initialIndex, setInitialIndex] = useState(0);
+  const [current, setCurrent] = useState(0);
   const [failedIndexes, setFailedIndexes] = useState<Set<number>>(new Set());
   const markFailed = (i: number) =>
     setFailedIndexes((prev) => new Set(prev).add(i));
 
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setCurrent(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi]);
+
+  const prev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
+  const next = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
+
   if (!images.length) {
     return (
-      <div
-        className={cn(
-          "relative aspect-[16/9] w-full overflow-hidden rounded-2xl",
-          className,
-        )}
-      >
+      <div className={cn("relative aspect-[4/3] w-full overflow-hidden rounded-2xl", className)}>
         <ImagePlaceholder label={alt !== "Listing photo" ? alt : undefined} />
       </div>
     );
   }
 
-  const [cover, ...rest] = images;
-  const thumbs = rest.slice(0, 4);
-  const openModal = (index = 0) => { setInitialIndex(index); setOpen(true); };
-
   return (
-    <div className={cn("relative", className)}>
-      <div className="grid h-80 grid-cols-2 grid-rows-2 gap-1 overflow-hidden rounded-2xl sm:h-[460px] sm:grid-cols-4 sm:gap-2">
-        <button
-          type="button"
-          onClick={() => openModal(0)}
-          aria-label="Open photo gallery"
-          className="group relative col-span-2 row-span-2 cursor-pointer focus:outline-none"
-        >
-          {failedIndexes.has(0) ? (
-            <ImagePlaceholder label={alt !== "Listing photo" ? alt : undefined} />
-          ) : (
-            <Image
-              src={cover}
-              alt={alt}
-              fill
-              priority
-              sizes="(max-width: 640px) 100vw, 50vw"
-              className="object-cover transition-opacity group-hover:opacity-90"
-              onError={() => markFailed(0)}
-            />
-          )}
-        </button>
-        {thumbs.map((img, index) => (
-          <button
-            type="button"
-            key={index}
-            onClick={() => openModal(index + 1)}
-            aria-label="Open photo gallery"
-            className="group relative hidden cursor-pointer focus:outline-none sm:block"
-          >
-            {failedIndexes.has(index + 1) ? (
-              <ImagePlaceholder />
-            ) : (
-              <Image
-                src={img}
-                alt={alt}
-                fill
-                sizes="25vw"
-                className="object-cover transition-opacity group-hover:opacity-90"
-                onError={() => markFailed(index + 1)}
-              />
-            )}
-          </button>
-        ))}
+    <div className={cn("relative overflow-hidden rounded-2xl bg-neutral-100 dark:bg-neutral-900", className)}>
+      {/* Carousel */}
+      <div
+        ref={emblaRef}
+        className="overflow-hidden cursor-grab active:cursor-grabbing"
+      >
+        <div className="flex">
+          {images.map((src, i) => (
+            <div key={i} className="relative flex min-w-0 flex-[0_0_100%] items-center justify-center">
+              {failedIndexes.has(i) ? (
+                <div className="relative aspect-[4/3] w-full">
+                  <ImagePlaceholder label={alt !== "Listing photo" ? alt : undefined} />
+                </div>
+              ) : (
+                <Image
+                  src={src}
+                  alt={`${alt} ${i + 1}`}
+                  width={1200}
+                  height={900}
+                  className="max-h-[520px] w-auto object-contain"
+                  priority={i === 0}
+                  onError={() => markFailed(i)}
+                />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
+      {/* Prev / Next */}
       {images.length > 1 && (
-        <button
-          type="button"
-          onClick={() => openModal(0)}
-          className="absolute right-3 bottom-3 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-md hover:bg-neutral-100 focus:outline-none dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
-        >
-          <Images className="h-4 w-4" aria-hidden />
-          Show all photos
-        </button>
-      )}
+        <>
+          <button
+            type="button"
+            onClick={prev}
+            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-md hover:bg-white dark:bg-neutral-800/80 dark:hover:bg-neutral-800"
+            aria-label="Previous photo"
+          >
+            <ChevronLeft className="h-5 w-5 text-neutral-700 dark:text-neutral-200" />
+          </button>
+          <button
+            type="button"
+            onClick={next}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-md hover:bg-white dark:bg-neutral-800/80 dark:hover:bg-neutral-800"
+            aria-label="Next photo"
+          >
+            <ChevronRight className="h-5 w-5 text-neutral-700 dark:text-neutral-200" />
+          </button>
 
-      <PropertyGalleryModal
-        images={images}
-        alt={alt}
-        isOpen={open}
-        initialIndex={initialIndex}
-        onClose={() => setOpen(false)}
-      />
+          {/* Counter */}
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs font-medium text-white">
+            {current + 1} / {images.length}
+          </div>
+        </>
+      )}
     </div>
   );
 };

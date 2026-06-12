@@ -93,7 +93,7 @@ export const NcModal = ({
               <div className="relative border-b border-neutral-100 px-6 py-4 text-center md:py-5 dark:border-neutral-700">
                 <ButtonClose
                   onClick={closeModal}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 sm:left-4"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 sm:right-4"
                 />
                 {modalTitle && (
                   <DialogTitle
