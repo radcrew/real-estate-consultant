@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment } from "react";
-import Link from "next/link";
 import { Popover, Transition } from "@headlessui/react";
 import { DollarSign, Search } from "lucide-react";
 
@@ -14,10 +13,11 @@ const formatThousand = (value: number) => value.toLocaleString("en-US");
 type PriceRangeInputProps = {
   value: [number, number];
   onChange: (value: [number, number]) => void;
-  submitHref: string;
+  onSubmit: () => void;
+  submitting?: boolean;
 };
 
-export const PriceRangeInput = ({ value, onChange, submitHref }: PriceRangeInputProps) => {
+export const PriceRangeInput = ({ value, onChange, onSubmit, submitting }: PriceRangeInputProps) => {
   const [min, max] = value;
 
   return (
@@ -46,13 +46,15 @@ export const PriceRangeInput = ({ value, onChange, submitHref }: PriceRangeInput
             </Popover.Button>
 
             <div className="pr-2 xl:pr-4">
-              <Link
-                href={submitHref}
-                className="flex size-14 items-center justify-center rounded-full bg-primary-600 text-neutral-50 transition-colors hover:bg-primary-700 focus:outline-none"
-                aria-label="Start search"
+              <button
+                type="submit"
+                onClick={onSubmit}
+                disabled={submitting}
+                className="flex size-14 items-center justify-center rounded-full bg-primary-600 text-neutral-50 transition-colors hover:bg-primary-700 focus:outline-none disabled:opacity-60"
+                aria-label="Search"
               >
                 <Search className="size-6" aria-hidden />
-              </Link>
+              </button>
             </div>
           </div>
 

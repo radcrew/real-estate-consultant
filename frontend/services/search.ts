@@ -37,12 +37,28 @@ export type SearchResponse = {
   offset: number;
 };
 
+export type QuickSearchBody = {
+  location?: string;
+  property_types?: string[];
+  price_min?: number;
+  price_max?: number;
+};
+
+export type QuickSearchResponse = {
+  search_profile_id: string;
+};
+
 export type UpdateSearchCriteriaBody = Record<string, unknown>;
 
 export type SearchFiltersResponse = Record<string, unknown>;
 
 export class SearchService {
   constructor(private readonly http: AxiosInstance) {}
+
+  async quickSearch(body: QuickSearchBody): Promise<QuickSearchResponse> {
+    const { data } = await this.http.post<QuickSearchResponse>("/search/quick", body);
+    return data;
+  }
 
   async search(
     sessionProfileId: string,
