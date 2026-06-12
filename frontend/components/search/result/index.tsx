@@ -86,12 +86,9 @@ export const SearchResults = () => {
         )}
 
         {!error && (
-          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="my-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-3xl font-semibold text-neutral-900 sm:text-4xl dark:text-neutral-100">
-                Properties
-              </h2>
-              <span className="mt-2 block text-neutral-500 dark:text-neutral-400">
+              <span className="block text-neutral-500 dark:text-neutral-400">
                 {resultCountLabel(models, loading)}
               </span>
             </div>
