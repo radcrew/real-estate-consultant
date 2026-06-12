@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import secrets
 from typing import Annotated
 from uuid import UUID
@@ -15,6 +16,8 @@ from app.repositories.profiles import fetch_profile_row, set_profile_avatar_url
 from app.schemas.account import AccountProfileResponse
 from app.utils.account_profile import account_profile_response
 from app.utils.exceptions import raise_bad_gateway, raise_bad_request
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -57,6 +60,7 @@ async def upload_account_avatar(
             {"content-type": content_type, "upsert": "true"},
         )
     except Exception as exc:  # noqa: BLE001 - surface any storage failure as 502
+        logger.error("Supabase Storage upload to bucket %r failed: %s", _AVATAR_BUCKET, exc)
         raise_bad_gateway("Failed to upload avatar.", cause=exc)
 
     public_url = storage.get_public_url(path)
