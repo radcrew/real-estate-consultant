@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useCallback, useState } from "react";
 
 import { ButtonPrimary } from "@components/ui/button-primary";
@@ -15,15 +15,17 @@ import { GoogleAuthButton } from "./button";
 
 export const SignInForm = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const { signIn, error, isSubmitting } = useAuth();
 
   const handleSuccess = useCallback(() => {
-    router.push("/");
+    const next = searchParams.get("next");
+    router.push(next && next.startsWith("/") ? next : "/");
     router.refresh();
-  }, [router]);
+  }, [router, searchParams]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

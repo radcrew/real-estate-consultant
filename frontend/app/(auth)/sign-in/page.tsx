@@ -22,9 +22,8 @@ const SignInPage = () => (
     <Suspense fallback={null}>
       <OAuthErrorNotice />
       <SignUpNotice />
+      <SignInForm />
     </Suspense>
-
-    <SignInForm />
 
     <AuthPageFooter prompt="No account?" linkHref="/sign-up" linkLabel="Create one" />
   </div>
