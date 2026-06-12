@@ -38,7 +38,10 @@ def create_app() -> FastAPI:
         exc: SupabaseRequestError,
     ) -> JSONResponse:
         logger.warning("Supabase request failed: %s", exc)
-        return JSONResponse(status_code=502, content={"detail": str(exc)})
+        return JSONResponse(
+            status_code=502,
+            content={"detail": "We couldn't reach the database. Please try again shortly."},
+        )
 
     app.include_router(system_router)
     app.include_router(api_router, prefix="/api")

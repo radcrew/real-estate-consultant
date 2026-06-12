@@ -63,7 +63,7 @@ async def upload_account_avatar(
         logger.error("Supabase Storage upload to bucket %r failed: %s", _AVATAR_BUCKET, exc)
         raise_bad_gateway("Failed to upload avatar.", cause=exc)
 
-    public_url = storage.get_public_url(path)
+    public_url = await storage.get_public_url(path)
     if not isinstance(public_url, str) or not public_url:
         raise_bad_gateway("Failed to resolve avatar URL.")
 
