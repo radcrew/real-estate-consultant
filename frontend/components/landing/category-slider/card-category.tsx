@@ -1,14 +1,14 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 
 import { cn } from "@utils/common";
+import { searchService } from "@services/search";
 
 import type { Category } from "./data";
 
-/**
- * Category card, merging Voyager's `CardCategory4` (square→5:6, centered text)
- * and `CardCategory5` (4:3, left-aligned text) into one variant-driven card.
- */
 export type CardType = "card4" | "card5";
 
 type CardCategoryProps = {
@@ -17,15 +17,29 @@ type CardCategoryProps = {
 };
 
 export const CardCategory = ({ category, cardType }: CardCategoryProps) => {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
   const isCard4 = cardType === "card4";
 
+  const handleClick = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      const { search_profile_id } = await searchService.quickSearch(category.search);
+      router.push(`/search/${search_profile_id}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <Link href={category.href} className="flex flex-col">
-      <div
-        className={cn(
-          "group relative aspect-[4/3] w-full flex-shrink-0 overflow-hidden rounded-2xl",
-        )}
-      >
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={loading}
+      className="flex w-full flex-col text-left disabled:opacity-60"
+    >
+      <div className="group relative aspect-[4/3] w-full flex-shrink-0 overflow-hidden rounded-2xl">
         <Image
           src={category.thumbnail}
           className="size-full rounded-2xl object-cover"
@@ -40,10 +54,7 @@ export const CardCategory = ({ category, cardType }: CardCategoryProps) => {
         <h2 className="truncate text-base font-medium text-neutral-900 sm:text-lg dark:text-neutral-100">
           {category.name}
         </h2>
-        <span className="mt-2 block text-sm text-neutral-500 dark:text-neutral-400">
-          {category.count.toLocaleString("en-US")} properties
-        </span>
       </div>
-    </Link>
+    </button>
   );
 };
