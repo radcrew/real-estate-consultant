@@ -28,6 +28,10 @@ export type ListingSubmissionPayload = {
 
 export type ListingSubmissionResult = { id: string; status: string };
 
+export type FeaturedListingsResponse = {
+  listings: ListingDetailResponse[];
+};
+
 export type AgentProfileResponse = {
   name: string;
   email?: string | null;
@@ -54,6 +58,15 @@ export type ListingSubmissionItem = {
 
 export class ListingsService {
   constructor(private readonly http: AxiosInstance) {}
+
+  async getFeaturedListings(
+    options?: { signal?: AbortSignal },
+  ): Promise<FeaturedListingsResponse> {
+    const { data } = await this.http.get<FeaturedListingsResponse>("/listings/featured", {
+      signal: options?.signal,
+    });
+    return data;
+  }
 
   async getListing(
     propertyId: string,
