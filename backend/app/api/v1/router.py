@@ -4,6 +4,7 @@ from app.api.v1.endpoints.account.router import router as account_router
 from app.api.v1.endpoints.agents import router as agents_router
 from app.api.v1.endpoints.auth.router import router as auth_router
 from app.api.v1.endpoints.intake_sessions.router import router as intake_sessions_router
+from app.api.v1.endpoints.listings.featured import router as featured_router
 from app.api.v1.endpoints.listings.router import router as listings_router
 from app.api.v1.endpoints.outreach.router import router as outreach_router
 from app.api.v1.endpoints.ping.router import router as ping_router
@@ -16,6 +17,7 @@ router = APIRouter()
 router.include_router(auth_router)
 router.include_router(ping_router)
 router.include_router(submissions_router)
+router.include_router(featured_router)
 
 protected = APIRouter(dependencies=[Depends(get_current_user)])
 protected.include_router(questions_router)
