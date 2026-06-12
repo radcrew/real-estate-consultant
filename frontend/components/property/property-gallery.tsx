@@ -26,6 +26,7 @@ export const PropertyGallery = ({
   className,
 }: PropertyGalleryProps) => {
   const [open, setOpen] = useState(false);
+  const [initialIndex, setInitialIndex] = useState(0);
   const [failedIndexes, setFailedIndexes] = useState<Set<number>>(new Set());
   const markFailed = (i: number) =>
     setFailedIndexes((prev) => new Set(prev).add(i));
@@ -45,14 +46,14 @@ export const PropertyGallery = ({
 
   const [cover, ...rest] = images;
   const thumbs = rest.slice(0, 4);
-  const openModal = () => setOpen(true);
+  const openModal = (index = 0) => { setInitialIndex(index); setOpen(true); };
 
   return (
     <div className={cn("relative", className)}>
       <div className="grid h-80 grid-cols-2 grid-rows-2 gap-1 overflow-hidden rounded-2xl sm:h-[460px] sm:grid-cols-4 sm:gap-2">
         <button
           type="button"
-          onClick={openModal}
+          onClick={() => openModal(0)}
           aria-label="Open photo gallery"
           className="group relative col-span-2 row-span-2 cursor-pointer focus:outline-none"
         >
@@ -74,7 +75,7 @@ export const PropertyGallery = ({
           <button
             type="button"
             key={index}
-            onClick={openModal}
+            onClick={() => openModal(index + 1)}
             aria-label="Open photo gallery"
             className="group relative hidden cursor-pointer focus:outline-none sm:block"
           >
@@ -109,6 +110,7 @@ export const PropertyGallery = ({
         images={images}
         alt={alt}
         isOpen={open}
+        initialIndex={initialIndex}
         onClose={() => setOpen(false)}
       />
     </div>
