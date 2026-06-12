@@ -16,31 +16,45 @@ export type LocationSuggestion = {
   label: string;
 };
 
-const GOOGLE_MAPS_SCRIPT_ID = "google-maps-bootstrap";
+// Shared promise so every hook instance (including StrictMode remounts) awaits the same load.
+let _placesLibPromise: Promise<unknown> | null = null;
 
-const loadGoogleMapsBootstrap = async (apiKey: string) => {
-  if (typeof window === "undefined") return;
-  if (window.google?.maps?.importLibrary) return;
+const loadPlacesLibrary = (apiKey: string): Promise<unknown> => {
+  if (_placesLibPromise) return _placesLibPromise;
 
-  const existing = document.getElementById(GOOGLE_MAPS_SCRIPT_ID);
-  if (existing) {
-    await new Promise<void>((resolve, reject) => {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(), { once: true });
-    });
-    return;
-  }
+  _placesLibPromise = new Promise<unknown>((resolve, reject) => {
+    if (typeof window === "undefined") {
+      resolve(null);
+      return;
+    }
 
-  await new Promise<void>((resolve, reject) => {
+    // Already loaded — grab the places library directly.
+    if (window.google?.maps?.places) {
+      resolve(window.google.maps.places);
+      return;
+    }
+
     const script = document.createElement("script");
-    script.id = GOOGLE_MAPS_SCRIPT_ID;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&loading=async`;
+    // Classic (non-async) load with libraries=places — window.google.maps.places
+    // is fully available synchronously by the time onload fires, no importLibrary needed.
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
     script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Google Maps"));
+    script.onload = () => {
+      if (window.google?.maps?.places) {
+        resolve(window.google.maps.places);
+      } else {
+        _placesLibPromise = null;
+        reject(new Error("Google Maps did not initialize correctly"));
+      }
+    };
+    script.onerror = () => {
+      _placesLibPromise = null;
+      reject(new Error("Failed to load Google Maps"));
+    };
     document.head.appendChild(script);
   });
+
+  return _placesLibPromise;
 };
 
 type UseLocationOptions = {
@@ -62,9 +76,11 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
   const suggestionsTimerRef = useRef<number | null>(null);
   const fetchGenerationRef = useRef(0);
   const placesHostRef = useRef<HTMLDivElement | null>(null);
+  const queryRef = useRef(initialQuery);
 
   useEffect(() => {
     setQuery(initialQuery);
+    queryRef.current = initialQuery;
     setSuggestions([]);
     predictionByPlaceIdRef.current = new Map();
   }, [initialQuery]);
@@ -79,12 +95,13 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
       }
 
       try {
-        await loadGoogleMapsBootstrap(GOOGLE_MAPS_API_KEY);
-        if (!isMounted || !window.google?.maps?.importLibrary) return;
-
-        const placesLib = await window.google.maps.importLibrary("places");
+        const placesLib = await loadPlacesLibrary(GOOGLE_MAPS_API_KEY);
         if (!isMounted) return;
         placesLibRef.current = placesLib;
+
+        if (queryRef.current.trim().length >= 2) {
+          fetchSuggestions(queryRef.current);
+        }
       } catch {
         if (isMounted) setLoadError("Unable to load location autocomplete.");
       }
@@ -94,6 +111,7 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
     return () => {
       isMounted = false;
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(
@@ -186,6 +204,7 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
+    queryRef.current = value;
     setSuggestions([]);
     predictionByPlaceIdRef.current = new Map();
     fetchSuggestions(value);
