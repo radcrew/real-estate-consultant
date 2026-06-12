@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import useEmblaCarousel from "embla-carousel-react";
 
 import { NcModal } from "@components/ui/nc-modal";
 import { ImagePlaceholder } from "./image-placeholder";
@@ -25,15 +26,27 @@ export const PropertyGalleryModal = ({
   const [current, setCurrent] = useState(initialIndex);
   const [failedIndexes, setFailedIndexes] = useState<Set<number>>(new Set());
 
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, dragFree: false });
+
+  // Sync embla position when modal opens or initialIndex changes
   useEffect(() => {
     if (isOpen) {
       setCurrent(initialIndex);
       setFailedIndexes(new Set());
+      emblaApi?.scrollTo(initialIndex, true);
     }
-  }, [isOpen, initialIndex]);
+  }, [isOpen, initialIndex, emblaApi]);
 
-  const prev = () => setCurrent((c) => (c - 1 + images.length) % images.length);
-  const next = () => setCurrent((c) => (c + 1) % images.length);
+  // Keep current index in sync as embla scrolls
+  useEffect(() => {
+    if (!emblaApi) return;
+    const onSelect = () => setCurrent(emblaApi.selectedScrollSnap());
+    emblaApi.on("select", onSelect);
+    return () => { emblaApi.off("select", onSelect); };
+  }, [emblaApi]);
+
+  const prev = useCallback(() => emblaApi?.scrollPrev(), [emblaApi]);
+  const next = useCallback(() => emblaApi?.scrollNext(), [emblaApi]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -43,8 +56,7 @@ export const PropertyGalleryModal = ({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, images.length]);
+  }, [isOpen, prev, next]);
 
   const markFailed = (i: number) =>
     setFailedIndexes((prev) => new Set(prev).add(i));
@@ -59,22 +71,29 @@ export const PropertyGalleryModal = ({
       renderTrigger={() => null}
       renderContent={() => (
         <div className="flex flex-col">
-          {/* Main image */}
+          {/* Draggable carousel */}
           <div className="relative aspect-[16/10] w-full overflow-hidden bg-neutral-100 dark:bg-neutral-900">
-            {failedIndexes.has(current) ? (
-              <ImagePlaceholder label={alt} />
-            ) : (
-              <Image
-                key={current}
-                src={images[current]}
-                alt={`${alt} — photo ${current + 1}`}
-                fill
-                sizes="(max-width: 1024px) 100vw, 1024px"
-                className="object-contain"
-                priority
-                onError={() => markFailed(current)}
-              />
-            )}
+            <div ref={emblaRef} className="h-full w-full overflow-hidden cursor-grab active:cursor-grabbing">
+              <div className="flex h-full">
+                {images.map((src, i) => (
+                  <div key={i} className="relative h-full w-full flex-[0_0_100%]">
+                    {failedIndexes.has(i) ? (
+                      <ImagePlaceholder label={alt} />
+                    ) : (
+                      <Image
+                        src={src}
+                        alt={`${alt} — photo ${i + 1}`}
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 1024px"
+                        className="object-contain"
+                        priority={i === initialIndex}
+                        onError={() => markFailed(i)}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {images.length > 1 && (
               <>
@@ -105,7 +124,7 @@ export const PropertyGalleryModal = ({
                 <button
                   key={i}
                   type="button"
-                  onClick={() => setCurrent(i)}
+                  onClick={() => emblaApi?.scrollTo(i)}
                   className={`relative h-14 w-20 shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${
                     i === current
                       ? "border-primary-600"
