@@ -30,11 +30,16 @@ def raise_hf_request_timeout(*, cause: APITimeoutError) -> NoReturn:
 
 
 def raise_hf_openai_error(*, cause: OpenAIError) -> NoReturn:
-    raise_bad_gateway(f"Hugging Face request failed: {cause}", cause=cause)
+    raise_bad_gateway(
+        "The AI service is temporarily unavailable. Please try again later.",
+        cause=cause,
+    )
 
 
 def raise_hf_structured_refusal(*, refusal: str) -> NoReturn:
-    raise_bad_gateway(f"Hugging Face refused the structured request: {refusal}")
+    raise_bad_gateway(
+        "The AI service was unable to process this request. Please try again later.",
+    )
 
 
 def raise_hf_structured_reply_incomplete() -> NoReturn:
