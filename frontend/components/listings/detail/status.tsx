@@ -45,12 +45,11 @@ export const ListingDetailNotice = ({
 
 export const ListingDetailSkeleton = () => (
   <div className="space-y-10">
-    <div className="grid h-80 grid-cols-2 grid-rows-2 gap-1 overflow-hidden rounded-2xl sm:h-[460px] sm:grid-cols-4 sm:gap-2">
-      <div className="col-span-2 row-span-2 animate-pulse bg-neutral-100 dark:bg-neutral-800" />
+    <div className="flex gap-2 overflow-hidden rounded-2xl p-2 bg-neutral-100 dark:bg-neutral-900">
       {Array.from({ length: 4 }, (_, i) => (
         <div
           key={i}
-          className="hidden animate-pulse bg-neutral-100 sm:block dark:bg-neutral-800"
+          className="h-64 w-[455px] shrink-0 animate-pulse rounded-xl bg-neutral-200 dark:bg-neutral-800"
         />
       ))}
     </div>
