@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { NcModal } from "@components/ui/nc-modal";
+import { ImagePlaceholder } from "./image-placeholder";
 
 type PropertyGalleryModalProps = {
   images: string[];
@@ -22,10 +23,13 @@ export const PropertyGalleryModal = ({
   onClose,
 }: PropertyGalleryModalProps) => {
   const [current, setCurrent] = useState(initialIndex);
+  const [failedIndexes, setFailedIndexes] = useState<Set<number>>(new Set());
 
-  // Sync when caller opens to a specific index.
   useEffect(() => {
-    if (isOpen) setCurrent(initialIndex);
+    if (isOpen) {
+      setCurrent(initialIndex);
+      setFailedIndexes(new Set());
+    }
   }, [isOpen, initialIndex]);
 
   const prev = () => setCurrent((c) => (c - 1 + images.length) % images.length);
@@ -39,46 +43,39 @@ export const PropertyGalleryModal = ({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, images.length]);
+
+  const markFailed = (i: number) =>
+    setFailedIndexes((prev) => new Set(prev).add(i));
 
   return (
     <NcModal
       isOpenProp={isOpen}
       onCloseModal={onClose}
-      modalTitle=""
+      modalTitle={`${current + 1} / ${images.length}`}
       contentExtraClass="max-w-5xl"
       contentPaddingClass="p-0"
       renderTrigger={() => null}
       renderContent={() => (
-        <div className="relative flex flex-col">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3">
-            <span className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
-              {current + 1} / {images.length}
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white"
-              aria-label="Close"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          {/* Image */}
+        <div className="flex flex-col">
+          {/* Main image */}
           <div className="relative aspect-[16/10] w-full overflow-hidden bg-neutral-100 dark:bg-neutral-900">
-            <Image
-              key={current}
-              src={images[current]}
-              alt={`${alt} — photo ${current + 1}`}
-              fill
-              sizes="(max-width: 1024px) 100vw, 1024px"
-              className="object-contain"
-              priority
-            />
+            {failedIndexes.has(current) ? (
+              <ImagePlaceholder label={alt} />
+            ) : (
+              <Image
+                key={current}
+                src={images[current]}
+                alt={`${alt} — photo ${current + 1}`}
+                fill
+                sizes="(max-width: 1024px) 100vw, 1024px"
+                className="object-contain"
+                priority
+                onError={() => markFailed(current)}
+              />
+            )}
 
-            {/* Prev / Next */}
             {images.length > 1 && (
               <>
                 <button
@@ -116,13 +113,18 @@ export const PropertyGalleryModal = ({
                   }`}
                   aria-label={`Go to photo ${i + 1}`}
                 >
-                  <Image
-                    src={src}
-                    alt={`${alt} thumbnail ${i + 1}`}
-                    fill
-                    sizes="80px"
-                    className="object-cover"
-                  />
+                  {failedIndexes.has(i) ? (
+                    <ImagePlaceholder />
+                  ) : (
+                    <Image
+                      src={src}
+                      alt={`${alt} thumbnail ${i + 1}`}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                      onError={() => markFailed(i)}
+                    />
+                  )}
                 </button>
               ))}
             </div>

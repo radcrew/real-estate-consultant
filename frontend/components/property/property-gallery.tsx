@@ -98,7 +98,7 @@ export const PropertyGallery = ({
       {images.length > 1 && (
         <button
           type="button"
-          onClick={openModal}
+          onClick={() => openModal(0)}
           className="absolute right-3 bottom-3 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-medium text-neutral-700 shadow-md hover:bg-neutral-100 focus:outline-none dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800"
         >
           <Images className="h-4 w-4" aria-hidden />
