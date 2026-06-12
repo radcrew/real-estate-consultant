@@ -33,8 +33,12 @@ export async function GET(request: Request) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error || !data.session?.refresh_token) {
-      const message = error?.message || "No session returned. Try signing in again.";
-      return NextResponse.redirect(buildSignInErrorUrl(requestUrl.origin, message));
+      if (error) {
+        console.error("[oauth] exchangeCodeForSession failed:", error.message);
+      }
+      return NextResponse.redirect(
+        buildSignInErrorUrl(requestUrl.origin, "Sign-in failed. Please try again."),
+      );
     }
 
     await syncProfileNamesAfterOAuth(supabase, data.session.user);
@@ -58,7 +62,9 @@ export async function GET(request: Request) {
     });
     return response;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Sign-in failed.";
-    return NextResponse.redirect(buildSignInErrorUrl(requestUrl.origin, message));
+    console.error("[oauth] callback failed:", err);
+    return NextResponse.redirect(
+      buildSignInErrorUrl(requestUrl.origin, "Sign-in failed. Please try again."),
+    );
   }
 }

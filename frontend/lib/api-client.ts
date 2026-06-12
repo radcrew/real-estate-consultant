@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import { readSession } from "@lib/auth-session";
+import { clearSession, readSession } from "@lib/auth-session";
 import { BACKEND_BASE_URL } from "@lib/config";
 
 export const apiClient = axios.create({
@@ -19,3 +19,17 @@ apiClient.interceptors.request.use((config) => {
 
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: unknown) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      clearSession();
+      if (typeof window !== "undefined") {
+        const next = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/sign-in?next=${next}`;
+      }
+    }
+    return Promise.reject(error);
+  },
+);

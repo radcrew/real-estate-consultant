@@ -4,8 +4,6 @@ import type { ChangeEvent } from "react";
 
 import { Input } from "@components/ui/input";
 
-import { FIELD_INPUT_CLASS } from "./styles";
-
 export type EmailFieldProps = {
   id: string;
   value: string;
@@ -36,7 +34,6 @@ export const EmailField = ({
       value={value}
       onChange={onChange}
       disabled={disabled}
-      className={FIELD_INPUT_CLASS}
     />
   </div>
 );

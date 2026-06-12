@@ -1,104 +1,184 @@
 "use client";
 
-import Link from "next/link";
+import { useMemo, useState } from "react";
+import { LayoutGrid, Map as MapIcon } from "lucide-react";
 import { useParams } from "next/navigation";
-import { Search } from "lucide-react";
 
-import { buttonVariants } from "@components/ui/buttons";
+import { NoticeCard } from "@components/ui/notice-card";
+import type { PropertyModel } from "@components/property/listing-model";
+import {
+  PropertyCard,
+  PropertyCardSkeleton,
+  PROPERTY_GRID,
+} from "@components/property/property-card";
+import { Pagination } from "@components/ui/pagination";
+import { SectionGridHasMap } from "@components/property/section-grid-has-map";
+import { usePropertySearchResults } from "@hooks/use-property-search-results";
 import { cn } from "@utils/common";
-import { useSearchSessionResults } from "@hooks/use-search-session-results";
 
-import { ResultCard } from "./result-card";
 import { SearchFilter } from "./filter-bar";
 
+type View = "grid" | "map";
+
 const SKELETON_COUNT = 6;
+const PAGE_SIZE = 9;
+const TOGGLE_BTN =
+  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors";
+
+const resultCountLabel = (models: PropertyModel[], loading: boolean) =>
+  loading
+    ? "Searching…"
+    : `${models.length} ${models.length === 1 ? "property" : "properties"}`;
 
 export const SearchResults = () => {
   const params = useParams<{ id?: string }>();
-  const sessionProfileId = typeof params?.id === "string" ? params.id : undefined;
-  const { listings, loading, error, criteria, applyCriteria } = useSearchSessionResults(sessionProfileId);
+  const sessionProfileId =
+    typeof params?.id === "string" ? params.id : undefined;
+  const { models, loading, error, criteria, applyCriteria } =
+    usePropertySearchResults(sessionProfileId);
+  const [view, setView] = useState<View>("grid");
+  const [page, setPage] = useState(0);
 
-  const filtersLoading = loading && !error;
-  const showFilterDock = filtersLoading || Object.keys(criteria).length > 0;
+  // Reset to the first page whenever the result set changes (adjust during render).
+  const [prevModels, setPrevModels] = useState(models);
+  if (models !== prevModels) {
+    setPrevModels(models);
+    setPage(0);
+  }
 
+  const pageCount = Math.ceil(models.length / PAGE_SIZE);
+  const pagedModels = useMemo(
+    () => models.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE),
+    [models, page],
+  );
+
+  const showFilterDock =
+    (loading && !error) || Object.keys(criteria).length > 0;
   const showNoResults =
-    !loading &&
-    !error &&
-    listings.length === 0 &&
-    Boolean(sessionProfileId?.trim());
+    !loading && !error && models.length === 0 && Boolean(sessionProfileId?.trim());
+  const hasResults = !loading && !error && models.length > 0;
 
   return (
-    <div className="min-h-[60vh] bg-muted/20">
-      {showFilterDock ? (
-        <div className="fixed left-0 right-0 top-16 z-30 border-b border-border bg-background shadow-sm">
+    <div className="min-h-[60vh]">
+      {showFilterDock && (
+        <div className="fixed top-20 right-0 left-0 z-30 border-b border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
           <div className="mx-auto max-w-screen-xl px-4 py-2">
-            <SearchFilter criteria={criteria} disabled={loading} onSearch={applyCriteria} />
+            <SearchFilter
+              criteria={criteria}
+              disabled={loading}
+              onSearch={applyCriteria}
+            />
           </div>
         </div>
-      ) : null}
+      )}
 
       <div
         className={cn(
-          "mx-auto max-w-screen-xl px-4 pb-4 sm:pb-6",
-          showFilterDock ? "pt-[3.75rem]" : "py-4 sm:py-6",
+          "mx-auto px-4 pb-12",
+          view === "map" ? "max-w-[1600px]" : "max-w-screen-xl",
+          showFilterDock ? "pt-16" : "pt-10",
         )}
       >
-        {error && <p className="py-6 text-center text-destructive">{error}</p>}
+        {error && (
+          <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-center text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
+        {!error && (
+          <div className="my-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <span className="block text-neutral-500 dark:text-neutral-400">
+                {resultCountLabel(models, loading)}
+              </span>
+            </div>
+
+            {hasResults && (
+              <div className="inline-flex shrink-0 rounded-full border border-neutral-200 p-1 dark:border-neutral-700">
+                <button
+                  type="button"
+                  onClick={() => setView("grid")}
+                  className={cn(
+                    TOGGLE_BTN,
+                    view === "grid"
+                      ? "bg-primary-600 text-white"
+                      : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white",
+                  )}
+                  aria-pressed={view === "grid"}
+                >
+                  <LayoutGrid className="h-4 w-4" aria-hidden />
+                  Grid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView("map")}
+                  className={cn(
+                    TOGGLE_BTN,
+                    view === "map"
+                      ? "bg-primary-600 text-white"
+                      : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-white",
+                  )}
+                  aria-pressed={view === "map"}
+                >
+                  <MapIcon className="h-4 w-4" aria-hidden />
+                  Map
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {loading && !error && (
           <div
-            className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8"
+            className={PROPERTY_GRID}
             role="status"
             aria-live="polite"
             aria-label="Loading search results"
           >
             {Array.from({ length: SKELETON_COUNT }, (_, i) => (
-              <div
-                key={i}
-                className="overflow-hidden rounded-lg border border-border bg-card shadow-sm"
-              >
-                <div className="aspect-[4/3] animate-pulse bg-muted" />
-                <div className="space-y-3 p-4">
-                  <div className="h-5 w-[85%] max-w-[14rem] animate-pulse rounded-md bg-muted" />
-                  <div className="h-4 w-[55%] max-w-[10rem] animate-pulse rounded-md bg-muted" />
-                  <div className="h-12 w-full animate-pulse rounded-md bg-muted" />
-                  <div className="flex justify-between gap-4 pt-1">
-                    <div className="h-4 w-16 animate-pulse rounded-md bg-muted" />
-                    <div className="h-4 w-20 animate-pulse rounded-md bg-muted" />
-                  </div>
-                </div>
+              <PropertyCardSkeleton key={i} />
+            ))}
+          </div>
+        )}
+
+        {hasResults &&
+          (view === "grid" ? (
+            <>
+              <div className={PROPERTY_GRID}>
+                {pagedModels.map((model) => (
+                  <PropertyCard key={model.id} data={model} />
+                ))}
               </div>
-            ))}
-          </div>
-        )}
 
-        {!loading && !error && listings.length > 0 && (
-          <div
-            className={cn(
-              "grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-7 lg:grid-cols-3 lg:gap-8",
-              showFilterDock && "mt-8",
-            )}
-          >
-            {listings.map((listing) => (
-              <ResultCard key={listing.id} listing={listing} />
-            ))}
-          </div>
-        )}
+              {pageCount > 1 && (
+                <div className="mt-12 flex justify-center">
+                  <Pagination
+                    items={Array.from({ length: pageCount }, (_, i) => ({
+                      label: String(i + 1),
+                    }))}
+                    activeIndex={page}
+                    onPageClick={(i) => {
+                      setPage(i);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <SectionGridHasMap data={models} />
+          ))}
 
-        <div className="mt-12">
-          {showNoResults ? (
-            <p className="mb-8 text-center text-base text-muted-foreground">No search results</p>
-          ) : null}
-          <div className="flex justify-center border-t border-border pt-10">
-            <Link
-              href="/listings"
-              className={cn(buttonVariants({ variant: "outline", size: "lg" }), "inline-flex gap-2")}
-            >
-              <Search className="size-5 shrink-0" aria-hidden />
-              Browse all properties
-            </Link>
-          </div>
-        </div>
+        {showNoResults && (
+          <NoticeCard className="mt-4">
+            <p className="text-neutral-700 dark:text-neutral-200">
+              No properties match your search.
+            </p>
+            <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
+              Try widening your filters — adjust price, size, or property type above.
+            </p>
+          </NoticeCard>
+        )}
       </div>
     </div>
   );

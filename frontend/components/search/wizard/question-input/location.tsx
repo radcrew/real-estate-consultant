@@ -39,7 +39,6 @@ export const LocationQuestionInput = ({
         onChange={(event) => {
           handleQueryChange(event.target.value);
         }}
-        className="h-9 border-border/80 bg-background px-3 text-sm"
       />
 
       {loadError && <p className="text-xs text-muted-foreground">{loadError}</p>}
@@ -49,12 +48,12 @@ export const LocationQuestionInput = ({
       )}
 
       {showSuggestionList && (
-        <div className="rounded-md border border-border/70 bg-background shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
           {suggestions.map((suggestion) => (
             <button
               key={suggestion.placeId}
               type="button"
-              className="block w-full cursor-pointer px-3 py-2 text-left text-sm hover:bg-muted"
+              className="block w-full cursor-pointer px-4 py-2.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
               onClick={() => selectSuggestion(suggestion)}
             >
               {suggestion.label}

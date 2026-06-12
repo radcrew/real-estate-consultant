@@ -11,7 +11,7 @@ import {
 } from "@components/ui/dropdown-menu";
 import { cn } from "@utils/common";
 
-import { FILTER_BAR_PILL } from "./styles";
+import { FILTER_BAR_PILL, FILTER_BAR_PILL_ACTIVE } from "./styles";
 import { stopMenuTriggerBubble } from "./utils";
 
 const SUGGESTED_TYPES = [
@@ -82,20 +82,24 @@ export const MultiSelectFilter = ({ label, value, onChange, disabled, className 
         <DropdownMenuTrigger
           disabled={disabled}
           aria-label={`${label}: ${summaryForAria}`}
-          className={cn(FILTER_BAR_PILL, "disabled:pointer-events-none disabled:opacity-50")}
+          className={cn(
+            FILTER_BAR_PILL,
+            hasValue && FILTER_BAR_PILL_ACTIVE,
+            "disabled:pointer-events-none disabled:opacity-50",
+          )}
         >
           <span className="min-w-0 flex-1 truncate text-left">{triggerText}</span>
           {hasValue ? (
             <span
               title={`Clear ${label}`}
-              className="-mr-1 flex size-8 shrink-0 cursor-default items-center justify-center rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="-mr-1 flex size-8 shrink-0 cursor-default items-center justify-center rounded-sm text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
               onPointerDown={stopMenuTriggerBubble}
               onClick={handleClear}
             >
               <X className="size-4 shrink-0" aria-hidden />
             </span>
           ) : (
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground pointer-events-none" aria-hidden />
+            <ChevronDown className="size-4 shrink-0 text-neutral-500 dark:text-neutral-400 pointer-events-none" aria-hidden />
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" side="bottom" sideOffset={6} className="max-h-72 min-w-[12rem] overflow-y-auto p-1">

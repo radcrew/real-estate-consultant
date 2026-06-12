@@ -116,7 +116,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       });
 
       if (oauthError) {
-        setError(oauthError.message);
+        console.error("[auth] Google sign-in failed:", oauthError.message);
+        setError("Could not start Google sign-in. Please try again.");
         setSubmitting(false);
         googleOAuthInFlightRef.current = false;
         return;
@@ -127,11 +128,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         return;
       }
 
-      setError("Could not start Google sign-in.");
+      setError("Could not start Google sign-in. Please try again.");
       setSubmitting(false);
       googleOAuthInFlightRef.current = false;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      console.error("[auth] Google sign-in failed:", err);
+      setError("Could not start Google sign-in. Please try again.");
       setSubmitting(false);
       googleOAuthInFlightRef.current = false;
     }

@@ -27,4 +27,5 @@ def account_profile_response(*, user: User, profile: Profile | None) -> AccountP
         state=profile.state,
         zip_code=profile.zip_code,
         country=profile.country,
+        avatar_url=profile.avatar_url,
     )

@@ -52,6 +52,23 @@ async def search_properties(
     return rows, total
 
 
+async def list_properties_by_broker(
+    session: AsyncSession,
+    broker_name: str,
+    *,
+    limit: int = 60,
+) -> list[dict[str, Any]]:
+    """All listings whose ``listing_broker_name`` matches (case-insensitive)."""
+    query = (
+        select(PropertyRow)
+        .where(func.lower(PropertyRow.listing_broker_name) == broker_name.strip().lower())
+        .order_by(PropertyRow.id)
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    return [property_row_to_search_dict(row) for row in result.scalars().all()]
+
+
 async def get_property_by_id(session: AsyncSession, property_id: UUID) -> dict[str, Any] | None:
     query = select(PropertyRow).where(PropertyRow.id == property_id).limit(1)
     result = await session.execute(query)

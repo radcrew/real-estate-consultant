@@ -15,24 +15,24 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const trim = (v: string) => v.trim();
 
-export const validateEmail = (value: string): string | null => {
+const validateEmail = (value: string): string | null => {
   const t = trim(value);
   if (!t) return "Email is required.";
   if (!EMAIL_RE.test(t)) return "Email format invalid.";
   return null;
 };
 
-export const validateFirstName = (value: string): string | null => {
+const validateFirstName = (value: string): string | null => {
   if (!trim(value)) return "First name is required.";
   return null;
 };
 
-export const validateLastName = (value: string): string | null => {
+const validateLastName = (value: string): string | null => {
   if (!trim(value)) return "Last name is required.";
   return null;
 };
 
-export const validatePhone = (value: string): string | null => {
+const validatePhone = (value: string): string | null => {
   const t = trim(value);
   if (!t) return null;
   if (t.length < 7) return "Phone number looks too short.";
@@ -40,7 +40,7 @@ export const validatePhone = (value: string): string | null => {
   return null;
 };
 
-export const validateZipCode = (value: string): string | null => {
+const validateZipCode = (value: string): string | null => {
   const t = trim(value);
   if (!t) return null;
   if (!/^[A-Za-z0-9][A-Za-z0-9\s-]{2,14}$/.test(t)) return "Enter a valid postal or ZIP code.";

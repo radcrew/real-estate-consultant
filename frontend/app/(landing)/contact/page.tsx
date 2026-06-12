@@ -1,15 +1,66 @@
-const ContactPage = () => (
-  <main className="flex flex-1 flex-col bg-background">
-    <div className="mx-auto max-w-screen-xl px-4 py-16 sm:py-20">
-      <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-        Contact us
-      </h1>
-      <p className="mt-3 max-w-lg text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
-        A contact form and direct channels will appear here. For now, use the
-        navigation above to explore listings and account options.
-      </p>
-    </div>
-  </main>
-)
+import type { Metadata } from "next";
 
-export default ContactPage
+import { ContactForm } from "@components/contact/form";
+import { Subscribe } from "@components/landing/subscribe";
+import { SocialsList } from "@components/ui/socials-list";
+
+export const metadata: Metadata = {
+  title: "Contact",
+  description: "Get in touch with RadEstate",
+};
+
+const INFO = [
+  {
+    title: "🗺 ADDRESS",
+    desc: "200 W Madison St, Suite 2100, Chicago, IL 60606",
+  },
+  {
+    title: "💌 EMAIL",
+    desc: "hello@radestate.com",
+  },
+  {
+    title: "☎ PHONE",
+    desc: "(312) 555-0142",
+  },
+];
+
+const ContactPage = () => (
+  <div className="overflow-hidden">
+    <div className="mb-24 lg:mb-32">
+      <h2 className="my-16 flex items-center justify-center text-3xl font-semibold leading-[115%] text-neutral-900 sm:my-20 md:text-5xl md:leading-[115%] dark:text-neutral-100">
+        Contact
+      </h2>
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="grid flex-shrink-0 grid-cols-1 gap-12 sm:grid-cols-2">
+          <div className="max-w-sm space-y-8">
+            {INFO.map((item) => (
+              <div key={item.title}>
+                <h3 className="text-sm font-semibold uppercase tracking-wider dark:text-neutral-200">
+                  {item.title}
+                </h3>
+                <span className="mt-2 block text-neutral-500 dark:text-neutral-400">
+                  {item.desc}
+                </span>
+              </div>
+            ))}
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wider dark:text-neutral-200">
+                🌏 SOCIALS
+              </h3>
+              <SocialsList className="mt-2" />
+            </div>
+          </div>
+          <div>
+            <ContactForm />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="mx-auto max-w-screen-xl px-4">
+      <Subscribe className="pb-24 lg:pb-32" />
+    </div>
+  </div>
+);
+
+export default ContactPage;

@@ -10,15 +10,19 @@ from fastapi import APIRouter, Query
 from app.core.deps import CurrentUser, DbSession, SupabaseSdkDep
 from app.models.properties import Properties
 from app.repositories.intake_sessions import (
+    create_intake_session_row,
     load_profile_session_row,
     parse_intake_session,
     save_intake_criteria,
+    update_intake_session_completed,
 )
 from app.repositories.properties import normalize_criteria, search_properties
 from app.repositories.property_images import fetch_first_image_url
-from app.repositories.search_profiles import ensure_search_profile_access
+from app.repositories.search_profiles import create_search_profile, ensure_search_profile_access
 from app.schemas.search import (
     PropertyMatch,
+    QuickSearchBody,
+    QuickSearchResponse,
     SearchCriteriaUpdateResponse,
     SearchPropertiesResponse,
     UpdateSearchCriteriaBody,
@@ -26,6 +30,30 @@ from app.schemas.search import (
 from app.utils.listings import format_listing_type_label
 
 router = APIRouter(prefix="/search", tags=["search"])
+
+
+@router.post(
+    "/quick",
+    response_model=QuickSearchResponse,
+    summary="Create a search profile from hero form inputs",
+)
+async def quick_search(
+    body: QuickSearchBody,
+    client: SupabaseSdkDep,
+    current_user: CurrentUser,
+) -> QuickSearchResponse:
+    search_profile_id = await create_search_profile(client, current_user.id)
+    session = await create_intake_session_row(client)
+    criteria: dict = {}
+    if body.location:
+        criteria["location"] = {"label": body.location}
+    if body.property_types:
+        criteria["property_type"] = body.property_types
+    if body.price_min is not None or body.price_max is not None:
+        criteria["price"] = {"min": body.price_min, "max": body.price_max}
+    await save_intake_criteria(client, session.id, criteria)
+    await update_intake_session_completed(client, session.id, search_profile_id)
+    return QuickSearchResponse(search_profile_id=search_profile_id)
 
 
 @router.get(

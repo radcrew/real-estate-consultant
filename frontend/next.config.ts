@@ -18,6 +18,17 @@ const nextConfig: NextConfig = {
         hostname: "api.apify.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "images.pexels.com",
+        pathname: "/**",
+      },
+      {
+        // Supabase Storage public URLs (e.g. profile avatars).
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
     ],
   },
 };

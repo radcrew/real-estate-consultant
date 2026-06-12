@@ -1,25 +1,44 @@
-import * as React from "react";
+"use client";
+
+import type { InputHTMLAttributes, Ref } from "react";
 
 import { cn } from "@utils/common";
 
-export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
+/**
+ * App text input (Voyager-styled).
+ *
+ * Ported from Voyager's `shared/Input.tsx`. Adapted to this stack: `cn()`,
+ * React 19 `ref`-as-prop (no `forwardRef`), and Tailwind v4 focus syntax.
+ * Looks best with the @tailwindcss/forms plugin.
+ */
+export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  sizeClass?: string;
+  fontClass?: string;
+  rounded?: string;
+  ref?: Ref<HTMLInputElement>;
+}
 
-export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type = "text", ...props }, ref) => (
-    <input
-      type={type}
-      ref={ref}
-      data-slot="input"
-      className={cn(
-        "flex h-9 w-full border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors",
-        "placeholder:text-muted-foreground",
-        "focus-visible:outline-none focus-visible:border-ring focus-visible:border-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 ring-offset-background",
-        "disabled:cursor-not-allowed disabled:opacity-50",
-        "aria-invalid:border-destructive aria-invalid:ring-destructive/30",
-        className
-      )}
-      {...props}
-    />
-  )
+export const Input = ({
+  className,
+  sizeClass = "h-11 px-4 py-3",
+  fontClass = "text-sm font-normal",
+  rounded = "rounded-2xl",
+  type = "text",
+  ref,
+  ...props
+}: InputProps) => (
+  <input
+    ref={ref}
+    type={type}
+    className={cn(
+      "block w-full border-neutral-200 bg-white",
+      "focus:border-primary-300 focus:ring-2 focus:ring-primary-200/50",
+      "dark:border-neutral-700 dark:bg-neutral-900 dark:focus:ring-primary-600/25",
+      rounded,
+      fontClass,
+      sizeClass,
+      className,
+    )}
+    {...props}
+  />
 );
-Input.displayName = "Input";

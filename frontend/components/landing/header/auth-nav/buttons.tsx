@@ -1,21 +1,25 @@
 import Link from "next/link";
 
-import { buttonVariants } from "@components/ui/buttons";
-import { cn } from "@utils/common";
+import { ButtonPrimary } from "@components/ui/button-primary";
 
+/**
+ * Logged-out header actions, styled to match the Voyager header: a plain
+ * "Sign In" text link plus an indigo "Get Started" pill. Routes are unchanged.
+ */
 export const NavAuthButtons = () => (
   <>
     <Link
       href="/sign-in"
-      className="text-sm font-semibold text-foreground transition-colors hover:text-foreground/80"
+      className="hidden text-sm font-medium text-neutral-700 transition-colors hover:text-neutral-900 sm:inline dark:text-neutral-300 dark:hover:text-neutral-100"
     >
       Sign In
     </Link>
-    <Link
+    <ButtonPrimary
       href="/sign-up"
-      className={cn(buttonVariants({ size: "default" }), "px-4 font-semibold shadow-none")}
+      sizeClass="px-4 py-2.5"
+      fontSize="text-sm font-medium"
     >
       Get Started
-    </Link>
+    </ButtonPrimary>
   </>
 );

@@ -10,6 +10,17 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
 from app.models.properties import Properties
 
 
+class QuickSearchBody(BaseModel):
+    location: str | None = None
+    property_types: list[str] = Field(default_factory=list)
+    price_min: int | None = None
+    price_max: int | None = None
+
+
+class QuickSearchResponse(BaseModel):
+    search_profile_id: UUID
+
+
 class UpdateSearchCriteriaBody(RootModel[dict[str, Any]]):
     """Replace intake ``criteria``: keys are question keys; values are answers (any JSON shape)."""
 

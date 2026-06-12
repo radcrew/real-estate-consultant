@@ -14,6 +14,7 @@ export type AccountProfileResponse = {
   state: string | null;
   zip_code: string | null;
   country: string | null;
+  avatar_url: string | null;
 };
 
 export type AccountProfileUpdateBody = Partial<{
@@ -97,6 +98,37 @@ export class AccountService {
     options?: { signal?: AbortSignal },
   ): Promise<void> {
     await this.http.post("/account/password", body, { signal: options?.signal });
+  }
+
+  async getSavedIds(options?: { signal?: AbortSignal }): Promise<string[]> {
+    const { data } = await this.http.get<{ property_ids: string[] }>("/account/saved", {
+      signal: options?.signal,
+    });
+    return data.property_ids;
+  }
+
+  async addSaved(propertyId: string, options?: { signal?: AbortSignal }): Promise<void> {
+    await this.http.post("/account/saved", { property_id: propertyId }, { signal: options?.signal });
+  }
+
+  async removeSaved(propertyId: string, options?: { signal?: AbortSignal }): Promise<void> {
+    await this.http.delete(`/account/saved/${encodeURIComponent(propertyId)}`, {
+      signal: options?.signal,
+    });
+  }
+
+  async uploadAvatar(
+    file: File,
+    options?: { signal?: AbortSignal },
+  ): Promise<AccountProfileResponse> {
+    const form = new FormData();
+    form.append("file", file);
+    const { data } = await this.http.post<AccountProfileResponse>("/account/avatar", form, {
+      signal: options?.signal,
+      // Null the JSON default so the browser sets multipart/form-data + boundary.
+      headers: { "Content-Type": null },
+    });
+    return data;
   }
 }
 

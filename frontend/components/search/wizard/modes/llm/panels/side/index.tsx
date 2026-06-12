@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, SlidersHorizontal, Wand2 } from "lucide-react";
 
 import { useSearchWizard } from "@contexts/search-wizard";
-import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@utils/common";
-import type { LlmInputResponse } from "@services/intake-sessions";
+import { intakeSessionsService, type LlmInputResponse } from "@services/intake-sessions";
 
 import { STYLES } from "../../styles";
 
@@ -17,7 +16,6 @@ type SidePanelProps = {
 
 export const SidePanel = ({ lastResponse }: SidePanelProps) => {
   const router = useRouter();
-  const { completeSession } = useIntakeSessions();
   const { sessionId, setErrorMessage, resetToChooser, onClose } = useSearchWizard();
   const [isSearchBusy, setSearchBusy] = useState(false);
 
@@ -31,7 +29,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
     setSearchBusy(true);
     setErrorMessage(null);
     try {
-      const completed = await completeSession(sessionId);
+      const completed = await intakeSessionsService.completeSession(sessionId);
       const profileId = completed.search_profile_id;
       if (!profileId) {
         setErrorMessage("Search profile was not created. Please try again.");
@@ -45,7 +43,6 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
       setSearchBusy(false);
     }
   }, [
-    completeSession,
     isComplete,
     isSearchBusy,
     lastResponse,
@@ -60,7 +57,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
       <div className={STYLES.card}>
         <div className={STYLES.cardHeader}>
           <div className={STYLES.cardTitleRow}>
-            <SlidersHorizontal className="size-4 text-amber-600" aria-hidden />
+            <SlidersHorizontal className="size-4 text-primary-600" aria-hidden />
             <h3 className={STYLES.cardTitle}>Extracted Criteria</h3>
           </div>
         </div>

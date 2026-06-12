@@ -19,7 +19,9 @@ import {
   buildProfileUpdateBody,
   mapProfileResponseToForm,
 } from "@services/account";
+import { brand } from "@config/brand";
 
+import { AccountSidebar, type AccountTab } from "./sidebar";
 import { AccountPasswordSection } from "./sections/password";
 import { AccountPersonalInfoSection } from "./sections/personal-info";
 
@@ -39,7 +41,11 @@ export const AccountPage = () => {
   const router = useRouter();
   const { session, ready, refresh } = useAuth();
 
+  const [activeTab, setActiveTab] = useState<AccountTab>("profile");
+
   const [savedProfile, setSavedProfile] = useState<ProfileFormValues>(emptyProfile);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
 
@@ -78,6 +84,7 @@ export const AccountPage = () => {
         const next = mapProfileResponseToForm(data);
         setSavedProfile(next);
         setDraftProfile(next);
+        setAvatarUrl(data.avatar_url ?? null);
       } catch (e) {
         if (ac.signal.aborted) return;
         setProfileLoadError(getApiErrorMessage(e));
@@ -112,6 +119,22 @@ export const AccountPage = () => {
     setEditingProfile(false);
     setProfileErrors({});
     setProfileNotice(null);
+  }, []);
+
+  const uploadAvatar = useCallback(async (file: File) => {
+    setAvatarUploading(true);
+    setProfileNotice(null);
+    try {
+      const data = await accountService.uploadAvatar(file);
+      setAvatarUrl(data.avatar_url ?? null);
+      setProfileNoticeVariant("success");
+      setProfileNotice("Photo updated.");
+    } catch (e) {
+      setProfileNoticeVariant("error");
+      setProfileNotice(getApiErrorMessage(e));
+    } finally {
+      setAvatarUploading(false);
+    }
   }, []);
 
   const persistSessionEmailIfNeeded = useCallback(
@@ -268,40 +291,56 @@ export const AccountPage = () => {
   const profileValues = editingProfile ? draftProfile : mergedSavedProfile;
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
-      <header className="border-b border-border pb-8">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Account</h1>
-        <p className="mt-2 max-w-xl text-sm text-muted-foreground">Manage your profile and security.</p>
-      </header>
+    <div className="flex flex-col lg:flex-row">
+      <AccountSidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      <div className="mt-10 flex flex-col gap-10">
-        <AccountPersonalInfoSection
-          editing={editingProfile}
-          values={profileValues}
-          errors={profileErrors}
-          notice={profileNotice}
-          noticeVariant={profileNoticeVariant}
-          saving={profileSaving}
-          profileLoading={profileLoading}
-          onEdit={startEditProfile}
-          onCancel={cancelEditProfile}
-          onSave={saveProfile}
-          onChangeField={updateDraft}
-        />
+      <main className="min-w-0 flex-1 px-4 py-10 sm:px-6 lg:px-10">
+        <div className="mx-auto w-full max-w-3xl">
+          <header className="border-b border-border pb-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              {brand.account.workspaceLabel}
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              {brand.account.title}
+            </h1>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">{brand.account.subtitle}</p>
+          </header>
 
-        <AccountPasswordSection
-          currentPassword={currentPassword}
-          newPassword={newPassword}
-          confirmPassword={confirmPassword}
-          errors={passwordErrors}
-          submitting={passwordSubmitting}
-          success={passwordSuccess}
-          onChangeCurrent={onChangeCurrentPassword}
-          onChangeNew={onChangeNewPassword}
-          onChangeConfirm={onChangeConfirmPassword}
-          onSubmit={submitPasswordChange}
-        />
-      </div>
-    </main>
+          <div className="mt-10">
+            {activeTab === "profile" ? (
+              <AccountPersonalInfoSection
+                editing={editingProfile}
+                values={profileValues}
+                errors={profileErrors}
+                notice={profileNotice}
+                noticeVariant={profileNoticeVariant}
+                saving={profileSaving}
+                profileLoading={profileLoading}
+                avatarUrl={avatarUrl}
+                avatarUploading={avatarUploading}
+                onUploadAvatar={uploadAvatar}
+                onEdit={startEditProfile}
+                onCancel={cancelEditProfile}
+                onSave={saveProfile}
+                onChangeField={updateDraft}
+              />
+            ) : (
+              <AccountPasswordSection
+                currentPassword={currentPassword}
+                newPassword={newPassword}
+                confirmPassword={confirmPassword}
+                errors={passwordErrors}
+                submitting={passwordSubmitting}
+                success={passwordSuccess}
+                onChangeCurrent={onChangeCurrentPassword}
+                onChangeNew={onChangeNewPassword}
+                onChangeConfirm={onChangeConfirmPassword}
+                onSubmit={submitPasswordChange}
+              />
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
   );
 };

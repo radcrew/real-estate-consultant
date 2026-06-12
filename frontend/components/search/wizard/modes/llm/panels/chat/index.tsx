@@ -4,9 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, Loader2 } from "lucide-react";
 
 import { useSearchWizard } from "@contexts/search-wizard";
-import { useIntakeSessions } from "@hooks/use-intake-sessions";
 import { getApiErrorMessage } from "@utils/common";
-import type { LlmInputResponse } from "@services/intake-sessions";
+import { intakeSessionsService, type LlmInputResponse } from "@services/intake-sessions";
 
 import type { ChatMessage } from "../../types";
 import { ChatComposer } from "./composer";
@@ -18,7 +17,6 @@ type ChatPanelProps = {
 };
 
 export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
-  const { submitLlmInput } = useIntakeSessions();
   const {
     clearLlmChatBootstrap,
     errorMessage,
@@ -83,7 +81,7 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
     setMessages((m) => [...m, userMsg]);
 
     try {
-      const data = await submitLlmInput(sessionId, {
+      const data = await intakeSessionsService.submitLlmInput(sessionId, {
         input: text,
         mode: "llm",
       });
@@ -114,7 +112,6 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
     onLlmSuccess,
     sessionId,
     setErrorMessage,
-    submitLlmInput,
   ]);
 
   return (

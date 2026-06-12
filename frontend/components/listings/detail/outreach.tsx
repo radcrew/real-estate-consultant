@@ -1,19 +1,21 @@
 "use client";
 
-import Link from "next/link";
-import { Loader2, Mail } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
-import { Button, buttonVariants } from "@components/ui/buttons";
+import { ButtonPrimary } from "@components/ui/button-primary";
+import { ButtonThird } from "@components/ui/button-third";
+import { Textarea } from "@components/ui/textarea";
 import { useAuth } from "@contexts/auth";
 import { useOutreachDraft } from "@hooks/use-outreach-draft";
 import type { ListingProperty } from "@services/listings";
-import { cn } from "@utils/common";
 
 type ListingOutreachSectionProps = {
   property: ListingProperty;
 };
 
-export const ListingOutreachSection = ({ property }: ListingOutreachSectionProps) => {
+export const ListingOutreachSection = ({
+  property,
+}: ListingOutreachSectionProps) => {
   const { session, ready } = useAuth();
   const propertyId = typeof property.id === "string" ? property.id.trim() : "";
 
@@ -43,14 +45,14 @@ export const ListingOutreachSection = ({ property }: ListingOutreachSectionProps
     .join(" · ");
 
   const hasDraftText = draftText !== (draft?.draft_email ?? "");
-  const canSave = Boolean(draft?.id) && hasDraftText && !saving && !generating && !loadingLatest;
+  const canSave =
+    Boolean(draft?.id) && hasDraftText && !saving && !generating && !loadingLatest;
 
   const onGenerate = async () => {
     clearError();
     try {
       await generateDraft();
-    } catch {
-    }
+    } catch {}
   };
 
   const onSave = async () => {
@@ -58,64 +60,60 @@ export const ListingOutreachSection = ({ property }: ListingOutreachSectionProps
     clearError();
     try {
       await saveDraft();
-    } catch {
-    }
+    } catch {}
   };
 
   return (
     <section
-      className="mt-10 rounded-xl border border-border bg-card p-5 shadow-sm sm:p-6"
+      className="mt-10 rounded-2xl border border-neutral-200 bg-white p-6 dark:border-neutral-700 dark:bg-neutral-900"
       aria-labelledby="listing-outreach-heading"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h2
             id="listing-outreach-heading"
-            className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+            className="text-sm font-semibold tracking-wide text-neutral-500 uppercase dark:text-neutral-400"
           >
             Broker outreach
           </h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          <p className="mt-1 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
             Please review before you send from your own email.
           </p>
           {brokerLine ? (
-            <p className="mt-2 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground/80">Listing contact:</span> {brokerLine}
+            <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+              <span className="font-medium text-neutral-700 dark:text-neutral-200">
+                Listing contact:
+              </span>{" "}
+              {brokerLine}
             </p>
           ) : null}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <Button
+          <ButtonThird
             type="button"
-            variant="outline"
-            size="sm"
             disabled={generating || loadingLatest}
+            loading={generating}
             onClick={onGenerate}
+            sizeClass="px-4 py-2"
+            fontSize="text-sm font-medium"
           >
-            {generating ? (
-              <>
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-                Generating…
-              </>
-            ) : (
-              "Generate draft"
-            )}
-          </Button>
-          <Button type="button" variant="default" size="sm" disabled={!canSave} onClick={onSave}>
-            {saving ? (
-              <>
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-                Saving…
-              </>
-            ) : (
-              "Save changes"
-            )}
-          </Button>
+            {generating ? "Generating…" : "Generate draft"}
+          </ButtonThird>
+          <ButtonPrimary
+            type="button"
+            disabled={!canSave}
+            loading={saving}
+            onClick={onSave}
+            sizeClass="px-4 py-2"
+            fontSize="text-sm font-medium"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </ButtonPrimary>
         </div>
       </div>
 
       {loadingLatest && !draft && !generating ? (
-        <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="mt-4 flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
           <Loader2 className="size-4 animate-spin" aria-hidden />
           Loading saved draft…
         </div>
@@ -123,13 +121,17 @@ export const ListingOutreachSection = ({ property }: ListingOutreachSectionProps
 
       {error ? (
         <div
-          className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400"
           role="alert"
         >
           <p>{error}</p>
-          <Button type="button" variant="ghost" size="xs" className="mt-2 h-auto px-0" onClick={refreshLatest}>
+          <button
+            type="button"
+            onClick={refreshLatest}
+            className="mt-2 text-sm font-medium underline underline-offset-4"
+          >
             Retry load
-          </Button>
+          </button>
         </div>
       ) : null}
 
@@ -137,16 +139,18 @@ export const ListingOutreachSection = ({ property }: ListingOutreachSectionProps
         <label htmlFor="outreach-draft-email" className="sr-only">
           Draft email
         </label>
-        <textarea
+        <Textarea
           id="outreach-draft-email"
           value={draftText}
           onChange={(e) => setDraftText(e.target.value)}
           rows={12}
           disabled={generating || (loadingLatest && !draft)}
           placeholder={
-            draft || generating ? "Draft appears here — edit freely, then save." : "Generate a draft to get started."
+            draft || generating
+              ? "Draft appears here — edit freely, then save."
+              : "Generate a draft to get started."
           }
-          className="min-h-[12rem] w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed text-foreground shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-[12rem] resize-y leading-relaxed"
         />
       </div>
     </section>

@@ -16,6 +16,7 @@ class AccountProfileResponse(BaseModel):
     state: str | None = None
     zip_code: str | None = None
     country: str | None = None
+    avatar_url: str | None = None
 
 
 class AccountProfileUpdate(BaseModel):
@@ -33,3 +34,11 @@ class AccountProfileUpdate(BaseModel):
 class AccountPasswordChangeRequest(BaseModel):
     current_password: str = Field(min_length=1, max_length=200)
     new_password: str = Field(min_length=8, max_length=72)
+
+
+class SavedListingsResponse(BaseModel):
+    property_ids: list[str]
+
+
+class SavedListingCreate(BaseModel):
+    property_id: str = Field(min_length=1, max_length=200)

@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Voyager form atoms are designed against @tailwindcss/forms (base strategy:
+   styles native inputs/selects/textareas/checkboxes globally). */
+@plugin "@tailwindcss/forms";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -50,16 +54,63 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * Voyager design tokens (default "indigo-coolGrey" palette).
+ * Ported from Voyager's tailwind.config.js + styles/__theme_colors.scss so that
+ * ported Voyager components keep working with their primary, secondary and
+ * neutral color utilities. These are additive: shadcn's singular
+ * --color-primary / --color-secondary
+ * (used by the existing app) are untouched; only the default `neutral` scale is
+ * replaced with Voyager's coolGrey, which Voyager components rely on.
+ * Works in light and dark via the `dark:` variant (.dark class) already defined.
+ */
+@theme {
+  --color-primary-50: rgb(238 242 255);
+  --color-primary-100: rgb(224 231 255);
+  --color-primary-200: rgb(199 210 254);
+  --color-primary-300: rgb(165 180 252);
+  --color-primary-400: rgb(129 140 248);
+  --color-primary-500: rgb(99 102 241);
+  --color-primary-600: rgb(79 70 229);
+  --color-primary-700: rgb(67 56 202);
+  --color-primary-800: rgb(55 48 163);
+  --color-primary-900: rgb(49 46 129);
+
+  --color-secondary-50: rgb(240 253 250);
+  --color-secondary-100: rgb(204 251 241);
+  --color-secondary-200: rgb(153 246 228);
+  --color-secondary-300: rgb(153 246 228);
+  --color-secondary-400: rgb(45 212 191);
+  --color-secondary-500: rgb(20 184 166);
+  --color-secondary-600: rgb(13 148 136);
+  --color-secondary-700: rgb(15 118 110);
+  --color-secondary-800: rgb(17 94 89);
+  --color-secondary-900: rgb(19 78 74);
+
+  --color-neutral-50: rgb(249 250 251);
+  --color-neutral-100: rgb(243 244 246);
+  --color-neutral-200: rgb(229 231 235);
+  --color-neutral-300: rgb(209 213 219);
+  --color-neutral-400: rgb(156 163 175);
+  --color-neutral-500: rgb(107 114 128);
+  --color-neutral-600: rgb(75 85 99);
+  --color-neutral-700: rgb(55 65 81);
+  --color-neutral-800: rgb(31 41 55);
+  --color-neutral-900: rgb(17 24 39);
+}
+
 :root {
-  /* RadEstate header: slate-50 canvas, amber-400 brand, slate-900 text */
-  --background: oklch(0.984 0.003 247.858);
+  /* Voyager canvas: pure white body, neutral-900 text (matches Voyager's
+     `bg-white text-neutral-900`). */
+  --background: oklch(1 0 0);
   --foreground: oklch(0.208 0.042 265.755);
   --card: oklch(0.984 0.003 247.858);
   --card-foreground: oklch(0.208 0.042 265.755);
   --popover: oklch(0.984 0.003 247.858);
   --popover-foreground: oklch(0.208 0.042 265.755);
-  --primary: oklch(0.828 0.159 84.429);
-  --primary-foreground: oklch(0.208 0.042 265.755);
+  /* Voyager primary = indigo (primary-600 rgb 79 70 229) */
+  --primary: oklch(0.511 0.214 277);
+  --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.968 0.007 247.896);
   --secondary-foreground: oklch(0.208 0.042 265.755);
   --muted: oklch(0.968 0.007 247.896);
@@ -69,7 +120,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.929 0.006 264.531);
   --input: oklch(0.929 0.006 264.531);
-  --ring: oklch(0.828 0.159 84.429);
+  --ring: oklch(0.511 0.214 277);
   --chart-1: oklch(0.828 0.159 84.429);
   --chart-2: oklch(0.446 0.03 256.802);
   --chart-3: oklch(0.208 0.042 265.755);
@@ -78,12 +129,12 @@
   --radius: 0.5rem;
   --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-primary: oklch(0.828 0.159 84.429);
-  --sidebar-primary-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-primary: oklch(0.511 0.214 277);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.968 0.007 247.896);
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.006 264.531);
-  --sidebar-ring: oklch(0.828 0.159 84.429);
+  --sidebar-ring: oklch(0.511 0.214 277);
   /* Hero headline strips (royal blue) */
   --hero: oklch(0.4 0.19 264);
   --hero-foreground: oklch(0.99 0.005 106);
@@ -96,8 +147,9 @@
   --card-foreground: oklch(0.984 0.003 247.858);
   --popover: oklch(0.25 0.04 265);
   --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.85 0.14 84);
-  --primary-foreground: oklch(0.208 0.042 265.755);
+  /* Voyager primary = indigo (primary-500 rgb 99 102 241 in dark) */
+  --primary: oklch(0.585 0.207 277);
+  --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.3 0.04 265);
   --secondary-foreground: oklch(0.984 0.003 247.858);
   --muted: oklch(0.3 0.04 265);
@@ -107,7 +159,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.85 0.14 84);
+  --ring: oklch(0.585 0.207 277);
   --chart-1: oklch(0.85 0.14 84);
   --chart-2: oklch(0.72 0.02 260);
   --chart-3: oklch(0.984 0.003 247.858);
@@ -115,12 +167,12 @@
   --chart-5: oklch(0.4 0.04 265);
   --sidebar: oklch(0.25 0.04 265);
   --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.85 0.14 84);
-  --sidebar-primary-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-primary: oklch(0.585 0.207 277);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.3 0.04 265);
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.85 0.14 84);
+  --sidebar-ring: oklch(0.585 0.207 277);
   --hero: oklch(0.52 0.16 264);
   --hero-foreground: oklch(0.99 0.005 106);
 }

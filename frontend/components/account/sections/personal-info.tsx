@@ -1,6 +1,10 @@
 "use client";
 
-import { Button } from "@components/ui/buttons";
+import { useRef } from "react";
+import { Camera, Loader2 } from "lucide-react";
+
+import { Button } from "@components/ui/button-variants";
+import { Avatar } from "@components/ui/avatar";
 import { SaveCancelGroup } from "@components/ui/save-cancel-group";
 
 import type { ProfileFieldKey, ProfileFormValues } from "@utils/account/validation";
@@ -16,6 +20,9 @@ export type AccountPersonalInfoSectionProps = {
   noticeVariant?: "error" | "success";
   saving?: boolean;
   profileLoading?: boolean;
+  avatarUrl?: string | null;
+  avatarUploading?: boolean;
+  onUploadAvatar?: (file: File) => void;
   onEdit: () => void;
   onCancel: () => void;
   onSave: () => void;
@@ -30,11 +37,30 @@ export const AccountPersonalInfoSection = ({
   noticeVariant = "error",
   saving = false,
   profileLoading = false,
+  avatarUrl = null,
+  avatarUploading = false,
+  onUploadAvatar,
   onEdit,
   onCancel,
   onSave,
   onChangeField,
-}: AccountPersonalInfoSectionProps) => (
+}: AccountPersonalInfoSectionProps) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) {
+      onUploadAvatar?.(file);
+    }
+  };
+  const displayName =
+    `${values.firstName} ${values.lastName}`.trim() || values.email.trim() || "User";
+  const locationLine =
+    [values.city, values.state].filter((v) => v.trim()).join(", ") ||
+    values.country.trim();
+
+  return (
   <section
     className={ACCOUNT_SECTION_CARD_CLASS}
     aria-labelledby="personal-heading"
@@ -76,7 +102,50 @@ export const AccountPersonalInfoSection = ({
       </div>
     </div>
 
-    <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+    <div className="mt-6 flex flex-col gap-10 lg:flex-row">
+      <div className="flex flex-shrink-0 flex-col items-center lg:items-start">
+        <div className="relative overflow-hidden rounded-2xl">
+          <Avatar
+            sizeClass="w-28 h-28 sm:w-32 sm:h-32"
+            radius="rounded-2xl"
+            imgUrl={avatarUrl ?? undefined}
+            userName={displayName}
+            containerClassName="ring-1 ring-neutral-200 dark:ring-neutral-700"
+          />
+          {onUploadAvatar ? (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={avatarUploading}
+              aria-label="Change profile photo"
+              className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-2xl bg-black/50 text-xs font-medium text-white opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none disabled:cursor-default"
+            >
+              {avatarUploading ? (
+                <Loader2 className="size-5 animate-spin" aria-hidden />
+              ) : (
+                <>
+                  <Camera className="size-5" aria-hidden />
+                  <span>Change photo</span>
+                </>
+              )}
+            </button>
+          ) : null}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="sr-only"
+            onChange={onPickFile}
+          />
+        </div>
+        {locationLine ? (
+          <p className="mt-3 text-center text-sm text-neutral-500 lg:text-left dark:text-neutral-400">
+            {locationLine}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="grid min-w-0 flex-grow grid-cols-1 gap-5 sm:grid-cols-2">
       <AccountField
         id="account-firstName"
         label="First name"
@@ -159,6 +228,8 @@ export const AccountPersonalInfoSection = ({
         error={editing ? errors.country : null}
         readOnly={!editing}
       />
+      </div>
     </div>
   </section>
-);
+  );
+};

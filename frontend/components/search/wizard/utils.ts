@@ -5,11 +5,10 @@ import {
   type RangeQuestion,
   type AnswerValue,
   type RangeAnswerValue,
-  type WizardAnswers,
   type WizardQuestion,
 } from "./types";
 
-export const getRangeQuestionUnit = (question: RangeQuestion): string | undefined =>
+const getRangeQuestionUnit = (question: RangeQuestion): string | undefined =>
   question.options?.unit;
 
 export const getQuestionInputDisplayTitle = (question: WizardQuestion): string => {
@@ -58,7 +57,7 @@ export const parseQuestion = (question: IntakeSessionQuestion): WizardQuestion =
 
 const rangeTitleKey = (title: string) => title.trim().toLowerCase();
 
-export const formatRangeValue = (value: number, questionTitle: string, unit?: string) => {
+const formatRangeValue = (value: number, questionTitle: string, unit?: string) => {
   const key = rangeTitleKey(questionTitle);
   if (key === "price") {
     return formatMoney(value, { integerThreshold: 0 });
@@ -134,11 +133,6 @@ export const getDefaultAnswer = (question: WizardQuestion): AnswerValue => {
 
   return "";
 };
-
-export const createInitialAnswers = (questions: WizardQuestion[]): WizardAnswers =>
-  Object.fromEntries(
-    questions.map((question) => [question.id, getDefaultAnswer(question)]),
-  );
 
 export const isQuestionComplete = (
   question: WizardQuestion,

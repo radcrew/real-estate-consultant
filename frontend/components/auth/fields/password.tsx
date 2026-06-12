@@ -4,8 +4,6 @@ import type { ChangeEvent, ReactNode } from "react";
 
 import { Input } from "@components/ui/input";
 
-import { FIELD_INPUT_CLASS } from "./styles";
-
 export type PasswordFieldProps = {
   id: string;
   value: string;
@@ -46,7 +44,6 @@ export const PasswordField = ({
       value={value}
       onChange={onChange}
       disabled={disabled}
-      className={FIELD_INPUT_CLASS}
     />
     {children}
   </div>

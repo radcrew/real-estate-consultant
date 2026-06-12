@@ -24,6 +24,7 @@ class Profile(BaseModel):
     country: str | None = None
     city: str | None = None
     state: str | None = None
+    avatar_url: str | None = None
 
 
 def profile_from_row(row: dict[str, Any] | None) -> Profile | None:

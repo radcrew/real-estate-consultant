@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
-import { useIntakeSessions } from "@hooks/use-intake-sessions";
+import { intakeSessionsService } from "@services/intake-sessions";
 import { getApiErrorMessage } from "@utils/common";
 
 import type {
@@ -67,8 +67,6 @@ export const SearchWizardProvider = ({
   onClose,
 }: SearchWizardProviderProps) => {
   const router = useRouter();
-  const { createSession, getSession, submitAnswer, completeSession } =
-    useIntakeSessions();
   const [activeMode, setActiveMode] = useState<SearchWizardMode>(() =>
     initialSessionId ? "guided" : "selector",
   );
@@ -109,7 +107,7 @@ export const SearchWizardProvider = ({
       setErrorMessage(null);
 
       try {
-        const response = await getSession(initialSessionId);
+        const response = await intakeSessionsService.getSession(initialSessionId);
 
         if (isCancelled) {
           return;
@@ -163,7 +161,7 @@ export const SearchWizardProvider = ({
     return () => {
       isCancelled = true;
     };
-  }, [getSession, initialSessionId]);
+  }, [initialSessionId]);
 
   const startGuidedForm = async () => {
     if (isLoadingQuestion || isSubmitting) {
@@ -174,7 +172,7 @@ export const SearchWizardProvider = ({
     setErrorMessage(null);
 
     try {
-      const response = await createSession("guided");
+      const response = await intakeSessionsService.createSession("guided");
       if (!response.first_question) {
         setErrorMessage(
           "The server is temporarily unavailable. Please try again later.",
@@ -202,7 +200,7 @@ export const SearchWizardProvider = ({
     setErrorMessage(null);
 
     try {
-      const response = await createSession("llm");
+      const response = await intakeSessionsService.createSession("llm");
       setSessionId(response.session_id);
       const parts: string[] = [];
       const welcome = response.message?.trim();
@@ -267,7 +265,7 @@ export const SearchWizardProvider = ({
         return;
       }
 
-      const response = await submitAnswer(sessionId, {
+      const response = await intakeSessionsService.submitAnswer(sessionId, {
         key: currentQuestion.id,
         answers: answerToSubmit,
       });
@@ -281,7 +279,7 @@ export const SearchWizardProvider = ({
       setSummaryRows((current) => [...current, newSummaryRow]);
 
       if (response.next_question == null) {
-        const completed = await completeSession(sessionId);
+        const completed = await intakeSessionsService.completeSession(sessionId);
         const profileId = completed.search_profile_id;
         if (!profileId) {
           setErrorMessage("Search profile was not created. Please try again.");

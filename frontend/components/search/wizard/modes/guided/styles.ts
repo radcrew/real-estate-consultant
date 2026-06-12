@@ -1,20 +1,19 @@
 export const STYLES = {
   summaryGrid: [
-    "mt-5 grid gap-4 items-start pt-8 sm:pt-10 lg:pt-12",
+    "mt-5 grid gap-5 items-start pt-8 sm:pt-10 lg:pt-12",
     "lg:grid-cols-[minmax(0,1.35fr)_320px]",
   ].join(" "),
   progressRow: "w-full lg:col-span-2",
   mainColumn: "flex w-full min-w-0 flex-col gap-3",
   summaryColumn: "w-full",
   section: [
-    "flex w-full flex-col rounded-xl",
-    "border border-border/70 bg-background/90",
-    "p-4 shadow-[0_20px_70px_-45px_rgba(15,23,42,0.55)] sm:p-5",
+    "flex w-full flex-col rounded-3xl",
+    "border border-neutral-200 bg-white p-6 shadow-sm sm:p-7",
+    "dark:border-neutral-700 dark:bg-neutral-900",
   ].join(" "),
   errorBanner:
-    "mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive",
+    "mb-4 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive",
   loadingState: "py-10 text-sm text-muted-foreground",
   actionsRow:
-    "mt-8 flex flex-col gap-3 border-t border-border/70 pt-6 sm:flex-row sm:items-center sm:justify-between",
-  buttonDefault: "h-9 px-3 text-sm",
+    "mt-8 flex flex-col gap-3 border-t border-neutral-200 pt-6 dark:border-neutral-700 sm:flex-row sm:items-center sm:justify-between",
 } as const;

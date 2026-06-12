@@ -1,83 +1,47 @@
-import Image from "next/image";
-import Link from "next/link";
-import { Search } from "lucide-react";
+"use client";
 
-import type { FeaturedListing } from "@constants";
-import { FEATURED_LISTINGS } from "@constants";
-import { buttonVariants } from "@components/ui/buttons";
-import { cn } from "@utils/common";
+import { useEffect, useState } from "react";
 
-import { STYLES } from "./styles";
+import { brand } from "@config/brand";
+import { detailToModel, type PropertyModel } from "@components/property/listing-model";
+import { PropertyCard, PropertyCardSkeleton, PROPERTY_GRID } from "@components/property/property-card";
+import { ButtonSecondary } from "@components/ui/button-secondary";
+import { Heading2 } from "@components/ui/heading2";
+import { listingsService } from "@services/listings";
 
-const ListingCard = ({ listing }: { listing: FeaturedListing }) => (
-  <Link
-    href={`/listings/${listing.id}`}
-    className={STYLES.cardLink}
-  >
-    <div className={STYLES.cardImageWrap}>
-      <Image
-        src={listing.imageSrc}
-        alt={listing.imageAlt}
-        fill
-        className={STYLES.cardImage}
-        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-      />
-      <div className={STYLES.badgeLeftWrap}>
-        <span className={STYLES.badgeLeft}>
-          {listing.category}
-        </span>
-      </div>
-      <div className={STYLES.badgeRightWrap}>
-        <span className={STYLES.badgeRight}>
-          {listing.transactionType}
-        </span>
-      </div>
-    </div>
-    <div className={STYLES.cardBody}>
-      <h3 className={STYLES.cardTitle}>
-        {listing.title}
-      </h3>
-      <p className={STYLES.cardLocation}>{listing.location}</p>
-      <div className={STYLES.cardFooter}>
-        <span className={STYLES.cardSqft}>
-          {listing.sqftLabel}
-        </span>
-        {listing.priceLabel ? (
-          <span className={STYLES.cardPrice}>
-            {listing.priceLabel}
-          </span>
-        ) : (
-          <span className={STYLES.cardPriceEmpty}>—</span>
-        )}
-      </div>
-    </div>
-  </Link>
+const HEADING = brand.sections.featured.heading;
+const SUB_HEADING = (
+  <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
+    {brand.sections.featured.subHeading}
+  </span>
 );
+export const FeaturedListings = () => {
+  const [models, setModels] = useState<PropertyModel[] | null>(null);
 
-export const FeaturedListings = () => (
-  <section className={STYLES.section} aria-labelledby="featured-listings-heading">
-    <div className={STYLES.inner}>
-      <h2 id="featured-listings-heading" className={STYLES.title}>
-        Featured Listings
-      </h2>
-      <div className={STYLES.grid}>
-        {FEATURED_LISTINGS.map((listing) => (
-          <ListingCard key={listing.id} listing={listing} />
-        ))}
+  useEffect(() => {
+    const controller = new AbortController();
+    listingsService
+      .getFeaturedListings({ signal: controller.signal })
+      .then((res) => setModels(res.listings.map(detailToModel)))
+      .catch(() => setModels([]));
+    return () => controller.abort();
+  }, []);
+
+  const loading = models === null;
+
+  return (
+    <section className="relative">
+      <Heading2 heading={HEADING} subHeading={SUB_HEADING} />
+
+      <div className={PROPERTY_GRID}>
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => <PropertyCardSkeleton key={i} />)
+          : models.map((item) => <PropertyCard key={item.id} data={item} />)}
       </div>
 
-      <div className={STYLES.browseRow}>
-        <Link
-          href="/listings"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "lg" }),
-            STYLES.browseButton,
-          )}
-        >
-          <Search className="size-5 shrink-0" aria-hidden />
-          Browse All Properties
-        </Link>
+      <div className="mt-14 flex justify-center">
+        <ButtonSecondary href="/listings">Browse all properties</ButtonSecondary>
       </div>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
