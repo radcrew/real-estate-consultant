@@ -111,6 +111,7 @@ export const AccountPersonalInfoSection = ({
             imgUrl={avatarUrl ?? undefined}
             userName={displayName}
             containerClassName="ring-1 ring-neutral-200 dark:ring-neutral-700"
+            sizes="128px"
           />
           {onUploadAvatar ? (
             <button

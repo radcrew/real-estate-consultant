@@ -1,6 +1,4 @@
-import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight } from "lucide-react";
 
 import { Avatar } from "@components/ui/avatar";
 
@@ -15,10 +13,7 @@ type CardBrokerProps = {
 };
 
 export const CardBroker = ({ broker }: CardBrokerProps) => (
-  <Link
-    href={broker.href}
-    className="flex flex-col overflow-hidden rounded-3xl bg-white transition-shadow hover:shadow-xl dark:bg-neutral-900"
-  >
+  <div className="flex flex-col overflow-hidden rounded-3xl bg-white dark:bg-neutral-900">
     <div className="relative flex-shrink-0">
       <div className="relative aspect-[7/3] w-full md:aspect-[7/4]">
         <Image
@@ -29,12 +24,6 @@ export const CardBroker = ({ broker }: CardBrokerProps) => (
           className="object-cover"
           sizes="(max-width: 400px) 100vw, 400px"
         />
-      </div>
-      <div className="absolute inset-x-3 top-3 flex">
-        <div className="flex items-center justify-center rounded-full bg-neutral-100 px-4 py-1 text-xs font-medium leading-none dark:bg-neutral-800">
-          {broker.count.toLocaleString("en-US")}
-          <ArrowRight className="ml-3 size-5 text-primary-600" aria-hidden />
-        </div>
       </div>
     </div>
 
@@ -68,5 +57,5 @@ export const CardBroker = ({ broker }: CardBrokerProps) => (
         </span>
       </div>
     </div>
-  </Link>
+  </div>
 );

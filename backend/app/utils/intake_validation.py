@@ -33,8 +33,13 @@ def compute_current_index(questions: list[dict], criteria: object) -> int:
 def _missing_required_fields(
     merged_criteria: dict[str, Any],
     required_fields: list[str],
+    skipped_fields: set[str],
 ) -> list[str]:
-    return [key for key in required_fields if key not in merged_criteria]
+    return [
+        key
+        for key in required_fields
+        if key not in merged_criteria and key not in skipped_fields
+    ]
 
 
 def merge_missing_fields(
@@ -42,10 +47,12 @@ def merge_missing_fields(
     merged_criteria: dict[str, Any],
     required_fields: list[str],
     model_missing: list[str],
+    skipped_fields: list[str] | None = None,
 ) -> list[str]:
     """Use the model's missing keys when they match real gaps; otherwise criteria-based gaps."""
-    still_missing = _missing_required_fields(merged_criteria, required_fields)
-    from_model = [key for key in model_missing if key in required_fields]
+    skipped = set(skipped_fields or [])
+    still_missing = _missing_required_fields(merged_criteria, required_fields, skipped)
+    from_model = [key for key in model_missing if key in required_fields and key not in skipped]
     if from_model:
         overlap = [key for key in from_model if key in still_missing]
         return overlap if overlap else still_missing

@@ -23,6 +23,7 @@ import {
 import { OAUTH_CALLBACK_PATH } from "@lib/config";
 import { getSupabaseBrowserClient } from "@lib/supabase-browser";
 import { authService } from "@services/auth";
+import { accountService } from "@services/account";
 
 export type AuthCredentials = {
   email: string;
@@ -61,6 +62,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
   const googleOAuthInFlightRef = useRef(false);
+  const avatarPatchedRef = useRef(false);
 
   const signIn = useCallback(
     async ({ email, password }: AuthCredentials, onSuccess: () => void) => {
@@ -86,6 +88,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           tokenType,
           user,
         });
+
+        // Fetch the profile in the background to populate avatarUrl in the
+        // session — don't block sign-in if this fails.
+        accountService.getProfile().then((profile) => {
+          const stored = readSession();
+          if (stored && profile.avatar_url) {
+            saveSession({ ...stored, user: { ...stored.user, avatarUrl: profile.avatar_url } });
+          }
+        }).catch(() => {});
 
         onSuccess();
       } catch (err) {
@@ -182,6 +193,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     window.addEventListener(AUTH_SESSION_CHANGED_EVENT, refresh);
     return () => window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, refresh);
   }, [refresh]);
+
+  // When a session is loaded without avatarUrl (e.g. after OAuth or a stale
+  // cookie), fetch the profile once and patch it in so the avatar shows up.
+  useEffect(() => {
+    if (!session || session.user.avatarUrl != null || avatarPatchedRef.current) return;
+    avatarPatchedRef.current = true;
+    accountService.getProfile().then((profile) => {
+      if (!profile.avatar_url) return;
+      const stored = readSession();
+      if (stored) {
+        saveSession({ ...stored, user: { ...stored.user, avatarUrl: profile.avatar_url } });
+      }
+    }).catch(() => {});
+  }, [session]);
 
   return (
     <AuthContext.Provider
