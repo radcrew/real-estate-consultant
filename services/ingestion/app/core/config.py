@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     service_auth_token: str = ""
     service_auth_token_next: str = ""
 
+    # Outbound rate limiting for HTTP-fetching connectors ("polite ingestion").
+    # See app/connectors/rate_limit.py.
+    connector_max_concurrency: int = 2
+    connector_rate_per_second: float = 1.0
+
     git_sha: str = Field(
         default="", validation_alias=AliasChoices("GIT_SHA", "VERCEL_GIT_COMMIT_SHA")
     )

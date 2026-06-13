@@ -87,7 +87,9 @@ async def process_next_job() -> ProcessResponse:
             # Retry if under the attempt cap; otherwise fail permanently.
             retry_status = "pending" if attempts < _MAX_ATTEMPTS else "failed"
             await _update_job(client, job_id, retry_status, error=str(exc))
-            return ProcessResponse(processed=True, job_id=job_id, source=source, status=retry_status)
+            return ProcessResponse(
+                processed=True, job_id=job_id, source=source, status=retry_status
+            )
 
     finally:
         await client.postgrest.aclose()
