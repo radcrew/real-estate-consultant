@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -305,14 +306,43 @@ def listing_to_models(
     return prop, images
 
 
+@dataclass
+class IngestionReport:
+    """Summary of a normalization pass over a raw listing dataset."""
+
+    fetched: int
+    normalized: int
+    rejected_reasons: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def rejected(self) -> int:
+        return self.fetched - self.normalized
+
+
 def load_property_dataset(
     path: Path | None = None,
-) -> list[tuple[Properties, list[PropertyImages]]]:
+) -> tuple[list[tuple[Properties, list[PropertyImages]]], IngestionReport]:
     try:
-        return [listing_to_models(row) for row in parse_json_file(path)]
+        raw_rows = parse_json_file(path)
     except FileNotFoundError as exc:
         logger.warning("Seed: dataset file missing (%s)", exc)
         raise
     except ValueError as exc:
         logger.warning("Seed: invalid dataset (%s)", exc)
         raise
+
+    rows: list[tuple[Properties, list[PropertyImages]]] = []
+    rejected_reasons: dict[str, int] = {}
+    for raw_row in raw_rows:
+        prop, images = listing_to_models(raw_row)
+        if prop.address is None:
+            rejected_reasons["missing_address"] = rejected_reasons.get("missing_address", 0) + 1
+            continue
+        rows.append((prop, images))
+
+    report = IngestionReport(
+        fetched=len(raw_rows),
+        normalized=len(rows),
+        rejected_reasons=rejected_reasons,
+    )
+    return rows, report
