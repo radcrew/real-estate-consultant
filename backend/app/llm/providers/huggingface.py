@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any, TypeVar
 
 import httpx
 from openai import APITimeoutError, AsyncOpenAI, OpenAIError
+from openai.types.completion_usage import CompletionUsage
 from pydantic import BaseModel, ValidationError
 
 from app.core.config import Settings, settings
@@ -23,6 +26,8 @@ HF_READ_TIMEOUT = 75.0
 HF_WRITE_TIMEOUT = 30.0
 HF_POOL_TIMEOUT = 10.0
 HF_TRANSIENT_RETRIES = 3
+
+logger = logging.getLogger(__name__)
 
 StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
 
@@ -53,6 +58,37 @@ class HuggingFaceProvider:
             max_retries=transient_retries,
         )
 
+    def _log_call(
+        self,
+        *,
+        outcome: str,
+        duration_ms: float,
+        usage: CompletionUsage | None = None,
+    ) -> None:
+        cost_usd = None
+        if usage is not None:
+            cost_usd = round(
+                (
+                    usage.prompt_tokens * self.settings.hf_input_cost_per_1m
+                    + usage.completion_tokens * self.settings.hf_output_cost_per_1m
+                )
+                / 1_000_000,
+                6,
+            )
+        logger.info(
+            "llm_call",
+            extra={
+                "provider": "huggingface",
+                "model": self.settings.hf_model,
+                "outcome": outcome,
+                "duration_ms": round(duration_ms, 2),
+                "prompt_tokens": usage.prompt_tokens if usage else None,
+                "completion_tokens": usage.completion_tokens if usage else None,
+                "total_tokens": usage.total_tokens if usage else None,
+                "estimated_cost_usd": cost_usd,
+            },
+        )
+
     async def generate_structured_output(
         self,
         *,
@@ -65,6 +101,7 @@ class HuggingFaceProvider:
         if not self.settings.hf_token.strip():
             raise_hf_api_key_not_configured()
 
+        start = time.perf_counter()
         try:
             completion = await self.client.beta.chat.completions.parse(
                 model=self.settings.hf_model,
@@ -74,17 +111,24 @@ class HuggingFaceProvider:
                 response_format=response_format,
             )
         except ValidationError as exc:
+            self._log_call(outcome="parse_failed", duration_ms=(time.perf_counter() - start) * 1000)
             raise_hf_completion_parse_failed(cause=exc)
         except APITimeoutError as exc:
+            self._log_call(outcome="timeout", duration_ms=(time.perf_counter() - start) * 1000)
             raise_hf_request_timeout(cause=exc)
         except OpenAIError as exc:
+            self._log_call(outcome="error", duration_ms=(time.perf_counter() - start) * 1000)
             raise_hf_openai_error(cause=exc)
 
+        duration_ms = (time.perf_counter() - start) * 1000
         message = completion.choices[0].message
         if message.parsed is not None:
+            self._log_call(outcome="success", duration_ms=duration_ms, usage=completion.usage)
             return message.parsed
         if message.refusal:
+            self._log_call(outcome="refusal", duration_ms=duration_ms, usage=completion.usage)
             raise_hf_structured_refusal(refusal=str(message.refusal))
+        self._log_call(outcome="incomplete", duration_ms=duration_ms, usage=completion.usage)
         raise_hf_structured_reply_incomplete()
 
 
