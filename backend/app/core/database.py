@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -49,6 +50,18 @@ async def close_db() -> None:
 
     DB_ASYNC_ENGINE = None
     DB_ASYNC_SESSION_MAKER = None
+
+
+async def check_db() -> bool:
+    """Return True if the DB engine can execute a trivial query."""
+    if DB_ASYNC_ENGINE is None:
+        return False
+    try:
+        async with DB_ASYNC_ENGINE.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

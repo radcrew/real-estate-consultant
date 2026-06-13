@@ -44,6 +44,11 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # Populated automatically by Vercel; set manually for other hosts.
+    git_sha: str = Field(
+        default="", validation_alias=AliasChoices("GIT_SHA", "VERCEL_GIT_COMMIT_SHA")
+    )
+
 
 
 settings = Settings()
