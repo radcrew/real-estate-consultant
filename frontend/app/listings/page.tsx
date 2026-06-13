@@ -4,26 +4,24 @@ import { useEffect, useState } from "react";
 
 import { ButtonPrimary } from "@components/ui/button-primary";
 import { detailToModel, type PropertyModel } from "@components/property/listing-model";
-import { PropertyCardSkeleton, PROPERTY_GRID } from "@components/property/property-card";
-import { SectionGridFeatureProperty } from "@components/property/section-grid-feature-property";
+import { PropertyCard, PropertyCardSkeleton, PROPERTY_GRID } from "@components/property/property-card";
+import { Heading2 } from "@components/ui/heading2";
 import { brand } from "@config/brand";
 import { listingsService } from "@services/listings";
 
 const ListingsIndexPage = () => {
-  const [models, setModels] = useState<PropertyModel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [models, setModels] = useState<PropertyModel[] | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-
     listingsService
       .getFeaturedListings({ signal: controller.signal })
       .then((res) => setModels(res.listings.map(detailToModel)))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-
+      .catch(() => setModels([]));
     return () => controller.abort();
   }, []);
+
+  const loading = models === null;
 
   return (
     <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
@@ -42,24 +40,21 @@ const ListingsIndexPage = () => {
         </ButtonPrimary>
       </div>
 
-      {loading ? (
-        <div className={`${PROPERTY_GRID} pt-12`}>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <PropertyCardSkeleton key={i} />
-          ))}
-        </div>
-      ) : (
-        <SectionGridFeatureProperty
-          className="pt-12"
+      <section className="relative pt-12">
+        <Heading2
           heading={brand.sections.featured.heading}
           subHeading={
             <span className="mt-3 block text-neutral-500 dark:text-neutral-400">
               {brand.sections.featured.subHeading}
             </span>
           }
-          data={models}
         />
-      )}
+        <div className={PROPERTY_GRID}>
+          {loading
+            ? Array.from({ length: 6 }).map((_, i) => <PropertyCardSkeleton key={i} />)
+            : models.map((item) => <PropertyCard key={item.id} data={item} />)}
+        </div>
+      </section>
     </div>
   );
 };
