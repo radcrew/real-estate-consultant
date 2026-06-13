@@ -6,11 +6,10 @@ import logging
 
 import httpx
 
+from app.clients.ingestion.client import IngestionClient
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-
-_TIMEOUT = httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0)
 
 
 async def wake_processor() -> None:
@@ -23,11 +22,16 @@ async def wake_processor() -> None:
     if not settings.ingestion_service_url:
         return
 
-    url = settings.ingestion_service_url.rstrip("/") + "/api/v1/jobs/process"
-    headers = {"Authorization": f"Bearer {settings.ingestion_service_token}"}
+    client = IngestionClient(settings.ingestion_service_url, settings.ingestion_service_token)
     try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.post(url, headers=headers)
-            resp.raise_for_status()
+        result = await client.process_jobs()
+        logger.info(
+            "ingestion_wake_processed",
+            extra={
+                "processed": result.processed,
+                "job_id": result.job_id,
+                "status": result.status,
+            },
+        )
     except httpx.HTTPError as exc:
         logger.warning("ingestion_wake_failed", extra={"error": str(exc)})
