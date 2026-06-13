@@ -79,6 +79,9 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
   const queryRef = useRef(initialQuery);
 
   useEffect(() => {
+    // Only sync from outside when the parent clears or externally resets the
+    // value — not when *we* called onChange() and the value echoed back.
+    if (initialQuery === queryRef.current) return;
     setQuery(initialQuery);
     queryRef.current = initialQuery;
     setSuggestions([]);
