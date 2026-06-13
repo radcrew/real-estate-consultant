@@ -97,6 +97,26 @@ export const parseSearchCriteriaEntries = (criteria: Record<string, unknown>): P
     })
     .filter((x): x is ParsedCriteriaEntry => x != null);
 
+export const formatCriteriaValue = (value: unknown): string => {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value.toLocaleString();
+  if (Array.isArray(value)) return value.join(", ");
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if ("label" in obj && obj.label) return String(obj.label);
+    if ("min" in obj || "max" in obj) {
+      const min = obj.min != null ? Number(obj.min).toLocaleString() : null;
+      const max = obj.max != null ? Number(obj.max).toLocaleString() : null;
+      if (min && max) return `${min} – ${max}`;
+      if (min) return `≥ ${min}`;
+      if (max) return `≤ ${max}`;
+    }
+    return JSON.stringify(value);
+  }
+  return String(value);
+};
+
 export const getCriteriaFromFilters = (
   fields: Record<string, SearchCriterionField>,
 ): Record<string, unknown> => {

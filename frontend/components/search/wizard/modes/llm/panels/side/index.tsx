@@ -6,32 +6,13 @@ import { ArrowLeft, Loader2, SlidersHorizontal, Wand2 } from "lucide-react";
 
 import { useSearchWizard } from "@contexts/search-wizard";
 import { getApiErrorMessage } from "@utils/common";
+import { formatCriteriaValue } from "@utils/search/criteria";
 import { intakeSessionsService, type LlmInputResponse } from "@services/intake-sessions";
 
 import { STYLES } from "../../styles";
 
 type SidePanelProps = {
   lastResponse: LlmInputResponse | null;
-};
-
-const formatCriteriaValue = (value: unknown): string => {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return value.toLocaleString();
-  if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    if ("label" in obj && obj.label) return String(obj.label);
-    if ("min" in obj || "max" in obj) {
-      const min = obj.min != null ? obj.min.toLocaleString() : null;
-      const max = obj.max != null ? obj.max.toLocaleString() : null;
-      if (min && max) return `${min} – ${max}`;
-      if (min) return `≥ ${min}`;
-      if (max) return `≤ ${max}`;
-    }
-    return JSON.stringify(value);
-  }
-  return String(value);
 };
 
 export const SidePanel = ({ lastResponse }: SidePanelProps) => {
