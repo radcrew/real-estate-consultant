@@ -18,6 +18,7 @@ jobs:
       - name: Check endpoints
         env:
           BASE_URL: ${{ secrets.BACKEND_PRODUCTION_URL }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           if [ -z "$BASE_URL" ]; then
             echo "BACKEND_PRODUCTION_URL secret is not set — skipping probe."
@@ -27,7 +28,9 @@ jobs:
           smoke() {
             local path="$1"
             for i in 1 2 3; do
-              status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL$path")
+              status=$(curl -s -o /dev/null -w "%{http_code}" \
+                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+                "$BASE_URL$path")
               [ "$status" = "200" ] && { echo "OK $path"; return 0; }
               [ $i -lt 3 ] && sleep 5
             done

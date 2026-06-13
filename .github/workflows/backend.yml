@@ -3,7 +3,8 @@
 # Separate Vercel project with Root Directory = backend (Settings → General).
 # Deploy runs from backend/ (repo-root .vercelignore excludes backend for the frontend project).
 #
-# GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_BACKEND_PROJECT_ID
+# GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_BACKEND_PROJECT_ID,
+#                 VERCEL_AUTOMATION_BYPASS_SECRET (Vercel → Settings → Deployment Protection)
 # Production env in Vercel: see backend/.env.example
 name: Backend
 
@@ -74,15 +75,21 @@ jobs:
       - name: Smoke test
         env:
           BASE_URL: ${{ steps.deploy.outputs.url }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           smoke() {
             local path="$1"
             for i in 1 2 3; do
-              status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL$path")
+              body=$(curl -s -w "\n%{http_code}" \
+                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+                "$BASE_URL$path")
+              status=$(echo "$body" | tail -1)
               [ "$status" = "200" ] && { echo "OK $path"; return 0; }
               [ $i -lt 3 ] && sleep 5
             done
-            echo "FAIL $path — last status $status" && exit 1
+            echo "FAIL $path — status $status — body:"
+            echo "$body" | head -5
+            exit 1
           }
           smoke /health/ready
           smoke /api/v1/ping
@@ -114,15 +121,24 @@ jobs:
       - name: Smoke test
         env:
           BASE_URL: ${{ steps.deploy.outputs.url }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
+          if [ -z "$BYPASS_SECRET" ]; then
+            echo "::warning::VERCEL_AUTOMATION_BYPASS_SECRET is not set — requests may be blocked by Vercel protection (401)."
+          fi
           smoke() {
             local path="$1"
             for i in 1 2 3; do
-              status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL$path")
+              body=$(curl -s -w "\n%{http_code}" \
+                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+                "$BASE_URL$path")
+              status=$(echo "$body" | tail -1)
               [ "$status" = "200" ] && { echo "OK $path"; return 0; }
               [ $i -lt 3 ] && sleep 5
             done
-            echo "FAIL $path — last status $status" && exit 1
+            echo "FAIL $path — status $status — body:"
+            echo "$body" | head -5
+            exit 1
           }
           smoke /health/ready
           smoke /api/v1/ping
