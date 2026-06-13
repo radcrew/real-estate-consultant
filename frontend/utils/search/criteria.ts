@@ -42,6 +42,45 @@ const parseCriterionUnit = (raw: Record<string, unknown>): string | undefined =>
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : undefined;
 };
 
+const parseRangeBound = (value: unknown): number => {
+  if (value === null || value === undefined || value === "") {
+    return Number.NaN;
+  }
+  const n = Number(value);
+  return Number.isFinite(n) ? n : Number.NaN;
+};
+
+const locationDataToString = (value: unknown): string => {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (isRecord(value)) {
+    const parts = [value.city, value.state, value.country].filter(
+      (part): part is string => typeof part === "string" && part.trim().length > 0,
+    );
+    if (parts.length > 0) {
+      return parts.join(", ");
+    }
+    if (typeof value.label === "string" && value.label.trim().length > 0) {
+      return value.label.trim();
+    }
+    if (typeof value.input === "string" && value.input.trim().length > 0) {
+      return value.input.trim();
+    }
+  }
+  return "";
+};
+
+const multiSelectDataToArray = (value: unknown): string[] => {
+  if (Array.isArray(value) && value.every((x) => typeof x === "string")) {
+    return value.map((x) => x.trim()).filter((x) => x.length > 0);
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    return [value.trim()];
+  }
+  return [];
+};
+
 const parseCriterionField = (raw: unknown): SearchCriterionField | null => {
   if (!isRecord(raw)) {
     return null;
@@ -55,27 +94,17 @@ const parseCriterionField = (raw: unknown): SearchCriterionField | null => {
     const unitExtra = unit != null ? { unit } : {};
     const dataRaw = raw.data;
     if (isRecord(dataRaw)) {
-      const minNum = Number(dataRaw.min);
-      const maxNum = Number(dataRaw.max);
-      const min = Number.isFinite(minNum) ? minNum : Number.NaN;
-      const max = Number.isFinite(maxNum) ? maxNum : Number.NaN;
+      const min = parseRangeBound(dataRaw.min);
+      const max = parseRangeBound(dataRaw.max);
       return { type: "range", data: { min, max }, ...labelExtra, ...unitExtra };
     }
     return { type: "range", data: { min: Number.NaN, max: Number.NaN }, ...labelExtra, ...unitExtra };
   }
   if (type === "location") {
-    const d = raw.data;
-    if (typeof d === "string") {
-      return { type: "location", data: d, ...labelExtra };
-    }
-    return { type: "location", data: "", ...labelExtra };
+    return { type: "location", data: locationDataToString(raw.data), ...labelExtra };
   }
   if (type === "multi-select") {
-    const d = raw.data;
-    if (Array.isArray(d) && d.every((x) => typeof x === "string")) {
-      return { type: "multi-select", data: [...d], ...labelExtra };
-    }
-    return { type: "multi-select", data: [], ...labelExtra };
+    return { type: "multi-select", data: multiSelectDataToArray(raw.data), ...labelExtra };
   }
   return null;
 };

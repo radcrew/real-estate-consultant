@@ -21,6 +21,7 @@ from app.schemas.intake_sessions import (
     SubmitLlmIntakeInputRequest,
     SubmitLlmIntakeInputResponse,
 )
+from app.utils.intake_criteria import normalize_merged_criteria
 from app.utils.intake_validation import compute_current_index
 
 router = APIRouter()
@@ -48,7 +49,11 @@ async def submit_llm_intake_input(
     )
 
     extracted = llm_result["extracted"]
-    merged_criteria = llm_result["merged_criteria"]
+    merged_criteria = normalize_merged_criteria(
+        llm_result["merged_criteria"],
+        questions,
+        reserved_keys=frozenset({SKIPPED_FIELDS_KEY}),
+    )
     missing_fields = llm_result["missing_fields"]
     skipped_fields = llm_result["skipped_fields"]
     is_complete = bool(llm_result["is_complete"])
