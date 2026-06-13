@@ -71,6 +71,22 @@ jobs:
           url=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
+      - name: Smoke test
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          smoke() {
+            local path="$1"
+            for i in 1 2 3; do
+              status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL$path")
+              [ "$status" = "200" ] && { echo "OK $path"; return 0; }
+              [ $i -lt 3 ] && sleep 5
+            done
+            echo "FAIL $path — last status $status" && exit 1
+          }
+          smoke /health/ready
+          smoke /api/v1/ping
+
   deploy-preview:
     name: Deploy preview to Vercel
     needs: lint
@@ -94,6 +110,22 @@ jobs:
         run: |
           url=$(vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          smoke() {
+            local path="$1"
+            for i in 1 2 3; do
+              status=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL$path")
+              [ "$status" = "200" ] && { echo "OK $path"; return 0; }
+              [ $i -lt 3 ] && sleep 5
+            done
+            echo "FAIL $path — last status $status" && exit 1
+          }
+          smoke /health/ready
+          smoke /api/v1/ping
 
       - name: Preview URL
         run: echo "### Preview deployment\n${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"

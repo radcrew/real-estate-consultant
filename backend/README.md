@@ -111,6 +111,25 @@ If seeding fails after [Dataset preparation](#dataset-preparation) and [Seeding]
 - Ensure **`public.properties`** (and any related tables your seed uses) exist and match the columns expected in `app/models/properties.py` and the seed code. Apply schema in the Supabase SQL editor or whatever migration workflow your team uses. After DDL, run **`NOTIFY pgrst, 'reload schema';`** if PostgREST still serves a stale schema ([docs](https://supabase.com/docs/guides/troubleshooting/refresh-postgrest-schema)). PostgREST **`PGRST204`** usually means the schema cache is stale after DDL—run the same `NOTIFY`, then retry **`python -m app.seed.main`**.
 - Property rows use **upsert** on **`id`**; images for those ids are deleted then re-inserted. For a full reset in dev, truncate or delete rows as needed, then run **`python -m app.seed.main`** again.
 
+## Database connection pooling (Vercel serverless)
+
+Each Vercel serverless invocation starts a fresh Python process and calls `init_db()`, which opens a new SQLAlchemy engine. With a direct Postgres connection (port 5432) this creates a new physical connection on every cold start, quickly exhausting Supabase's connection limit under any real traffic.
+
+**Recommended setup for production:** point `DATABASE_URL` at Supabase's **Transaction Pooler** (pgbouncer, port 6543) and set `DB_SERVERLESS=true`.
+
+```
+# Vercel production env vars
+DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres
+DB_SERVERLESS=true
+```
+
+`DB_SERVERLESS=true` does two things:
+
+1. **`NullPool`** — SQLAlchemy holds no idle connections between requests; pgbouncer owns the pool.
+2. **`statement_cache_size=0`** — disables asyncpg prepared statements, which pgbouncer transaction mode does not support.
+
+Keep `DATABASE_URL` pointing at the direct port (5432) for local dev and schema migrations (pgbouncer transaction mode blocks DDL and `SET` commands).
+
 ## Linting
 
 With dev dependencies installed:

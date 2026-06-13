@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     )
 
     database_url: str
+    # How long asyncpg waits to establish a connection, and the per-statement timeout.
+    # Both prevent a flaky DB call from stalling until Vercel's hard function kill.
+    db_connect_timeout_s: float = 10.0
+    db_statement_timeout_ms: int = 30_000
+    # Set to true when DATABASE_URL points to Supabase's pgbouncer (port 6543).
+    # Enables NullPool (no idle connections between invocations) and disables asyncpg
+    # prepared statements, which pgbouncer transaction mode does not support.
+    db_serverless: bool = False
 
     supabase_url: str
     supabase_service_role_key: str
@@ -39,6 +47,11 @@ class Settings(BaseSettings):
     hf_output_cost_per_1m: float = 0.0
 
     log_level: str = "INFO"
+
+    # Populated automatically by Vercel; set manually for other hosts.
+    git_sha: str = Field(
+        default="", validation_alias=AliasChoices("GIT_SHA", "VERCEL_GIT_COMMIT_SHA")
+    )
 
 
 

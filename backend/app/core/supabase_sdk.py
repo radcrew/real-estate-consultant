@@ -32,6 +32,20 @@ async def close_supabase() -> None:
     _supabase_http = None
 
 
+async def check_supabase() -> bool:
+    """Return True if the Supabase REST endpoint responds with a non-5xx status."""
+    key = settings.supabase_anon_key or settings.supabase_service_role_key
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(
+                f"{settings.supabase_url}/rest/v1/",
+                headers={"apikey": key},
+            )
+        return r.status_code < 500
+    except Exception:
+        return False
+
+
 def get_supabase_sdk_client() -> AsyncClient:
     if _supabase_client is None:
         raise RuntimeError("Supabase client requested before init_supabase()")
