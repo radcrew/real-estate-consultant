@@ -102,6 +102,7 @@ export type LlmInputResponse = {
   current_index: number;
   total_questions: number;
   missing_fields: string[];
+  skipped_fields: string[];
   next_question: LlmNextQuestion | null;
   is_complete: boolean;
 };

@@ -23,11 +23,9 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
   const criteria = lastResponse?.criteria ?? {};
   const missingFields = lastResponse?.missing_fields ?? [];
   const criteriaEntries = Object.entries(criteria).filter(([, v]) => v !== null && v !== undefined);
-  const isComplete = lastResponse?.is_complete ?? false;
-  const canSearch = isComplete || (lastResponse !== null && missingFields.length === 0);
 
   const handleSearchProperties = useCallback(async () => {
-    if (!sessionId || !canSearch || isSearchBusy) return;
+    if (!sessionId || isSearchBusy) return;
     setSearchBusy(true);
     setErrorMessage(null);
     try {
@@ -44,7 +42,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
     } finally {
       setSearchBusy(false);
     }
-  }, [canSearch, isSearchBusy, onClose, router, sessionId, setErrorMessage]);
+  }, [isSearchBusy, onClose, router, sessionId, setErrorMessage]);
 
   return (
     <aside className={STYLES.sidebar}>
@@ -75,9 +73,9 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
       </div>
 
       {missingFields.length > 0 && (
-        <div className={STYLES.missingCard}>
-          <p className={STYLES.missingTitle}>Still needed:</p>
-          <ul className={STYLES.missingList}>
+        <div className={STYLES.considerCard}>
+          <p className={STYLES.considerTitle}>Things to consider:</p>
+          <ul className={STYLES.considerList}>
             {missingFields.map((f) => (
               <li key={f}>{f.replace(/_/g, " ")}</li>
             ))}
@@ -88,7 +86,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
       <button
         type="button"
         className={STYLES.searchCta}
-        disabled={!canSearch || isSearchBusy || !sessionId}
+        disabled={isSearchBusy || !sessionId}
         onClick={handleSearchProperties}
       >
         {isSearchBusy ? (
