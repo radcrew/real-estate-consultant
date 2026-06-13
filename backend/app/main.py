@@ -10,7 +10,11 @@ from app.api.system import router as system_router
 from app.core.config import settings
 from app.core.database import close_db, init_db
 from app.core.db_safe import SupabaseRequestError
+from app.core.logging import configure_logging
+from app.core.middleware import RequestLoggingMiddleware
 from app.core.supabase_sdk import close_supabase, init_supabase
+
+configure_logging(settings.log_level)
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +62,8 @@ def create_app() -> FastAPI:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+
+    app.add_middleware(RequestLoggingMiddleware)
 
     return app
 

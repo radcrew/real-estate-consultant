@@ -35,5 +35,7 @@ class Settings(BaseSettings):
     hf_model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     hf_base_url: str = "https://router.huggingface.co/v1"
 
+    log_level: str = "INFO"
+
 
 settings = Settings()
