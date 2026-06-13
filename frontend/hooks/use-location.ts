@@ -205,6 +205,7 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
   const handleQueryChange = (value: string) => {
     setQuery(value);
     queryRef.current = value;
+    onChange(value);
     setSuggestions([]);
     predictionByPlaceIdRef.current = new Map();
     fetchSuggestions(value);
