@@ -129,12 +129,21 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
             "missing_fields": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Required criteria keys still missing.",
+                "description": "Required criteria keys still missing and worth asking about.",
+            },
+            "skipped_fields": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Required criteria keys the user explicitly declined to answer "
+                    "(e.g. 'no preference', 'doesn't matter', 'skip that'). "
+                    "Never ask about these again."
+                ),
             },
             "next_question": TypeAdapter(LlmParseNextQuestion).json_schema(),
             "is_complete": {"type": "boolean"},
         },
-        "required": ["extracted", "missing_fields", "next_question", "is_complete"],
+        "required": ["extracted", "missing_fields", "skipped_fields", "next_question", "is_complete"],
     }
 
 

@@ -47,6 +47,7 @@ class LlmParseModelOutput(BaseModel):
 
     extracted: dict[str, Any] = Field(default_factory=dict)
     missing_fields: list[str] = Field(default_factory=list)
+    skipped_fields: list[str] = Field(default_factory=list)
     next_question: LlmParseNextQuestion = Field(default_factory=LlmParseNextQuestion)
     is_complete: bool = False
 
@@ -65,7 +66,7 @@ class LlmParseModelOutput(BaseModel):
 
         return data
 
-    @field_validator("missing_fields", mode="before")
+    @field_validator("missing_fields", "skipped_fields", mode="before")
     @classmethod
     def validate_missing_fields(cls, value: object) -> list[str]:
         if not isinstance(value, list):

@@ -13,10 +13,20 @@ INTAKE_PARSE_SYSTEM_PROMPT_RULES = (
     "Rules:\n"
     "- Keep ``extracted`` sparse: omit properties when unknown.\n"
     "- ``missing_fields`` must list only keys still missing from required criteria "
-    "(see required_fields in the user message).\n"
+    "(see required_fields in the user message) that are worth asking about.\n"
+    "- ``skipped_fields`` must list required keys the user explicitly declined to "
+    "answer (e.g. 'no preference', 'doesn't matter', 'skip that', 'not important to me'). "
+    "Once a field is in skipped_fields, never put it in missing_fields or next_question "
+    "again, and never ask about it again. The user message also lists "
+    "previously_skipped_fields — always include those keys in skipped_fields too.\n"
+    "- A key must never appear in both missing_fields and skipped_fields.\n"
     "- ``next_question.key`` should be one of question_keys when possible, "
-    "ideally the first missing required field.\n"
-    "- ``next_question.text`` should be concise and conversational."
+    "ideally the first entry in missing_fields. Do not suggest a question for a key "
+    "in skipped_fields or already present in current_criteria/extracted.\n"
+    "- ``next_question.text`` should be concise and conversational. If missing_fields "
+    "is empty, leave next_question.key and next_question.text empty/null.\n"
+    "- ``is_complete`` should be true once missing_fields is empty (everything is "
+    "either answered or skipped)."
 )
 
 OPENING_QUESTION_SYSTEM_PROMPT_BASE = (
