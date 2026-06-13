@@ -1,0 +1,5 @@
+# Vercel Python runtime installs from this file (keep in sync with pyproject.toml).
+fastapi[standard]>=0.115.0
+pydantic-settings>=2.6.0
+supabase>=2.10.0
+httpx>=0.27.0

@@ -1,0 +1,33 @@
+from pathlib import Path
+
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_SVC_ROOT = Path(__file__).resolve().parents[2]
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=_SVC_ROOT / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    app_name: str = "Real Estate Ingestion Service"
+    version: str = "0.1.0"
+
+    supabase_url: str
+    supabase_service_role_key: str
+
+    # Path to the raw listing JSON file used by the loopnet-seed connector.
+    # For local dev point at ../../backend/dataset/raw-data.json if needed.
+    dataset_path: str = "dataset/raw-data.json"
+
+    log_level: str = "INFO"
+
+    git_sha: str = Field(
+        default="", validation_alias=AliasChoices("GIT_SHA", "VERCEL_GIT_COMMIT_SHA")
+    )
+
+
+settings = Settings()

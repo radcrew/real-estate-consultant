@@ -48,6 +48,9 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # URL of the ingestion microservice (Phase 3). Empty string disables the feature.
+    ingestion_service_url: str = ""
+
     # Populated automatically by Vercel; set manually for other hosts.
     git_sha: str = Field(
         default="", validation_alias=AliasChoices("GIT_SHA", "VERCEL_GIT_COMMIT_SHA")
