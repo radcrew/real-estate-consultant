@@ -113,5 +113,6 @@ class SubmitLlmIntakeInputResponse(BaseModel):
     current_index: int
     total_questions: int
     missing_fields: list[str]
+    skipped_fields: list[str]
     next_question: IntakeSessionFirstQuestion | None = None
     is_complete: bool
