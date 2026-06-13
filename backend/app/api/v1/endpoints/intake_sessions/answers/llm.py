@@ -64,6 +64,11 @@ async def submit_llm_intake_input(
     await save_intake_criteria(client, session_id, merged_criteria)
 
     public_criteria = {k: v for k, v in merged_criteria.items() if k != SKIPPED_FIELDS_KEY}
+    question_titles = {
+        row["key"]: (row.get("title") or row["key"].replace("_", " ").title())
+        for row in questions
+        if isinstance(row.get("key"), str)
+    }
 
     return SubmitLlmIntakeInputResponse(
         extracted=extracted,
@@ -72,6 +77,7 @@ async def submit_llm_intake_input(
         total_questions=len(questions),
         missing_fields=missing_fields,
         skipped_fields=skipped_fields,
+        question_titles=question_titles,
         next_question=next_question,
         is_complete=is_complete,
     )

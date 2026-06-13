@@ -22,6 +22,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
 
   const criteria = lastResponse?.criteria ?? {};
   const missingFields = lastResponse?.missing_fields ?? [];
+  const questionTitles = lastResponse?.question_titles ?? {};
   const criteriaEntries = Object.entries(criteria).filter(([, v]) => v !== null && v !== undefined);
 
   const handleSearchProperties = useCallback(async () => {
@@ -74,10 +75,10 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
 
       {missingFields.length > 0 && (
         <div className={STYLES.considerCard}>
-          <p className={STYLES.considerTitle}>Things to consider:</p>
+          <p className={STYLES.considerTitle}>Optional details:</p>
           <ul className={STYLES.considerList}>
             {missingFields.map((f) => (
-              <li key={f}>{f.replace(/_/g, " ")}</li>
+              <li key={f}>{questionTitles[f] ?? f.replace(/_/g, " ")}</li>
             ))}
           </ul>
         </div>
