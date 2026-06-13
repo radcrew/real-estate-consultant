@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from app.core.db_safe import execute_db_safe
 from app.core.deps import CurrentAdmin, SupabaseSdkDep
+from app.services.ingestion_client import wake_processor
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
@@ -60,6 +61,7 @@ async def enqueue_ingest(
     )
     job = result.data[0]
     logger.info("job_enqueued", extra={"job_id": job["id"], "source": source, "idem_key": idem_key})
+    await wake_processor()
     return EnqueueResponse(
         job_id=job["id"],
         source=source,

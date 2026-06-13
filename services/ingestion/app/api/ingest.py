@@ -5,14 +5,19 @@ from __future__ import annotations
 import logging
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from supabase import acreate_client
 
 from app.connectors.loopnet_seed import LoopNetSeedConnector
+from app.core.auth import require_service_token
 from app.core.config import settings
 from app.schemas.ingest import IngestRequest, IngestResponse
 
-router = APIRouter(prefix="/ingest", tags=["ingest"])
+router = APIRouter(
+    prefix="/ingest",
+    tags=["ingest"],
+    dependencies=[Depends(require_service_token)],
+)
 logger = logging.getLogger(__name__)
 
 _CONNECTORS = {

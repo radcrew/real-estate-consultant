@@ -5,15 +5,20 @@ from __future__ import annotations
 import logging
 import time
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from supabase import AsyncClient, acreate_client
 
 from app.connectors.loopnet_seed import LoopNetSeedConnector
+from app.core.auth import require_internal_token
 from app.core.config import settings
 from app.core.db_safe import execute_db_safe
 
-router = APIRouter(prefix="/jobs", tags=["jobs"])
+router = APIRouter(
+    prefix="/jobs",
+    tags=["jobs"],
+    dependencies=[Depends(require_internal_token)],
+)
 logger = logging.getLogger(__name__)
 
 _MAX_ATTEMPTS = 3
@@ -32,17 +37,12 @@ class ProcessResponse(BaseModel):
 
 
 @router.post("/process", response_model=ProcessResponse)
-async def process_next_job(request: Request) -> ProcessResponse:
+async def process_next_job() -> ProcessResponse:
     """Claim one pending job, run its connector, and update status to done/failed.
 
-    Called by Vercel cron every 15 minutes. If CRON_SECRET is set, validates
-    the Authorization: Bearer header Vercel includes on cron requests.
+    Called by Vercel cron every 15 minutes, or by the backend to process the
+    queue immediately after enqueueing (see require_internal_token).
     """
-    if settings.cron_secret:
-        auth = request.headers.get("authorization", "")
-        if auth != f"Bearer {settings.cron_secret}":
-            raise HTTPException(status_code=401, detail="Unauthorized")
-
     client = await acreate_client(settings.supabase_url, settings.supabase_service_role_key)
     try:
         result = await execute_db_safe(client.rpc("claim_next_job").execute())

@@ -50,6 +50,8 @@ class Settings(BaseSettings):
 
     # URL of the ingestion microservice (Phase 3). Empty string disables the feature.
     ingestion_service_url: str = ""
+    # Bearer token sent to the ingestion service (must match its SERVICE_AUTH_TOKEN).
+    ingestion_service_token: str = ""
 
     # Populated automatically by Vercel; set manually for other hosts.
     git_sha: str = Field(

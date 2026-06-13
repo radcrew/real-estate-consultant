@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     # Set to the CRON_SECRET Vercel injects on cron requests (leave empty to skip auth).
     cron_secret: str = ""
 
+    # Shared bearer token the backend sends when calling this service directly.
+    # See app/core/auth.py for the rotation procedure.
+    service_auth_token: str = ""
+    service_auth_token_next: str = ""
+
     git_sha: str = Field(
         default="", validation_alias=AliasChoices("GIT_SHA", "VERCEL_GIT_COMMIT_SHA")
     )
