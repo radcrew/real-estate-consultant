@@ -2,8 +2,6 @@ export type AuthorBox = {
   id: string;
   displayName: string;
   jobName: string;
-  count: number;
-  href: string;
   avatar: string;
   bgImage: string;
 };
@@ -16,25 +14,22 @@ const BG_IMAGES = [
 ];
 
 const NAMES = [
-  ["Alex Morgan", "industrial-broker", 132],
-  ["Priya Patel", "retail-specialist", 98],
-  ["Daniel Cho", "office-leasing", 87],
-  ["Maria Santos", "flex-industrial", 76],
-  ["James O'Brien", "logistics-broker", 64],
-  ["Sara Klein", "investment-sales", 58],
-  ["Tom Whitfield", "cold-storage", 51],
-  ["Nina Rossi", "land-development", 47],
-  ["Marcus Lee", "medical-office", 39],
-  ["Emily Carter", "tenant-rep", 34],
+  ["Alex Morgan", "industrial-broker"],
+  ["Priya Patel", "retail-specialist"],
+  ["Daniel Cho", "office-leasing"],
+  ["Maria Santos", "flex-industrial"],
+  ["James O'Brien", "logistics-broker"],
+  ["Sara Klein", "investment-sales"],
+  ["Tom Whitfield", "cold-storage"],
+  ["Nina Rossi", "land-development"],
+  ["Marcus Lee", "medical-office"],
+  ["Emily Carter", "tenant-rep"],
 ] as const;
 
-/** "Top brokers" data — Voyager's author-box concept adapted to CRE brokers. */
-export const TOP_BROKERS: AuthorBox[] = NAMES.map(([displayName, jobName, count], i) => ({
+export const TOP_BROKERS: AuthorBox[] = NAMES.map(([displayName, jobName], i) => ({
   id: String(i + 1),
   displayName,
   jobName,
-  count,
-  href: "/listings",
   avatar: `/images/avatars/Image-${i + 1}.png`,
   bgImage: BG_IMAGES[i % BG_IMAGES.length],
 }));

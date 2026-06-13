@@ -1,6 +1,4 @@
 import { SectionHeading } from "@components/landing/section-heading";
-import { ButtonPrimary } from "@components/ui/button-primary";
-import { ButtonSecondary } from "@components/ui/button-secondary";
 import { cn } from "@utils/common";
 
 import { CardBroker } from "./card";
@@ -26,9 +24,5 @@ export const BrokerBox = ({ className }: BrokerBoxProps) => (
       ))}
     </div>
 
-    <div className="mt-16 flex flex-col justify-center space-y-3 sm:flex-row sm:space-x-5 sm:space-y-0">
-      <ButtonSecondary href="/listings">Show me more</ButtonSecondary>
-      <ButtonPrimary href="/sign-up">Become a partner</ButtonPrimary>
-    </div>
   </div>
 );
