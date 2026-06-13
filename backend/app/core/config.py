@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     )
 
     database_url: str
+    # How long asyncpg waits to establish a connection, and the per-statement timeout.
+    # Both prevent a flaky DB call from stalling until Vercel's hard function kill.
+    db_connect_timeout_s: float = 10.0
+    db_statement_timeout_ms: int = 30_000
 
     supabase_url: str
     supabase_service_role_key: str

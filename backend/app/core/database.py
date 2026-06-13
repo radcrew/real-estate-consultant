@@ -24,7 +24,14 @@ async def init_db() -> None:
     global DB_ASYNC_ENGINE, DB_ASYNC_SESSION_MAKER
 
     async_url = _async_database_url(settings.database_url)
-    DB_ASYNC_ENGINE = create_async_engine(async_url, pool_pre_ping=True)
+    DB_ASYNC_ENGINE = create_async_engine(
+        async_url,
+        pool_pre_ping=True,
+        connect_args={
+            "timeout": settings.db_connect_timeout_s,
+            "command_timeout": settings.db_statement_timeout_ms / 1000,
+        },
+    )
     DB_ASYNC_SESSION_MAKER = async_sessionmaker(
         DB_ASYNC_ENGINE,
         class_=AsyncSession,
