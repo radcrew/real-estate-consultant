@@ -14,18 +14,39 @@ type SidePanelProps = {
   lastResponse: LlmInputResponse | null;
 };
 
+const formatCriteriaValue = (value: unknown): string => {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value.toLocaleString();
+  if (Array.isArray(value)) return value.join(", ");
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if ("label" in obj && obj.label) return String(obj.label);
+    if ("min" in obj || "max" in obj) {
+      const min = obj.min != null ? obj.min.toLocaleString() : null;
+      const max = obj.max != null ? obj.max.toLocaleString() : null;
+      if (min && max) return `${min} – ${max}`;
+      if (min) return `≥ ${min}`;
+      if (max) return `≤ ${max}`;
+    }
+    return JSON.stringify(value);
+  }
+  return String(value);
+};
+
 export const SidePanel = ({ lastResponse }: SidePanelProps) => {
   const router = useRouter();
   const { sessionId, setErrorMessage, resetToChooser, onClose } = useSearchWizard();
   const [isSearchBusy, setSearchBusy] = useState(false);
 
-  const isComplete = lastResponse?.is_complete ?? false;
+  const criteria = lastResponse?.criteria ?? {};
   const missingFields = lastResponse?.missing_fields ?? [];
+  const criteriaEntries = Object.entries(criteria).filter(([, v]) => v !== null && v !== undefined);
+  const isComplete = lastResponse?.is_complete ?? false;
+  const canSearch = isComplete || (lastResponse !== null && missingFields.length === 0);
 
   const handleSearchProperties = useCallback(async () => {
-    if (!sessionId || !isComplete || isSearchBusy || !lastResponse) {
-      return;
-    }
+    if (!sessionId || !canSearch || isSearchBusy) return;
     setSearchBusy(true);
     setErrorMessage(null);
     try {
@@ -42,15 +63,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
     } finally {
       setSearchBusy(false);
     }
-  }, [
-    isComplete,
-    isSearchBusy,
-    lastResponse,
-    onClose,
-    router,
-    sessionId,
-    setErrorMessage,
-  ]);
+  }, [canSearch, isSearchBusy, onClose, router, sessionId, setErrorMessage]);
 
   return (
     <aside className={STYLES.sidebar}>
@@ -61,9 +74,23 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
             <h3 className={STYLES.cardTitle}>Extracted Criteria</h3>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Structured criteria from this chat will appear here once the API provides them.
-        </p>
+
+        {criteriaEntries.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Criteria will appear here as you describe what you're looking for.
+          </p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {criteriaEntries.map(([key, value]) => (
+              <li key={key} className="flex justify-between gap-3 text-sm">
+                <span className="capitalize text-muted-foreground">{key.replace(/_/g, " ")}</span>
+                <span className="font-medium text-neutral-800 dark:text-neutral-200 text-right">
+                  {formatCriteriaValue(value)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {missingFields.length > 0 && (
@@ -71,7 +98,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
           <p className={STYLES.missingTitle}>Still needed:</p>
           <ul className={STYLES.missingList}>
             {missingFields.map((f) => (
-              <li key={f}>{f}</li>
+              <li key={f}>{f.replace(/_/g, " ")}</li>
             ))}
           </ul>
         </div>
@@ -80,7 +107,7 @@ export const SidePanel = ({ lastResponse }: SidePanelProps) => {
       <button
         type="button"
         className={STYLES.searchCta}
-        disabled={!isComplete || isSearchBusy || !sessionId}
+        disabled={!canSearch || isSearchBusy || !sessionId}
         onClick={handleSearchProperties}
       >
         {isSearchBusy ? (

@@ -65,10 +65,14 @@ class AnthropicProvider:
         text = response.content[0].text if response.content else ""
         text = text.strip()
 
-        # Strip markdown fences if model wraps output
-        if text.startswith("```"):
-            text = text.split("\n", 1)[-1]
-            text = text.rsplit("```", 1)[0].strip()
+        # Extract the first JSON object or array, tolerating leading/trailing prose
+        # and markdown fences that Claude sometimes adds.
+        start = next((i for i, c in enumerate(text) if c in "{["), -1)
+        end_brace = text.rfind("}")
+        end_bracket = text.rfind("]")
+        end = max(end_brace, end_bracket)
+        if start != -1 and end != -1 and end >= start:
+            text = text[start : end + 1]
 
         try:
             data = json.loads(text)
