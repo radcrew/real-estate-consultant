@@ -27,6 +27,9 @@ from app.utils.intake_validation import merge_missing_fields
 
 QuestionRow = dict[str, Any]
 
+# Reserved criteria key holding required fields the user explicitly declined to answer.
+SKIPPED_FIELDS_KEY = "_skipped_fields"
+
 
 async def parse_user_input(
     *,
@@ -36,6 +39,11 @@ async def parse_user_input(
 ) -> dict[str, Any]:
     """Parse free-form user intake input into structured criteria and next-step hints."""
     question_keys, required_fields = extract_question_keys(questions)
+    previously_skipped = [
+        key for key in current_criteria.get(SKIPPED_FIELDS_KEY, []) if isinstance(key, str)
+    ]
+    criteria_for_prompt = {k: v for k, v in current_criteria.items() if k != SKIPPED_FIELDS_KEY}
+
     intake_schema = render_intake_response_schema(questions=questions)
     system_prompt = (
         f"{INTAKE_PARSE_SYSTEM_PROMPT_HEADER}{intake_schema}\n"
@@ -44,9 +52,10 @@ async def parse_user_input(
     user_prompt = json.dumps(
         {
             "user_input": user_input,
-            "current_criteria": current_criteria,
+            "current_criteria": criteria_for_prompt,
             "question_keys": question_keys,
             "required_fields": required_fields,
+            "previously_skipped_fields": previously_skipped,
         },
         ensure_ascii=True,
     )
@@ -62,8 +71,9 @@ async def parse_user_input(
     return _build_intake_parse_result(
         parsed_output=parsed_output,
         question_keys=question_keys,
-        current_criteria=current_criteria,
+        current_criteria=criteria_for_prompt,
         required_fields=required_fields,
+        previously_skipped=previously_skipped,
     )
 
 
@@ -148,29 +158,36 @@ def _build_intake_parse_result(
     question_keys: list[str],
     current_criteria: dict[str, Any],
     required_fields: list[str],
+    previously_skipped: list[str],
 ) -> dict[str, Any]:
     allowed_keys = set(question_keys)
     extracted = {
         key: value for key, value in parsed_output.extracted.items() if key in allowed_keys
     }
     merged_criteria = {**current_criteria, **extracted}
+
+    skipped_fields = sorted(
+        {*previously_skipped, *parsed_output.skipped_fields} & set(required_fields),
+    )
+
     missing_fields = merge_missing_fields(
         merged_criteria=merged_criteria,
         required_fields=required_fields,
         model_missing=parsed_output.missing_fields,
+        skipped_fields=skipped_fields,
     )
 
+    if skipped_fields:
+        merged_criteria = {**merged_criteria, SKIPPED_FIELDS_KEY: skipped_fields}
+
     next_question = parsed_output.next_question.model_dump()
-    is_complete = (
-        parsed_output.is_complete
-        if parsed_output.is_complete
-        else len(missing_fields) == 0
-    )
+    is_complete = len(missing_fields) == 0
 
     return {
         "extracted": extracted,
         "merged_criteria": merged_criteria,
         "missing_fields": missing_fields,
+        "skipped_fields": skipped_fields,
         "next_question": next_question,
         "is_complete": is_complete,
     }
