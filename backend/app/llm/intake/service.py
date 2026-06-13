@@ -66,7 +66,7 @@ async def parse_user_input(
         ],
         response_format=LlmParseModelOutput,
         temperature=0.1,
-        max_tokens=450,
+        max_tokens=800,
     )
     return _build_intake_parse_result(
         parsed_output=parsed_output,

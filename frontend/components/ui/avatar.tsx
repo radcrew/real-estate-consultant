@@ -34,6 +34,8 @@ export interface AvatarProps {
   userName?: string;
   hasChecked?: boolean;
   hasCheckedClass?: string;
+  /** Passed to next/image sizes — set to match the rendered pixel size for best quality. */
+  sizes?: string;
   /** Skip the image optimizer (needed for arbitrary remote hosts not in next.config). */
   unoptimized?: boolean;
   /** Forwarded to the image (e.g. "no-referrer" for OAuth provider avatars). */
@@ -48,6 +50,7 @@ export const Avatar = ({
   userName = "User",
   hasChecked,
   hasCheckedClass = "w-4 h-4 -top-0.5 -right-0.5",
+  sizes = "96px",
   unoptimized,
   referrerPolicy,
 }: AvatarProps) => {
@@ -71,7 +74,7 @@ export const Avatar = ({
           src={imgUrl}
           alt={name}
           fill
-          sizes="64px"
+          sizes={sizes}
           unoptimized={unoptimized}
           referrerPolicy={referrerPolicy}
         />

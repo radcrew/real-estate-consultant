@@ -47,6 +47,7 @@ type AccountSidebarProps = {
 export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) => {
   const { session } = useAuth();
   const email = session?.user.email?.trim() ?? "";
+  const avatarUrl = session?.user.avatarUrl?.trim() || undefined;
 
   return (
     <aside className="flex-shrink-0 bg-neutral-950 text-neutral-200 lg:min-h-[calc(100vh-5rem)] lg:w-72">
@@ -64,8 +65,11 @@ export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) 
         <div className="flex items-center gap-3">
           <Avatar
             sizeClass="w-11 h-11"
+            imgUrl={avatarUrl}
             userName={email || "User"}
             containerClassName="ring-2 ring-primary-500/40"
+            sizes="44px"
+            unoptimized
           />
           <div className="min-w-0">
             <p className="truncate font-medium text-white">{email || "Your account"}</p>
