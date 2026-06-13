@@ -35,5 +35,8 @@ class Settings(BaseSettings):
     hf_model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     hf_base_url: str = "https://router.huggingface.co/v1"
 
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-haiku-4-5-20251001"
+
 
 settings = Settings()
