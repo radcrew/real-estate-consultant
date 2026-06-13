@@ -45,7 +45,7 @@ export const PropertyGallery = ({
       <div ref={emblaRef} className="overflow-hidden cursor-grab active:cursor-grabbing">
         <div className="flex gap-2 p-2">
           {images.map((src, i) => (
-            <div key={i} className="relative h-64 w-[455px] shrink-0 overflow-hidden rounded-xl">
+            <div key={i} className="relative h-80 w-[569px] shrink-0 overflow-hidden rounded-xl">
               {failedIndexes.has(i) ? (
                 <ImagePlaceholder label={alt !== "Listing photo" ? alt : undefined} />
               ) : (
@@ -54,7 +54,7 @@ export const PropertyGallery = ({
                   alt={`${alt} ${i + 1}`}
                   fill
                   className="object-cover"
-                  sizes="455px"
+                  sizes="569px"
                   priority={i === 0}
                   onError={() => markFailed(i)}
                 />

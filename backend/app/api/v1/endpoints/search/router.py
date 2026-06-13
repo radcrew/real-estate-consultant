@@ -46,7 +46,7 @@ async def quick_search(
     session = await create_intake_session_row(client)
     criteria: dict = {}
     if body.location:
-        criteria["location"] = {"label": body.location}
+        criteria["location"] = body.location
     if body.property_types:
         criteria["property_type"] = body.property_types
     if body.price_min is not None or body.price_max is not None:

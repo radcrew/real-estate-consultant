@@ -49,7 +49,7 @@ export const ListingDetailSkeleton = () => (
       {Array.from({ length: 4 }, (_, i) => (
         <div
           key={i}
-          className="h-64 w-[455px] shrink-0 animate-pulse rounded-xl bg-neutral-200 dark:bg-neutral-800"
+          className="h-80 w-[569px] shrink-0 animate-pulse rounded-xl bg-neutral-200 dark:bg-neutral-800"
         />
       ))}
     </div>

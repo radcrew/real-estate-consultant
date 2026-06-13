@@ -40,5 +40,8 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-haiku-4-5-20251001"
+
 
 settings = Settings()

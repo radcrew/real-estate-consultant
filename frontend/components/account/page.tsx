@@ -126,7 +126,13 @@ export const AccountPage = () => {
     setProfileNotice(null);
     try {
       const data = await accountService.uploadAvatar(file);
-      setAvatarUrl(data.avatar_url ?? null);
+      const newAvatarUrl = data.avatar_url ?? null;
+      setAvatarUrl(newAvatarUrl);
+      const stored = readSession();
+      if (stored) {
+        saveSession({ ...stored, user: { ...stored.user, avatarUrl: newAvatarUrl } });
+        refresh();
+      }
       setProfileNoticeVariant("success");
       setProfileNotice("Photo updated.");
     } catch (e) {
@@ -135,7 +141,7 @@ export const AccountPage = () => {
     } finally {
       setAvatarUploading(false);
     }
-  }, []);
+  }, [refresh]);
 
   const persistSessionEmailIfNeeded = useCallback(
     (email: string | null) => {

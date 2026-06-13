@@ -53,16 +53,11 @@ def _build_question_value_schema(row: QuestionRow) -> dict[str, Any]:
 
     if question_type in {"location", "geo", "address"}:
         return {
-            "type": "object",
+            "type": "string",
             "description": (
-                "Geographic intent; use null for unknown lat/lng. "
-                "label should name the city, region, or address phrase."
+                "City, region, or address phrase. Use comma-separated parts when "
+                "multiple (e.g. 'Chicago, IL, US')."
             ),
-            "properties": {
-                "label": {"type": "string"},
-                "lat": {"type": "number"},
-                "lng": {"type": "number"},
-            },
         }
 
     if question_type in {"range", "numeric_range", "sqft_range", "rent_range", "size_range"}:
@@ -75,7 +70,14 @@ def _build_question_value_schema(row: QuestionRow) -> dict[str, Any]:
             },
         }
 
-    if question_type in {"multiselect", "multi_select", "tags", "checkboxes", "building_types"}:
+    if question_type in {
+        "multiselect",
+        "multi_select",
+        "multi-select",
+        "tags",
+        "checkboxes",
+        "building_types",
+    }:
         schema: dict[str, Any] = {
             "type": "array",
             "items": {"type": "string"},
@@ -129,12 +131,23 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
             "missing_fields": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Required criteria keys still missing.",
+                "description": "Required criteria keys still missing and worth asking about.",
+            },
+            "skipped_fields": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "Required criteria keys the user explicitly declined to answer "
+                    "(e.g. 'no preference', 'doesn't matter', 'skip that'). "
+                    "Never ask about these again."
+                ),
             },
             "next_question": TypeAdapter(LlmParseNextQuestion).json_schema(),
             "is_complete": {"type": "boolean"},
         },
-        "required": ["extracted", "missing_fields", "next_question", "is_complete"],
+        "required": [
+            "extracted", "missing_fields", "skipped_fields", "next_question", "is_complete",
+        ],
     }
 
 

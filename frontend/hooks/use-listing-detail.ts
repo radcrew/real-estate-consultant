@@ -16,24 +16,16 @@ export const useListingDetail = (): UseListingDetailResult => {
   const params = useParams<{ id?: string }>();
   const listingId = (typeof params?.id === "string" ? params.id : "").trim();
 
+  const [fetchedId, setFetchedId] = useState<string | null>(null);
   const [data, setData] = useState<ListingDetailResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset to a fresh loading state when the target listing changes (adjust
-  // during render so the effect only owns the async fetch).
-  const [prevListingId, setPrevListingId] = useState(listingId);
-  if (listingId !== prevListingId) {
-    setPrevListingId(listingId);
+  useEffect(() => {
+    if (!listingId) return;
+
+    setFetchedId(null);
     setData(null);
     setError(null);
-    setLoading(true);
-  }
-
-  useEffect(() => {
-    if (!listingId) {
-      return; // empty id is handled by the derived result below
-    }
 
     const controller = new AbortController();
 
@@ -42,16 +34,13 @@ export const useListingDetail = (): UseListingDetailResult => {
       .then((res) => {
         if (!controller.signal.aborted) {
           setData(res);
+          setFetchedId(listingId);
         }
       })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) {
           setError(getApiErrorMessage(err));
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoading(false);
+          setFetchedId(listingId);
         }
       });
 
@@ -64,7 +53,7 @@ export const useListingDetail = (): UseListingDetailResult => {
 
   return {
     data,
-    loading,
+    loading: fetchedId !== listingId,
     error,
   };
 };

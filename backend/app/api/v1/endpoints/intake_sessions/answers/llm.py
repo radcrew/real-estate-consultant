@@ -11,6 +11,7 @@ from app.llm import (
     parse_user_input,
     resolve_next_intake_question,
 )
+from app.llm.intake.service import SKIPPED_FIELDS_KEY
 from app.repositories.intake_sessions import (
     load_intake_session_row,
     save_intake_criteria,
@@ -20,6 +21,7 @@ from app.schemas.intake_sessions import (
     SubmitLlmIntakeInputRequest,
     SubmitLlmIntakeInputResponse,
 )
+from app.utils.intake_criteria import normalize_merged_criteria
 from app.utils.intake_validation import compute_current_index
 
 router = APIRouter()
@@ -47,8 +49,13 @@ async def submit_llm_intake_input(
     )
 
     extracted = llm_result["extracted"]
-    merged_criteria = llm_result["merged_criteria"]
+    merged_criteria = normalize_merged_criteria(
+        llm_result["merged_criteria"],
+        questions,
+        reserved_keys=frozenset({SKIPPED_FIELDS_KEY}),
+    )
     missing_fields = llm_result["missing_fields"]
+    skipped_fields = llm_result["skipped_fields"]
     is_complete = bool(llm_result["is_complete"])
 
     next_question = resolve_next_intake_question(
@@ -60,12 +67,22 @@ async def submit_llm_intake_input(
     current_index = compute_current_index(questions, merged_criteria)
 
     await save_intake_criteria(client, session_id, merged_criteria)
+
+    public_criteria = {k: v for k, v in merged_criteria.items() if k != SKIPPED_FIELDS_KEY}
+    question_titles = {
+        row["key"]: (row.get("title") or row["key"].replace("_", " ").title())
+        for row in questions
+        if isinstance(row.get("key"), str)
+    }
+
     return SubmitLlmIntakeInputResponse(
         extracted=extracted,
-        criteria=merged_criteria,
+        criteria=public_criteria,
         current_index=current_index,
         total_questions=len(questions),
         missing_fields=missing_fields,
+        skipped_fields=skipped_fields,
+        question_titles=question_titles,
         next_question=next_question,
         is_complete=is_complete,
     )

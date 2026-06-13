@@ -41,10 +41,10 @@ export const STYLES = {
   cardHeader: "mb-3 flex items-center gap-2",
   cardTitleRow: "flex items-center gap-2",
   cardTitle: "text-sm font-semibold text-foreground",
-  missingCard:
+  considerCard:
     "rounded-2xl border border-amber-300/80 bg-amber-50/90 p-4 text-sm text-amber-950 shadow-sm dark:border-amber-700/50 dark:bg-amber-950/25 dark:text-amber-50",
-  missingTitle: "mb-2 font-semibold",
-  missingList: "list-disc space-y-1 pl-4",
+  considerTitle: "mb-2 font-semibold",
+  considerList: "list-disc space-y-1 pl-4",
   searchCta:
     "inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-primary-600 px-4 text-sm font-semibold text-neutral-50 transition hover:bg-primary-700 disabled:pointer-events-none disabled:opacity-50",
   switchLink:

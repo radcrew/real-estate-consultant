@@ -88,13 +88,19 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
       onLlmSuccess(data);
 
       const followUp = data.next_question?.text?.trim();
-      if (followUp) {
+      const assistantReply =
+        followUp ||
+        (data.missing_fields.length === 0
+          ? "You're all set! You can start searching properties now, or tell me if you'd like to update anything."
+          : "");
+
+      if (assistantReply) {
         setMessages((m) => [
           ...m,
           {
             id: crypto.randomUUID(),
             role: "assistant",
-            content: followUp,
+            content: assistantReply,
           },
         ]);
       }

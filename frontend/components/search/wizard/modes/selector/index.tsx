@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -24,6 +24,7 @@ export const SearchModeSelector = () => {
     startSmartChat,
     startGuidedForm,
   } = useSearchWizard();
+  const [starting, setStarting] = useState<"form" | "chat" | null>(null);
 
   return (
     <div className={STYLES.chooserWrapper}>
@@ -62,10 +63,10 @@ export const SearchModeSelector = () => {
 
           <ButtonThird
             className={STYLES.choiceFormCta}
-            onClick={startGuidedForm}
+            onClick={() => { setStarting("form"); startGuidedForm(); }}
             disabled={isBusy}
           >
-            {isBusy ? "Loading form..." : "Use Form"}
+            {starting === "form" ? "Loading form..." : "Use Form"}
             <ArrowRight className="ml-2 size-4" aria-hidden />
           </ButtonThird>
         </section>
@@ -93,10 +94,10 @@ export const SearchModeSelector = () => {
 
           <ButtonPrimary
             className={STYLES.choiceAiCta}
-            onClick={startSmartChat}
+            onClick={() => { setStarting("chat"); startSmartChat(); }}
             disabled={isBusy}
           >
-            Use AI Chat
+            {starting === "chat" ? "Loading chat..." : "Use AI Chat"}
             <Sparkles className="ml-2 size-4" aria-hidden />
           </ButtonPrimary>
         </section>
