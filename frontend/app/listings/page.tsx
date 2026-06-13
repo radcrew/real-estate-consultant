@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 import { ButtonPrimary } from "@components/ui/button-primary";
 import { detailToModel, type PropertyModel } from "@components/property/listing-model";
@@ -9,17 +10,23 @@ import { Heading2 } from "@components/ui/heading2";
 import { brand } from "@config/brand";
 import { listingsService } from "@services/listings";
 
+const isCancellation = (err: unknown) =>
+  (err instanceof DOMException && err.name === "AbortError") ||
+  (err != null && typeof err === "object" && "code" in err && (err as { code: string }).code === "ERR_CANCELED");
+
 const ListingsIndexPage = () => {
+  const pathname = usePathname();
   const [models, setModels] = useState<PropertyModel[] | null>(null);
 
   useEffect(() => {
+    setModels(null);
     const controller = new AbortController();
     listingsService
       .getFeaturedListings({ signal: controller.signal })
       .then((res) => setModels(res.listings.map(detailToModel)))
-      .catch(() => setModels([]));
+      .catch((err: unknown) => { if (!isCancellation(err)) setModels([]); });
     return () => controller.abort();
-  }, []);
+  }, [pathname]);
 
   const loading = models === null;
 
