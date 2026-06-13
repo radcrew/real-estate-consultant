@@ -10,20 +10,23 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+import time
 
 from supabase import acreate_client
 
 from app.core.config import settings
 from app.core.db_safe import SupabaseRequestError
+from app.core.logging import configure_logging
 from app.seed.insert import SeedManager
 from app.seed.parse import load_property_dataset
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+configure_logging(settings.log_level)
 logger = logging.getLogger("seed")
 
 
 async def run_seed() -> None:
-    rows = load_property_dataset()
+    start = time.perf_counter()
+    rows, report = load_property_dataset()
     logger.info("Parsed %d property row(s)", len(rows))
 
     properties_payload = [prop for prop, _ in rows]
@@ -39,13 +42,19 @@ async def run_seed() -> None:
     finally:
         await client.postgrest.aclose()
 
-    first_address = rows[0][0].address if rows else None
+    duration_ms = (time.perf_counter() - start) * 1000
     logger.info(
-        "Finished OK (record_count=%d, inserted_count=%d, images=%d, first_address=%r)",
-        len(rows),
-        inserted,
-        inserted_images,
-        first_address,
+        "ingestion_run",
+        extra={
+            "source": "seed:dataset/raw-data.json",
+            "fetched": report.fetched,
+            "normalized": report.normalized,
+            "rejected": report.rejected,
+            "rejected_reasons": report.rejected_reasons,
+            "inserted_properties": inserted,
+            "inserted_images": inserted_images,
+            "duration_ms": round(duration_ms, 2),
+        },
     )
 
 

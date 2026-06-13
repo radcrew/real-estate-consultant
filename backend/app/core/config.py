@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     hf_token: str = ""
     hf_model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     hf_base_url: str = "https://router.huggingface.co/v1"
+    # USD per 1M tokens, for cost-attribution telemetry. 0 disables cost estimates.
+    hf_input_cost_per_1m: float = 0.0
+    hf_output_cost_per_1m: float = 0.0
+
+    log_level: str = "INFO"
 
 
 
