@@ -25,6 +25,9 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # Set to the CRON_SECRET Vercel injects on cron requests (leave empty to skip auth).
+    cron_secret: str = ""
+
     git_sha: str = Field(
         default="", validation_alias=AliasChoices("GIT_SHA", "VERCEL_GIT_COMMIT_SHA")
     )
