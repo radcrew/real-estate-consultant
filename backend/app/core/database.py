@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
@@ -25,13 +26,18 @@ async def init_db() -> None:
     global DB_ASYNC_ENGINE, DB_ASYNC_SESSION_MAKER
 
     async_url = _async_database_url(settings.database_url)
+    connect_args: dict = {
+        "timeout": settings.db_connect_timeout_s,
+        "command_timeout": settings.db_statement_timeout_ms / 1000,
+    }
+    if settings.db_serverless:
+        # pgbouncer transaction mode rejects prepared statements; disable them.
+        connect_args["statement_cache_size"] = 0
     DB_ASYNC_ENGINE = create_async_engine(
         async_url,
-        pool_pre_ping=True,
-        connect_args={
-            "timeout": settings.db_connect_timeout_s,
-            "command_timeout": settings.db_statement_timeout_ms / 1000,
-        },
+        pool_pre_ping=not settings.db_serverless,
+        poolclass=NullPool if settings.db_serverless else None,
+        connect_args=connect_args,
     )
     DB_ASYNC_SESSION_MAKER = async_sessionmaker(
         DB_ASYNC_ENGINE,

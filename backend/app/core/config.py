@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Both prevent a flaky DB call from stalling until Vercel's hard function kill.
     db_connect_timeout_s: float = 10.0
     db_statement_timeout_ms: int = 30_000
+    # Set to true when DATABASE_URL points to Supabase's pgbouncer (port 6543).
+    # Enables NullPool (no idle connections between invocations) and disables asyncpg
+    # prepared statements, which pgbouncer transaction mode does not support.
+    db_serverless: bool = False
 
     supabase_url: str
     supabase_service_role_key: str
