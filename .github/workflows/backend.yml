@@ -120,6 +120,9 @@ jobs:
           BASE_URL: ${{ steps.deploy.outputs.url }}
           BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
+          if [ -z "$BYPASS_SECRET" ]; then
+            echo "::warning::VERCEL_AUTOMATION_BYPASS_SECRET is not set — requests may be blocked by Vercel protection (401)."
+          fi
           smoke() {
             local path="$1"
             for i in 1 2 3; do
