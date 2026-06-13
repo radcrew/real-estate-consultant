@@ -1,9 +1,10 @@
-"""Structured JSON logging with per-request context injection."""
+"""Structured JSON logging with per-request context injection, scrubbing, and filtering."""
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from contextvars import ContextVar
 from typing import Any
 
@@ -16,6 +17,31 @@ _STDLIB_ATTRS: frozenset[str] = frozenset({
     "created", "msecs", "relativeCreated", "thread", "threadName",
     "processName", "process", "message", "taskName", "asctime",
 })
+
+# Paths whose successful, fast requests are too noisy to log (e.g. health probes).
+_NOISY_PATHS: frozenset[str] = frozenset({"/health"})
+
+# Keys whose values are always redacted, regardless of content.
+_REDACT_KEYS: frozenset[str] = frozenset({
+    "password", "token", "access_token", "refresh_token", "authorization",
+    "api_key", "hf_token", "secret",
+})
+
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_REDACTED = "***"
+
+
+def _scrub(value: Any, key: str | None = None) -> Any:
+    """Redact sensitive keys and mask email addresses in log payloads."""
+    if key is not None and key.lower() in _REDACT_KEYS:
+        return _REDACTED
+    if isinstance(value, str):
+        return _EMAIL_RE.sub(_REDACTED, value)
+    if isinstance(value, dict):
+        return {k: _scrub(v, k) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_scrub(v) for v in value]
+    return value
 
 
 class _JsonFormatter(logging.Formatter):
@@ -35,12 +61,22 @@ class _JsonFormatter(logging.Formatter):
         for key, val in record.__dict__.items():
             if key not in _STDLIB_ATTRS and key not in payload:
                 payload[key] = val
-        return json.dumps(payload, default=str)
+        return json.dumps(_scrub(payload), default=str)
+
+
+class _DropNoisyRequestsFilter(logging.Filter):
+    """Drop fast, successful requests to noisy paths (e.g. health checks)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.name == "app.request" and record.levelno < logging.WARNING:
+            return getattr(record, "path", None) not in _NOISY_PATHS
+        return True
 
 
 def configure_logging(level: str = "INFO") -> None:
     handler = logging.StreamHandler()
     handler.setFormatter(_JsonFormatter())
+    handler.addFilter(_DropNoisyRequestsFilter())
     root = logging.getLogger()
     root.handlers.clear()
     root.addHandler(handler)
