@@ -145,7 +145,9 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
             "next_question": TypeAdapter(LlmParseNextQuestion).json_schema(),
             "is_complete": {"type": "boolean"},
         },
-        "required": ["extracted", "missing_fields", "skipped_fields", "next_question", "is_complete"],
+        "required": [
+            "extracted", "missing_fields", "skipped_fields", "next_question", "is_complete",
+        ],
     }
 
 

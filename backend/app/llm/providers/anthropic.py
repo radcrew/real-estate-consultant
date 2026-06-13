@@ -21,7 +21,9 @@ _TIMEOUT = 60.0
 
 
 class AnthropicProvider:
-    def __init__(self, *, settings: Settings, client: anthropic.AsyncAnthropic | None = None) -> None:
+    def __init__(
+        self, *, settings: Settings, client: anthropic.AsyncAnthropic | None = None
+    ) -> None:
         self.settings = settings
         self.client = client or anthropic.AsyncAnthropic(
             api_key=settings.anthropic_api_key or "missing-anthropic-api-key",
@@ -40,7 +42,9 @@ class AnthropicProvider:
             raise_service_unavailable("Anthropic API key is not configured.")
 
         system_parts = [m["content"] for m in messages if m["role"] == "system"]
-        user_parts = [{"role": m["role"], "content": m["content"]} for m in messages if m["role"] != "system"]
+        user_parts = [
+            {"role": m["role"], "content": m["content"]} for m in messages if m["role"] != "system"
+        ]
         system_prompt = "\n\n".join(system_parts) if system_parts else None
 
         try:
