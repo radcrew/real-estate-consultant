@@ -2,8 +2,10 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException
 
 from app.api.router import api_router
 from app.api.system import router as system_router
@@ -41,13 +43,49 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(SupabaseRequestError)
     async def supabase_request_error_handler(
-        _request: Request,
+        request: Request,
         exc: SupabaseRequestError,
     ) -> JSONResponse:
-        logger.warning("Supabase request failed: %s", exc)
+        logger.warning(
+            "Supabase request failed: %s",
+            exc,
+            extra={"error": type(exc).__name__, "path": request.url.path, "method": request.method},
+        )
         return JSONResponse(
             status_code=502,
             content={"detail": "We couldn't reach the database. Please try again shortly."},
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_logging_handler(request: Request, exc: HTTPException) -> JSONResponse:
+        level = logging.ERROR if exc.status_code >= 500 else logging.WARNING
+        logger.log(
+            level,
+            "http_exception",
+            extra={
+                "error": type(exc).__name__,
+                "status": exc.status_code,
+                "path": request.url.path,
+                "method": request.method,
+                "detail": exc.detail,
+            },
+        )
+        return await http_exception_handler(request, exc)
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logger.error(
+            "unhandled_exception",
+            exc_info=exc,
+            extra={
+                "error": type(exc).__name__,
+                "path": request.url.path,
+                "method": request.method,
+            },
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error. Please try again later."},
         )
 
     app.include_router(system_router)
