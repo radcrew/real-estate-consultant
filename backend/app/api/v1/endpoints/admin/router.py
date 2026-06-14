@@ -35,8 +35,8 @@ async def enqueue_ingest(
 ) -> EnqueueResponse:
     """Insert a pending job into the queue; returns immediately with job_id.
 
-    The ingestion service polls the queue every 15 minutes via Vercel cron
-    and calls claim_next_job() to atomically pick it up.
+    A GitHub Actions poller calls the ingestion service every 15 minutes,
+    which calls claim_next_job() to atomically pick it up.
     """
     source = body.source
     idem_key = f"{source}:{date.today().isoformat()}"

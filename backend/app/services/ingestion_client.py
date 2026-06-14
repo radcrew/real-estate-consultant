@@ -16,8 +16,8 @@ async def wake_processor() -> None:
     """Best-effort call to process the job queue immediately.
 
     If this fails (service down, auth not configured yet), the job stays
-    queued and is picked up by the ingestion service's Vercel cron within
-    15 minutes, so failures here are logged and swallowed.
+    queued and is picked up by the GitHub Actions job poller within 15
+    minutes, so failures here are logged and swallowed.
     """
     if not settings.ingestion_service_url:
         return

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
-    # Set to the CRON_SECRET Vercel injects on cron requests (leave empty to skip auth).
+    # Shared secret for the GitHub Actions job poller (leave empty to skip auth).
     cron_secret: str = ""
 
     # Shared bearer token the backend sends when calling this service directly.

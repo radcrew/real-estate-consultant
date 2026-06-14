@@ -295,7 +295,7 @@ flowchart TD
   C --> D[Frontend subscribes\nSupabase Realtime on jobs row\nadmin-only RLS policy]
 
   W --> F{claim_next_job\nFOR UPDATE SKIP LOCKED}
-  E[Vercel cron, every 15 min\nfallback if the wake call fails] --> F
+  E[GitHub Actions poller, every 15 min\nfallback if the wake call fails] --> F
   F -->|status = pending -> running| D
   F --> G[Run connector\ne.g. loopnet-seed]
   G --> H[Normalize listings]

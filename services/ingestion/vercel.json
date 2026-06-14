@@ -7,11 +7,5 @@
   },
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
-  ],
-  "crons": [
-    {
-      "path": "/api/v1/jobs/process",
-      "schedule": "*/15 * * * *"
-    }
   ]
 }

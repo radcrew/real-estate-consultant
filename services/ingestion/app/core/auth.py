@@ -32,7 +32,7 @@ def require_service_token(request: Request) -> None:
 
 
 def require_internal_token(request: Request) -> None:
-    """Require the cron secret (Vercel cron) or the service token (backend).
+    """Require the cron secret (GitHub Actions poller) or the service token (backend).
 
     For endpoints called by both internal callers.
     """
