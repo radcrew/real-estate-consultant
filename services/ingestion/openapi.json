@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Real Estate Ingestion Service",
+    "title": "Real Estate Consultant API",
     "version": "0.1.0"
   },
   "paths": {
@@ -96,7 +96,7 @@
           "jobs"
         ],
         "summary": "Process Next Job",
-        "description": "Claim one pending job, run its connector, and update status to done/failed.\n\nCalled by Vercel cron every 15 minutes, or by the backend to process the\nqueue immediately after enqueueing (see require_internal_token).",
+        "description": "Claim one pending job, run its connector, and update status to done/failed.\n\nCalled by the GitHub Actions job poller every 15 minutes, or by the backend\nto process the queue immediately after enqueueing (see require_internal_token).",
         "operationId": "process_next_job_api_v1_jobs_process_post",
         "responses": {
           "200": {

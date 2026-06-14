@@ -40,8 +40,8 @@ class ProcessResponse(BaseModel):
 async def process_next_job() -> ProcessResponse:
     """Claim one pending job, run its connector, and update status to done/failed.
 
-    Called by Vercel cron every 15 minutes, or by the backend to process the
-    queue immediately after enqueueing (see require_internal_token).
+    Called by the GitHub Actions job poller every 15 minutes, or by the backend
+    to process the queue immediately after enqueueing (see require_internal_token).
     """
     client = await acreate_client(settings.supabase_url, settings.supabase_service_role_key)
     try:
