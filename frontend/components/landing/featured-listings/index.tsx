@@ -40,8 +40,9 @@ export const FeaturedListings = () => {
       </div>
 
       <div className="mt-14 flex justify-center">
-        <ButtonSecondary href="/listings">Browse all properties</ButtonSecondary>
+        <ButtonSecondary href="/listings">Browse properties</ButtonSecondary>
       </div>
     </section>
   );
 };
+  
