@@ -13,10 +13,14 @@ on:
     branches: [main]
     paths:
       - "backend/**"
+      - "services/ingestion/**"
+      - "scripts/generate_ingestion_client.py"
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
       - "backend/**"
+      - "services/ingestion/**"
+      - "scripts/generate_ingestion_client.py"
       - ".github/workflows/backend.yml"
 
 env:
@@ -45,9 +49,37 @@ jobs:
       - name: Ruff
         run: ruff check app
 
+  contract-check:
+    name: Ingestion client contract check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e "backend[dev]"
+          python -m pip install -e "services/ingestion"
+
+      - name: Regenerate ingestion client from OpenAPI schema
+        run: python scripts/generate_ingestion_client.py
+
+      - name: Fail on contract drift
+        run: |
+          if ! git diff --exit-code -- services/ingestion/openapi.json backend/app/clients/ingestion/models.py; then
+            echo "::error::Ingestion API contract changed — run 'python scripts/generate_ingestion_client.py' and commit the result."
+            exit 1
+          fi
+
   deploy:
     name: Deploy to Vercel
-    needs: lint
+    needs: [lint, contract-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     defaults:
@@ -96,7 +128,7 @@ jobs:
 
   deploy-preview:
     name: Deploy preview to Vercel
-    needs: lint
+    needs: [lint, contract-check]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     defaults:

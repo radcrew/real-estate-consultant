@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.api.v1.endpoints.account.router import router as account_router
+from app.api.v1.endpoints.admin.router import router as admin_router
 from app.api.v1.endpoints.agents import router as agents_router
 from app.api.v1.endpoints.auth.router import router as auth_router
 from app.api.v1.endpoints.intake_sessions.router import router as intake_sessions_router
@@ -14,6 +15,7 @@ from app.api.v1.endpoints.submissions import router as submissions_router
 from app.core.deps import get_current_user
 
 router = APIRouter()
+router.include_router(admin_router)
 router.include_router(auth_router)
 router.include_router(ping_router)
 router.include_router(submissions_router)
