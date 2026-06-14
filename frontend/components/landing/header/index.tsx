@@ -5,7 +5,6 @@ import { Navigation } from "@components/ui/navigation";
 import { SwitchDarkMode } from "@components/ui/switch-dark-mode";
 
 import { AuthNav } from "./auth-nav";
-import { SearchDropdown } from "./search-dropdown";
 
 /**
  * Site header in Voyager's MainNav layout (h-20 bar: logo + desktop nav on the
@@ -23,7 +22,6 @@ export const Header = () => (
 
       <div className="flex shrink-0 items-center justify-end text-neutral-700 dark:text-neutral-100">
         <div className="hidden items-center gap-2 lg:flex">
-          <SearchDropdown />
           <ButtonSecondary
             href="/list-property"
             sizeClass="px-4 py-2"
