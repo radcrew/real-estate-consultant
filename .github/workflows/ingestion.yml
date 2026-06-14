@@ -72,9 +72,6 @@ jobs:
     needs: [lint, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/ingestion
     environment:
       name: production
       url: ${{ steps.deploy.outputs.url }}
@@ -121,9 +118,6 @@ jobs:
     needs: [lint, test]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/ingestion
     steps:
       - name: Checkout
         uses: actions/checkout@v4
