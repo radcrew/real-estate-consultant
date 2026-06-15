@@ -12,9 +12,7 @@ from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.utils.exceptions import raise_bad_gateway
 from app.utils.supabase.response import as_row_list, get_single_row
 
-_FIRST_QUESTION_SELECT = "key, title, text, type, options, required"
 _QUESTION_SELECT = "key, title, text, type, options, order_index, required"
-_LOAD_QUESTIONS_ERROR = "No question is configured for intake flow."
 
 _RANGE_QUESTION_TYPES: frozenset[str] = frozenset(
     {"range", "numeric_range", "sqft_range", "rent_range", "size_range"},
@@ -94,38 +92,6 @@ def next_question_row_after_order(questions: list[dict], *, after_order: int) ->
         if o > after_order:
             return q
     return None
-
-
-async def load_first_intake_question(client: AsyncClient) -> IntakeSessionFirstQuestion:
-    result = await execute_db_safe(
-        client.table("questions")
-        .select(_FIRST_QUESTION_SELECT)
-        .order("order_index")
-        .limit(1)
-        .execute(),
-    )
-    row = get_single_row(result, detail=_LOAD_QUESTIONS_ERROR)
-    return map_question_to_model(row)
-
-
-async def load_intake_question_filters(client: AsyncClient) -> dict[str, dict[str, str]]:
-    """Build ``{ question.key: {\"type\", \"label\"} }`` from ``questions`` for UI filters."""
-    result = await execute_db_safe(
-        client.table("questions").select("key, type, title").order("order_index").execute(),
-    )
-    rows = as_row_list(result.data)
-    out: dict[str, dict[str, str]] = {}
-    for row in rows:
-        raw_key = row.get("key")
-        if not isinstance(raw_key, str) or not raw_key.strip():
-            continue
-        k = raw_key.strip()
-        qtype = row.get("type")
-        qtitle = row.get("title")
-        type_str = qtype.strip() if isinstance(qtype, str) and qtype.strip() else "text"
-        label_str = qtitle.strip() if isinstance(qtitle, str) else ""
-        out[k] = {"type": type_str, "label": label_str}
-    return out
 
 
 async def load_question_key_metadata(

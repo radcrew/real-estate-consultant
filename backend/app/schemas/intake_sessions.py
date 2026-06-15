@@ -61,14 +61,6 @@ class GetIntakeSessionResponse(IntakeSession):
     next_question: IntakeSessionFirstQuestion | None = None
 
 
-class PatchIntakeSessionStatusRequest(BaseModel):
-    """Request body for ``PATCH /api/v1/intake-sessions/{session_id}`` (status only)."""
-
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    status: str
-
-
 class UpdateIntakeSessionAnswersRequest(BaseModel):
     """Request body for ``PATCH /api/v1/intake-sessions/{session_id}/answers/guided``."""
 
