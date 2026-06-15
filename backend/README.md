@@ -70,7 +70,6 @@ Copy `.env.example` to `.env` in this same directory and adjust values as needed
 | Variable   | Purpose |
 |------------|---------|
 | `APP_NAME` | Title shown in the OpenAPI metadata |
-| `IS_DEV_MODE` | Reserved for future dev-only toggles; `DEBUG` is accepted as an alias (not used by routes today) |
 
 Environment values are loaded from `backend/.env` by path, so loading does not depend on the shell’s current working directory.
 
