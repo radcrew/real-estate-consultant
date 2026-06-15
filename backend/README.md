@@ -76,40 +76,21 @@ Environment values are loaded from `backend/.env` by path, so loading does not d
 
 ## Dataset
 
-The dev seed pipeline reads **`backend/dataset/raw-data.json`**. That file should be a **JSON array of objects** (LoopNet-style listing records). The parser maps each object into a row for Supabase **`public.properties`**.
+**`backend/dataset/raw-data.json`** holds the listing dataset — a **JSON array of objects** (LoopNet-style listing records). It is consumed by the **ingestion service's `loopnet-seed` connector** (`services/ingestion/app/connectors/loopnet_seed.py`), which normalizes each object into a row for Supabase **`public.properties`**. (The backend's standalone seed CLI was removed once the ingestion service took over.)
+
+The connector reads the path in its `dataset_path` setting (default `dataset/raw-data.json`, relative to the ingestion service); for local dev you can point it at this backend copy — see `services/ingestion/app/core/config.py`.
 
 ### Dataset preparation
 
-Follow these steps **before** running **`python -m app.seed.main`**:
+Follow these steps to produce the dataset file:
 
 1. **Scrape LoopNet** using **[Apify](https://apify.com/)**. In the Apify Store, search for **LoopNet** (or “loop”) scrapers **Actors**, pick one that fits your needs, configure the run, and start it.
 2. **Trial limit:** On a **free trial**, Apify typically returns only about **50 results** per run. Paid runs can return more, depending on the Actor and your plan.
 3. **Export:** When the run finishes, download or export the dataset as **JSON**. Apify may name the file something like **`raw_dataset.json`** (or another default); that is fine as an export artifact.
-4. **Place the file for this backend:** Copy or rename the export so it exists exactly as **`backend/dataset/raw-data.json`** (create the **`dataset/`** folder under `backend/` if it is missing). The application code looks for that path by default—**not** `raw_dataset.json` unless you change the code in `app/seed/parse.py`.
+4. **Place the file:** Copy or rename the export so it exists exactly as **`backend/dataset/raw-data.json`** (create the **`dataset/`** folder under `backend/` if it is missing).
 5. **Validate shape:** The file’s root must be a **JSON array** (`[ ... ]`), and each element must be a **JSON object** (`{ ... }`). If the export is wrapped differently (e.g. one object with a `"data"` array), reshape or re-export so the root is the array of listings.
 
-If the file is missing, not found at that path, or fails those checks, **`python -m app.seed.main`** exits with an error and logs the reason.
-
-## Seeding
-
-After **dataset preparation** and with **`SUPABASE_URL`** / **`SUPABASE_SERVICE_ROLE_KEY`** set in `.env`:
-
-From **`backend/`** (virtual environment activated):
-
-```powershell
-python -m app.seed.main
-```
-
-Each successful run **upserts** properties and replaces **`property_images`** for the seeded property ids. For a clean re-seed in dev, run **`truncate table public.properties;`** (and clear related image rows if needed) in the Supabase SQL editor (or `psql`) before running **`python -m app.seed.main`** again.
-
-## Seeding troubleshooting
-
-If seeding fails after [Dataset preparation](#dataset-preparation) and [Seeding](#seeding):
-
-- Run the command from **`backend/`** so `app` imports resolve (same as the server).
-- **`SUPABASE_URL`** and **`SUPABASE_SERVICE_ROLE_KEY`** must be valid; connection problems are logged with an `httpx` explanation.
-- Ensure **`public.properties`** (and any related tables your seed uses) exist and match the columns expected in `app/models/properties.py` and the seed code. Apply schema in the Supabase SQL editor or whatever migration workflow your team uses. After DDL, run **`NOTIFY pgrst, 'reload schema';`** if PostgREST still serves a stale schema ([docs](https://supabase.com/docs/guides/troubleshooting/refresh-postgrest-schema)). PostgREST **`PGRST204`** usually means the schema cache is stale after DDL—run the same `NOTIFY`, then retry **`python -m app.seed.main`**.
-- Property rows use **upsert** on **`id`**; images for those ids are deleted then re-inserted. For a full reset in dev, truncate or delete rows as needed, then run **`python -m app.seed.main`** again.
+If the file is missing, not found at the configured path, or fails those checks, the connector's run fails and logs the reason.
 
 ## Database connection pooling (Vercel serverless)
 
