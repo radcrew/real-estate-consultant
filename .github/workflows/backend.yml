@@ -73,7 +73,7 @@ jobs:
 
       - name: Fail on contract drift
         run: |
-          if ! git diff --exit-code -- services/ingestion/openapi.json backend/app/clients/ingestion/models.py; then
+          if ! git diff --exit-code -- backend/app/clients/ingestion/models.py; then
             echo "::error::Ingestion API contract changed — run 'python scripts/generate_ingestion_client.py' and commit the result."
             exit 1
           fi
