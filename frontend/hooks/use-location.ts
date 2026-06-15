@@ -114,7 +114,6 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
     return () => {
       isMounted = false;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(
