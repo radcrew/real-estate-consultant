@@ -20,7 +20,7 @@ import {
   saveSession,
   type StoredSession,
 } from "@lib/auth-session";
-import { OAUTH_CALLBACK_PATH } from "@lib/config";
+import { OAUTH_CALLBACK_PATH } from "@config/env";
 import { getSupabaseBrowserClient } from "@lib/supabase-browser";
 import { authService } from "@services/auth";
 import { accountService } from "@services/account";

@@ -3,7 +3,7 @@
 import GoogleMapReact from "google-map-react";
 
 import type { PropertyModel } from "@typings/property";
-import { GOOGLE_MAPS_API_KEY } from "@lib/config";
+import { GOOGLE_MAPS_API_KEY } from "@config/env";
 import { cn } from "@utils/common";
 
 /**
