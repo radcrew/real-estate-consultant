@@ -13,3 +13,6 @@ frontend/out
 .DS_Store
 Thumbs.db
 *.log
+
+# Tool-generated temp files (e.g. <file>.tmp.<pid>.<hash>)
+*.tmp.*

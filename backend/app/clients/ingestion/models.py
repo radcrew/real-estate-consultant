@@ -3,22 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, Field
-
-
-class IngestRequest(BaseModel):
-    source: str | None = Field("loopnet-seed", title="Source")
-
-
-class IngestResponse(BaseModel):
-    source: str = Field(..., title="Source")
-    fetched: int = Field(..., title="Fetched")
-    normalized: int = Field(..., title="Normalized")
-    rejected: int = Field(..., title="Rejected")
-    rejected_reasons: dict[str, int] = Field(..., title="Rejected Reasons")
-    duration_ms: float = Field(..., title="Duration Ms")
 
 
 class ProcessResponse(BaseModel):
@@ -27,15 +12,3 @@ class ProcessResponse(BaseModel):
     source: str | None = Field(None, title="Source")
     status: str | None = Field(None, title="Status")
     message: str | None = Field(None, title="Message")
-
-
-class ValidationError(BaseModel):
-    loc: list[str | int] = Field(..., title="Location")
-    msg: str = Field(..., title="Message")
-    type: str = Field(..., title="Error Type")
-    input: Any | None = Field(None, title="Input")
-    ctx: dict[str, Any] | None = Field(None, title="Context")
-
-
-class HTTPValidationError(BaseModel):
-    detail: list[ValidationError] | None = Field(None, title="Detail")

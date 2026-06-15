@@ -49,47 +49,6 @@
         }
       }
     },
-    "/api/v1/ingest": {
-      "post": {
-        "tags": [
-          "ingest"
-        ],
-        "summary": "Trigger Ingest",
-        "operationId": "trigger_ingest_api_v1_ingest_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/IngestRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/IngestResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/jobs/process": {
       "post": {
         "tags": [
@@ -115,71 +74,6 @@
   },
   "components": {
     "schemas": {
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
-      },
-      "IngestRequest": {
-        "properties": {
-          "source": {
-            "type": "string",
-            "title": "Source",
-            "default": "loopnet-seed"
-          }
-        },
-        "type": "object",
-        "title": "IngestRequest"
-      },
-      "IngestResponse": {
-        "properties": {
-          "source": {
-            "type": "string",
-            "title": "Source"
-          },
-          "fetched": {
-            "type": "integer",
-            "title": "Fetched"
-          },
-          "normalized": {
-            "type": "integer",
-            "title": "Normalized"
-          },
-          "rejected": {
-            "type": "integer",
-            "title": "Rejected"
-          },
-          "rejected_reasons": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "type": "object",
-            "title": "Rejected Reasons"
-          },
-          "duration_ms": {
-            "type": "number",
-            "title": "Duration Ms"
-          }
-        },
-        "type": "object",
-        "required": [
-          "source",
-          "fetched",
-          "normalized",
-          "rejected",
-          "rejected_reasons",
-          "duration_ms"
-        ],
-        "title": "IngestResponse"
-      },
       "ProcessResponse": {
         "properties": {
           "processed": {
@@ -236,46 +130,6 @@
           "processed"
         ],
         "title": "ProcessResponse"
-      },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
-          }
-        },
-        "type": "object",
-        "required": [
-          "loc",
-          "msg",
-          "type"
-        ],
-        "title": "ValidationError"
       }
     }
   }
