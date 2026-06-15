@@ -13,7 +13,7 @@ import {
 } from "@components/property/property-card";
 import { Pagination } from "@components/ui/pagination";
 import { SectionGridHasMap } from "@components/property/section-grid-has-map";
-import { usePropertySearchResults } from "@hooks/use-property-search-results";
+import { useSearchResults } from "@hooks/use-search-results";
 import { cn } from "@utils/common";
 
 import { SearchFilter } from "./filter-bar";
@@ -35,7 +35,7 @@ export const SearchResults = () => {
   const sessionProfileId =
     typeof params?.id === "string" ? params.id : undefined;
   const { models, loading, error, criteria, applyCriteria } =
-    usePropertySearchResults(sessionProfileId);
+    useSearchResults(sessionProfileId);
   const [view, setView] = useState<View>("grid");
   const [page, setPage] = useState(0);
 

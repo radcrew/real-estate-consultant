@@ -19,7 +19,7 @@ import { buildDefaultSearchCriteriaShell } from "@utils/search/criteria";
  */
 const DEFAULT_PAGE = { limit: 20, offset: 0 } as const;
 
-export const usePropertySearchResults = (
+export const useSearchResults = (
   sessionProfileId: string | undefined,
 ) => {
   const [models, setModels] = useState<PropertyModel[]>([]);
