@@ -5,7 +5,7 @@ import { LayoutGrid, Map as MapIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 
 import { NoticeCard } from "@components/ui/notice-card";
-import type { PropertyModel } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
 import {
   PropertyCard,
   PropertyCardSkeleton,

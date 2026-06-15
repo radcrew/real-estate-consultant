@@ -2,10 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  toPropertyModels,
-  type PropertyModel,
-} from "@components/property/listing-model";
+import { toPropertyModels } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
 import { searchService, type UpdateSearchCriteriaBody } from "@services/search";
 import { buildDefaultSearchCriteriaShell } from "@utils/search/criteria";
 

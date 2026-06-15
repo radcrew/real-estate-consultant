@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 
 import { Heading2 } from "@components/ui/heading2";
-import type { PropertyModel } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
 import { PropertyCard } from "@components/property/property-card";
 import { PropertyMap } from "@components/property/property-map";
 

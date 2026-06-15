@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 
 import { brand } from "@config/brand";
-import { detailToModel, type PropertyModel } from "@components/property/listing-model";
+import { detailToModel } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
 import { PropertyCard, PropertyCardSkeleton, PROPERTY_GRID } from "@components/property/property-card";
 import { ButtonSecondary } from "@components/ui/button-secondary";
 import { Heading2 } from "@components/ui/heading2";

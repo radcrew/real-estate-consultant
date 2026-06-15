@@ -7,7 +7,7 @@ import { MapPin } from "lucide-react";
 
 import { Badge } from "@components/ui/badge";
 import { BtnLikeIcon } from "@components/ui/btn-like-icon";
-import type { PropertyModel } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
 import { ImagePlaceholder } from "@components/property/image-placeholder";
 import { cn } from "@utils/common";
 

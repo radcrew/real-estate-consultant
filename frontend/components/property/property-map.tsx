@@ -2,7 +2,7 @@
 
 import GoogleMapReact from "google-map-react";
 
-import type { PropertyModel } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
 import { GOOGLE_MAPS_API_KEY } from "@lib/config";
 import { cn } from "@utils/common";
 

@@ -1,4 +1,4 @@
-import type { PropertyModel } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
 import { PropertyMap } from "@components/property/property-map";
 
 /**

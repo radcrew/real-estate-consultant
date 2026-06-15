@@ -28,7 +28,8 @@
       "@constants/*": ["./constants/*"],
       "@hooks/*": ["./hooks/*"],
       "@contexts/*": ["./contexts/*"],
-      "@config/*": ["./config/*"]
+      "@config/*": ["./config/*"],
+      "@typings/*": ["./types/*"]
     }
   },
   "include": [
