@@ -1,6 +1,6 @@
 # Runbook — Backend Incident Response
 
-Use this when the backend is down, degraded, or a synthetic check is firing.
+Use this when the backend is down, degraded, or an UptimeRobot alert is firing.
 Start at **Step 1** and work down until the issue is identified.
 
 ---
@@ -11,7 +11,7 @@ Start at **Step 1** and work down until the issue is identified.
 |-------|-----|
 | Is it us or the platform? | Check [Vercel status](https://www.vercel-status.com) and [Supabase status](https://status.supabase.com) |
 | Which endpoints are affected? | `curl -i https://<BACKEND_URL>/health/ready` — inspect the `checks` field |
-| When did it start? | GitHub Actions → **Synthetics** workflow — first failed run timestamp |
+| When did it start? | **UptimeRobot** dashboard → the monitor's event log — first "down" event timestamp |
 | What version is live? | `curl https://<BACKEND_URL>/health/ready` → `git_sha` field, match against git log |
 
 ---
@@ -104,7 +104,7 @@ git push origin main          # triggers backend.yml → deploy + smoke test
 
 ## Step 5 — After the incident
 
-1. Update the error-budget tracking in `docs/slo.md` (count failed synthetic probes).
+1. Update the error-budget tracking in `docs/slo.md` (read UptimeRobot uptime % / down events).
 2. If budget drops below 25 %, freeze non-critical deploys per the error-budget policy.
 3. Write a brief post-incident note (what broke, root cause, fix, prevention) and add it
    as a comment to the GitHub issue or PR that caused the incident.
