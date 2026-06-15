@@ -2,7 +2,7 @@
 
 Internal MVP for an **AI-assisted commercial real estate search** workflow: intake, lawful listing ingestion, property understanding, fit-based ranking, saved searches and watchlists, and **draft** broker outreach (no auto-send).
 
-The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with LLMs accessed through **OpenRouter**. Details are in [Stack](#stack) below and in [docs/spec.md](docs/spec.md).
+The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with LLMs accessed through **OpenRouter**. Details are in [Stack](#stack) below.
 
 ---
 
@@ -16,18 +16,6 @@ The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with 
 | **LLM** | [OpenRouter](https://openrouter.ai/) | Model routing and API for extraction, fit summaries, ranking explanations, and outreach drafts |
 
 Ingestion may integrate additional tools (for example **Apify** or similar) behind FastAPI; those are implementation details of each connector, not replacements for the core stack above.
-
----
-
-## Documentation
-
-Start with the product spec, then drill into scope boundaries.
-
-| Document | Description |
-|----------|-------------|
-| [docs/spec.md](docs/spec.md) | Product vision, MVP pillars, architecture principles, stack alignment |
-| [docs/mvp-scope.md](docs/mvp-scope.md) | Structured Phase 1 scope (intake through admin foundation) |
-| [docs/out-of-scope.md](docs/out-of-scope.md) | Explicit MVP exclusions |
 
 ---
 
