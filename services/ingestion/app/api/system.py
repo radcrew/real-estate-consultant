@@ -11,12 +11,12 @@ router = APIRouter(tags=["system"])
 _started_at: str = datetime.now(UTC).isoformat()
 
 
-@router.get("/health/live")
+@router.api_route("/health/live", methods=["GET", "HEAD"])
 def health_live() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.get("/health/ready")
+@router.api_route("/health/ready", methods=["GET", "HEAD"])
 async def health_ready() -> JSONResponse:
     key = settings.supabase_service_role_key
     supabase_ok = False

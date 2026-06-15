@@ -12,18 +12,18 @@ router = APIRouter(tags=["system"])
 _started_at: str = datetime.now(UTC).isoformat()
 
 
-@router.get("/health")
+@router.api_route("/health", methods=["GET", "HEAD"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.get("/health/live")
+@router.api_route("/health/live", methods=["GET", "HEAD"])
 def health_live() -> dict[str, str]:
     """Liveness: the process is up and the event loop is responsive."""
     return {"status": "ok"}
 
 
-@router.get("/health/ready")
+@router.api_route("/health/ready", methods=["GET", "HEAD"])
 async def health_ready() -> JSONResponse:
     """Readiness: DB and Supabase are reachable. Returns 503 if either is down."""
     db_ok, supabase_ok = await check_db(), await check_supabase()
