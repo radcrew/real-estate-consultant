@@ -95,10 +95,11 @@ sampling/rate-limiting (single-user traffic), SIEM/ELK stacks.
    - Step in `.github/workflows/backend.yml` / `frontend.yml` that curls
      `/health/ready` and one key API route after `vercel deploy`, failing the job
      on bad responses.
-5. **Scheduled synthetic checks (GitHub Actions cron)**
-   - Workflow running the smoke script against production every ~15 min,
-     notifying on failure. Replaces an external uptime pinger — no third-party
-     service needed.
+5. **Scheduled uptime checks (UptimeRobot)**
+   - An UptimeRobot HTTP monitor hitting `/health/ready` every 5 min, alerting on
+     failure (email/Slack/webhook) and tracking uptime % for the SLO. The
+     `/health/*` and `/api/v1/ping` routes are exempted from Vercel deployment
+     protection so the free tier can reach them without a custom header.
 6. **SLOs with error budget + runbook docs**
    - `docs/slo.md`: availability and latency targets, plus error-budget math
      (e.g. 99.5% ⇒ ~3.6 h/month) and what happens when the budget is spent.
@@ -210,7 +211,7 @@ the BFF pattern).
 | 1 | Phase 1.1–1.4: structured logs, middleware + context, scrubbing, exception handler | S | Log ingestion, normalization, filtering |
 | 1b | Phase 1.5–1.6: LLM call telemetry + ingestion-run reports | M | Telemetry, log pipelines |
 | 2 | Phase 2.1–2.3: dependency timeouts, health endpoints, DB pooling | M | SRE, reliability |
-| 3 | Phase 2.4–2.5: CI smoke tests + scheduled synthetic checks | S | SRE, deployment |
+| 3 | Phase 2.4–2.5: CI smoke tests + UptimeRobot uptime checks | S | SRE, deployment |
 | 4 | Phase 4.1–4.2: security CI + Dependabot | S | SecOps automation |
 | 5 | Phase 3.1: architecture doc + diagrams | M | System design |
 | 6 | Phase 5.1: bash ops scripts | S | Bash, Linux CLI |
