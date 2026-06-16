@@ -8,8 +8,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-logger = logging.getLogger(__name__)
-
 from app.api.v1.endpoints.intake_sessions.exceptions import (
     raise_intake_endpoint_no_questions_configured,
 )
@@ -36,6 +34,8 @@ from app.schemas.intake_sessions import (
     IntakeSessionFirstQuestion,
 )
 from app.utils.intake_validation import compute_current_index, has_answer
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
