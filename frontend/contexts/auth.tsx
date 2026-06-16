@@ -96,7 +96,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           if (stored && profile.avatar_url) {
             saveSession({ ...stored, user: { ...stored.user, avatarUrl: profile.avatar_url } });
           }
-        }).catch(() => {});
+        }).catch((err) => {
+          console.warn("[auth] background profile fetch failed:", err);
+        });
 
         onSuccess();
       } catch (err) {
@@ -205,7 +207,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (stored) {
         saveSession({ ...stored, user: { ...stored.user, avatarUrl: profile.avatar_url } });
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      console.warn("[auth] background avatar fetch failed:", err);
+    });
   }, [session]);
 
   return (
