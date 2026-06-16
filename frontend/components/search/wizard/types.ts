@@ -43,8 +43,7 @@ export type RangeAnswerValue = {
   max: number | null;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnswerValue = any;
+export type AnswerValue = string | string[] | RangeAnswerValue;
 export type WizardAnswers = Record<string, AnswerValue>;
 
 export type SummaryRow = {

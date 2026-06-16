@@ -24,7 +24,7 @@ export const FeaturedListings = () => {
     listingsService
       .getFeaturedListings({ signal: controller.signal })
       .then((res) => setModels(res.listings.map(detailToModel)))
-      .catch(() => setModels([]));
+      .catch(() => { if (!controller.signal.aborted) setModels([]); });
     return () => controller.abort();
   }, []);
 

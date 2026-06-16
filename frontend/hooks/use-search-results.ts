@@ -29,6 +29,7 @@ export const useSearchResults = (
   );
   const [error, setError] = useState<string | null>(null);
   const criteriaSessionRef = useRef<string | undefined>(undefined);
+  const controllerRef = useRef<AbortController | null>(null);
 
   const resetAll = () => {
     setModels([]);
@@ -92,14 +93,18 @@ export const useSearchResults = (
       if (!id) {
         return;
       }
+      const controller = new AbortController();
+      controllerRef.current = controller;
       setLoading(true);
       setError(null);
       try {
         await searchService.updateCriteria(id, nextCriteria);
-        await load();
+        await load(controller.signal);
       } catch {
-        setLoading(false);
-        setError("Could not update criteria. Try again later.");
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setError("Could not update criteria. Try again later.");
+        }
       }
     },
     [load, sessionProfileId],
@@ -107,8 +112,11 @@ export const useSearchResults = (
 
   useEffect(() => {
     const abortController = new AbortController();
+    controllerRef.current = abortController;
     load(abortController.signal);
-    return () => abortController.abort();
+    return () => {
+      controllerRef.current?.abort();
+    };
   }, [load]);
 
   return { models, loading, error, criteria, applyCriteria };
