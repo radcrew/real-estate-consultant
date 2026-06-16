@@ -81,7 +81,7 @@ async def _run_connector(
 ) -> str:
     start = time.perf_counter()
     try:
-        report = await connector_cls(client).run()  # type: ignore[call-arg]
+        report = await connector_cls(client).run()
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
         await _update_job(
             client,
