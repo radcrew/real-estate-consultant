@@ -91,7 +91,7 @@ def create_app() -> FastAPI:
     app.include_router(system_router)
     app.include_router(api_router, prefix="/api")
 
-    cors_origins = [settings.frontend_origin]
+    cors_origins = settings.cors_origins
     if cors_origins:
         app.add_middleware(
             CORSMiddleware,
