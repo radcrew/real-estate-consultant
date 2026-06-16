@@ -26,6 +26,7 @@ const FOOTER_COLUMNS: FooterColumn[] = [
       { label: "Listings", href: "/listings" },
       { label: "Insights", href: "/blog" },
       { label: "List your property", href: "/list-property" },
+      { label: "Newsletter", href: "/newsletter" },
       { label: "Contact", href: "/contact" },
     ],
   },
@@ -89,7 +90,7 @@ export const Footer = () => {
           ))}
         </div>
 
-        <div className="mt-16 flex min-h-16 items-center justify-center border-t border-neutral-200 text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
+        <div className="mt-16 flex items-center justify-center border-t border-neutral-200 py-8 text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
           RadEstate © {year} — Built by RadCrew
         </div>
       </div>

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 
 import { SectionHeading } from "@components/landing/section-heading";
-import { Subscribe } from "@components/landing/subscribe";
 import { Testimonials } from "@components/landing/testimonials";
 import { BgGlassmorphism } from "@components/ui/bg-glassmorphism";
 
@@ -115,8 +114,6 @@ const AboutPage = () => (
       </div>
 
       <Testimonials />
-
-      <Subscribe />
     </div>
   </div>
 );
