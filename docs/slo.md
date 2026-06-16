@@ -1,8 +1,8 @@
 # Service Level Objectives
 
 Service targets for the real-estate consultant backend (Vercel serverless + Supabase).
-Measured over a rolling 30-day window against the `/health/ready` synthetic checks
-(`.github/workflows/synthetics.yml`, every 15 minutes).
+Measured over a rolling 30-day window against the `/health/ready` checks run by
+[UptimeRobot](https://uptimerobot.com) (every 5 minutes).
 
 ---
 
@@ -19,11 +19,11 @@ Measured over a rolling 30-day window against the `/health/ready` synthetic chec
 ```
 total minutes = 30 × 24 × 60 = 43 200
 budget        = 43 200 × (1 − 0.995) = 216 minutes ≈ 3 h 36 min
-probe period  = 15 min  →  budget ≈ 14 missed probes before breach
+probe period  = 5 min   →  budget ≈ 43 missed probes before breach
 ```
 
-**What counts as downtime:** any 15-minute window in which `/health/ready` returns
-non-200 or times out on all three retry attempts.
+**What counts as downtime:** any period UptimeRobot reports `/health/ready` as down
+(non-200 / timeout), as shown in the monitor's uptime % and event log.
 
 **What does NOT count:** scheduled Vercel maintenance announced >24 h in advance,
 or Supabase platform incidents tracked on status.supabase.com.
@@ -57,8 +57,8 @@ emitted automatically at 3 s.
 
 Until a dedicated metrics backend is in place, compliance is approximated from:
 
-1. **GitHub Actions** — count failed `Synthetics` workflow runs in the 30-day window.
-   Each failed run = one 15-minute window of downtime.
+1. **UptimeRobot** — read the monitor's 30-day uptime % directly, or count down
+   events in the monitor's event log.
 2. **Vercel function logs** — filter structured logs for `"level":"ERROR"` or
    `status >= 500` in `request_completed` events.
 3. **Supabase dashboard** — DB query latency and connection counts.

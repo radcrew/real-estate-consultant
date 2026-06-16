@@ -13,17 +13,20 @@ _started_at: str = datetime.now(UTC).isoformat()
 
 
 @router.get("/health")
+@router.head("/health", include_in_schema=False)
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @router.get("/health/live")
+@router.head("/health/live", include_in_schema=False)
 def health_live() -> dict[str, str]:
     """Liveness: the process is up and the event loop is responsive."""
     return {"status": "ok"}
 
 
 @router.get("/health/ready")
+@router.head("/health/ready", include_in_schema=False)
 async def health_ready() -> JSONResponse:
     """Readiness: DB and Supabase are reachable. Returns 503 if either is down."""
     db_ok, supabase_ok = await check_db(), await check_supabase()

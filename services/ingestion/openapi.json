@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Real Estate Consultant API",
+    "title": "Real Estate Ingestion Service",
     "version": "0.1.0"
   },
   "paths": {

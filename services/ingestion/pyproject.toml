@@ -24,6 +24,12 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
 
+# Vercel's Python builder loads the FastAPI instance named `app` from this module.
+# Without this, both app/main.py and the old api/index.py were detected as
+# entrypoints, causing FUNCTION_INVOCATION_FAILED at runtime.
+[tool.vercel]
+entrypoint = "app.main:app"
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

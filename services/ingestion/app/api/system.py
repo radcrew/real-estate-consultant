@@ -12,11 +12,13 @@ _started_at: str = datetime.now(UTC).isoformat()
 
 
 @router.get("/health/live")
+@router.head("/health/live", include_in_schema=False)
 def health_live() -> dict[str, str]:
     return {"status": "ok"}
 
 
 @router.get("/health/ready")
+@router.head("/health/ready", include_in_schema=False)
 async def health_ready() -> JSONResponse:
     key = settings.supabase_service_role_key
     supabase_ok = False
