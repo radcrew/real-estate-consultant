@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     });
     return response;
   } catch (err) {
-    console.error("[oauth] callback failed:", err);
+    console.error("[oauth] callback failed:", err instanceof Error ? err.message : String(err));
     return NextResponse.redirect(
       buildSignInErrorUrl(requestUrl.origin, "Sign-in failed. Please try again."),
     );
