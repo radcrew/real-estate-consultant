@@ -26,10 +26,10 @@ async def change_account_password(
     if not email:
         raise_account_no_email_for_password_change()
 
-    await verify_current_email_password(client, email=email, password=body.current_password)
-
     if body.current_password == body.new_password:
         raise_account_new_password_same_as_current()
+
+    await verify_current_email_password(client, email=email, password=body.current_password)
 
     await update_auth_user_password(client, current_user.id, new_password=body.new_password)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

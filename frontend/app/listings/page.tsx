@@ -1,11 +1,12 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { ButtonPrimary } from "@components/ui/button-primary";
-import { detailToModel, type PropertyModel } from "@components/property/listing-model";
-import { PropertyCard, PropertyCardSkeleton, PROPERTY_GRID } from "@components/property/property-card";
+import { detailToModel } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
+import { PropertyCard, PropertyCardSkeleton, PROPERTY_GRID } from "@components/property/card";
 import { Heading2 } from "@components/ui/heading2";
 import { brand } from "@config/brand";
 import { listingsService } from "@services/listings";

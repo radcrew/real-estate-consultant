@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from app.core.db_safe import execute_db_safe
 from app.core.deps import CurrentAdmin, SupabaseSdkDep
-from app.services.ingestion_client import wake_processor
+from app.services.ingestion import wake_processor
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
@@ -59,6 +59,8 @@ async def enqueue_ingest(
     result = await execute_db_safe(
         client.table("jobs").insert({"source": source, "idempotency_key": idem_key}).execute()
     )
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Job insert returned no data.")
     job = result.data[0]
     logger.info("job_enqueued", extra={"job_id": job["id"], "source": source, "idem_key": idem_key})
     await wake_processor()

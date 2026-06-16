@@ -19,18 +19,6 @@ def _bearer_token(request: Request) -> str:
     return token if scheme.lower() == "bearer" else ""
 
 
-def require_service_token(request: Request) -> None:
-    """Require Authorization: Bearer <SERVICE_AUTH_TOKEN[_NEXT]>.
-
-    For endpoints only the backend should call directly.
-    """
-    valid = {t for t in (settings.service_auth_token, settings.service_auth_token_next) if t}
-    if not valid:
-        raise HTTPException(status_code=503, detail="Service auth not configured.")
-    if _bearer_token(request) not in valid:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-
 def require_internal_token(request: Request) -> None:
     """Require the cron secret (GitHub Actions poller) or the service token (backend).
 
@@ -39,7 +27,7 @@ def require_internal_token(request: Request) -> None:
     valid = {
         t
         for t in (
-            settings.cron_secret,
+            settings.trigger_token,
             settings.service_auth_token,
             settings.service_auth_token_next,
         )

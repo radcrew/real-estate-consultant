@@ -1,6 +1,6 @@
 "use client";
 
-import type { AnswerValue, WizardQuestion } from "../types";
+import type { AnswerValue, RangeAnswerValue, WizardQuestion } from "../types";
 
 import { MultiSelectQuestionInput } from "./select/multi";
 import { QuestionInputShell } from "./shell";
@@ -26,7 +26,7 @@ export const QuestionInput = ({
     {question.kind === "text" && (
       <TextQuestionInput
         question={question}
-        answer={answer}
+        answer={answer as string}
         onChange={onAnswerChange}
       />
     )}
@@ -34,7 +34,7 @@ export const QuestionInput = ({
     {question.kind === "single-select" && (
       <SingleSelectQuestionInput
         question={question}
-        answer={answer}
+        answer={answer as string}
         onChange={onAnswerChange}
       />
     )}
@@ -42,7 +42,7 @@ export const QuestionInput = ({
     {question.kind === "multi-select" && (
       <MultiSelectQuestionInput
         question={question}
-        answer={answer}
+        answer={answer as string[]}
         onToggle={onMultiSelectToggle}
       />
     )}
@@ -50,7 +50,7 @@ export const QuestionInput = ({
     {question.kind === "range" && (
       <RangeQuestionInput
         question={question}
-        answer={answer}
+        answer={answer as RangeAnswerValue}
         onChange={onAnswerChange}
       />
     )}

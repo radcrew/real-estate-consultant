@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   description: "Get in touch with RadEstate",
 };
 
+const INFO_HEADING = "text-sm font-semibold uppercase tracking-wider dark:text-neutral-200";
+
 const INFO = [
   {
     title: "🗺 ADDRESS",
@@ -35,7 +37,7 @@ const ContactPage = () => (
           <div className="max-w-sm space-y-8">
             {INFO.map((item) => (
               <div key={item.title}>
-                <h3 className="text-sm font-semibold uppercase tracking-wider dark:text-neutral-200">
+                <h3 className={INFO_HEADING}>
                   {item.title}
                 </h3>
                 <span className="mt-2 block text-neutral-500 dark:text-neutral-400">
@@ -44,7 +46,7 @@ const ContactPage = () => (
               </div>
             ))}
             <div>
-              <h3 className="text-sm font-semibold uppercase tracking-wider dark:text-neutral-200">
+              <h3 className={INFO_HEADING}>
                 🌏 SOCIALS
               </h3>
               <SocialsList className="mt-2" />

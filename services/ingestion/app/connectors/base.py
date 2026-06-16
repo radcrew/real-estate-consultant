@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from supabase import AsyncClient
+
 
 @dataclass
 class IngestionReport:
@@ -20,6 +22,9 @@ class IngestionReport:
 
 class ConnectorBase(ABC):
     """All listing connectors implement this interface."""
+
+    def __init__(self, client: AsyncClient) -> None:
+        self._client = client
 
     @property
     @abstractmethod

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 from uuid import UUID
 
@@ -33,6 +34,8 @@ from app.schemas.intake_sessions import (
     IntakeSessionFirstQuestion,
 )
 from app.utils.intake_validation import compute_current_index, has_answer
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -66,7 +69,11 @@ async def create_intake_session(
                 type=first_question.type,
                 options=first_question.options,
             )
-        except HTTPException:
+        except HTTPException as exc:
+            logger.warning(
+                "llm_opening_question_failed",
+                extra={"status_code": exc.status_code, "detail": exc.detail},
+            )
             llm_question_text = first_question.text
 
         next_question = IntakeSessionFirstQuestion(

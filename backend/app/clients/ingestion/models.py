@@ -8,19 +8,6 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class IngestRequest(BaseModel):
-    source: str | None = Field("loopnet-seed", title="Source")
-
-
-class IngestResponse(BaseModel):
-    source: str = Field(..., title="Source")
-    fetched: int = Field(..., title="Fetched")
-    normalized: int = Field(..., title="Normalized")
-    rejected: int = Field(..., title="Rejected")
-    rejected_reasons: dict[str, int] = Field(..., title="Rejected Reasons")
-    duration_ms: float = Field(..., title="Duration Ms")
-
-
 class ProcessResponse(BaseModel):
     processed: bool = Field(..., title="Processed")
     job_id: str | None = Field(None, title="Job Id")

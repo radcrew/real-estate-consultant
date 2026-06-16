@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { AdminIngestView } from "@components/admin/ingest-view";
+import { AdminIngestView } from "@components/admin/ingest";
 
 export const metadata: Metadata = {
   title: "Ingestion",

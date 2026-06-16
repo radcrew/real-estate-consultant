@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { GOOGLE_MAPS_API_KEY } from "@lib/config";
+import { GOOGLE_MAPS_API_KEY } from "@config/env";
 
 declare global {
   interface Window {
@@ -114,7 +114,6 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
     return () => {
       isMounted = false;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(

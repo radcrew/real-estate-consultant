@@ -1,19 +1,19 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { LayoutGrid, Map as MapIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 
 import { NoticeCard } from "@components/ui/notice-card";
-import type { PropertyModel } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
 import {
   PropertyCard,
   PropertyCardSkeleton,
   PROPERTY_GRID,
-} from "@components/property/property-card";
+} from "@components/property/card";
 import { Pagination } from "@components/ui/pagination";
-import { SectionGridHasMap } from "@components/property/section-grid-has-map";
-import { usePropertySearchResults } from "@hooks/use-property-search-results";
+import { SectionGridHasMap } from "@components/property/grid-with-map";
+import { useSearchResults } from "@hooks/use-search-results";
 import { cn } from "@utils/common";
 
 import { SearchFilter } from "./filter-bar";
@@ -35,7 +35,7 @@ export const SearchResults = () => {
   const sessionProfileId =
     typeof params?.id === "string" ? params.id : undefined;
   const { models, loading, error, criteria, applyCriteria } =
-    usePropertySearchResults(sessionProfileId);
+    useSearchResults(sessionProfileId);
   const [view, setView] = useState<View>("grid");
   const [page, setPage] = useState(0);
 

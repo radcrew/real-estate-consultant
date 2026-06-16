@@ -8,6 +8,7 @@ from supabase import AsyncClient, AuthApiError
 from supabase_auth.types import User
 
 from app.core.database import get_session
+from app.core.db_safe import SupabaseRequestError
 from app.core.exceptions import (
     raise_auth_invalid_access_token,
     raise_auth_missing_bearer,
@@ -15,7 +16,7 @@ from app.core.exceptions import (
 )
 from app.core.supabase_sdk import get_supabase_sdk_client
 from app.repositories.profiles import fetch_profile_row
-from app.utils.exceptions import raise_forbidden
+from app.utils.exceptions import raise_forbidden, raise_service_unavailable
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 
@@ -52,7 +53,10 @@ async def get_current_admin(
     client: SupabaseSdkDep,
 ) -> User:
     """Require the authenticated user to have ``profiles.is_admin = true``."""
-    raw = await fetch_profile_row(client, UUID(user.id))
+    try:
+        raw = await fetch_profile_row(client, UUID(user.id))
+    except SupabaseRequestError as exc:
+        raise_service_unavailable("Profile service unavailable.", cause=exc)
     if not raw or not raw.get("is_admin"):
         raise_forbidden("Admin access required.")
     return user

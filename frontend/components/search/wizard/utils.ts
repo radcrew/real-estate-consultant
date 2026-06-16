@@ -5,6 +5,7 @@ import {
   type RangeQuestion,
   type AnswerValue,
   type RangeAnswerValue,
+  type LocationAnswerValue,
   type WizardQuestion,
 } from "./types";
 
@@ -81,15 +82,16 @@ export const formatAnswerForSummary = (
   }
 
   if (question.kind === "range") {
+    const ra = answer as RangeAnswerValue;
     if (
       typeof answer === "object" &&
       answer != null &&
       !Array.isArray(answer) &&
-      typeof answer.min === "number" &&
-      typeof answer.max === "number"
+      typeof ra.min === "number" &&
+      typeof ra.max === "number"
     ) {
       const unit = getRangeQuestionUnit(question);
-      return `${formatRangeValue(answer.min, question.title, unit)} - ${formatRangeValue(answer.max, question.title, unit)}`;
+      return `${formatRangeValue(ra.min, question.title, unit)} - ${formatRangeValue(ra.max, question.title, unit)}`;
     }
     return "Not answered";
   }
@@ -103,15 +105,16 @@ export const formatAnswerForSummary = (
       answer != null &&
       !Array.isArray(answer)
     ) {
-      const parts = [answer.city, answer.state, answer.country].filter(Boolean);
+      const loc = answer as LocationAnswerValue;
+      const parts = [loc.city, loc.state, loc.country].filter(Boolean);
       if (parts.length > 0) {
         return parts.join(", ");
       }
-      if (typeof answer.label === "string" && answer.label.trim().length > 0) {
-        return answer.label.trim();
+      if (typeof loc.label === "string" && loc.label.trim().length > 0) {
+        return loc.label.trim();
       }
-      if (typeof answer.input === "string" && answer.input.trim().length > 0) {
-        return answer.input.trim();
+      if (typeof loc.input === "string" && loc.input.trim().length > 0) {
+        return loc.input.trim();
       }
     }
     return "Not answered";

@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@lib/config";
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@config/env";
 
 export const getSupabaseServerClient = async () => {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {

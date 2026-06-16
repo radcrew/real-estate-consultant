@@ -37,7 +37,7 @@ async def save_listing(
 
 @router.delete("/saved/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def unsave_listing(
-    property_id: str,
+    property_id: UUID,
     current_user: CurrentUser,
     client: SupabaseSdkDep,
 ) -> None:

@@ -25,8 +25,8 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
-    # Shared secret for the GitHub Actions job poller (leave empty to skip auth).
-    cron_secret: str = ""
+    # Shared secret for GitHub Actions workflows (dataset change trigger, manual runs).
+    trigger_token: str = ""
 
     # Shared bearer token the backend sends when calling this service directly.
     # See app/core/auth.py for the rotation procedure.

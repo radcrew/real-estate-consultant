@@ -2,10 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  toPropertyModels,
-  type PropertyModel,
-} from "@components/property/listing-model";
+import { toPropertyModels } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
 import { searchService, type UpdateSearchCriteriaBody } from "@services/search";
 import { buildDefaultSearchCriteriaShell } from "@utils/search/criteria";
 
@@ -19,7 +17,7 @@ import { buildDefaultSearchCriteriaShell } from "@utils/search/criteria";
  */
 const DEFAULT_PAGE = { limit: 20, offset: 0 } as const;
 
-export const usePropertySearchResults = (
+export const useSearchResults = (
   sessionProfileId: string | undefined,
 ) => {
   const [models, setModels] = useState<PropertyModel[]>([]);
@@ -31,6 +29,7 @@ export const usePropertySearchResults = (
   );
   const [error, setError] = useState<string | null>(null);
   const criteriaSessionRef = useRef<string | undefined>(undefined);
+  const controllerRef = useRef<AbortController | null>(null);
 
   const resetAll = () => {
     setModels([]);
@@ -94,14 +93,18 @@ export const usePropertySearchResults = (
       if (!id) {
         return;
       }
+      const controller = new AbortController();
+      controllerRef.current = controller;
       setLoading(true);
       setError(null);
       try {
         await searchService.updateCriteria(id, nextCriteria);
-        await load();
+        await load(controller.signal);
       } catch {
-        setLoading(false);
-        setError("Could not update criteria. Try again later.");
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setError("Could not update criteria. Try again later.");
+        }
       }
     },
     [load, sessionProfileId],
@@ -109,8 +112,11 @@ export const usePropertySearchResults = (
 
   useEffect(() => {
     const abortController = new AbortController();
+    controllerRef.current = abortController;
     load(abortController.signal);
-    return () => abortController.abort();
+    return () => {
+      controllerRef.current?.abort();
+    };
   }, [load]);
 
   return { models, loading, error, criteria, applyCriteria };
