@@ -61,7 +61,7 @@ class _JsonFormatter(logging.Formatter):
             "request_id": request_id_var.get("-"),
         }
         if self._swo_token:
-            payload["token"] = self._swo_token
+            payload["swo_token"] = self._swo_token
         if (uid := user_id_var.get(None)) is not None:
             payload["user_id"] = uid
         if record.exc_info:
