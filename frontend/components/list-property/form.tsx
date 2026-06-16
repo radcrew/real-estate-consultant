@@ -9,6 +9,8 @@ import { Textarea } from "@components/ui/textarea";
 import { listingsService } from "@services/listings";
 import { getApiErrorMessage } from "@utils/common";
 
+import { AddressAutocomplete } from "./address-autocomplete";
+
 const LABEL = "text-sm font-medium text-neutral-700 dark:text-neutral-300";
 const CARD = "rounded-2xl border border-neutral-200 p-6 sm:p-8 dark:border-neutral-700";
 const SECTION_HEADING = "text-lg font-semibold text-neutral-900 dark:text-neutral-100";
@@ -171,11 +173,18 @@ export const ListPropertyForm = () => {
         <div className={FIELD_GRID}>
           <label className="block sm:col-span-2">
             <span className={LABEL}>Street address</span>
-            <Input
+            <AddressAutocomplete
               className="mt-1.5"
-              autoComplete="street-address"
               value={form.address}
-              onChange={(e) => set("address", e.target.value)}
+              onChange={(value) => set("address", value)}
+              onSelect={({ address, city, state }) =>
+                setForm((f) => ({
+                  ...f,
+                  address: address || f.address,
+                  city: city || f.city,
+                  state: state || f.state,
+                }))
+              }
             />
           </label>
           <label className="block">
