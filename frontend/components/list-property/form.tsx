@@ -14,7 +14,7 @@ const CARD = "rounded-2xl border border-neutral-200 p-6 sm:p-8 dark:border-neutr
 const SECTION_HEADING = "text-lg font-semibold text-neutral-900 dark:text-neutral-100";
 const FIELD_GRID = "mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2";
 
-const PROPERTY_TYPES = ["Industrial", "Flex", "Retail", "Office", "Land", "Medical"];
+const PROPERTY_TYPES = ["Industrial", "Retail", "Flex"];
 
 type FormState = {
   property_type: string;
