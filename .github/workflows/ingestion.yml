@@ -1,0 +1,164 @@
+# Ingestion microservice: lint + tests on PR/push; preview deploy on PR; production deploy on push to main.
+#
+# Separate Vercel project with Root Directory = services/ingestion (Settings → General).
+# Deploy runs from services/ingestion/ (repo-root .vercelignore excludes it for the
+# frontend project; backend/vercelignore excludes it for the backend project).
+#
+# GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_INGESTION_PROJECT_ID,
+#                 VERCEL_AUTOMATION_BYPASS_SECRET (Vercel → Settings → Deployment Protection)
+# Production env in Vercel: see services/ingestion/.env.example
+name: Ingestion
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "services/ingestion/**"
+      - ".github/workflows/ingestion.yml"
+  pull_request:
+    paths:
+      - "services/ingestion/**"
+      - ".github/workflows/ingestion.yml"
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_INGESTION_PROJECT_ID }}
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/ingestion
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -U pip && python -m pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check app
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/ingestion
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -U pip && python -m pip install -e ".[dev]"
+
+      - name: Pytest
+        run: pytest -q
+
+  deploy:
+    name: Deploy to Vercel
+    needs: [lint, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        id: deploy
+        run: |
+          url=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.url }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          smoke() {
+            local path="$1"
+            for i in 1 2 3; do
+              body=$(curl -s -w "\n%{http_code}" \
+                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+                "$BASE_URL$path")
+              status=$(echo "$body" | tail -1)
+              [ "$status" = "200" ] && { echo "OK $path"; return 0; }
+              [ $i -lt 3 ] && sleep 5
+            done
+            echo "FAIL $path — status $status — body:"
+            echo "$body" | head -5
+            exit 1
+          }
+          smoke /health/live
+          smoke /health/ready
+
+  deploy-preview:
+    name: Deploy preview to Vercel
+    needs: [lint, test]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy preview to Vercel
+        id: deploy
+        run: |
+          url=$(vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.url }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          if [ -z "$BYPASS_SECRET" ]; then
+            echo "::warning::VERCEL_AUTOMATION_BYPASS_SECRET is not set — requests may be blocked by Vercel protection (401)."
+          fi
+          smoke() {
+            local path="$1"
+            for i in 1 2 3; do
+              body=$(curl -s -w "\n%{http_code}" \
+                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+                "$BASE_URL$path")
+              status=$(echo "$body" | tail -1)
+              [ "$status" = "200" ] && { echo "OK $path"; return 0; }
+              [ $i -lt 3 ] && sleep 5
+            done
+            echo "FAIL $path — status $status — body:"
+            echo "$body" | head -5
+            exit 1
+          }
+          smoke /health/live
+          smoke /health/ready
+
+      - name: Preview URL
+        run: echo "### Preview deployment\n${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"

@@ -7,7 +7,7 @@ from typing import Any
 
 from app.llm.intake.exceptions import raise_hf_opening_response_missing_text
 from app.llm.intake.schema import extract_question_keys, render_intake_response_schema
-from app.llm.providers.anthropic import anthropic_provider as huggingface_provider
+from app.llm.providers import huggingface_provider
 from app.llm.providers.prompts import (
     INTAKE_PARSE_SYSTEM_PROMPT_HEADER,
     INTAKE_PARSE_SYSTEM_PROMPT_RULES,

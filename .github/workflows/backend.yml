@@ -3,19 +3,25 @@
 # Separate Vercel project with Root Directory = backend (Settings → General).
 # Deploy runs from backend/ (repo-root .vercelignore excludes backend for the frontend project).
 #
-# GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_BACKEND_PROJECT_ID
+# GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_BACKEND_PROJECT_ID,
+#                 VERCEL_AUTOMATION_BYPASS_SECRET (Vercel → Settings → Deployment Protection)
 # Production env in Vercel: see backend/.env.example
 name: Backend
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
       - "backend/**"
+      - "services/ingestion/**"
+      - "scripts/generate_ingestion_client.py"
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
       - "backend/**"
+      - "services/ingestion/**"
+      - "scripts/generate_ingestion_client.py"
       - ".github/workflows/backend.yml"
 
 env:
@@ -44,9 +50,37 @@ jobs:
       - name: Ruff
         run: ruff check app
 
+  contract-check:
+    name: Ingestion client contract check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install -e "backend[dev]"
+          python -m pip install -e "services/ingestion"
+
+      - name: Regenerate ingestion client from OpenAPI schema
+        run: python scripts/generate_ingestion_client.py
+
+      - name: Fail on contract drift
+        run: |
+          if ! git diff --exit-code -- services/ingestion/openapi.json backend/app/clients/ingestion/models.py; then
+            echo "::error::Ingestion API contract changed — run 'python scripts/generate_ingestion_client.py' and commit the result."
+            exit 1
+          fi
+
   deploy:
     name: Deploy to Vercel
-    needs: lint
+    needs: [lint, contract-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     defaults:
@@ -71,9 +105,31 @@ jobs:
           url=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
 
+      - name: Smoke test
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.url }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          smoke() {
+            local path="$1"
+            for i in 1 2 3; do
+              body=$(curl -s -w "\n%{http_code}" \
+                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+                "$BASE_URL$path")
+              status=$(echo "$body" | tail -1)
+              [ "$status" = "200" ] && { echo "OK $path"; return 0; }
+              [ $i -lt 3 ] && sleep 5
+            done
+            echo "FAIL $path — status $status — body:"
+            echo "$body" | head -5
+            exit 1
+          }
+          smoke /health/ready
+          smoke /api/v1/ping
+
   deploy-preview:
     name: Deploy preview to Vercel
-    needs: lint
+    needs: [lint, contract-check]
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     defaults:
@@ -94,6 +150,31 @@ jobs:
         run: |
           url=$(vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.url }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          if [ -z "$BYPASS_SECRET" ]; then
+            echo "::warning::VERCEL_AUTOMATION_BYPASS_SECRET is not set — requests may be blocked by Vercel protection (401)."
+          fi
+          smoke() {
+            local path="$1"
+            for i in 1 2 3; do
+              body=$(curl -s -w "\n%{http_code}" \
+                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+                "$BASE_URL$path")
+              status=$(echo "$body" | tail -1)
+              [ "$status" = "200" ] && { echo "OK $path"; return 0; }
+              [ $i -lt 3 ] && sleep 5
+            done
+            echo "FAIL $path — status $status — body:"
+            echo "$body" | head -5
+            exit 1
+          }
+          smoke /health/ready
+          smoke /api/v1/ping
 
       - name: Preview URL
         run: echo "### Preview deployment\n${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
