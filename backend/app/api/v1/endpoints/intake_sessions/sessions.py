@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
+
+logger = logging.getLogger(__name__)
 
 from app.api.v1.endpoints.intake_sessions.exceptions import (
     raise_intake_endpoint_no_questions_configured,
@@ -66,7 +69,11 @@ async def create_intake_session(
                 type=first_question.type,
                 options=first_question.options,
             )
-        except HTTPException:
+        except HTTPException as exc:
+            logger.warning(
+                "llm_opening_question_failed",
+                extra={"status_code": exc.status_code, "detail": exc.detail},
+            )
             llm_question_text = first_question.text
 
         next_question = IntakeSessionFirstQuestion(
