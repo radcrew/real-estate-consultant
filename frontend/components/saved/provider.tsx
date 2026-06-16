@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -38,16 +39,19 @@ export const SavedListingsProvider = ({ children }: { children: ReactNode }) => 
 
   const [ids, setIds] = useState<Set<string>>(new Set());
   const [ready, setReady] = useState(false);
+  const sessionAcRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!authReady) return;
     if (!session) {
+      sessionAcRef.current = null;
       setIds(new Set());
       setReady(true);
       return;
     }
 
     const ac = new AbortController();
+    sessionAcRef.current = ac;
     setReady(false);
     void (async () => {
       try {
@@ -60,7 +64,10 @@ export const SavedListingsProvider = ({ children }: { children: ReactNode }) => 
       }
     })();
 
-    return () => ac.abort();
+    return () => {
+      ac.abort();
+      sessionAcRef.current = null;
+    };
   }, [authReady, session]);
 
   const isSaved = useCallback((id: string) => ids.has(id), [ids]);
@@ -78,10 +85,12 @@ export const SavedListingsProvider = ({ children }: { children: ReactNode }) => 
         else next.delete(id);
         return next;
       });
+      const signal = sessionAcRef.current?.signal;
       const req = willSave
-        ? accountService.addSaved(id)
-        : accountService.removeSaved(id);
+        ? accountService.addSaved(id, { signal })
+        : accountService.removeSaved(id, { signal });
       req.catch(() => {
+        if (!sessionAcRef.current || sessionAcRef.current.signal.aborted) return;
         // revert on failure
         setIds((prev) => {
           const next = new Set(prev);
