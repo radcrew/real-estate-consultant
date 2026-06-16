@@ -43,7 +43,15 @@ export type RangeAnswerValue = {
   max: number | null;
 };
 
-export type AnswerValue = string | string[] | RangeAnswerValue;
+export type LocationAnswerValue = {
+  city?: string;
+  state?: string;
+  country?: string;
+  label?: string;
+  input?: string;
+};
+
+export type AnswerValue = string | string[] | RangeAnswerValue | LocationAnswerValue;
 export type WizardAnswers = Record<string, AnswerValue>;
 
 export type SummaryRow = {

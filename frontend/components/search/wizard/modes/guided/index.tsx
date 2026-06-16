@@ -56,7 +56,7 @@ export const GuidedQuestionnaire = () => {
             <QuestionInput
               key={currentQuestion.id}
               question={currentQuestion}
-              answer={currentAnswer}
+              answer={currentAnswer ?? ""}
               onAnswerChange={updateCurrentAnswer}
               onMultiSelectToggle={toggleCurrentMultiSelect}
             />

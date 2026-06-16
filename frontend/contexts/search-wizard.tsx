@@ -135,12 +135,12 @@ export const SearchWizardProvider = ({
         setTotalSteps(total);
         setCurrentQuestion(currentQuestionToShow);
         setQuestionHistory(visibleHistory);
-        setAnswers(hydratedAnswers);
+        setAnswers(hydratedAnswers as WizardAnswers);
         setSummaryRows(
           summaryQuestions.map((question) => ({
             id: question.id,
             label: question.title,
-            value: formatAnswerForSummary(question, criteria[question.id]),
+            value: formatAnswerForSummary(question, criteria[question.id] as AnswerValue),
           })),
         );
         setStepIndex(hydratedStepIndex);

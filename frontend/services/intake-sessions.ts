@@ -29,7 +29,11 @@ export type CreateGuidedIntakeSessionResponse = {
 
 export type SubmitIntakeSessionAnswerBody = {
   key: string;
-  answers: string | string[] | { min: number | null; max: number | null };
+  answers:
+    | string
+    | string[]
+    | { min: number | null; max: number | null }
+    | { city?: string; state?: string; country?: string; label?: string; input?: string };
 };
 
 export type SubmitIntakeSessionAnswerResponse = {
