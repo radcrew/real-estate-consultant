@@ -14,10 +14,6 @@ export const STYLES = {
   chooserHeading:
     "text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-4xl",
   chooserSubtitle: "mt-3 text-lg text-neutral-500 dark:text-neutral-400",
-  chooserError: [
-    "mt-6 w-full max-w-3xl rounded-2xl border border-destructive/30 bg-destructive/5",
-    "px-4 py-3 text-sm text-destructive",
-  ].join(" "),
   choiceIconCellSky:
     "flex size-12 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200",
   choiceIconCellViolet:

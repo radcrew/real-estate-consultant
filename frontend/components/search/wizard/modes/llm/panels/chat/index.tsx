@@ -19,7 +19,6 @@ type ChatPanelProps = {
 export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
   const {
     clearLlmChatBootstrap,
-    errorMessage,
     isLoadingQuestion,
     isSubmitting,
     llmChatBootstrap,
@@ -128,10 +127,6 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
         </div>
         <h2 className={STYLES.chatTitle}>AI Property Assistant</h2>
       </header>
-
-      {errorMessage && (
-        <div className={`${STYLES.errorBanner} mx-4 mt-3 sm:mx-5`}>{errorMessage}</div>
-      )}
 
       {isBusy ? (
         <div className={STYLES.loadingWrap}>

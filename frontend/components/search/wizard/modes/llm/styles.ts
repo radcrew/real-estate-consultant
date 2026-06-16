@@ -50,6 +50,4 @@ export const STYLES = {
   switchLink:
     "flex w-full cursor-pointer items-center justify-center gap-2 border-0 bg-transparent py-2 text-sm font-medium text-muted-foreground underline-offset-4 hover:text-foreground hover:underline",
   loadingWrap: "flex flex-1 items-center justify-center py-16 text-sm text-muted-foreground",
-  errorBanner:
-    "mb-3 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive",
 } as const;

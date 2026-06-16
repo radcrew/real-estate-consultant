@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import { intakeSessionsService } from "@services/intake-sessions";
+import { useToast } from "@components/ui/toast";
 import { getApiErrorMessage } from "@utils/common";
 
 import type {
@@ -33,7 +34,6 @@ type SearchWizardContextValue = {
   canContinue: boolean;
   currentAnswer: AnswerValue | undefined;
   currentQuestion: WizardQuestion | null;
-  errorMessage: string | null;
   goNext: () => Promise<void>;
   isBusy: boolean;
   isLoadingQuestion: boolean;
@@ -67,6 +67,7 @@ export const SearchWizardProvider = ({
   onClose,
 }: SearchWizardProviderProps) => {
   const router = useRouter();
+  const { showError } = useToast();
   const [activeMode, setActiveMode] = useState<SearchWizardMode>(() =>
     initialSessionId ? "guided" : "selector",
   );
@@ -83,9 +84,19 @@ export const SearchWizardProvider = ({
     Boolean(initialSessionId),
   );
   const [isSubmitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [llmChatBootstrap, setLlmChatBootstrap] = useState<string[] | null>(
     null,
+  );
+
+  // Surface errors as toasts. Kept as `setErrorMessage(value | null)` so callers
+  // that previously cleared inline errors with `null` remain valid no-ops.
+  const setErrorMessage = useCallback(
+    (value: string | null) => {
+      if (value) {
+        showError(value);
+      }
+    },
+    [showError],
   );
 
   const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
@@ -161,7 +172,7 @@ export const SearchWizardProvider = ({
     return () => {
       isCancelled = true;
     };
-  }, [initialSessionId]);
+  }, [initialSessionId, setErrorMessage]);
 
   const startGuidedForm = async () => {
     if (isLoadingQuestion || isSubmitting) {
@@ -369,7 +380,6 @@ export const SearchWizardProvider = ({
     canContinue,
     currentAnswer,
     currentQuestion,
-    errorMessage,
     goNext,
     isBusy,
     isLoadingQuestion,

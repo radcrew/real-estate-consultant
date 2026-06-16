@@ -11,8 +11,6 @@ export const STYLES = {
     "border border-neutral-200 bg-white p-6 shadow-sm sm:p-7",
     "dark:border-neutral-700 dark:bg-neutral-900",
   ].join(" "),
-  errorBanner:
-    "mb-4 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive",
   loadingState: "py-10 text-sm text-muted-foreground",
   actionsRow:
     "mt-8 flex flex-col gap-3 border-t border-neutral-200 pt-6 dark:border-neutral-700 sm:flex-row sm:items-center sm:justify-between",

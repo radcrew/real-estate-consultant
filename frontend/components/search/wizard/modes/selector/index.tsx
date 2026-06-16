@@ -18,7 +18,6 @@ import { STYLES } from "./styles";
 
 export const SearchModeSelector = () => {
   const {
-    errorMessage,
     isBusy,
     onClose,
     startSmartChat,
@@ -36,10 +35,6 @@ export const SearchModeSelector = () => {
           Choose the search style that works best for you.
         </p>
       </div>
-
-      {errorMessage && (
-        <div className={STYLES.chooserError}>{errorMessage}</div>
-      )}
 
       <div className={STYLES.chooserGrid}>
         <section className={STYLES.choiceCard}>

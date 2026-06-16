@@ -17,7 +17,6 @@ export const GuidedQuestionnaire = () => {
     canContinue,
     currentAnswer,
     currentQuestion,
-    errorMessage,
     goNext,
     goPrev,
     isBusy,
@@ -48,10 +47,6 @@ export const GuidedQuestionnaire = () => {
           className={STYLES.section}
           onKeyDown={handleKeyDown}
         >
-          {errorMessage && (
-            <div className={STYLES.errorBanner}>{errorMessage}</div>
-          )}
-
           {currentQuestion ? (
             <QuestionInput
               key={currentQuestion.id}
