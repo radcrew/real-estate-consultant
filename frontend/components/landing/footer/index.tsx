@@ -54,7 +54,7 @@ export const Footer = () => {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="relative border-t border-neutral-200 py-20 lg:py-24 dark:border-neutral-700">
+    <footer className="relative border-t border-neutral-200 pt-20 lg:pt-24 dark:border-neutral-700">
       <div className="mx-auto max-w-screen-xl px-4">
         <div className="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 md:grid-cols-4 lg:gap-x-10">
           <div className="col-span-2 flex flex-col gap-5 md:col-span-4 lg:col-span-1">
@@ -89,7 +89,7 @@ export const Footer = () => {
           ))}
         </div>
 
-        <div className="mt-16 border-t border-neutral-200 pt-8 text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
+        <div className="mt-16 flex min-h-16 items-center justify-center border-t border-neutral-200 text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
           RadEstate © {year} — Built by RadCrew
         </div>
       </div>
