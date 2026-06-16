@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from app.core.db_safe import execute_db_safe
 from app.core.deps import CurrentAdmin, SupabaseSdkDep
-from app.services.ingestion_client import wake_processor
+from app.services.ingestion import wake_processor
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 logger = logging.getLogger(__name__)
