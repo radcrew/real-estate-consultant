@@ -4,7 +4,7 @@ from fastapi import APIRouter, status
 from supabase import AuthApiError, AuthWeakPasswordError
 
 from app.api.v1.endpoints.auth.exceptions import (
-    raise_sign_up_auth_api_error,
+    raise_auth_api_error,
     raise_sign_up_email_already_exists,
     raise_sign_up_weak_password_api,
     raise_sign_up_weak_password_sdk,
@@ -45,7 +45,7 @@ async def sign_up(body: SignUpRequest, client: SupabaseSdkDep) -> SignUpResponse
         if exc.code == "weak_password":
             raise_sign_up_weak_password_api(exc=exc)
 
-        raise_sign_up_auth_api_error(exc)
+        raise_auth_api_error(exc)
 
     user = result.user
     user_id = UUID(user.id)
