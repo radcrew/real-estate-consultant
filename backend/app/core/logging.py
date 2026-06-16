@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import re
+import socket
 from contextvars import ContextVar
+from logging.handlers import SysLogHandler
 from typing import Any
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
@@ -45,6 +47,10 @@ def _scrub(value: Any, key: str | None = None) -> Any:
 
 
 class _JsonFormatter(logging.Formatter):
+    def __init__(self, swo_token: str = "") -> None:
+        super().__init__()
+        self._swo_token = swo_token
+
     def format(self, record: logging.LogRecord) -> str:
         record.message = record.getMessage()
         payload: dict[str, Any] = {
@@ -54,6 +60,8 @@ class _JsonFormatter(logging.Formatter):
             "message": record.message,
             "request_id": request_id_var.get("-"),
         }
+        if self._swo_token:
+            payload["token"] = self._swo_token
         if (uid := user_id_var.get(None)) is not None:
             payload["user_id"] = uid
         if record.exc_info:
@@ -73,13 +81,32 @@ class _DropNoisyRequestsFilter(logging.Filter):
         return True
 
 
-def configure_logging(level: str = "INFO") -> None:
-    handler = logging.StreamHandler()
-    handler.setFormatter(_JsonFormatter())
-    handler.addFilter(_DropNoisyRequestsFilter())
+def configure_logging(
+    level: str = "INFO",
+    swo_hostname: str = "",
+    swo_port: int = 514,
+    swo_token: str = "",
+) -> None:
+    formatter = _JsonFormatter(swo_token=swo_token)
+    noise_filter = _DropNoisyRequestsFilter()
+
+    stdout_handler = logging.StreamHandler()
+    stdout_handler.setFormatter(formatter)
+    stdout_handler.addFilter(noise_filter)
+
     root = logging.getLogger()
     root.handlers.clear()
-    root.addHandler(handler)
+    root.addHandler(stdout_handler)
+
+    if swo_hostname and swo_token:
+        swo_handler = SysLogHandler(
+            address=(swo_hostname, swo_port),
+            socktype=socket.SOCK_DGRAM,
+        )
+        swo_handler.setFormatter(formatter)
+        swo_handler.addFilter(noise_filter)
+        root.addHandler(swo_handler)
+
     root.setLevel(level)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)

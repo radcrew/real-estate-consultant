@@ -43,6 +43,11 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # SolarWinds Observability (Papertrail) syslog. Leave blank to disable.
+    swo_hostname: str = ""
+    swo_port: int = 514
+    swo_token: str = ""
+
     # URL of the ingestion microservice (Phase 3). Empty string disables the feature.
     ingestion_service_url: str = ""
     # Bearer token sent to the ingestion service (must match its SERVICE_AUTH_TOKEN).
