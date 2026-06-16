@@ -10,6 +10,10 @@ import { FIELD_FOCUSED, FIELD_PADDING } from "./styles";
 
 const formatThousand = (value: number) => value.toLocaleString("en-US");
 
+const PRICE_LABEL = "flex-1 text-sm font-medium text-neutral-700 dark:text-neutral-300";
+const CURRENCY_PREFIX = "pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-neutral-500";
+const PRICE_INPUT = "block w-full rounded-full border-neutral-200 bg-transparent pl-7 pr-3 text-sm text-neutral-900 focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-500 dark:text-neutral-200";
+
 type PriceRangeInputProps = {
   value: [number, number];
   onChange: (value: [number, number]) => void;
@@ -75,10 +79,10 @@ export const PriceRangeInput = ({ value, onChange, onSubmit, submitting }: Price
               <div className="flex flex-col space-y-6">
                 <span className="font-medium">Price range</span>
                 <div className="flex justify-between space-x-3">
-                  <label className="flex-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                  <label className={PRICE_LABEL}>
                     Min price
                     <div className="relative mt-1 rounded-md">
-                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-neutral-500">
+                      <span className={CURRENCY_PREFIX}>
                         $
                       </span>
                       <input
@@ -87,14 +91,14 @@ export const PriceRangeInput = ({ value, onChange, onSubmit, submitting }: Price
                         step={1000}
                         value={min}
                         onChange={(e) => onChange([Number(e.target.value), max])}
-                        className="block w-full rounded-full border-neutral-200 bg-transparent pl-7 pr-3 text-sm text-neutral-900 focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-500 dark:text-neutral-200"
+                        className={PRICE_INPUT}
                       />
                     </div>
                   </label>
-                  <label className="flex-1 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                  <label className={PRICE_LABEL}>
                     Max price
                     <div className="relative mt-1 rounded-md">
-                      <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-neutral-500">
+                      <span className={CURRENCY_PREFIX}>
                         $
                       </span>
                       <input
@@ -103,7 +107,7 @@ export const PriceRangeInput = ({ value, onChange, onSubmit, submitting }: Price
                         step={1000}
                         value={max}
                         onChange={(e) => onChange([min, Number(e.target.value)])}
-                        className="block w-full rounded-full border-neutral-200 bg-transparent pl-7 pr-3 text-sm text-neutral-900 focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-500 dark:text-neutral-200"
+                        className={PRICE_INPUT}
                       />
                     </div>
                   </label>

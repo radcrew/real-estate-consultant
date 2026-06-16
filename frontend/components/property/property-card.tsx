@@ -39,6 +39,8 @@ export interface PropertyCardProps {
   className?: string;
 }
 
+const TITLE_CLASS = "text-base font-semibold text-neutral-900 dark:text-white";
+
 const transactionColor = (transactionType: string) =>
   transactionType.toLowerCase().includes("sale") ? "green" : "blue";
 
@@ -88,7 +90,7 @@ export const PropertyCard = ({ data, className }: PropertyCardProps) => {
         <span className="text-sm text-neutral-500 dark:text-neutral-400">
           {data.category}
         </span>
-        <h2 className="text-base font-semibold text-neutral-900 dark:text-white">
+        <h2 className={TITLE_CLASS}>
           <span className="line-clamp-1">{data.title}</span>
         </h2>
         <div className="flex items-center space-x-1.5 text-sm text-neutral-500 dark:text-neutral-400">
@@ -111,7 +113,7 @@ export const PropertyCard = ({ data, className }: PropertyCardProps) => {
 
         <div className="w-14 border-b border-neutral-100 dark:border-neutral-800" />
         <div className="mt-auto flex items-center justify-between">
-          <span className="text-base font-semibold text-neutral-900 dark:text-white">
+          <span className={TITLE_CLASS}>
             {data.priceLabel ?? "Price on request"}
           </span>
         </div>

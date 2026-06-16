@@ -14,6 +14,9 @@ export interface PropertyGalleryProps {
   className?: string;
 }
 
+const NAV_BUTTON = "absolute top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-md hover:bg-white dark:bg-neutral-800/80 dark:hover:bg-neutral-800";
+const CHEVRON_ICON = "h-5 w-5 text-neutral-700 dark:text-neutral-200";
+
 export const PropertyGallery = ({
   images,
   alt = "Listing photo",
@@ -69,18 +72,18 @@ export const PropertyGallery = ({
           <button
             type="button"
             onClick={prev}
-            className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-md hover:bg-white dark:bg-neutral-800/80 dark:hover:bg-neutral-800"
+            className={cn(NAV_BUTTON, "left-3")}
             aria-label="Previous photo"
           >
-            <ChevronLeft className="h-5 w-5 text-neutral-700 dark:text-neutral-200" />
+            <ChevronLeft className={CHEVRON_ICON} />
           </button>
           <button
             type="button"
             onClick={next}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-white/80 p-2 shadow-md hover:bg-white dark:bg-neutral-800/80 dark:hover:bg-neutral-800"
+            className={cn(NAV_BUTTON, "right-3")}
             aria-label="Next photo"
           >
-            <ChevronRight className="h-5 w-5 text-neutral-700 dark:text-neutral-200" />
+            <ChevronRight className={CHEVRON_ICON} />
           </button>
         </>
       )}

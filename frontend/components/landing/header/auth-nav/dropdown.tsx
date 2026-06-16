@@ -14,6 +14,7 @@ import { useAuth } from "@contexts/auth";
  * icon-and-label rows with the Voyager hover treatment. Wired to this app's
  * auth (Account, Saved, Sign out) and lucide icons.
  */
+const DIVIDER = "w-full border-b border-neutral-200 dark:border-neutral-700";
 const ITEM_CLASS =
   "-m-3 flex items-center rounded-lg p-2 text-left transition duration-150 ease-in-out hover:bg-neutral-100 focus:outline-none dark:hover:bg-neutral-700";
 const ICON_WRAP =
@@ -73,7 +74,7 @@ export const ProfileDropdown = () => {
                     </div>
                   </div>
 
-                  <div className="w-full border-b border-neutral-200 dark:border-neutral-700" />
+                  <div className={DIVIDER} />
 
                   <Link href="/account" className={ITEM_CLASS} onClick={() => close()}>
                     <div className={ICON_WRAP}>
@@ -89,7 +90,7 @@ export const ProfileDropdown = () => {
                     <p className="ml-4 text-sm font-medium">Saved</p>
                   </Link>
 
-                  <div className="w-full border-b border-neutral-200 dark:border-neutral-700" />
+                  <div className={DIVIDER} />
 
                   <button
                     type="button"

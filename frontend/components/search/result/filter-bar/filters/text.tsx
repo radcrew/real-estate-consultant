@@ -12,6 +12,8 @@ import { useLocation } from "@hooks/use-location";
 import { cn } from "@utils/common";
 
 import { FILTER_BAR_PILL, FILTER_BAR_PILL_ACTIVE } from "./styles";
+
+const STATUS_TEXT = "mt-2 text-xs text-neutral-500 dark:text-neutral-400";
 import { stopMenuKeyboardCapture, stopMenuTriggerBubble } from "./utils";
 
 type TextFilterProps = {
@@ -89,11 +91,11 @@ export const TextFilter = ({ fieldKey, label, value, onChange, disabled, classNa
         />
 
         {loadError ? (
-          <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">{loadError}</p>
+          <p className={STATUS_TEXT}>{loadError}</p>
         ) : null}
 
         {isLoadingSuggestions ? (
-          <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">Searching locations...</p>
+          <p className={STATUS_TEXT}>Searching locations...</p>
         ) : null}
 
         {showSuggestionList ? (

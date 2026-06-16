@@ -14,6 +14,8 @@ import {
   type PropertyTypeOption,
 } from "./property-type-select";
 
+const DIVIDER = "h-8 self-center border-r border-slate-200 dark:border-slate-700";
+
 type HeroRealEstateSearchFormProps = {
   className?: string;
 };
@@ -55,10 +57,10 @@ export const HeroRealEstateSearchForm = ({ className }: HeroRealEstateSearchForm
           onChange={setLocation}
         />
 
-        <div className="h-8 self-center border-r border-slate-200 dark:border-slate-700" />
+        <div className={DIVIDER} />
         <PropertyTypeSelect value={propertyTypes} onChange={setPropertyTypes} />
 
-        <div className="h-8 self-center border-r border-slate-200 dark:border-slate-700" />
+        <div className={DIVIDER} />
         <PriceRangeInput
           value={priceRange}
           onChange={setPriceRange}

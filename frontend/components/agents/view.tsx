@@ -10,6 +10,10 @@ import { PropertyCard, PROPERTY_GRID } from "@components/property/property-card"
 import { listingsService, type AgentProfileResponse } from "@services/listings";
 import { getApiErrorMessage } from "@utils/common";
 
+const PAGE_SHELL = "mx-auto max-w-screen-xl px-4 py-16 lg:py-20";
+const SECTION_HEADING = "text-2xl font-semibold text-neutral-900 dark:text-neutral-100";
+const CONTACT_LINK = "flex items-center gap-3 text-sm text-neutral-600 hover:text-primary-600 dark:text-neutral-300";
+
 type AgentViewProps = {
   broker: string;
 };
@@ -38,7 +42,7 @@ export const AgentView = ({ broker }: AgentViewProps) => {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
+      <div className={PAGE_SHELL}>
         <p className="text-neutral-500 dark:text-neutral-400">Loading agent…</p>
       </div>
     );
@@ -46,7 +50,7 @@ export const AgentView = ({ broker }: AgentViewProps) => {
 
   if (error || !data) {
     return (
-      <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
+      <div className={PAGE_SHELL}>
         <NoticeCard>
           <p className="text-neutral-600 dark:text-neutral-300">
             {error ?? "Agent not found."}
@@ -64,7 +68,7 @@ export const AgentView = ({ broker }: AgentViewProps) => {
         <div className="flex flex-col items-center space-y-6 rounded-2xl border border-neutral-200 p-6 text-center sm:p-8 lg:sticky lg:top-24 dark:border-neutral-700">
           <Avatar userName={data.name} sizeClass="h-28 w-28 text-3xl" radius="rounded-full" />
           <div className="space-y-1">
-            <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">
+            <h1 className={SECTION_HEADING}>
               {data.name}
             </h1>
             <p className="text-sm text-neutral-500 dark:text-neutral-400">Listing broker</p>
@@ -77,7 +81,7 @@ export const AgentView = ({ broker }: AgentViewProps) => {
                 {data.email ? (
                   <a
                     href={`mailto:${data.email}`}
-                    className="flex items-center gap-3 text-sm text-neutral-600 hover:text-primary-600 dark:text-neutral-300"
+                    className={CONTACT_LINK}
                   >
                     <Mail className="size-5 shrink-0 text-neutral-400" aria-hidden />
                     <span className="truncate">{data.email}</span>
@@ -86,7 +90,7 @@ export const AgentView = ({ broker }: AgentViewProps) => {
                 {data.phone ? (
                   <a
                     href={`tel:${data.phone}`}
-                    className="flex items-center gap-3 text-sm text-neutral-600 hover:text-primary-600 dark:text-neutral-300"
+                    className={CONTACT_LINK}
                   >
                     <Phone className="size-5 shrink-0 text-neutral-400" aria-hidden />
                     <span className="truncate">{data.phone}</span>
@@ -99,7 +103,7 @@ export const AgentView = ({ broker }: AgentViewProps) => {
       </div>
 
       <div className="mt-10 min-w-0 flex-1 lg:mt-0">
-        <h2 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">
+        <h2 className={SECTION_HEADING}>
           {data.name}&rsquo;s listings
         </h2>
         <span className="mt-2 block text-neutral-500 dark:text-neutral-400">
