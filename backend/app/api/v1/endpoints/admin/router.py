@@ -59,6 +59,8 @@ async def enqueue_ingest(
     result = await execute_db_safe(
         client.table("jobs").insert({"source": source, "idempotency_key": idem_key}).execute()
     )
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Job insert returned no data.")
     job = result.data[0]
     logger.info("job_enqueued", extra={"job_id": job["id"], "source": source, "idem_key": idem_key})
     await wake_processor()
