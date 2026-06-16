@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
@@ -41,4 +43,4 @@ class SavedListingsResponse(BaseModel):
 
 
 class SavedListingCreate(BaseModel):
-    property_id: str = Field(min_length=1, max_length=200)
+    property_id: UUID
