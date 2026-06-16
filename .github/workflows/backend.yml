@@ -15,13 +15,13 @@ on:
     paths:
       - "backend/**"
       - "services/ingestion/**"
-      - "scripts/generate_ingestion_client.py"
+      - "scripts/generate_ingestion_models.py"
       - ".github/workflows/backend.yml"
   pull_request:
     paths:
       - "backend/**"
       - "services/ingestion/**"
-      - "scripts/generate_ingestion_client.py"
+      - "scripts/generate_ingestion_models.py"
       - ".github/workflows/backend.yml"
 
 env:
@@ -69,12 +69,12 @@ jobs:
           python -m pip install -e "services/ingestion"
 
       - name: Regenerate ingestion client from OpenAPI schema
-        run: python scripts/generate_ingestion_client.py
+        run: python scripts/generate_ingestion_models.py
 
       - name: Fail on contract drift
         run: |
           if ! git diff --exit-code -- backend/app/clients/ingestion/models.py; then
-            echo "::error::Ingestion API contract changed — run 'python scripts/generate_ingestion_client.py' and commit the result."
+            echo "::error::Ingestion API contract changed — run 'python scripts/generate_ingestion_models.py' and commit the result."
             exit 1
           fi
 

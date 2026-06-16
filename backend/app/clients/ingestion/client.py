@@ -1,7 +1,7 @@
 """Typed HTTP client for the ingestion microservice.
 
 Request/response models in ``models.py`` are generated from the ingestion
-service's OpenAPI schema — see ``scripts/generate_ingestion_client.py``. A
+service's OpenAPI schema — see ``scripts/generate_ingestion_models.py``. A
 contract change there regenerates (or fails to match) this client, so
 mismatches surface at build time instead of at runtime.
 """
