@@ -44,7 +44,11 @@ async def process_next_job() -> ProcessResponse:
     Called by the GitHub Actions job poller every 15 minutes, or by the backend
     to process the queue immediately after enqueueing (see require_internal_token).
     """
-    async with await acreate_client(settings.supabase_url, settings.supabase_service_role_key) as client:
+    async with await acreate_client(
+            settings.supabase_url,
+            settings.supabase_service_role_key,
+        ) as client:
+
         job = await _claim_job(client)
         if job is None:
             return ProcessResponse(processed=False, message="No pending jobs.")
@@ -91,7 +95,11 @@ async def _run_connector(
                 "duration_ms": duration_ms,
             },
         )
-        logger.info("job_done", extra={"job_id": job_id, "source": source, "duration_ms": duration_ms})
+        logger.info("job_done", extra={
+            "job_id": job_id, 
+            "source": source, 
+            "duration_ms": duration_ms
+            })
         return "done"
     except Exception as exc:
         logger.error("job_error", extra={"job_id": job_id, "source": source, "error": str(exc)})
