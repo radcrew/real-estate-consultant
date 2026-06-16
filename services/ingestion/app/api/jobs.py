@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel
 from supabase import AsyncClient, acreate_client
 
@@ -64,6 +64,38 @@ async def process_next_job() -> ProcessResponse:
             return ProcessResponse(processed=True, job_id=job_id, source=source, status="failed")
 
         status = await _run_connector(client, job_id, source, attempts, connector_cls)
+        return ProcessResponse(processed=True, job_id=job_id, source=source, status=status)
+
+
+@router.post("/run/{source}", response_model=ProcessResponse)
+async def run_job(
+    source: str = Path(..., description="Connector source name, e.g. 'loopnet-seed'"),
+) -> ProcessResponse:
+    """Enqueue a job for `source` and immediately run it.
+
+    Called by CI after the dataset file is updated (push to main).
+    Reuses the same internal/cron token as /process.
+    """
+    if source not in _CONNECTORS:
+        raise HTTPException(status_code=400, detail=f"Unknown source: {source!r}")
+
+    async with await acreate_client(
+            settings.supabase_url,
+            settings.supabase_service_role_key,
+        ) as client:
+
+        result = await execute_db_safe(
+            client.table("jobs").insert({"source": source}).execute()
+        )
+        if not result.data:
+            raise HTTPException(status_code=500, detail="Failed to enqueue job.")
+
+        job = result.data[0]
+        job_id: str = job["id"]
+        attempts: int = job.get("attempts", 0)
+        logger.info("job_run_triggered", extra={"job_id": job_id, "source": source})
+
+        status = await _run_connector(client, job_id, source, attempts, _CONNECTORS[source])
         return ProcessResponse(processed=True, job_id=job_id, source=source, status=status)
 
 
