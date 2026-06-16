@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from supabase import AsyncClient, acreate_client
 
+from app.connectors.base import ConnectorBase
 from app.connectors.loopnet_seed import LoopNetSeedConnector
 from app.core.auth import require_internal_token
 from app.core.config import settings
@@ -44,11 +45,10 @@ async def process_next_job() -> ProcessResponse:
     to process the queue immediately after enqueueing (see require_internal_token).
     """
     async with await acreate_client(settings.supabase_url, settings.supabase_service_role_key) as client:
-        result = await execute_db_safe(client.rpc("claim_next_job").execute())
-        if not result.data:
+        job = await _claim_job(client)
+        if job is None:
             return ProcessResponse(processed=False, message="No pending jobs.")
 
-        job = result.data[0]
         job_id: str = job["id"]
         source: str = job["source"]
         attempts: int = job["attempts"]
@@ -59,36 +59,46 @@ async def process_next_job() -> ProcessResponse:
             await _update_job(client, job_id, "failed", error=f"Unknown source: {source!r}")
             return ProcessResponse(processed=True, job_id=job_id, source=source, status="failed")
 
-        start = time.perf_counter()
-        try:
-            report = await connector_cls(client).run()
-            duration_ms = round((time.perf_counter() - start) * 1000, 2)
-            await _update_job(
-                client,
-                job_id,
-                "done",
-                result={
-                    "fetched": report.fetched,
-                    "normalized": report.normalized,
-                    "rejected": report.rejected,
-                    "rejected_reasons": report.rejected_reasons,
-                    "duration_ms": duration_ms,
-                },
-            )
-            logger.info(
-                "job_done",
-                extra={"job_id": job_id, "source": source, "duration_ms": duration_ms},
-            )
-            return ProcessResponse(processed=True, job_id=job_id, source=source, status="done")
+        status = await _run_connector(client, job_id, source, attempts, connector_cls)
+        return ProcessResponse(processed=True, job_id=job_id, source=source, status=status)
 
-        except Exception as exc:
-            logger.error("job_error", extra={"job_id": job_id, "source": source, "error": str(exc)})
-            # Retry if under the attempt cap; otherwise fail permanently.
-            retry_status = "pending" if attempts < _MAX_ATTEMPTS else "failed"
-            await _update_job(client, job_id, retry_status, error=str(exc))
-            return ProcessResponse(
-                processed=True, job_id=job_id, source=source, status=retry_status
-            )
+
+async def _claim_job(client: AsyncClient) -> dict | None:
+    result = await execute_db_safe(client.rpc("claim_next_job").execute())
+    return result.data[0] if result.data else None
+
+
+async def _run_connector(
+    client: AsyncClient,
+    job_id: str,
+    source: str,
+    attempts: int,
+    connector_cls: type[ConnectorBase],
+) -> str:
+    start = time.perf_counter()
+    try:
+        report = await connector_cls(client).run()  # type: ignore[call-arg]
+        duration_ms = round((time.perf_counter() - start) * 1000, 2)
+        await _update_job(
+            client,
+            job_id,
+            "done",
+            result={
+                "fetched": report.fetched,
+                "normalized": report.normalized,
+                "rejected": report.rejected,
+                "rejected_reasons": report.rejected_reasons,
+                "duration_ms": duration_ms,
+            },
+        )
+        logger.info("job_done", extra={"job_id": job_id, "source": source, "duration_ms": duration_ms})
+        return "done"
+    except Exception as exc:
+        logger.error("job_error", extra={"job_id": job_id, "source": source, "error": str(exc)})
+        # Retry if under the attempt cap; otherwise fail permanently.
+        retry_status = "pending" if attempts < _MAX_ATTEMPTS else "failed"
+        await _update_job(client, job_id, retry_status, error=str(exc))
+        return retry_status
 
 
 async def _update_job(
