@@ -1,0 +1,43 @@
+# Triggers the ingestion microservice immediately when the dataset file is
+# updated on a push to main.
+#
+# Required GitHub secrets:
+#   INGESTION_SERVICE_URL           — deployed ingestion service base URL
+#   INGESTION_TRIGGER_TOKEN         — must match the ingestion service's TRIGGER_TOKEN env var
+#   VERCEL_AUTOMATION_BYPASS_SECRET — only if Vercel deployment protection is enabled
+name: Ingest on dataset change
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/ingestion/dataset/**"
+  workflow_dispatch:
+
+jobs:
+  run:
+    name: Trigger loopnet-seed ingestion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/v1/jobs/run/loopnet-seed
+        env:
+          BASE_URL: ${{ secrets.INGESTION_SERVICE_URL }}
+          TOKEN: ${{ secrets.INGESTION_TRIGGER_TOKEN }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "INGESTION_SERVICE_URL secret is not set — skipping."
+            exit 0
+          fi
+
+          body=$(curl -s -w "\n%{http_code}" \
+            -X POST "$BASE_URL/api/v1/jobs/run/loopnet-seed" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "x-vercel-protection-bypass: $BYPASS_SECRET")
+          status=$(echo "$body" | tail -1)
+          echo "$body" | head -n -1
+
+          if [ "$status" != "200" ]; then
+            echo "::error::jobs/run/loopnet-seed returned HTTP $status"
+            exit 1
+          fi

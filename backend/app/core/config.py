@@ -15,11 +15,6 @@ class Settings(BaseSettings):
 
     app_name: str = "Real Estate Consultant API"
     version: str = "0.1.0"
-    is_dev_mode: bool = Field(
-        default=False,
-        validation_alias=AliasChoices("IS_DEV_MODE", "DEBUG"),
-        description="Reserved for future dev-only behavior (not used by the API today).",
-    )
 
     database_url: str
     # How long asyncpg waits to establish a connection, and the per-statement timeout.

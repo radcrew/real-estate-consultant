@@ -1,12 +1,12 @@
 #!/usr/bin/env python
-"""Regenerate the backend's typed ingestion-service client from its OpenAPI schema.
+"""Regenerate backend/app/clients/ingestion/models.py from the ingestion service's OpenAPI schema.
 
 Usage:
-    python scripts/generate_ingestion_client.py
+    python scripts/generate_ingestion_models.py
 
 Run this after changing any request/response model under
 ``services/ingestion/app/schemas`` or ``services/ingestion/app/api``, then commit
-the regenerated files. CI re-runs this script and fails the build if the output
+the regenerated file. CI re-runs this script and fails the build if the output
 differs from what's committed (contract drift caught before it reaches production).
 
 Requires the ingestion service's runtime dependencies (to import its FastAPI app)
@@ -28,17 +28,17 @@ MODELS_PATH = ROOT / "backend" / "app" / "clients" / "ingestion" / "models.py"
 
 
 def export_openapi_schema() -> dict:
+    from app.main import app
+    return app.openapi()
+
+
+def main() -> None:
     # The ingestion service requires these at import time; values don't matter
     # for schema generation, so use placeholders if not already set.
     os.environ.setdefault("SUPABASE_URL", "https://placeholder.supabase.co")
     os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "placeholder")
     sys.path.insert(0, str(INGESTION_ROOT))
-    from app.main import app
 
-    return app.openapi()
-
-
-def main() -> None:
     schema = export_openapi_schema()
     OPENAPI_PATH.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {OPENAPI_PATH.relative_to(ROOT)}")

@@ -29,12 +29,12 @@ async def list_saved_property_ids(client: AsyncClient, user_id: UUID) -> list[st
 async def add_saved_listing(
     client: AsyncClient,
     user_id: UUID,
-    property_id: str,
+    property_id: UUID,
 ) -> None:
     """Idempotent add (upsert on the (user_id, property_id) primary key)."""
     await execute_db_safe(
         client.table("saved_listings")
-        .upsert({"user_id": str(user_id), "property_id": property_id})
+        .upsert({"user_id": str(user_id), "property_id": str(property_id)})
         .execute(),
     )
 
@@ -42,12 +42,12 @@ async def add_saved_listing(
 async def remove_saved_listing(
     client: AsyncClient,
     user_id: UUID,
-    property_id: str,
+    property_id: UUID,
 ) -> None:
     await execute_db_safe(
         client.table("saved_listings")
         .delete()
         .eq("user_id", str(user_id))
-        .eq("property_id", property_id)
+        .eq("property_id", str(property_id))
         .execute(),
     )

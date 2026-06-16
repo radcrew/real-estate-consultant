@@ -3,7 +3,7 @@ from fastapi import APIRouter
 from supabase import AuthApiError, AuthInvalidCredentialsError
 
 from app.api.v1.endpoints.auth.exceptions import (
-    raise_sign_in_auth_api_error,
+    raise_auth_api_error,
     raise_sign_in_email_not_confirmed,
     raise_sign_in_invalid_credentials,
     raise_sign_in_no_session,
@@ -35,7 +35,7 @@ async def sign_in(body: SignInRequest, client: SupabaseSdkDep) -> SignInResponse
         if exc.code in ("email_not_confirmed", "provider_email_needs_verification"):
             raise_sign_in_email_not_confirmed(message=str(exc.message), cause=exc)
 
-        raise_sign_in_auth_api_error(exc)
+        raise_auth_api_error(exc)
     except httpx.HTTPError as exc:
         raise_sign_in_transport_unavailable(cause=exc)
 

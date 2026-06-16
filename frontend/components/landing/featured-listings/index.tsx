@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 
 import { brand } from "@config/brand";
-import { detailToModel, type PropertyModel } from "@components/property/listing-model";
-import { PropertyCard, PropertyCardSkeleton, PROPERTY_GRID } from "@components/property/property-card";
+import { detailToModel } from "@components/property/listing-model";
+import type { PropertyModel } from "@typings/property";
+import { PropertyCard, PropertyCardSkeleton, PROPERTY_GRID } from "@components/property/card";
 import { ButtonSecondary } from "@components/ui/button-secondary";
 import { Heading2 } from "@components/ui/heading2";
 import { listingsService } from "@services/listings";
@@ -23,7 +24,7 @@ export const FeaturedListings = () => {
     listingsService
       .getFeaturedListings({ signal: controller.signal })
       .then((res) => setModels(res.listings.map(detailToModel)))
-      .catch(() => setModels([]));
+      .catch(() => { if (!controller.signal.aborted) setModels([]); });
     return () => controller.abort();
   }, []);
 
@@ -40,8 +41,9 @@ export const FeaturedListings = () => {
       </div>
 
       <div className="mt-14 flex justify-center">
-        <ButtonSecondary href="/listings">Browse all properties</ButtonSecondary>
+        <ButtonSecondary href="/listings">Browse properties</ButtonSecondary>
       </div>
     </section>
   );
 };
+  

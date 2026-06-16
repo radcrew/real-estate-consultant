@@ -10,8 +10,9 @@ import { listingsService } from "@services/listings";
 import { getApiErrorMessage } from "@utils/common";
 
 const LABEL = "text-sm font-medium text-neutral-700 dark:text-neutral-300";
-const CARD =
-  "rounded-2xl border border-neutral-200 p-6 sm:p-8 dark:border-neutral-700";
+const CARD = "rounded-2xl border border-neutral-200 p-6 sm:p-8 dark:border-neutral-700";
+const SECTION_HEADING = "text-lg font-semibold text-neutral-900 dark:text-neutral-100";
+const FIELD_GRID = "mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2";
 
 const PROPERTY_TYPES = ["Industrial", "Flex", "Retail", "Office", "Land", "Medical"];
 
@@ -111,10 +112,10 @@ export const ListPropertyForm = () => {
   return (
     <form className="space-y-8" onSubmit={onSubmit}>
       <section className={CARD}>
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <h2 className={SECTION_HEADING}>
           Property details
         </h2>
-        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className={FIELD_GRID}>
           <label className="block">
             <span className={LABEL}>Property type</span>
             <Select
@@ -164,10 +165,10 @@ export const ListPropertyForm = () => {
       </section>
 
       <section className={CARD}>
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <h2 className={SECTION_HEADING}>
           Location
         </h2>
-        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className={FIELD_GRID}>
           <label className="block sm:col-span-2">
             <span className={LABEL}>Street address</span>
             <Input
@@ -201,10 +202,10 @@ export const ListPropertyForm = () => {
       </section>
 
       <section className={CARD}>
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <h2 className={SECTION_HEADING}>
           Specs &amp; pricing
         </h2>
-        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className={FIELD_GRID}>
           <label className="block">
             <span className={LABEL}>Size (SF)</span>
             <Input
@@ -254,10 +255,10 @@ export const ListPropertyForm = () => {
       </section>
 
       <section className={CARD}>
-        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+        <h2 className={SECTION_HEADING}>
           Listing contact
         </h2>
-        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        <div className={FIELD_GRID}>
           <label className="block">
             <span className={LABEL}>Name</span>
             <Input

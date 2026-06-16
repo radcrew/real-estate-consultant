@@ -1,7 +1,7 @@
 import axios from "axios";
 
 import { clearSession, readSession } from "@lib/auth-session";
-import { BACKEND_BASE_URL } from "@lib/config";
+import { BACKEND_BASE_URL } from "@config/env";
 
 export const apiClient = axios.create({
   baseURL: `${BACKEND_BASE_URL}/api/v1`,

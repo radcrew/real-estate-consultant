@@ -30,7 +30,7 @@ export const syncProfileNamesAfterOAuth = async (
     .maybeSingle();
 
   if (selectError) {
-    console.warn("[oauth] profile select failed:", selectError.message);
+    console.error("[oauth] profile select failed:", selectError.message);
     return;
   }
 
@@ -50,7 +50,7 @@ export const syncProfileNamesAfterOAuth = async (
       .update({ email, first_name: first, last_name: last })
       .eq("id", userId);
     if (error) {
-      console.warn("[oauth] profile update failed:", error.message);
+      console.error("[oauth] profile update failed:", error.message);
     }
     return;
   }
@@ -62,6 +62,6 @@ export const syncProfileNamesAfterOAuth = async (
     last_name: last,
   });
   if (error) {
-    console.warn("[oauth] profile insert failed:", error.message);
+    console.error("[oauth] profile insert failed:", error.message);
   }
 };

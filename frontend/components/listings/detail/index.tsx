@@ -3,7 +3,7 @@
 import { HistoryBackButton } from "@components/ui/button-back";
 import { ButtonThird } from "@components/ui/button-third";
 import { detailToModel } from "@components/property/listing-model";
-import { PropertyGallery } from "@components/property/property-gallery";
+import { PropertyGallery } from "@components/property/gallery";
 
 import { useListingDetail } from "../../../hooks/use-listing-detail";
 import { ListingActions } from "./actions";

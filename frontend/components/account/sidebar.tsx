@@ -38,6 +38,7 @@ const TAB_ITEMS: {
 
 const ITEM_CLASS =
   "group flex flex-shrink-0 items-center gap-3 rounded-lg border-l-2 px-3 py-3 text-left transition-colors";
+const DESCRIPTION = "hidden text-xs text-neutral-500 group-hover:text-neutral-400 lg:block";
 
 type AccountSidebarProps = {
   activeTab: AccountTab;
@@ -106,7 +107,7 @@ export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) 
               />
               <span className="min-w-0">
                 <span className="block text-sm font-medium">{label}</span>
-                <span className="hidden text-xs text-neutral-500 group-hover:text-neutral-400 lg:block">
+                <span className={DESCRIPTION}>
                   {description}
                 </span>
               </span>
@@ -124,7 +125,7 @@ export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) 
           />
           <span className="min-w-0">
             <span className="block text-sm font-medium">Saved</span>
-            <span className="hidden text-xs text-neutral-500 group-hover:text-neutral-400 lg:block">
+            <span className={DESCRIPTION}>
               Properties you&rsquo;ve saved
             </span>
           </span>

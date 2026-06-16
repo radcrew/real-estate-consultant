@@ -36,7 +36,7 @@ def raise_sign_in_email_not_confirmed(*, message: str, cause: AuthApiError) -> N
     raise_forbidden(message, cause=cause)
 
 
-def raise_sign_in_auth_api_error(exc: AuthApiError) -> NoReturn:
+def raise_auth_api_error(exc: AuthApiError) -> NoReturn:
     status_code = exc.status if 400 <= exc.status < 600 else status.HTTP_400_BAD_REQUEST
     raise_client_error(status_code, str(exc.message), cause=exc)
 
@@ -56,11 +56,6 @@ def raise_sign_in_no_session() -> NoReturn:
 
 def raise_sign_up_email_already_exists(*, cause: BaseException) -> NoReturn:
     raise_conflict("An account with this email already exists.", cause=cause)
-
-
-def raise_sign_up_auth_api_error(exc: AuthApiError) -> NoReturn:
-    status_code = exc.status if 400 <= exc.status < 600 else status.HTTP_400_BAD_REQUEST
-    raise_client_error(status_code, str(exc.message), cause=exc)
 
 
 def raise_sign_up_weak_password_sdk(*, exc: AuthWeakPasswordError) -> NoReturn:

@@ -8,8 +8,6 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from supabase import AsyncClient
-
 from app.connectors.base import ConnectorBase, IngestionReport
 from app.core.config import settings
 from app.core.db_safe import execute_db_safe
@@ -260,9 +258,6 @@ class LoopNetSeedConnector(ConnectorBase):
     """Loads a local JSON dataset and upserts listings into Supabase."""
 
     name = "loopnet-seed"
-
-    def __init__(self, client: AsyncClient) -> None:
-        self._client = client
 
     async def run(self) -> IngestionReport:
         path = Path(settings.dataset_path)
