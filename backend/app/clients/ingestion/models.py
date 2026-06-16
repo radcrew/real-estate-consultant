@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
@@ -12,3 +14,15 @@ class ProcessResponse(BaseModel):
     source: str | None = Field(None, title="Source")
     status: str | None = Field(None, title="Status")
     message: str | None = Field(None, title="Message")
+
+
+class ValidationError(BaseModel):
+    loc: list[str | int] = Field(..., title="Location")
+    msg: str = Field(..., title="Message")
+    type: str = Field(..., title="Error Type")
+    input: Any | None = Field(None, title="Input")
+    ctx: dict[str, Any] | None = Field(None, title="Context")
+
+
+class HTTPValidationError(BaseModel):
+    detail: list[ValidationError] | None = Field(None, title="Detail")

@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Real Estate Ingestion Service",
+    "title": "Real Estate Consultant API",
     "version": "0.1.0"
   },
   "paths": {
@@ -70,10 +70,68 @@
           }
         }
       }
+    },
+    "/api/v1/jobs/run/{source}": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Run Job",
+        "description": "Enqueue a job for `source` and immediately run it.\n\nCalled by CI after the dataset file is updated (push to main).\nReuses the same internal/cron token as /process.",
+        "operationId": "run_job_api_v1_jobs_run__source__post",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Connector source name, e.g. 'loopnet-seed'",
+              "title": "Source"
+            },
+            "description": "Connector source name, e.g. 'loopnet-seed'"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
       "ProcessResponse": {
         "properties": {
           "processed": {
@@ -130,6 +188,46 @@
           "processed"
         ],
         "title": "ProcessResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
       }
     }
   }
