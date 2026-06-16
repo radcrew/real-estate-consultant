@@ -5,9 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import re
-import socket
+import urllib.request
 from contextvars import ContextVar
-from logging.handlers import SysLogHandler
 from typing import Any
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="-")
@@ -47,10 +46,6 @@ def _scrub(value: Any, key: str | None = None) -> Any:
 
 
 class _JsonFormatter(logging.Formatter):
-    def __init__(self, swo_token: str = "") -> None:
-        super().__init__()
-        self._swo_token = swo_token
-
     def format(self, record: logging.LogRecord) -> str:
         record.message = record.getMessage()
         payload: dict[str, Any] = {
@@ -60,8 +55,6 @@ class _JsonFormatter(logging.Formatter):
             "message": record.message,
             "request_id": request_id_var.get("-"),
         }
-        if self._swo_token:
-            payload["swo_token"] = self._swo_token
         if (uid := user_id_var.get(None)) is not None:
             payload["user_id"] = uid
         if record.exc_info:
@@ -70,6 +63,45 @@ class _JsonFormatter(logging.Formatter):
             if key not in _STDLIB_ATTRS and key not in payload:
                 payload[key] = val
         return json.dumps(_scrub(payload), default=str)
+
+
+class _SolarWindsBulkHandler(logging.Handler):
+    """Buffers log records and ships them as a bulk HTTP POST to SolarWinds."""
+
+    def __init__(self, url: str, token: str, capacity: int = 200) -> None:
+        super().__init__()
+        self._url = url
+        self._token = token
+        self._capacity = capacity
+        self._buffer: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self._buffer.append(self.format(record))
+            if len(self._buffer) >= self._capacity:
+                self.flush()
+        except Exception:
+            self.handleError(record)
+
+    def flush(self) -> None:
+        if not self._buffer:
+            return
+        lines = self._buffer[:]
+        self._buffer.clear()
+        try:
+            body = "\n".join(lines).encode()
+            req = urllib.request.Request(
+                self._url,
+                data=body,
+                headers={
+                    "Content-Type": "application/octet-stream",
+                    "Authorization": f"Bearer {self._token}",
+                },
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=3)
+        except Exception:
+            pass
 
 
 class _DropNoisyRequestsFilter(logging.Filter):
@@ -81,13 +113,22 @@ class _DropNoisyRequestsFilter(logging.Filter):
         return True
 
 
+_swo_handler: _SolarWindsBulkHandler | None = None
+
+
+def flush_swo() -> None:
+    if _swo_handler is not None:
+        _swo_handler.flush()
+
+
 def configure_logging(
     level: str = "INFO",
-    swo_hostname: str = "",
-    swo_port: int = 514,
+    swo_logs_url: str = "",
     swo_token: str = "",
 ) -> None:
-    formatter = _JsonFormatter(swo_token=swo_token)
+    global _swo_handler
+
+    formatter = _JsonFormatter()
     noise_filter = _DropNoisyRequestsFilter()
 
     stdout_handler = logging.StreamHandler()
@@ -98,14 +139,11 @@ def configure_logging(
     root.handlers.clear()
     root.addHandler(stdout_handler)
 
-    if swo_hostname and swo_token:
-        swo_handler = SysLogHandler(
-            address=(swo_hostname, swo_port),
-            socktype=socket.SOCK_DGRAM,
-        )
-        swo_handler.setFormatter(formatter)
-        swo_handler.addFilter(noise_filter)
-        root.addHandler(swo_handler)
+    if swo_logs_url and swo_token:
+        _swo_handler = _SolarWindsBulkHandler(url=swo_logs_url, token=swo_token)
+        _swo_handler.setFormatter(formatter)
+        _swo_handler.addFilter(noise_filter)
+        root.addHandler(_swo_handler)
 
     root.setLevel(level)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)

@@ -16,7 +16,7 @@ from app.core.logging import configure_logging
 from app.core.middleware import RequestLoggingMiddleware
 from app.core.supabase_sdk import close_supabase, init_supabase
 
-configure_logging(settings.log_level, settings.swo_hostname, settings.swo_port, settings.swo_token)
+configure_logging(settings.log_level, settings.swo_logs_url, settings.swo_token)
 
 logger = logging.getLogger(__name__)
 
