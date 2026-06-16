@@ -43,8 +43,7 @@ async def process_next_job() -> ProcessResponse:
     Called by the GitHub Actions job poller every 15 minutes, or by the backend
     to process the queue immediately after enqueueing (see require_internal_token).
     """
-    client = await acreate_client(settings.supabase_url, settings.supabase_service_role_key)
-    try:
+    async with await acreate_client(settings.supabase_url, settings.supabase_service_role_key) as client:
         result = await execute_db_safe(client.rpc("claim_next_job").execute())
         if not result.data:
             return ProcessResponse(processed=False, message="No pending jobs.")
@@ -91,9 +90,6 @@ async def process_next_job() -> ProcessResponse:
                 processed=True, job_id=job_id, source=source, status=retry_status
             )
 
-    finally:
-        await client.postgrest.aclose()
-
 
 async def _update_job(
     client: AsyncClient,
@@ -103,7 +99,7 @@ async def _update_job(
     result: dict | None = None,
     error: str | None = None,
 ) -> None:
-    payload: dict = {"status": status}
+    payload = {"status": status}
     if result is not None:
         payload["result"] = result
     if error is not None:
