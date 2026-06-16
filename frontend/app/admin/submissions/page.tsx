@@ -1,6 +1,6 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 
-import { AdminSubmissionsView } from "@components/admin/submissions-view";
+import { AdminSubmissionsView } from "@components/admin/submissions";
 
 export const metadata: Metadata = {
   title: "Submissions",

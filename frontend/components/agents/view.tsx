@@ -6,7 +6,7 @@ import { Mail, Phone } from "lucide-react";
 import { Avatar } from "@components/ui/avatar";
 import { NoticeCard } from "@components/ui/notice-card";
 import { propertyToModel } from "@components/property/listing-model";
-import { PropertyCard, PROPERTY_GRID } from "@components/property/property-card";
+import { PropertyCard, PROPERTY_GRID } from "@components/property/card";
 import { listingsService, type AgentProfileResponse } from "@services/listings";
 import { getApiErrorMessage } from "@utils/common";
 

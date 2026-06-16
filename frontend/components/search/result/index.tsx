@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import { LayoutGrid, Map as MapIcon } from "lucide-react";
@@ -10,9 +10,9 @@ import {
   PropertyCard,
   PropertyCardSkeleton,
   PROPERTY_GRID,
-} from "@components/property/property-card";
+} from "@components/property/card";
 import { Pagination } from "@components/ui/pagination";
-import { SectionGridHasMap } from "@components/property/section-grid-has-map";
+import { SectionGridHasMap } from "@components/property/grid-with-map";
 import { useSearchResults } from "@hooks/use-search-results";
 import { cn } from "@utils/common";
 
