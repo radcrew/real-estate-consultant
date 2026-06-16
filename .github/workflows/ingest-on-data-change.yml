@@ -1,9 +1,9 @@
 # Triggers the ingestion microservice immediately when the dataset file is
 # updated on a push to main.
 #
-# Reuses existing secrets — no new secrets required:
+# Required GitHub secrets:
 #   INGESTION_SERVICE_URL           — deployed ingestion service base URL
-#   INGESTION_CRON_TOKEN            — must match the ingestion service's CRON_SECRET
+#   INGESTION_TRIGGER_TOKEN         — must match the ingestion service's TRIGGER_TOKEN env var
 #   VERCEL_AUTOMATION_BYPASS_SECRET — only if Vercel deployment protection is enabled
 name: Ingest on dataset change
 
@@ -22,7 +22,7 @@ jobs:
       - name: Call /api/v1/jobs/run/loopnet-seed
         env:
           BASE_URL: ${{ secrets.INGESTION_SERVICE_URL }}
-          TOKEN: ${{ secrets.INGESTION_CRON_TOKEN }}
+          TOKEN: ${{ secrets.INGESTION_TRIGGER_TOKEN }}
           BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           if [ -z "$BASE_URL" ]; then

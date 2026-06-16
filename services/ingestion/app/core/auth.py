@@ -27,7 +27,7 @@ def require_internal_token(request: Request) -> None:
     valid = {
         t
         for t in (
-            settings.cron_secret,
+            settings.trigger_token,
             settings.service_auth_token,
             settings.service_auth_token_next,
         )
