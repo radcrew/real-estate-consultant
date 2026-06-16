@@ -42,8 +42,8 @@ type SearchWizardContextValue = {
   goPrev: () => void;
   resetToChooser: () => void;
   setErrorMessage: (value: string | null) => void;
-  startGuidedForm: () => Promise<void>;
-  startSmartChat: () => Promise<void>;
+  startGuidedForm: () => Promise<boolean>;
+  startSmartChat: () => Promise<boolean>;
   stepIndex: number;
   summaryRows: SummaryRow[];
   totalSteps: number;
@@ -174,9 +174,9 @@ export const SearchWizardProvider = ({
     };
   }, [initialSessionId, setErrorMessage]);
 
-  const startGuidedForm = async () => {
+  const startGuidedForm = async (): Promise<boolean> => {
     if (isLoadingQuestion || isSubmitting) {
-      return;
+      return false;
     }
 
     setLoadingQuestion(true);
@@ -189,22 +189,24 @@ export const SearchWizardProvider = ({
           "The server is temporarily unavailable. Please try again later.",
         );
         setActiveMode("selector");
-        return;
+        return false;
       }
 
       setSessionId(response.session_id);
       router.push(`/questionnaire/${response.session_id}`);
+      return true;
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
       setActiveMode("selector");
+      return false;
     } finally {
       setLoadingQuestion(false);
     }
   };
 
-  const startSmartChat = async () => {
+  const startSmartChat = async (): Promise<boolean> => {
     if (isLoadingQuestion || isSubmitting) {
-      return;
+      return false;
     }
 
     setLoadingQuestion(true);
@@ -224,9 +226,11 @@ export const SearchWizardProvider = ({
       }
       setLlmChatBootstrap(parts.length > 0 ? parts : null);
       setActiveMode("llm");
+      return true;
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
       setActiveMode("selector");
+      return false;
     } finally {
       setLoadingQuestion(false);
     }

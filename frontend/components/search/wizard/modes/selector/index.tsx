@@ -24,6 +24,24 @@ export const SearchModeSelector = () => {
     startGuidedForm,
   } = useSearchWizard();
   const [starting, setStarting] = useState<"form" | "chat" | null>(null);
+  // Once a choice is made, keep BOTH buttons disabled through the redirect —
+  // not just while `isBusy`, which can briefly flip off during navigation.
+  const isStarting = isBusy || starting !== null;
+
+  // Disable both buttons while starting; on failure the start call resolves
+  // `false` (it stays on the selector), so re-enable them to allow a retry.
+  // On success this view unmounts during the redirect.
+  const handleStart = async (
+    choice: "form" | "chat",
+    start: () => Promise<boolean>,
+  ) => {
+    if (isStarting) return;
+    setStarting(choice);
+    const ok = await start();
+    if (!ok) {
+      setStarting(null);
+    }
+  };
 
   return (
     <div className={STYLES.chooserWrapper}>
@@ -58,8 +76,8 @@ export const SearchModeSelector = () => {
 
           <ButtonThird
             className={STYLES.choiceFormCta}
-            onClick={() => { setStarting("form"); startGuidedForm(); }}
-            disabled={isBusy}
+            onClick={() => handleStart("form", startGuidedForm)}
+            disabled={isStarting}
           >
             {starting === "form" ? "Loading form..." : "Use Form"}
             <ArrowRight className="ml-2 size-4" aria-hidden />
@@ -89,8 +107,8 @@ export const SearchModeSelector = () => {
 
           <ButtonPrimary
             className={STYLES.choiceAiCta}
-            onClick={() => { setStarting("chat"); startSmartChat(); }}
-            disabled={isBusy}
+            onClick={() => handleStart("chat", startSmartChat)}
+            disabled={isStarting}
           >
             {starting === "chat" ? "Loading chat..." : "Use AI Chat"}
             <Sparkles className="ml-2 size-4" aria-hidden />
