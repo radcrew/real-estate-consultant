@@ -106,3 +106,14 @@ class TestParseLocationFields:
 
     def test_empty_string_location_returns_nones(self):
         assert parse_location_fields({"location": "   "}) == (None, None, None, None)
+
+    def test_single_token_returns_label_only(self):
+        label, city, state, country = parse_location_fields({"location": "Austin"})
+        assert label == "Austin"
+        assert city is None
+        assert state is None
+        assert country is None
+
+    def test_unknown_country_alias_returned_as_is(self):
+        _, _, _, country = parse_location_fields({"location": "Austin, TX, Canada"})
+        assert country == "Canada"
