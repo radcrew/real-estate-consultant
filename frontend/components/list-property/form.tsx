@@ -10,6 +10,7 @@ import { listingsService } from "@services/listings";
 import { getApiErrorMessage } from "@utils/common";
 
 import { AddressAutocomplete } from "./address-autocomplete";
+import { ImageUpload } from "./image-upload";
 
 const LABEL = "text-sm font-medium text-neutral-700 dark:text-neutral-300";
 const CARD = "rounded-2xl border border-neutral-200 p-6 sm:p-8 dark:border-neutral-700";
@@ -63,6 +64,7 @@ const num = (v: string): number | null => {
  */
 export const ListPropertyForm = () => {
   const [form, setForm] = useState<FormState>(INITIAL);
+  const [images, setImages] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +77,11 @@ export const ListPropertyForm = () => {
     setSubmitting(true);
     setError(null);
     try {
+      // Upload photos first (if any), then attach their URLs to the submission.
+      const image_urls = images.length
+        ? (await listingsService.uploadSubmissionImages(images)).urls
+        : [];
+
       await listingsService.submitListing({
         property_type: form.property_type,
         listing_type: form.listing_type,
@@ -89,6 +96,7 @@ export const ListPropertyForm = () => {
         loading_docks: num(form.loading_docks),
         contact_name: form.contact_name.trim(),
         contact_email: form.contact_email.trim(),
+        image_urls,
       });
       setSubmitted(true);
     } catch (err) {
@@ -207,6 +215,18 @@ export const ListPropertyForm = () => {
               onChange={(e) => set("state", e.target.value)}
             />
           </label>
+        </div>
+      </section>
+
+      <section className={CARD}>
+        <h2 className={SECTION_HEADING}>
+          Photos
+        </h2>
+        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+          Add photos of the property. The first image is used as the cover.
+        </p>
+        <div className="mt-6">
+          <ImageUpload files={images} onChange={setImages} disabled={submitting} />
         </div>
       </section>
 
