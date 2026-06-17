@@ -102,10 +102,11 @@ describe("GuidedQuestionnaire", () => {
     expect(screen.getByText("Loading your questionnaire...")).toBeInTheDocument();
   });
 
-  it("shows error message when errorMessage is set", () => {
-    mockWizard.errorMessage = "Failed to load.";
+  it("shows fallback message when question is null and not loading", () => {
+    mockWizard.currentQuestion = null;
+    mockWizard.isLoadingQuestion = false;
     render(<GuidedQuestionnaire />);
-    expect(screen.getByText("Failed to load.")).toBeInTheDocument();
+    expect(screen.getByText("We couldn't load the questionnaire.")).toBeInTheDocument();
   });
 
   it("shows summary panel", () => {
