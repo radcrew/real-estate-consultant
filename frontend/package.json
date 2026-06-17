@@ -33,6 +33,9 @@
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.9",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/google-map-react": "^2.1.7",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^20",
