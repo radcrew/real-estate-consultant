@@ -7,7 +7,7 @@ import time
 import uuid
 from typing import TYPE_CHECKING
 
-from app.core.logging import request_id_var, user_id_var
+from app.core.logging import flush_swo, request_id_var, user_id_var
 
 if TYPE_CHECKING:
     from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -60,3 +60,4 @@ class RequestLoggingMiddleware:
                     "duration_ms": round(duration_ms, 2),
                 },
             )
+            flush_swo()

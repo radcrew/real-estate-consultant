@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import urllib.request
 from contextvars import ContextVar
 from typing import Any
 
@@ -64,6 +65,45 @@ class _JsonFormatter(logging.Formatter):
         return json.dumps(_scrub(payload), default=str)
 
 
+class _SolarWindsBulkHandler(logging.Handler):
+    """Buffers log records and ships them as a bulk HTTP POST to SolarWinds."""
+
+    def __init__(self, url: str, token: str, capacity: int = 200) -> None:
+        super().__init__()
+        self._url = url
+        self._token = token
+        self._capacity = capacity
+        self._buffer: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self._buffer.append(self.format(record))
+            if len(self._buffer) >= self._capacity:
+                self.flush()
+        except Exception:
+            self.handleError(record)
+
+    def flush(self) -> None:
+        if not self._buffer:
+            return
+        lines = self._buffer[:]
+        self._buffer.clear()
+        try:
+            body = "\n".join(lines).encode()
+            req = urllib.request.Request(
+                self._url,
+                data=body,
+                headers={
+                    "Content-Type": "application/octet-stream",
+                    "Authorization": f"Bearer {self._token}",
+                },
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=3)
+        except Exception:
+            pass
+
+
 class _DropNoisyRequestsFilter(logging.Filter):
     """Drop fast, successful requests to noisy paths (e.g. health checks)."""
 
@@ -73,13 +113,38 @@ class _DropNoisyRequestsFilter(logging.Filter):
         return True
 
 
-def configure_logging(level: str = "INFO") -> None:
-    handler = logging.StreamHandler()
-    handler.setFormatter(_JsonFormatter())
-    handler.addFilter(_DropNoisyRequestsFilter())
+_swo_handler: _SolarWindsBulkHandler | None = None
+
+
+def flush_swo() -> None:
+    if _swo_handler is not None:
+        _swo_handler.flush()
+
+
+def configure_logging(
+    level: str = "INFO",
+    swo_logs_url: str = "",
+    swo_token: str = "",
+) -> None:
+    global _swo_handler
+
+    formatter = _JsonFormatter()
+    noise_filter = _DropNoisyRequestsFilter()
+
+    stdout_handler = logging.StreamHandler()
+    stdout_handler.setFormatter(formatter)
+    stdout_handler.addFilter(noise_filter)
+
     root = logging.getLogger()
     root.handlers.clear()
-    root.addHandler(handler)
+    root.addHandler(stdout_handler)
+
+    if swo_logs_url and swo_token:
+        _swo_handler = _SolarWindsBulkHandler(url=swo_logs_url, token=swo_token)
+        _swo_handler.setFormatter(formatter)
+        _swo_handler.addFilter(noise_filter)
+        root.addHandler(_swo_handler)
+
     root.setLevel(level)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
