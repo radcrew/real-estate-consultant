@@ -1,0 +1,29 @@
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  // Resolve the `@utils/*`, `@lib/*`, ... aliases from tsconfig.json natively.
+  resolve: {
+    tsconfigPaths: true,
+  },
+  test: {
+    // Pure-logic suites default to node; component suites opt into jsdom per-file
+    // via a `// @vitest-environment jsdom` docblock.
+    environment: "node",
+    globals: true,
+    setupFiles: ["./tests/setup.ts"],
+    include: ["**/*.{test,spec}.{ts,tsx}"],
+    exclude: ["node_modules", ".next", "dist"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "json-summary"],
+      include: [
+        "lib/**/*.ts",
+        "services/**/*.ts",
+        "utils/**/*.{ts,tsx}",
+        "config/**/*.ts",
+        "components/**/*.{ts,tsx}",
+      ],
+      exclude: ["**/*.d.ts", "**/*.{test,spec}.{ts,tsx}"],
+    },
+  },
+});
