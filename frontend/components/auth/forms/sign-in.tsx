@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useCallback, useState } from "react";
 
@@ -50,7 +51,16 @@ export const SignInForm = () => {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             disabled={isSubmitting}
-          />
+          >
+            <div className="mt-1.5 text-right">
+              <Link
+                href="/forgot-password"
+                className="text-sm font-medium text-primary-600 underline-offset-4 hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
+          </PasswordField>
         </div>
 
         <ButtonPrimary type="submit" disabled={isSubmitting} className="mt-6 w-full">

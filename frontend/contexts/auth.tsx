@@ -45,6 +45,9 @@ export type AuthContextValue = {
   signIn: (credentials: AuthCredentials, onSuccess: () => void) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signUp: (credentials: SignUpCredentials, onSuccess: () => void) => Promise<void>;
+  requestPasswordReset: (email: string, onSuccess: () => void) => Promise<void>;
+  updatePassword: (password: string, onSuccess: () => void) => Promise<void>;
+  clearError: () => void;
   error: string | null;
   isSubmitting: boolean;
 };
@@ -175,6 +178,65 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     [],
   );
 
+  const requestPasswordReset = useCallback(
+    async (email: string, onSuccess: () => void) => {
+      setError(null);
+      setSubmitting(true);
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+          email.trim(),
+          { redirectTo: `${window.location.origin}/reset-password` },
+        );
+
+        if (resetError) {
+          console.error("[auth] password reset request failed:", resetError.message);
+          setError("Could not send the reset email. Please try again.");
+          return;
+        }
+
+        onSuccess();
+      } catch (err) {
+        console.error("[auth] password reset request failed:", err);
+        setError("Could not send the reset email. Please try again.");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [],
+  );
+
+  const updatePassword = useCallback(
+    async (password: string, onSuccess: () => void) => {
+      setError(null);
+      setSubmitting(true);
+
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+
+        if (updateError) {
+          setError(
+            updateError.message ||
+              "Could not update your password. Your reset link may have expired.",
+          );
+          return;
+        }
+
+        onSuccess();
+      } catch (err) {
+        console.error("[auth] password update failed:", err);
+        setError("Could not update your password. Please try again.");
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [],
+  );
+
+  const clearError = useCallback(() => setError(null), []);
+
   const signInWithGoogle = useCallback(() => startGoogleOAuth(), [startGoogleOAuth]);
 
   const signOut = useCallback(() => {
@@ -220,6 +282,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         signIn,
         signInWithGoogle,
         signUp,
+        requestPasswordReset,
+        updatePassword,
+        clearError,
         signOut,
         refresh,
         error,
