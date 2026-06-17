@@ -2,7 +2,7 @@
 # Each package runs its own test suite with coverage enabled; a final job
 # aggregates the results into a single Markdown table on the PR conversation.
 #
-# Backend is listed as N/A until its test suite is added.
+# All three packages run their own test suite and upload a coverage artifact.
 name: Coverage Report
 
 on:
@@ -43,6 +43,34 @@ jobs:
           name: frontend-coverage
           path: frontend/coverage/coverage-summary.json
 
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -U pip && python -m pip install -e ".[dev]"
+
+      - name: Run coverage
+        run: pytest --cov=app --cov-report=json -q
+        env:
+          DATABASE_URL: postgresql+asyncpg://ci:ci@localhost/ci
+          SUPABASE_URL: https://ci-placeholder.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.json
+
   ingestion:
     name: Ingestion
     runs-on: ubuntu-latest
@@ -69,13 +97,18 @@ jobs:
 
   comment:
     name: Post comment
-    needs: [frontend, ingestion]
+    needs: [frontend, backend, ingestion]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: frontend-coverage
           path: coverage/frontend
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: coverage/backend
 
       - uses: actions/download-artifact@v4
         with:
@@ -107,6 +140,14 @@ jobs:
               core.warning(`Could not read frontend coverage: ${e.message}`);
             }
 
+            let backendPct = null;
+            try {
+              const be = JSON.parse(fs.readFileSync('coverage/backend/coverage.json', 'utf8'));
+              backendPct = be.totals.percent_covered;
+            } catch (e) {
+              core.warning(`Could not read backend coverage: ${e.message}`);
+            }
+
             let ingestionPct = null;
             try {
               const ing = JSON.parse(fs.readFileSync('coverage/ingestion/coverage.json', 'utf8'));
@@ -117,7 +158,7 @@ jobs:
 
             const rows = [
               ['Frontend', frontendPct],
-              ['Backend', null],
+              ['Backend', backendPct],
               ['Ingestion', ingestionPct],
             ];
 
