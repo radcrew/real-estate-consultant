@@ -20,7 +20,7 @@ export default defineConfig({
         "services/**/*.ts",
         "utils/**/*.{ts,tsx}",
         "config/**/*.ts",
-        "components/**/*.tsx",
+        "components/**/*.{ts,tsx}",
       ],
       exclude: ["**/*.d.ts", "**/*.{test,spec}.{ts,tsx}", "**/index.ts"],
     },
