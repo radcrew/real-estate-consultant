@@ -16,19 +16,19 @@ const makeAxiosError = (data: unknown, status = 400) => {
 
 describe("getApiErrorMessage", () => {
   it("returns fallback for non-axios errors", () => {
-    expect(getApiErrorMessage(new Error("oops"))).toBe("Request failed.");
+    expect(getApiErrorMessage(new Error("oops"))).toBe("Something went wrong. Please try again.");
   });
 
   it("returns fallback for plain objects", () => {
-    expect(getApiErrorMessage({ message: "something" })).toBe("Request failed.");
+    expect(getApiErrorMessage({ message: "something" })).toBe("Something went wrong. Please try again.");
   });
 
   it("returns fallback when response has no detail", () => {
-    expect(getApiErrorMessage(makeAxiosError({}))).toBe("Request failed.");
+    expect(getApiErrorMessage(makeAxiosError({}))).toBe("Something looks off with that request. Please review your answers and try again.");
   });
 
   it("returns fallback when detail is an empty string", () => {
-    expect(getApiErrorMessage(makeAxiosError({ detail: "   " }))).toBe("Request failed.");
+    expect(getApiErrorMessage(makeAxiosError({ detail: "   " }))).toBe("Something looks off with that request. Please review your answers and try again.");
   });
 
   it("extracts a string detail", () => {
@@ -50,6 +50,6 @@ describe("getApiErrorMessage", () => {
   });
 
   it("returns fallback for an empty validation array", () => {
-    expect(getApiErrorMessage(makeAxiosError({ detail: [] }))).toBe("Request failed.");
+    expect(getApiErrorMessage(makeAxiosError({ detail: [] }))).toBe("Something looks off with that request. Please review your answers and try again.");
   });
 });

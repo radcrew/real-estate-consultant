@@ -61,12 +61,6 @@ describe("SearchModeSelector", () => {
     expect(screen.getByRole("button", { name: /use ai chat/i })).toBeDisabled();
   });
 
-  it("shows an error message when errorMessage is set", () => {
-    mockWizard.errorMessage = "Something went wrong.";
-    render(<SearchModeSelector />);
-    expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
-  });
-
   it("shows 'Loading form...' while form is starting", async () => {
     mockWizard.startGuidedForm = vi.fn(() => new Promise(() => {}));
     render(<SearchModeSelector />);

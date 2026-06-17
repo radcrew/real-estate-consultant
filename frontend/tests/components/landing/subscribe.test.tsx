@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { Subscribe } from "@components/landing/subscribe";
+
+vi.mock("@components/ui/toast", () => ({
+  useToast: () => ({ showError: vi.fn(), showSuccess: vi.fn(), showToast: vi.fn() }),
+}));
 
 vi.mock("next/image", () => ({
   default: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} />,
@@ -13,7 +17,15 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+const mockFetchSuccess = () =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true }) }),
+  );
+
 describe("Subscribe", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it("renders the heading", () => {
     render(<Subscribe />);
     expect(screen.getByRole("heading", { name: /join our newsletter/i })).toBeInTheDocument();
@@ -29,16 +41,21 @@ describe("Subscribe", () => {
     expect(screen.getByRole("button", { name: /subscribe/i })).toBeInTheDocument();
   });
 
-  it("shows a thank-you message after form submission", () => {
-    render(<Subscribe />);
+  it("shows a thank-you message after form submission", async () => {
+    mockFetchSuccess();
+    const { findByRole } = render(<Subscribe />);
     fireEvent.submit(screen.getByRole("button", { name: /subscribe/i }).closest("form")!);
-    expect(screen.getByRole("status")).toHaveTextContent("Thanks for subscribing!");
+    expect(await findByRole("status")).toHaveTextContent("Thanks for subscribing!");
   });
 
-  it("hides the form after submission", () => {
+  it("hides the form after submission", async () => {
+    mockFetchSuccess();
     render(<Subscribe />);
     fireEvent.submit(screen.getByRole("button", { name: /subscribe/i }).closest("form")!);
-    expect(screen.queryByPlaceholderText("Enter your email")).not.toBeInTheDocument();
+    const { waitFor } = await import("@testing-library/react");
+    await waitFor(() =>
+      expect(screen.queryByPlaceholderText("Enter your email")).not.toBeInTheDocument(),
+    );
   });
 
   it("applies custom className", () => {

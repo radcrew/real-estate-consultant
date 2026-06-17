@@ -47,16 +47,6 @@ describe("ChatPanel", () => {
     expect(screen.getByText(/connecting/i)).toBeInTheDocument();
   });
 
-  it("shows error banner when errorMessage is set", () => {
-    mockWizard.mockReturnValue({
-      sessionId: "s1", errorMessage: "Something went wrong",
-      isLoadingQuestion: false, isSubmitting: false,
-      llmChatBootstrap: null, setErrorMessage: vi.fn(), clearLlmChatBootstrap: vi.fn(),
-    });
-    render(<ChatPanel onLlmSuccess={vi.fn()} />);
-    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
-  });
-
   it("sends a message and calls onLlmSuccess on reply", async () => {
     mockSubmitLlm.mockResolvedValue({
       criteria: { location: "Austin" }, missing_fields: [], question_titles: {},

@@ -24,7 +24,7 @@ describe("AdminSubmissionsView", () => {
   it("shows error on failure", async () => {
     mockListSubmissions.mockRejectedValue(new Error("Server error"));
     render(<AdminSubmissionsView />);
-    await waitFor(() => expect(screen.getByText(/request failed/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/something went wrong/i)).toBeInTheDocument());
   });
 
   it("renders submissions after load", async () => {

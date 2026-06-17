@@ -31,7 +31,7 @@ describe("AgentView", () => {
     mockGetAgent.mockRejectedValue(new Error("Not found"));
     render(<AgentView broker="Jane Broker" />);
     await waitFor(() => expect(screen.queryByText(/loading agent/i)).not.toBeInTheDocument());
-    expect(screen.getByText(/request failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
   });
 
   it("renders agent name after load", async () => {
