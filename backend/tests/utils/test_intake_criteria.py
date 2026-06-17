@@ -50,6 +50,20 @@ class TestNormalizeIntakeValue:
     def test_unknown_type_returned_unchanged(self):
         assert normalize_intake_value("custom_type", 42) == 42
 
+    def test_multi_select_non_list_non_string_returns_empty(self):
+        assert normalize_intake_value("multiselect", 42) == []
+
+    def test_range_invalid_min_max_falls_back_to_original(self):
+        # when all keys fail float conversion, original dict is returned unchanged
+        original = {"min": "bad", "max": None}
+        result = normalize_intake_value("range", original)
+        assert result == original
+
+    def test_range_partial_invalid_min_omitted(self):
+        result = normalize_intake_value("range", {"min": "bad", "max": 500})
+        assert "min" not in result
+        assert result["max"] == 500.0
+
 
 class TestNormalizeMergedCriteria:
     def test_normalizes_matching_keys(self):
