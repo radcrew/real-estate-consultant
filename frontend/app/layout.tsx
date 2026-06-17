@@ -3,6 +3,7 @@ import { Geist_Mono, Poppins } from "next/font/google";
 
 import { Header } from "@components/landing/header";
 import { SavedListingsProvider } from "@components/saved/provider";
+import { ToastProvider } from "@components/ui/toast";
 import { brand } from "@config/brand";
 import { AuthProvider } from "@contexts/auth";
 
@@ -71,8 +72,10 @@ const RootLayout = ({
       />
       <AuthProvider>
         <SavedListingsProvider>
-          <Header />
-          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+          <ToastProvider>
+            <Header />
+            <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+          </ToastProvider>
         </SavedListingsProvider>
       </AuthProvider>
     </body>

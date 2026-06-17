@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
 
+from app.api.v1.endpoints.submission_images import router as submission_images_router
 from app.core.deps import CurrentAdmin, SupabaseSdkDep, get_current_admin
 from app.repositories.listing_submissions import (
     create_listing_submission,
@@ -19,6 +20,7 @@ from app.schemas.listings import (
 from app.utils.exceptions import raise_not_found
 
 router = APIRouter(prefix="/listing-submissions", tags=["submissions"])
+router.include_router(submission_images_router)
 
 
 @router.post(

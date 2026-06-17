@@ -65,6 +65,7 @@ export const Button = ({
 }: ButtonProps) => {
   const classes = cn(
     "relative inline-flex h-auto items-center justify-center rounded-full transition-colors",
+    "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-60",
     fontSize,
     sizeClass,
     translate,

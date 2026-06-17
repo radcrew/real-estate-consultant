@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 
 import { SectionHeading } from "@components/landing/section-heading";
-import { Subscribe } from "@components/landing/subscribe";
 import { Testimonials } from "@components/landing/testimonials";
 import { BgGlassmorphism } from "@components/ui/bg-glassmorphism";
 
@@ -20,31 +19,21 @@ const FACTS = [
 const TEAM = [
   {
     id: "1",
-    name: "Niamh O'Shea",
-    job: "Co-founder & CEO",
-    avatar:
-      "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80",
+    name: "Hector Rosado",
+    job: "CEO & Founder",
+    avatar: "/images/team/hector-rosado.png",
   },
   {
     id: "2",
-    name: "Danien Jame",
-    job: "Co-founder & CTO",
-    avatar:
-      "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80",
+    name: "Jesus Monroig",
+    job: "Full Stack | Web3 Engineer",
+    avatar: "/images/team/jesus-monroig.png",
   },
   {
     id: "3",
-    name: "Orla Dwyer",
-    job: "Head of Brokerage",
-    avatar:
-      "https://images.unsplash.com/photo-1560365163-3e8d64e762ef?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80",
-  },
-  {
-    id: "4",
-    name: "Dara Frazier",
-    job: "Chief Strategy Officer",
-    avatar:
-      "https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80",
+    name: "Jorge Benitez",
+    job: "Full Stack | AI Engineer",
+    avatar: "/images/team/jorge-benitez.png",
   },
 ];
 
@@ -101,7 +90,7 @@ const AboutPage = () => (
       {/* Team */}
       <div className="relative">
         <SectionHeading desc="The people building RadEstate.">⛱ Team</SectionHeading>
-        <div className="grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8">
+        <div className="grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:gap-x-8">
           {TEAM.map((item) => (
             <div key={item.id} className="max-w-sm">
               <div className="relative aspect-square overflow-hidden rounded-xl">
@@ -125,8 +114,6 @@ const AboutPage = () => (
       </div>
 
       <Testimonials />
-
-      <Subscribe />
     </div>
   </div>
 );

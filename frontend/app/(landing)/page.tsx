@@ -10,7 +10,6 @@ import { FeaturedListings } from "@components/landing/featured-listings";
 import { SectionHero } from "@components/landing/hero";
 import { HowItWorks } from "@components/landing/how-it-works";
 import { OurFeatures } from "@components/landing/our-features";
-import { PartnerLogos } from "@components/landing/partner-logos";
 import { Subscribe } from "@components/landing/subscribe";
 import { Testimonials } from "@components/landing/testimonials";
 import { BackgroundSection } from "@components/ui/background-section";
@@ -21,7 +20,6 @@ const HomePage = () => (
     <BgGlassmorphism />
     <div className="relative z-10 mx-auto w-full max-w-screen-xl space-y-24 px-4 pb-24 lg:space-y-28 lg:pb-28 2xl:max-w-screen-2xl 2xl:px-32">
       <SectionHero className="pt-10 lg:pt-16" />
-      <PartnerLogos />
       <HowItWorks />
 
       <div className="relative py-16">

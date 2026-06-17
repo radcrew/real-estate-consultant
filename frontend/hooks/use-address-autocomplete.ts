@@ -4,67 +4,77 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { GOOGLE_MAPS_API_KEY } from "@config/env";
 
-declare global {
-  interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    google?: any;
-  }
-}
+import { loadPlacesLibrary } from "./use-location";
 
-export type LocationSuggestion = {
+export type AddressSuggestion = {
   placeId: string;
   label: string;
 };
 
-// Shared promise so every hook instance (including StrictMode remounts) awaits the same load.
-let _placesLibPromise: Promise<unknown> | null = null;
-
-export const loadPlacesLibrary = (apiKey: string): Promise<unknown> => {
-  if (_placesLibPromise) return _placesLibPromise;
-
-  _placesLibPromise = new Promise<unknown>((resolve, reject) => {
-    if (typeof window === "undefined") {
-      resolve(null);
-      return;
-    }
-
-    // Already loaded — grab the places library directly.
-    if (window.google?.maps?.places) {
-      resolve(window.google.maps.places);
-      return;
-    }
-
-    const script = document.createElement("script");
-    // Classic (non-async) load with libraries=places — window.google.maps.places
-    // is fully available synchronously by the time onload fires, no importLibrary needed.
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
-    script.async = true;
-    script.onload = () => {
-      if (window.google?.maps?.places) {
-        resolve(window.google.maps.places);
-      } else {
-        _placesLibPromise = null;
-        reject(new Error("Google Maps did not initialize correctly"));
-      }
-    };
-    script.onerror = () => {
-      _placesLibPromise = null;
-      reject(new Error("Failed to load Google Maps"));
-    };
-    document.head.appendChild(script);
-  });
-
-  return _placesLibPromise;
+/** Parsed parts populated from a selected place's address components. */
+export type ParsedAddress = {
+  address: string;
+  city: string;
+  state: string;
 };
 
-type UseLocationOptions = {
+type AddressComponent = {
+  types: string[];
+  longText?: string;
+  shortText?: string;
+  long_name?: string;
+  short_name?: string;
+};
+
+const componentValue = (
+  components: AddressComponent[],
+  type: string,
+  short = false,
+): string => {
+  const match = components.find((c) => c.types?.includes(type));
+  if (!match) return "";
+  return short
+    ? match.shortText ?? match.short_name ?? ""
+    : match.longText ?? match.long_name ?? "";
+};
+
+const toParsedAddress = (components: AddressComponent[]): ParsedAddress => {
+  const streetNumber = componentValue(components, "street_number");
+  const route = componentValue(components, "route");
+  const city =
+    componentValue(components, "locality") ||
+    componentValue(components, "postal_town") ||
+    componentValue(components, "sublocality") ||
+    componentValue(components, "administrative_area_level_2");
+  const state = componentValue(components, "administrative_area_level_1", true);
+
+  return {
+    address: [streetNumber, route].filter(Boolean).join(" "),
+    city,
+    state,
+  };
+};
+
+type UseAddressAutocompleteOptions = {
   initialQuery: string;
+  /** Called as the user types — keeps the street-address field controlled. */
   onChange: (value: string) => void;
+  /** Called once a place is selected and its components are resolved. */
+  onSelect: (parsed: ParsedAddress) => void;
 };
 
-export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
+/**
+ * Google Places autocomplete for a street-address field. Unlike `useLocation`
+ * (locality-only, single string), this suggests full addresses and, on select,
+ * resolves address components to fill street / city / state separately.
+ */
+export const useAddressAutocomplete = ({
+  initialQuery,
+  onChange,
+  onSelect,
+}: UseAddressAutocompleteOptions) => {
   const [query, setQuery] = useState(initialQuery);
-  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [isLoadingSuggestions, setLoadingSuggestions] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -75,42 +85,23 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
   const predictionByPlaceIdRef = useRef<Map<string, unknown>>(new Map());
   const suggestionsTimerRef = useRef<number | null>(null);
   const fetchGenerationRef = useRef(0);
-  const placesHostRef = useRef<HTMLDivElement | null>(null);
-  const queryRef = useRef(initialQuery);
-
-  useEffect(() => {
-    // Only sync from outside when the parent clears or externally resets the
-    // value — not when *we* called onChange() and the value echoed back.
-    if (initialQuery === queryRef.current) return;
-    setQuery(initialQuery);
-    queryRef.current = initialQuery;
-    setSuggestions([]);
-    predictionByPlaceIdRef.current = new Map();
-  }, [initialQuery]);
 
   useEffect(() => {
     let isMounted = true;
 
-    const initialize = async () => {
+    (async () => {
       if (!GOOGLE_MAPS_API_KEY) {
         if (isMounted) setLoadError("Location autocomplete is not configured.");
         return;
       }
-
       try {
         const placesLib = await loadPlacesLibrary(GOOGLE_MAPS_API_KEY);
-        if (!isMounted) return;
-        placesLibRef.current = placesLib;
-
-        if (queryRef.current.trim().length >= 2) {
-          fetchSuggestions(queryRef.current);
-        }
+        if (isMounted) placesLibRef.current = placesLib;
       } catch {
         if (isMounted) setLoadError("Unable to load location autocomplete.");
       }
-    };
+    })();
 
-    initialize();
     return () => {
       isMounted = false;
     };
@@ -129,8 +120,9 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
     const trimmed = input.trim();
     const placesLib = placesLibRef.current;
 
-    if (!placesLib || trimmed.length < 2) {
+    if (!placesLib || trimmed.length < 3) {
       setLoadingSuggestions(false);
+      setSuggestions([]);
       predictionByPlaceIdRef.current = new Map();
       return;
     }
@@ -155,18 +147,17 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
         }
 
         try {
-          const { suggestions: raw } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
-            input: trimmed,
-            sessionToken: sessionTokenRef.current,
-            includedPrimaryTypes: ["locality"],
-          });
+          const { suggestions: raw } =
+            await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+              input: trimmed,
+              sessionToken: sessionTokenRef.current,
+              includedPrimaryTypes: ["street_address", "premise", "subpremise"],
+            });
 
-          if (gen !== fetchGenerationRef.current) {
-            return;
-          }
+          if (gen !== fetchGenerationRef.current) return;
 
           const nextMap = new Map<string, unknown>();
-          const nextList: LocationSuggestion[] = [];
+          const nextList: AddressSuggestion[] = [];
 
           for (const item of raw ?? []) {
             const prediction = item?.placePrediction;
@@ -181,7 +172,6 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
               [prediction.mainText?.text, prediction.secondaryText?.text]
                 .filter(Boolean)
                 .join(", ");
-
             if (!label) continue;
 
             nextMap.set(placeId, prediction);
@@ -206,14 +196,11 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
 
   const handleQueryChange = (value: string) => {
     setQuery(value);
-    queryRef.current = value;
     onChange(value);
-    setSuggestions([]);
-    predictionByPlaceIdRef.current = new Map();
     fetchSuggestions(value);
   };
 
-  const selectSuggestion = (suggestion: LocationSuggestion) => {
+  const selectSuggestion = (suggestion: AddressSuggestion) => {
     setQuery(suggestion.label);
     setSuggestions([]);
 
@@ -221,8 +208,8 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
       | {
           toPlace: () => {
             fetchFields: (o: { fields: string[] }) => Promise<void>;
+            addressComponents?: AddressComponent[];
             formattedAddress?: string;
-            displayName?: string;
           };
         }
       | undefined;
@@ -239,12 +226,14 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
       try {
         const place = prediction.toPlace();
         await place.fetchFields({
-          fields: ["formattedAddress", "displayName"],
+          fields: ["addressComponents", "formattedAddress"],
         });
 
-        const formatted = place.formattedAddress ?? place.displayName ?? suggestion.label;
-
-        onChange(String(formatted));
+        const parsed = toParsedAddress(place.addressComponents ?? []);
+        // Prefer the parsed street line; fall back to the suggestion label.
+        const street = parsed.address || suggestion.label;
+        setQuery(street);
+        onSelect({ ...parsed, address: street });
       } catch {
         onChange(suggestion.label);
       } finally {
@@ -254,7 +243,7 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
   };
 
   const showSuggestionList = useMemo(
-    () => suggestions.length > 0 && query.trim().length >= 2,
+    () => suggestions.length > 0 && query.trim().length >= 3,
     [query, suggestions.length],
   );
 
@@ -264,7 +253,6 @@ export const useLocation = ({ initialQuery, onChange }: UseLocationOptions) => {
     isLoadingSuggestions,
     loadError,
     showSuggestionList,
-    placesHostRef,
     handleQueryChange,
     selectSuggestion,
   };

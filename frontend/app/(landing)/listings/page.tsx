@@ -32,7 +32,7 @@ const ListingsIndexPage = () => {
   const loading = models === null;
 
   return (
-    <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
+    <div className="mx-auto w-full max-w-screen-xl px-4 py-16 lg:py-20 2xl:max-w-screen-2xl 2xl:px-32">
       <div className="flex flex-col items-start gap-6 border-b border-neutral-200 pb-12 lg:flex-row lg:items-end lg:justify-between dark:border-neutral-700">
         <div className="max-w-2xl">
           <h1 className="text-3xl font-semibold text-neutral-900 md:text-4xl dark:text-neutral-100">

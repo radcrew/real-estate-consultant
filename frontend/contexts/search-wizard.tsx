@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import { intakeSessionsService } from "@services/intake-sessions";
+import { useToast } from "@components/ui/toast";
 import { getApiErrorMessage } from "@utils/common";
 
 import type {
@@ -33,7 +34,6 @@ type SearchWizardContextValue = {
   canContinue: boolean;
   currentAnswer: AnswerValue | undefined;
   currentQuestion: WizardQuestion | null;
-  errorMessage: string | null;
   goNext: () => Promise<void>;
   isBusy: boolean;
   isLoadingQuestion: boolean;
@@ -42,8 +42,8 @@ type SearchWizardContextValue = {
   goPrev: () => void;
   resetToChooser: () => void;
   setErrorMessage: (value: string | null) => void;
-  startGuidedForm: () => Promise<void>;
-  startSmartChat: () => Promise<void>;
+  startGuidedForm: () => Promise<boolean>;
+  startSmartChat: () => Promise<boolean>;
   stepIndex: number;
   summaryRows: SummaryRow[];
   totalSteps: number;
@@ -67,6 +67,7 @@ export const SearchWizardProvider = ({
   onClose,
 }: SearchWizardProviderProps) => {
   const router = useRouter();
+  const { showError } = useToast();
   const [activeMode, setActiveMode] = useState<SearchWizardMode>(() =>
     initialSessionId ? "guided" : "selector",
   );
@@ -83,9 +84,19 @@ export const SearchWizardProvider = ({
     Boolean(initialSessionId),
   );
   const [isSubmitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [llmChatBootstrap, setLlmChatBootstrap] = useState<string[] | null>(
     null,
+  );
+
+  // Surface errors as toasts. Kept as `setErrorMessage(value | null)` so callers
+  // that previously cleared inline errors with `null` remain valid no-ops.
+  const setErrorMessage = useCallback(
+    (value: string | null) => {
+      if (value) {
+        showError(value);
+      }
+    },
+    [showError],
   );
 
   const currentAnswer = currentQuestion ? answers[currentQuestion.id] : undefined;
@@ -161,11 +172,11 @@ export const SearchWizardProvider = ({
     return () => {
       isCancelled = true;
     };
-  }, [initialSessionId]);
+  }, [initialSessionId, setErrorMessage]);
 
-  const startGuidedForm = async () => {
+  const startGuidedForm = async (): Promise<boolean> => {
     if (isLoadingQuestion || isSubmitting) {
-      return;
+      return false;
     }
 
     setLoadingQuestion(true);
@@ -178,22 +189,24 @@ export const SearchWizardProvider = ({
           "The server is temporarily unavailable. Please try again later.",
         );
         setActiveMode("selector");
-        return;
+        return false;
       }
 
       setSessionId(response.session_id);
       router.push(`/questionnaire/${response.session_id}`);
+      return true;
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
       setActiveMode("selector");
+      return false;
     } finally {
       setLoadingQuestion(false);
     }
   };
 
-  const startSmartChat = async () => {
+  const startSmartChat = async (): Promise<boolean> => {
     if (isLoadingQuestion || isSubmitting) {
-      return;
+      return false;
     }
 
     setLoadingQuestion(true);
@@ -213,9 +226,11 @@ export const SearchWizardProvider = ({
       }
       setLlmChatBootstrap(parts.length > 0 ? parts : null);
       setActiveMode("llm");
+      return true;
     } catch (error) {
       setErrorMessage(getApiErrorMessage(error));
       setActiveMode("selector");
+      return false;
     } finally {
       setLoadingQuestion(false);
     }
@@ -369,7 +384,6 @@ export const SearchWizardProvider = ({
     canContinue,
     currentAnswer,
     currentQuestion,
-    errorMessage,
     goNext,
     isBusy,
     isLoadingQuestion,

@@ -15,8 +15,11 @@ type BlogPostCardProps = {
 };
 
 export const BlogPostCard = ({ post }: BlogPostCardProps) => (
-  <Link href={`/blog/${post.slug}`} className="group flex flex-col">
-    <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-neutral-100 dark:bg-neutral-800">
+  <Link
+    href={`/blog/${post.slug}`}
+    className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition-shadow duration-300 hover:shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+  >
+    <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100 dark:bg-neutral-800">
       <Image
         src={post.image}
         alt={post.title}
@@ -25,7 +28,7 @@ export const BlogPostCard = ({ post }: BlogPostCardProps) => (
         className="object-cover transition-transform duration-300 group-hover:scale-105"
       />
     </div>
-    <div className="mt-4 flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col p-5">
       <Badge name={post.category} color="indigo" className="self-start" />
       <h3 className="mt-3 text-lg font-semibold text-neutral-900 group-hover:text-primary-600 dark:text-neutral-100">
         <span className="line-clamp-2">{post.title}</span>

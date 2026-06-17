@@ -1,26 +1,55 @@
 "use client";
 
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import Image from "next/image";
 import { ArrowRight } from "lucide-react";
 
 import { Badge } from "@components/ui/badge";
 import { ButtonCircle } from "@components/ui/button-circle";
 import { Input } from "@components/ui/input";
+import { useToast } from "@components/ui/toast";
 import { cn } from "@utils/common";
 
 /**
- * Newsletter section, ported from Voyager's `SectionSubscribe2`. No newsletter
- * backend exists, so the form submits locally (shows a thank-you) rather than
- * POSTing anywhere — presentation only, matching the data-layer constraint.
+ * Newsletter section, ported from Voyager's `SectionSubscribe2`. Submits to the
+ * `/api/newsletter` route handler, which adds the email to the Buttondown list
+ * server-side (keeping the Buttondown API key off the client).
  */
 type SubscribeProps = {
   className?: string;
 };
 
 export const Subscribe = ({ className }: SubscribeProps) => {
+  const { showError } = useToast();
   const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data: { ok?: boolean; error?: string } = await res
+        .json()
+        .catch(() => ({}));
+
+      if (!res.ok || !data.ok) {
+        showError(data.error || "Could not subscribe. Please try again.");
+        return;
+      }
+
+      setSubscribed(true);
+    } catch {
+      showError("Could not reach the newsletter service. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className={cn("relative flex flex-col lg:flex-row lg:items-center", className)}>
@@ -50,13 +79,7 @@ export const Subscribe = ({ className }: SubscribeProps) => {
             Thanks for subscribing!
           </p>
         ) : (
-          <form
-            className="relative mt-10 max-w-sm"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSubscribed(true);
-            }}
-          >
+          <form className="relative mt-10 max-w-sm" onSubmit={handleSubmit}>
             <Input
               required
               aria-required
@@ -66,12 +89,14 @@ export const Subscribe = ({ className }: SubscribeProps) => {
               sizeClass="h-12 px-5 py-3"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={submitting}
             />
             <ButtonCircle
               type="submit"
               className="absolute right-1.5 top-1/2 -translate-y-1/2"
               size="w-10 h-10"
               aria-label="Subscribe"
+              disabled={submitting}
             >
               <ArrowRight className="size-5" aria-hidden />
             </ButtonCircle>

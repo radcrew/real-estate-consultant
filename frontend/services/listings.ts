@@ -24,9 +24,12 @@ export type ListingSubmissionPayload = {
   loading_docks?: number | null;
   contact_name: string;
   contact_email: string;
+  image_urls?: string[];
 };
 
 export type ListingSubmissionResult = { id: string; status: string };
+
+export type ListingSubmissionImagesResult = { urls: string[] };
 
 export type FeaturedListingsResponse = {
   listings: ListingDetailResponse[];
@@ -86,6 +89,26 @@ export class ListingsService {
       "/listing-submissions",
       payload,
       { signal: options?.signal },
+    );
+    return data;
+  }
+
+  async uploadSubmissionImages(
+    files: File[],
+    options?: { signal?: AbortSignal },
+  ): Promise<ListingSubmissionImagesResult> {
+    const form = new FormData();
+    for (const file of files) {
+      form.append("files", file);
+    }
+    const { data } = await this.http.post<ListingSubmissionImagesResult>(
+      "/listing-submissions/images",
+      form,
+      {
+        signal: options?.signal,
+        // Null the JSON default so the browser sets multipart/form-data + boundary.
+        headers: { "Content-Type": null },
+      },
     );
     return data;
   }

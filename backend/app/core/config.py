@@ -32,7 +32,19 @@ class Settings(BaseSettings):
     signup_email_confirm: bool = True
 
     # Browser origins allowed to call the API (comma-separated). Example: Next dev or prod web URL.
-    frontend_origin: str = "http://localhost:3000"
+    # Both http and https localhost are allowed by default so the Next dev server
+    # works whether or not it's started with --experimental-https.
+    frontend_origin: str = "http://localhost:3000,https://localhost:3000"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """`frontend_origin` parsed into a de-duplicated list of allowed origins."""
+        seen: dict[str, None] = {}
+        for origin in self.frontend_origin.split(","):
+            trimmed = origin.strip().rstrip("/")
+            if trimmed:
+                seen.setdefault(trimmed, None)
+        return list(seen)
 
     hf_token: str = ""
     hf_model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct"

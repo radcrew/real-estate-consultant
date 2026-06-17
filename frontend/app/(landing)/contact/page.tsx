@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
 import { ContactForm } from "@components/contact/form";
-import { Subscribe } from "@components/landing/subscribe";
 import { SocialsList } from "@components/ui/socials-list";
 
 export const metadata: Metadata = {
@@ -57,10 +56,6 @@ const ContactPage = () => (
           </div>
         </div>
       </div>
-    </div>
-
-    <div className="mx-auto max-w-screen-xl px-4">
-      <Subscribe className="pb-24 lg:pb-32" />
     </div>
   </div>
 );

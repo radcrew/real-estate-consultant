@@ -30,11 +30,18 @@ class ListingSubmissionCreate(BaseModel):
     loading_docks: int | None = Field(default=None, ge=0)
     contact_name: str = Field(min_length=1, max_length=200)
     contact_email: EmailStr
+    image_urls: list[str] = Field(default_factory=list, max_length=10)
 
 
 class ListingSubmissionResponse(BaseModel):
     id: str
     status: str
+
+
+class ListingSubmissionImagesResponse(BaseModel):
+    """Public URLs of images uploaded for a pending listing submission."""
+
+    urls: list[str]
 
 
 class ListingSubmissionItem(BaseModel):
