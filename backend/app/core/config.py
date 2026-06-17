@@ -43,6 +43,10 @@ class Settings(BaseSettings):
 
     log_level: str = "INFO"
 
+    # SolarWinds Observability bulk HTTP log ingestion. Leave blank to disable.
+    swo_logs_url: str = ""
+    swo_token: str = ""
+
     # URL of the ingestion microservice (Phase 3). Empty string disables the feature.
     ingestion_service_url: str = ""
     # Bearer token sent to the ingestion service (must match its SERVICE_AUTH_TOKEN).
