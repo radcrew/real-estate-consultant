@@ -10,6 +10,7 @@ from app.api.v1.endpoints.listings.router import router as listings_router
 from app.api.v1.endpoints.outreach.router import router as outreach_router
 from app.api.v1.endpoints.ping.router import router as ping_router
 from app.api.v1.endpoints.questions.router import router as questions_router
+from app.api.v1.endpoints.search.fit import router as search_fit_router
 from app.api.v1.endpoints.search.router import router as search_router
 from app.api.v1.endpoints.submissions import router as submissions_router
 from app.core.deps import get_current_user
@@ -26,6 +27,7 @@ protected = APIRouter(dependencies=[Depends(get_current_user)])
 protected.include_router(questions_router)
 protected.include_router(intake_sessions_router)
 protected.include_router(search_router)
+protected.include_router(search_fit_router)
 protected.include_router(account_router)
 protected.include_router(agents_router)
 protected.include_router(outreach_router)

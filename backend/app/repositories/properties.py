@@ -13,6 +13,7 @@ from app.db.property_row import PropertyRow
 from app.repositories.questions import load_question_key_metadata
 from app.schemas.search import CriteriaFieldItem
 from app.utils.search_sql import (
+    component_score_exprs,
     match_score_expr,
     property_row_to_search_dict,
     where_criteria,
@@ -76,6 +77,38 @@ async def get_property_by_id(session: AsyncSession, property_id: UUID) -> dict[s
     if row is None:
         return None
     return property_row_to_search_dict(row)
+
+
+async def get_property_match_breakdown(
+    session: AsyncSession,
+    property_id: UUID,
+    criteria: dict[str, Any],
+) -> tuple[dict[str, Any], tuple[float, float, float, float]] | None:
+    """Property row plus its (location, price, size, total) match-score components."""
+    location_expr, price_expr, size_expr = component_score_exprs(criteria)
+    total_expr = match_score_expr(criteria)
+
+    query = (
+        select(
+            PropertyRow,
+            location_expr.label("location_score"),
+            price_expr.label("price_score"),
+            size_expr.label("size_score"),
+            total_expr.label("match_score"),
+        )
+        .where(PropertyRow.id == property_id)
+        .limit(1)
+    )
+    result = await session.execute(query)
+    row = result.first()
+    if row is None:
+        return None
+
+    property_row, location_score, price_score, size_score, match_score = row
+    return (
+        property_row_to_search_dict(property_row),
+        (float(location_score), float(price_score), float(size_score), float(match_score)),
+    )
 
 
 async def normalize_criteria(

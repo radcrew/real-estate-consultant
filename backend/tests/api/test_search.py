@@ -111,3 +111,39 @@ class TestUpdateSearchCriteria:
         ):
             r = await client.put(f"/api/v1/search/{_PROFILE_UUID}", json={"location": "Dallas"})
         assert r.status_code == 200
+
+
+class TestExplainFit:
+    async def test_returns_explanation(self, client):
+        from app.llm.fit.schema import FitExplanationLLM
+
+        parsed = FitExplanationLLM(
+            summary="This listing is in Austin, matching your target city.",
+            strengths=["Right city"],
+            considerations=[],
+        )
+        breakdown = (_PROPERTY_ROW, (1.0, 0.8, 0.6, 82.0))
+
+        with (
+            patch("app.api.v1.endpoints.search.fit.ensure_search_profile_access", new_callable=AsyncMock),
+            patch("app.api.v1.endpoints.search.fit.load_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.search.fit.get_property_match_breakdown", new_callable=AsyncMock, return_value=breakdown),
+            patch("app.api.v1.endpoints.search.fit.generate_fit_explanation", new_callable=AsyncMock, return_value=parsed),
+        ):
+            r = await client.post(f"/api/v1/search/{_PROFILE_UUID}/fit/{_PROP_UUID}")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["property_id"] == _PROP_UUID
+        assert body["score"] == {"location": 1.0, "price": 0.8, "size": 0.6, "total": 82.0}
+        assert body["summary"] == parsed.summary
+        assert body["strengths"] == ["Right city"]
+        assert body["considerations"] == []
+
+    async def test_unknown_property_returns_404(self, client):
+        with (
+            patch("app.api.v1.endpoints.search.fit.ensure_search_profile_access", new_callable=AsyncMock),
+            patch("app.api.v1.endpoints.search.fit.load_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.search.fit.get_property_match_breakdown", new_callable=AsyncMock, return_value=None),
+        ):
+            r = await client.post(f"/api/v1/search/{_PROFILE_UUID}/fit/{_PROP_UUID}")
+        assert r.status_code == 404
