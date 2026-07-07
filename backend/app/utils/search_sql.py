@@ -159,10 +159,20 @@ def where_criteria(criteria: dict[str, Any]) -> Any:
     )
 
 
-def match_score_expr(criteria: dict[str, Any]) -> Any:
+def component_score_exprs(criteria: dict[str, Any]) -> tuple[Any, Any, Any]:
+    """(location, price, size) Gaussian/tiered sub-scores, each 0.0-1.0.
+
+    Shared by ``match_score_expr`` (blended total) and per-listing fit
+    explanations, which need the individual components, not just the blend.
+    """
     loc = location_score_expr(*parse_location_fields(criteria))
     price = _gaussian_score_for_criterion(PropertyRow.price, criteria.get("price"))
     size = _gaussian_score_for_criterion(PropertyRow.size_sqft, criteria.get("size_sqft"))
+    return loc, price, size
+
+
+def match_score_expr(criteria: dict[str, Any]) -> Any:
+    loc, price, size = component_score_exprs(criteria)
     raw_score_expr = _lit_float(0.4) * loc + _lit_float(0.3) * price + _lit_float(0.3) * size
     return func.least(
         _lit_float(100.0),
