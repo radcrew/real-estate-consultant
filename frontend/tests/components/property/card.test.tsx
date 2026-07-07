@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PropertyCard, PropertyCardSkeleton } from "@components/property/card";
 import type { PropertyModel } from "@typings/property";
+import type { FitExplanation } from "@services/search";
 
 vi.mock("next/image", () => ({
   default: ({ alt, src, onError }: { alt: string; src: string; onError?: () => void }) => (
@@ -65,6 +66,79 @@ describe("PropertyCard", () => {
   it("renders the location", () => {
     render(<PropertyCard data={MODEL} />);
     expect(screen.getByText(/Austin/)).toBeInTheDocument();
+  });
+});
+
+describe("PropertyCard fit explanation", () => {
+  const EXPLANATION: FitExplanation = {
+    property_id: "p-1",
+    score: { location: 1, price: 0.8, size: 0.6, total: 82 },
+    summary: "This listing is right in your target city.",
+    strengths: ["Right city", "Close to target price"],
+    considerations: ["Slightly larger than requested"],
+  };
+
+  it("does not render the affordance without onExplainFit", () => {
+    render(<PropertyCard data={MODEL} />);
+    expect(screen.queryByText(/why this fits/i)).not.toBeInTheDocument();
+  });
+
+  it("does not render the affordance when matchScore is 0", () => {
+    render(<PropertyCard data={{ ...MODEL, matchScore: 0 }} onExplainFit={vi.fn()} />);
+    expect(screen.queryByText(/why this fits/i)).not.toBeInTheDocument();
+  });
+
+  it("calls onExplainFit when expanded for the first time", () => {
+    const onExplainFit = vi.fn();
+    render(<PropertyCard data={MODEL} onExplainFit={onExplainFit} />);
+    fireEvent.click(screen.getByText(/why this fits/i));
+    expect(onExplainFit).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not navigate via the surrounding link when clicked", () => {
+    const onExplainFit = vi.fn();
+    render(<PropertyCard data={MODEL} onExplainFit={onExplainFit} />);
+    const event = fireEvent.click(screen.getByText(/why this fits/i));
+    expect(event).toBe(false); // preventDefault() was called
+  });
+
+  it("shows a loading state while generating", () => {
+    render(<PropertyCard data={MODEL} onExplainFit={vi.fn()} fitLoading />);
+    fireEvent.click(screen.getByText(/why this fits/i));
+    expect(screen.getByText(/explaining/i)).toBeInTheDocument();
+  });
+
+  it("renders the summary, strengths, and considerations once available", () => {
+    render(
+      <PropertyCard data={MODEL} onExplainFit={vi.fn()} fitExplanation={EXPLANATION} />,
+    );
+    fireEvent.click(screen.getByText(/why this fits/i));
+    expect(screen.getByText(EXPLANATION.summary)).toBeInTheDocument();
+    expect(screen.getByText("Right city")).toBeInTheDocument();
+    expect(screen.getByText("Slightly larger than requested")).toBeInTheDocument();
+  });
+
+  it("does not re-call onExplainFit once a cached explanation exists", () => {
+    const onExplainFit = vi.fn();
+    render(
+      <PropertyCard
+        data={MODEL}
+        onExplainFit={onExplainFit}
+        fitExplanation={EXPLANATION}
+      />,
+    );
+    fireEvent.click(screen.getByText(/why this fits/i));
+    expect(onExplainFit).not.toHaveBeenCalled();
+  });
+
+  it("toggles the panel closed on a second click", () => {
+    render(
+      <PropertyCard data={MODEL} onExplainFit={vi.fn()} fitExplanation={EXPLANATION} />,
+    );
+    fireEvent.click(screen.getByText(/why this fits/i));
+    expect(screen.getByText(EXPLANATION.summary)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/hide why this fits/i));
+    expect(screen.queryByText(EXPLANATION.summary)).not.toBeInTheDocument();
   });
 });
 

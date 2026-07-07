@@ -14,6 +14,7 @@ import {
 import { Pagination } from "@components/ui/pagination";
 import { SectionGridHasMap } from "@components/property/grid-with-map";
 import { useSearchResults } from "@hooks/use-search-results";
+import { useFitExplanation } from "@hooks/use-fit-explanation";
 import { cn } from "@utils/common";
 
 import { SearchFilter } from "./filter-bar";
@@ -36,6 +37,8 @@ export const SearchResults = () => {
     typeof params?.id === "string" ? params.id : undefined;
   const { models, loading, error, criteria, applyCriteria } =
     useSearchResults(sessionProfileId);
+  const { cache: fitCache, loadingId: fitLoadingId, explain: explainFit } =
+    useFitExplanation(sessionProfileId);
   const [view, setView] = useState<View>("grid");
   const [page, setPage] = useState(0);
 
@@ -146,7 +149,13 @@ export const SearchResults = () => {
             <>
               <div className={PROPERTY_GRID}>
                 {pagedModels.map((model) => (
-                  <PropertyCard key={model.id} data={model} />
+                  <PropertyCard
+                    key={model.id}
+                    data={model}
+                    fitExplanation={fitCache[model.id] ?? null}
+                    fitLoading={fitLoadingId === model.id}
+                    onExplainFit={() => explainFit(model.id)}
+                  />
                 ))}
               </div>
 
@@ -166,7 +175,12 @@ export const SearchResults = () => {
               )}
             </>
           ) : (
-            <SectionGridHasMap data={models} />
+            <SectionGridHasMap
+              data={models}
+              fitCache={fitCache}
+              fitLoadingId={fitLoadingId}
+              onExplainFit={explainFit}
+            />
           ))}
 
         {showNoResults && (

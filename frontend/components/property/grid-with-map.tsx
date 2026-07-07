@@ -6,6 +6,7 @@ import { Heading2 } from "@components/ui/heading2";
 import type { PropertyModel } from "@typings/property";
 import { PropertyCard } from "@components/property/card";
 import { PropertyMap } from "@components/property/map";
+import type { FitExplanation } from "@services/search";
 
 /**
  * Voyager-style grid + map split, ported from Voyager's `SectionGridHasMap`:
@@ -19,12 +20,18 @@ export interface SectionGridHasMapProps {
   data: PropertyModel[];
   heading?: ReactNode;
   subHeading?: ReactNode;
+  fitCache?: Record<string, FitExplanation>;
+  fitLoadingId?: string | null;
+  onExplainFit?: (propertyId: string) => void;
 }
 
 export const SectionGridHasMap = ({
   data,
   heading,
   subHeading,
+  fitCache,
+  fitLoadingId,
+  onExplainFit,
 }: SectionGridHasMapProps) => {
   const [activeId, setActiveId] = useState<string | undefined>(undefined);
 
@@ -42,7 +49,14 @@ export const SectionGridHasMap = ({
               onMouseEnter={() => setActiveId(item.id)}
               onMouseLeave={() => setActiveId(undefined)}
             >
-              <PropertyCard data={item} />
+              <PropertyCard
+                data={item}
+                fitExplanation={fitCache?.[item.id] ?? null}
+                fitLoading={fitLoadingId === item.id}
+                onExplainFit={
+                  onExplainFit ? () => onExplainFit(item.id) : undefined
+                }
+              />
             </div>
           ))}
         </div>

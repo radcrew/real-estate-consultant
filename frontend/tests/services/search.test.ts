@@ -55,4 +55,24 @@ describe("SearchService", () => {
       expect(http.put).toHaveBeenCalledWith("/search/sp-1", criteria);
     });
   });
+
+  describe("explainFit", () => {
+    it("calls POST /search/{profileId}/fit/{propertyId} and returns data", async () => {
+      const explanation = {
+        property_id: "prop-1",
+        score: { location: 1, price: 0.8, size: 0.6, total: 82 },
+        summary: "Good match.",
+        strengths: ["Right city"],
+        considerations: [],
+      };
+      const http = makeHttp(explanation);
+      const data = await new SearchService(http).explainFit("sp-1", "prop-1");
+      expect(http.post).toHaveBeenCalledWith(
+        "/search/sp-1/fit/prop-1",
+        undefined,
+        expect.any(Object),
+      );
+      expect(data).toEqual(explanation);
+    });
+  });
 });

@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { MapPin } from "lucide-react";
+import { Loader2, MapPin } from "lucide-react";
 
 import { Badge } from "@components/ui/badge";
 import { BtnLikeIcon } from "@components/ui/btn-like-icon";
 import type { PropertyModel } from "@typings/property";
 import { ImagePlaceholder } from "@components/property/image-placeholder";
+import type { FitExplanation } from "@services/search";
 import { cn } from "@utils/common";
 
 /**
@@ -37,6 +38,12 @@ export const PropertyCardSkeleton = () => (
 export interface PropertyCardProps {
   data: PropertyModel;
   className?: string;
+  /** Cached result for this property, if `onExplainFit` has already resolved once. */
+  fitExplanation?: FitExplanation | null;
+  /** True while this property's explanation is being generated. */
+  fitLoading?: boolean;
+  /** Present only on search-results views (a session/criteria exists to explain against). */
+  onExplainFit?: () => void;
 }
 
 const TITLE_CLASS = "text-base font-semibold text-neutral-900 dark:text-white";
@@ -44,10 +51,27 @@ const TITLE_CLASS = "text-base font-semibold text-neutral-900 dark:text-white";
 const transactionColor = (transactionType: string) =>
   transactionType.toLowerCase().includes("sale") ? "green" : "blue";
 
-export const PropertyCard = ({ data, className }: PropertyCardProps) => {
+export const PropertyCard = ({
+  data,
+  className,
+  fitExplanation,
+  fitLoading,
+  onExplainFit,
+}: PropertyCardProps) => {
   const cover = data.galleryImgs[0] || data.imageSrc;
   const hasTransaction = data.transactionType && data.transactionType !== "—";
   const [imgFailed, setImgFailed] = useState(false);
+  const [fitExpanded, setFitExpanded] = useState(false);
+
+  const handleExplainFitClick = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const next = !fitExpanded;
+    setFitExpanded(next);
+    if (next && !fitExplanation) {
+      onExplainFit?.();
+    }
+  };
 
   return (
     <Link
@@ -117,6 +141,47 @@ export const PropertyCard = ({ data, className }: PropertyCardProps) => {
             {data.priceLabel ?? "Price on request"}
           </span>
         </div>
+
+        {data.matchScore > 0 && onExplainFit && (
+          <div>
+            <button
+              type="button"
+              onClick={handleExplainFitClick}
+              className="text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
+            >
+              {fitExpanded ? "Hide why this fits" : "Why this fits"}
+            </button>
+
+            {fitExpanded && (
+              <div className="mt-2 rounded-lg bg-neutral-50 p-3 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                {fitLoading && !fitExplanation ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 className="size-3 animate-spin" aria-hidden />
+                    Explaining…
+                  </span>
+                ) : fitExplanation ? (
+                  <>
+                    <p>{fitExplanation.summary}</p>
+                    {fitExplanation.strengths.length > 0 && (
+                      <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+                        {fitExplanation.strengths.map((s) => (
+                          <li key={s}>{s}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {fitExplanation.considerations.length > 0 && (
+                      <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-neutral-500 dark:text-neutral-400">
+                        {fitExplanation.considerations.map((c) => (
+                          <li key={c}>{c}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </Link>
   );
