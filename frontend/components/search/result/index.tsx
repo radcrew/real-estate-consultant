@@ -37,8 +37,12 @@ export const SearchResults = () => {
     typeof params?.id === "string" ? params.id : undefined;
   const { models, loading, error, criteria, applyCriteria } =
     useSearchResults(sessionProfileId);
-  const { cache: fitCache, loadingId: fitLoadingId, explain: explainFit } =
-    useFitExplanation(sessionProfileId);
+  const {
+    cache: fitCache,
+    loadingId: fitLoadingId,
+    errors: fitErrors,
+    explain: explainFit,
+  } = useFitExplanation(sessionProfileId);
   const [view, setView] = useState<View>("grid");
   const [page, setPage] = useState(0);
 
@@ -154,6 +158,7 @@ export const SearchResults = () => {
                     data={model}
                     fitExplanation={fitCache[model.id] ?? null}
                     fitLoading={fitLoadingId === model.id}
+                    fitError={fitErrors[model.id]}
                     onExplainFit={() => explainFit(model.id)}
                   />
                 ))}
@@ -179,6 +184,7 @@ export const SearchResults = () => {
               data={models}
               fitCache={fitCache}
               fitLoadingId={fitLoadingId}
+              fitErrors={fitErrors}
               onExplainFit={explainFit}
             />
           ))}

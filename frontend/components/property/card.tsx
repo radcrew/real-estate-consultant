@@ -42,6 +42,8 @@ export interface PropertyCardProps {
   fitExplanation?: FitExplanation | null;
   /** True while this property's explanation is being generated. */
   fitLoading?: boolean;
+  /** Error message from the last failed explanation attempt for this property. */
+  fitError?: string | null;
   /** Present only on search-results views (a session/criteria exists to explain against). */
   onExplainFit?: () => void;
 }
@@ -56,6 +58,7 @@ export const PropertyCard = ({
   className,
   fitExplanation,
   fitLoading,
+  fitError,
   onExplainFit,
 }: PropertyCardProps) => {
   const cover = data.galleryImgs[0] || data.imageSrc;
@@ -159,6 +162,8 @@ export const PropertyCard = ({
                     <Loader2 className="size-3 animate-spin" aria-hidden />
                     Explaining…
                   </span>
+                ) : !fitExplanation && fitError ? (
+                  <span className="text-destructive">{fitError}</span>
                 ) : fitExplanation ? (
                   <>
                     <p>{fitExplanation.summary}</p>

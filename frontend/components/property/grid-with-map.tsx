@@ -22,6 +22,7 @@ export interface SectionGridHasMapProps {
   subHeading?: ReactNode;
   fitCache?: Record<string, FitExplanation>;
   fitLoadingId?: string | null;
+  fitErrors?: Record<string, string>;
   onExplainFit?: (propertyId: string) => void;
 }
 
@@ -31,6 +32,7 @@ export const SectionGridHasMap = ({
   subHeading,
   fitCache,
   fitLoadingId,
+  fitErrors,
   onExplainFit,
 }: SectionGridHasMapProps) => {
   const [activeId, setActiveId] = useState<string | undefined>(undefined);
@@ -53,6 +55,7 @@ export const SectionGridHasMap = ({
                 data={item}
                 fitExplanation={fitCache?.[item.id] ?? null}
                 fitLoading={fitLoadingId === item.id}
+                fitError={fitErrors?.[item.id]}
                 onExplainFit={
                   onExplainFit ? () => onExplainFit(item.id) : undefined
                 }

@@ -131,6 +131,32 @@ describe("PropertyCard fit explanation", () => {
     expect(onExplainFit).not.toHaveBeenCalled();
   });
 
+  it("shows the error message when explaining fails", () => {
+    render(
+      <PropertyCard
+        data={MODEL}
+        onExplainFit={vi.fn()}
+        fitError="Something went wrong."
+      />,
+    );
+    fireEvent.click(screen.getByText(/why this fits/i));
+    expect(screen.getByText("Something went wrong.")).toBeInTheDocument();
+  });
+
+  it("prefers a cached explanation over a stale error", () => {
+    render(
+      <PropertyCard
+        data={MODEL}
+        onExplainFit={vi.fn()}
+        fitExplanation={EXPLANATION}
+        fitError="Something went wrong."
+      />,
+    );
+    fireEvent.click(screen.getByText(/why this fits/i));
+    expect(screen.getByText(EXPLANATION.summary)).toBeInTheDocument();
+    expect(screen.queryByText("Something went wrong.")).not.toBeInTheDocument();
+  });
+
   it("toggles the panel closed on a second click", () => {
     render(
       <PropertyCard data={MODEL} onExplainFit={vi.fn()} fitExplanation={EXPLANATION} />,
