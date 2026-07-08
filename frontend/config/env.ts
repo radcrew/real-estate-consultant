@@ -1,5 +1,5 @@
 export const BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_API_URL?.trim() || "http://localhost:8000";
+  process.env.NEXT_PUBLIC_BACKEND_API_URL?.trim() || "http://localhost:8888";
 
 export const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";

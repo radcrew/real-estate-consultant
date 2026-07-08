@@ -30,27 +30,27 @@ Do this **from `backend/`** (the directory that contains `pyproject.toml`). The 
 3. **Run the API** — With the venv activated and cwd still `backend/`:
 
 ```powershell
-fastapi dev
+fastapi dev --port 8888
 ```
 
-This uses `[tool.fastapi]` in `pyproject.toml` (`entrypoint = "app.main:app"`), serves with reload on **http://127.0.0.1:8000** by default.
+This uses `[tool.fastapi]` in `pyproject.toml` (`entrypoint = "app.main:app"`), serves with reload on **http://127.0.0.1:8888**.
 
 **If your shell is at the repository root** (parent of `backend/`), point the CLI at `main.py` so imports resolve:
 
 ```powershell
-fastapi dev backend/app/main.py
+fastapi dev backend/app/main.py --port 8888
 ```
 
 **Production-style** (no reload, binds `0.0.0.0` by default for `fastapi run`):
 
 ```powershell
-fastapi run
+fastapi run --port 8888
 ```
 
 **Uvicorn directly** (same app, reload on localhost):
 
 ```powershell
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8888
 ```
 
 Running `fastapi dev` from the repo root **without** the `backend/app/main.py` path often fails with *Could not find a default file to run* because the CLI does not see `[tool.fastapi]` or the `app` package.
@@ -59,9 +59,9 @@ Running `fastapi dev` from the repo root **without** the `backend/app/main.py` p
 
 | URL | Description |
 |-----|-------------|
-| [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) | Liveness-style check |
-| [http://127.0.0.1:8000/api/v1/ping](http://127.0.0.1:8000/api/v1/ping) | Sample versioned route |
-| [http://127.0.0.1:8000/openapi.json](http://127.0.0.1:8000/openapi.json) | OpenAPI schema |
+| [http://127.0.0.1:8888/health](http://127.0.0.1:8888/health) | Liveness-style check |
+| [http://127.0.0.1:8888/api/v1/ping](http://127.0.0.1:8888/api/v1/ping) | Sample versioned route |
+| [http://127.0.0.1:8888/openapi.json](http://127.0.0.1:8888/openapi.json) | OpenAPI schema |
 
 ## Configuration
 
