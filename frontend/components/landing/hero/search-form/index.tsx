@@ -64,7 +64,6 @@ export const HeroRealEstateSearchForm = ({ className }: HeroRealEstateSearchForm
         <PriceRangeInput
           value={priceRange}
           onChange={setPriceRange}
-          onSubmit={handleSubmit}
           submitting={submitting}
         />
       </form>

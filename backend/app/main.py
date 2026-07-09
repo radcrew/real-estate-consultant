@@ -83,9 +83,20 @@ def create_app() -> FastAPI:
                 "method": request.method,
             },
         )
+        # Starlette routes handlers registered on the bare `Exception` class through
+        # ServerErrorMiddleware, which sits *outside* CORSMiddleware — so this response
+        # never picks up CORS headers on its own. Without them, the browser reports a
+        # CORS failure instead of surfacing this 500, hiding the real error from the
+        # frontend. Add the header manually, mirroring CORSMiddleware's own check.
+        headers = {}
+        origin = request.headers.get("origin")
+        if origin and origin in settings.cors_origins:
+            headers["Access-Control-Allow-Origin"] = origin
+            headers["Vary"] = "Origin"
         return JSONResponse(
             status_code=500,
             content={"detail": "Internal server error. Please try again later."},
+            headers=headers,
         )
 
     app.include_router(system_router)

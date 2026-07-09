@@ -17,11 +17,10 @@ const PRICE_INPUT = "block w-full rounded-full border-neutral-200 bg-transparent
 type PriceRangeInputProps = {
   value: [number, number];
   onChange: (value: [number, number]) => void;
-  onSubmit: () => void;
   submitting?: boolean;
 };
 
-export const PriceRangeInput = ({ value, onChange, onSubmit, submitting }: PriceRangeInputProps) => {
+export const PriceRangeInput = ({ value, onChange, submitting }: PriceRangeInputProps) => {
   const [min, max] = value;
 
   return (
@@ -52,7 +51,6 @@ export const PriceRangeInput = ({ value, onChange, onSubmit, submitting }: Price
             <div className="pr-2 xl:pr-4">
               <button
                 type="submit"
-                onClick={onSubmit}
                 disabled={submitting}
                 className="flex size-14 items-center justify-center rounded-full bg-primary-600 text-neutral-50 transition-colors hover:bg-primary-700 focus:outline-none disabled:opacity-60"
                 aria-label="Search"
