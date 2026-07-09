@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.property_row import PropertyRow
-from app.utils.search_sql import property_row_to_search_dict
+from app.domain.search_sql import property_row_to_search_dict
 
 _FEATURED_COUNT = 6
 _POOL_SIZE = 60

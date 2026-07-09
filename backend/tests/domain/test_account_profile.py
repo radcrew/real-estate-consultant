@@ -1,10 +1,10 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from supabase_auth.types import User
 
+from app.domain.account_profile import account_profile_response
 from app.models.profile import Profile
-from app.utils.account_profile import account_profile_response
 
 _UUID = str(uuid.uuid4())
 
@@ -15,7 +15,7 @@ def _make_user(email: str = "u@example.com", phone: str | None = None) -> User:
         app_metadata={},
         user_metadata={},
         aud="authenticated",
-        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2024, 1, 1, tzinfo=UTC),
         email=email,
         phone=phone,
     )

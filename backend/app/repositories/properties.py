@@ -10,14 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from supabase import AsyncClient
 
 from app.db.property_row import PropertyRow
-from app.repositories.questions import list_question_key_metadata
-from app.schemas.search import CriteriaFieldItem
-from app.utils.search_sql import (
+from app.domain.search_sql import (
     component_score_exprs,
     match_score_expr,
     property_row_to_search_dict,
     where_criteria,
 )
+from app.repositories.questions import list_question_key_metadata
+from app.schemas.search import CriteriaFieldItem
 
 
 async def search_properties(

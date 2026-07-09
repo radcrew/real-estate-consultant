@@ -1,9 +1,9 @@
-"""Tests for app.utils.search_sql (score expression building)."""
+"""Tests for app.domain.search_sql (score expression building)."""
 from __future__ import annotations
 
 from typing import Any
 
-from app.utils.search_sql import component_score_exprs, match_score_expr
+from app.domain.search_sql import component_score_exprs, match_score_expr
 
 
 def _sql(expr: Any) -> str:

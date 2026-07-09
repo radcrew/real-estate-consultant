@@ -9,6 +9,7 @@ from app.api.v1.endpoints.account.exceptions import (
     raise_account_no_fields_to_update,
 )
 from app.core.deps import CurrentUser, SupabaseSdkDep
+from app.domain.account_profile import account_profile_response
 from app.models.profile import profile_from_row
 from app.repositories.account import (
     get_auth_user,
@@ -23,7 +24,6 @@ from app.schemas.account import (
     AccountProfileResponse,
     AccountProfileUpdate,
 )
-from app.utils.account_profile import account_profile_response
 
 router = APIRouter()
 

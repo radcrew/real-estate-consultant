@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query
 
 from app.core.deps import CurrentUser, DbSession, SupabaseSdkDep
+from app.domain.listings import format_listing_type_label
 from app.models.properties import Properties
 from app.repositories.intake_sessions import (
     create_intake_session_row,
@@ -27,7 +28,6 @@ from app.schemas.search import (
     SearchPropertiesResponse,
     UpdateSearchCriteriaBody,
 )
-from app.utils.listings import format_listing_type_label
 
 router = APIRouter(prefix="/search", tags=["search"])
 

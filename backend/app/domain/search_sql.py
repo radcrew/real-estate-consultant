@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import Float, and_, case, cast, func, literal, or_, true
 
 from app.db.property_row import PropertyRow
-from app.utils.criteria_search import (
+from app.domain.criteria_search import (
     gaussian_target_sigma,
     ilike_pattern,
     parse_location_fields,

@@ -6,11 +6,11 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from app.core.deps import DbSession, SupabaseSdkDep
+from app.domain.listings import format_listing_type_label
 from app.models.properties import Properties
 from app.repositories.featured import list_featured_property_rows
 from app.repositories.property_images import get_first_image_url
 from app.schemas.listings import ListingDetailResponse
-from app.utils.listings import format_listing_type_label
 
 router = APIRouter()
 

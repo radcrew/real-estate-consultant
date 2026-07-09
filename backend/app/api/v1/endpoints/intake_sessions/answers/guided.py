@@ -10,6 +10,7 @@ from app.api.v1.endpoints.intake_sessions.answers.exceptions import (
     raise_intake_unknown_question_key,
 )
 from app.core.deps import SupabaseSdkDep
+from app.domain.intake_validation import compute_current_index
 from app.repositories.intake_sessions import (
     append_intake_criteria_answer,
     get_intake_session_row,
@@ -26,7 +27,6 @@ from app.schemas.intake_sessions import (
     UpdateIntakeSessionAnswersRequest,
     UpdateIntakeSessionAnswersResponse,
 )
-from app.utils.intake_validation import compute_current_index
 
 router = APIRouter()
 

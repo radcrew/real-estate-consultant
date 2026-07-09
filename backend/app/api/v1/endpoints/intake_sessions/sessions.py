@@ -12,6 +12,7 @@ from app.api.v1.endpoints.intake_sessions.exceptions import (
     raise_intake_endpoint_no_questions_configured,
 )
 from app.core.deps import CurrentUser, SupabaseSdkDep
+from app.domain.intake_validation import compute_current_index, has_answer
 from app.llm import (
     INTAKE_OPENING_MESSAGE,
     generate_opening_question,
@@ -33,7 +34,6 @@ from app.schemas.intake_sessions import (
     GetIntakeSessionResponse,
     IntakeSessionFirstQuestion,
 )
-from app.utils.intake_validation import compute_current_index, has_answer
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.utils.criteria_search import parse_location_fields, parse_range
+from app.domain.criteria_search import parse_location_fields, parse_range
 
 FIT_EXPLANATION_SYSTEM_PROMPT = (
     "You explain to a commercial real estate buyer or tenant why a specific listing "

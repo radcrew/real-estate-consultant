@@ -10,11 +10,11 @@ from uuid import UUID
 from fastapi import APIRouter, File, UploadFile
 
 from app.core.deps import CurrentUser, SupabaseSdkDep
+from app.domain.account_profile import account_profile_response
 from app.models.profile import profile_from_row
 from app.repositories.account import get_auth_user
 from app.repositories.profiles import get_profile_row, set_profile_avatar_url
 from app.schemas.account import AccountProfileResponse
-from app.utils.account_profile import account_profile_response
 from app.utils.exceptions import raise_bad_gateway, raise_bad_request
 
 logger = logging.getLogger(__name__)

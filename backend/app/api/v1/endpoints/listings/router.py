@@ -8,11 +8,11 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints.listings.exceptions import raise_listing_not_found
 from app.core.deps import DbSession, SupabaseSdkDep
+from app.domain.listings import format_listing_type_label
 from app.models.properties import Properties
 from app.repositories.properties import get_property_by_id
 from app.repositories.property_images import list_all_image_urls
 from app.schemas.listings import ListingDetailResponse
-from app.utils.listings import format_listing_type_label
 
 router = APIRouter(prefix="/listings", tags=["listings"])
 

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.domain.criteria_search import parse_location_fields, parse_range
 from app.llm.fit.exceptions import raise_fit_explanation_empty
 from app.llm.fit.prompts import FIT_EXPLANATION_SYSTEM_PROMPT, build_fit_user_message
 from app.llm.fit.schema import FitExplanationLLM
 from app.llm.providers import huggingface_provider
-from app.utils.criteria_search import parse_location_fields, parse_range
 
 _NO_CRITERIA_SUMMARY = (
     "No specific search criteria are set yet, so every listing scores neutrally. "

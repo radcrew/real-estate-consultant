@@ -1,4 +1,4 @@
-from app.utils.listings import format_listing_type_label
+from app.domain.listings import format_listing_type_label
 
 _KNOWN_CODES = [
     "LandForAuction",
