@@ -33,11 +33,13 @@ async def get_account_profile(
     current_user: CurrentUser,
     client: SupabaseSdkDep,
 ) -> AccountProfileResponse:
+    """``current_user`` already comes from a live token check, so no need to
+    re-fetch it via the Admin API here (that's only required after PATCH
+    mutates auth user attributes)."""
     user_id = UUID(current_user.id)
 
-    user = await get_auth_user(client, current_user.id)
     raw = await get_profile_row(client, user_id)
-    return account_profile_response(user=user, profile=profile_from_row(raw))
+    return account_profile_response(user=current_user, profile=profile_from_row(raw))
 
 
 @router.patch("/profile", response_model=AccountProfileResponse)

@@ -24,19 +24,11 @@ def _make_auth_user(email: str = "user@example.com"):
 
 
 class TestGetAccountProfile:
-    async def test_returns_profile(self, client):
-        auth_user = _make_auth_user()
-        with (
-            patch(
-                "app.api.v1.endpoints.account.profile.get_auth_user",
-                new_callable=AsyncMock,
-                return_value=auth_user,
-            ),
-            patch(
-                "app.api.v1.endpoints.account.profile.get_profile_row",
-                new_callable=AsyncMock,
-                return_value={"id": _UID, "first_name": "Alice", "last_name": "Smith"},
-            ),
+    async def test_returns_profile(self, client, mock_user):
+        with patch(
+            "app.api.v1.endpoints.account.profile.get_profile_row",
+            new_callable=AsyncMock,
+            return_value={"id": _UID, "first_name": "Alice", "last_name": "Smith"},
         ):
             r = await client.get("/api/v1/account/profile")
         assert r.status_code == 200
@@ -45,13 +37,23 @@ class TestGetAccountProfile:
         assert body["first_name"] == "Alice"
 
     async def test_profile_row_none_returns_minimal(self, client):
-        auth_user = _make_auth_user()
+        with patch(
+            "app.api.v1.endpoints.account.profile.get_profile_row",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            r = await client.get("/api/v1/account/profile")
+        assert r.status_code == 200
+        assert r.json()["first_name"] is None
+
+    async def test_does_not_call_admin_api(self, client):
+        """GET must not re-fetch the auth user via the Admin API — that call is a
+        redundant network round-trip and was the source of intermittent 503s."""
         with (
             patch(
                 "app.api.v1.endpoints.account.profile.get_auth_user",
                 new_callable=AsyncMock,
-                return_value=auth_user,
-            ),
+            ) as mock_get_auth_user,
             patch(
                 "app.api.v1.endpoints.account.profile.get_profile_row",
                 new_callable=AsyncMock,
@@ -60,7 +62,7 @@ class TestGetAccountProfile:
         ):
             r = await client.get("/api/v1/account/profile")
         assert r.status_code == 200
-        assert r.json()["first_name"] is None
+        mock_get_auth_user.assert_not_called()
 
 
 class TestUpdateAccountProfile:
