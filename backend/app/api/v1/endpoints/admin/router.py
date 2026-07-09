@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.core.db_safe import execute_db_safe
+from app.api.v1.endpoints.admin.exceptions import raise_job_already_queued
 from app.core.deps import CurrentAdmin, SupabaseSdkDep
+from app.repositories.jobs import find_active_job_by_idempotency_key, insert_job_row
 from app.services.ingestion import wake_processor
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -41,27 +42,11 @@ async def enqueue_ingest(
     source = body.source
     idem_key = f"{source}:{date.today().isoformat()}"
 
-    existing = await execute_db_safe(
-        client.table("jobs")
-        .select("id,status")
-        .eq("idempotency_key", idem_key)
-        .in_("status", ["pending", "running"])
-        .limit(1)
-        .execute()
-    )
-    if existing.data:
-        row = existing.data[0]
-        raise HTTPException(
-            status_code=409,
-            detail=f"Job for {source!r} is already {row['status']!r} today.",
-        )
+    existing = await find_active_job_by_idempotency_key(client, idem_key)
+    if existing is not None:
+        raise_job_already_queued(source, existing["status"])
 
-    result = await execute_db_safe(
-        client.table("jobs").insert({"source": source, "idempotency_key": idem_key}).execute()
-    )
-    if not result.data:
-        raise HTTPException(status_code=500, detail="Job insert returned no data.")
-    job = result.data[0]
+    job = await insert_job_row(client, source=source, idempotency_key=idem_key)
     logger.info("job_enqueued", extra={"job_id": job["id"], "source": source, "idem_key": idem_key})
     await wake_processor()
     return EnqueueResponse(

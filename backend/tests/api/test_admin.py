@@ -1,7 +1,7 @@
 """Tests for admin endpoints."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -32,15 +32,20 @@ _JOB_ROW = {"id": "job-uuid-1", "source": "loopnet-seed", "status": "pending", "
 
 class TestEnqueueIngest:
     async def test_success_enqueues_job(self, admin_client, mock_supabase):
-        no_existing = MagicMock()
-        no_existing.data = []
-        inserted = MagicMock()
-        inserted.data = [_JOB_ROW]
-
-        with patch("app.api.v1.endpoints.admin.router.execute_db_safe", new_callable=AsyncMock) as mock_exec:
-            mock_exec.side_effect = [no_existing, inserted]
-            with patch("app.api.v1.endpoints.admin.router.wake_processor", new_callable=AsyncMock):
-                r = await admin_client.post("/api/v1/admin/ingest", json={"source": "loopnet-seed"})
+        with (
+            patch(
+                "app.api.v1.endpoints.admin.router.find_active_job_by_idempotency_key",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "app.api.v1.endpoints.admin.router.insert_job_row",
+                new_callable=AsyncMock,
+                return_value=_JOB_ROW,
+            ),
+            patch("app.api.v1.endpoints.admin.router.wake_processor", new_callable=AsyncMock),
+        ):
+            r = await admin_client.post("/api/v1/admin/ingest", json={"source": "loopnet-seed"})
 
         assert r.status_code == 200
         body = r.json()
@@ -48,24 +53,29 @@ class TestEnqueueIngest:
         assert body["status"] == "pending"
 
     async def test_duplicate_job_returns_409(self, admin_client):
-        existing = MagicMock()
-        existing.data = [{"id": "job-1", "status": "running"}]
-
-        with patch("app.api.v1.endpoints.admin.router.execute_db_safe", new_callable=AsyncMock) as mock_exec:
-            mock_exec.return_value = existing
+        with patch(
+            "app.api.v1.endpoints.admin.router.find_active_job_by_idempotency_key",
+            new_callable=AsyncMock,
+            return_value={"id": "job-1", "status": "running"},
+        ):
             r = await admin_client.post("/api/v1/admin/ingest", json={"source": "loopnet-seed"})
 
         assert r.status_code == 409
 
-    async def test_insert_no_data_returns_500(self, admin_client):
-        no_existing = MagicMock()
-        no_existing.data = []
-        no_data = MagicMock()
-        no_data.data = []
+    async def test_insert_no_data_returns_502(self, admin_client):
+        with (
+            patch(
+                "app.api.v1.endpoints.admin.router.find_active_job_by_idempotency_key",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "app.api.v1.endpoints.admin.router.insert_job_row",
+                new_callable=AsyncMock,
+                side_effect=HTTPException(status_code=502, detail="Job insert returned no data."),
+            ),
+            patch("app.api.v1.endpoints.admin.router.wake_processor", new_callable=AsyncMock),
+        ):
+            r = await admin_client.post("/api/v1/admin/ingest", json={"source": "loopnet-seed"})
 
-        with patch("app.api.v1.endpoints.admin.router.execute_db_safe", new_callable=AsyncMock) as mock_exec:
-            mock_exec.side_effect = [no_existing, no_data]
-            with patch("app.api.v1.endpoints.admin.router.wake_processor", new_callable=AsyncMock):
-                r = await admin_client.post("/api/v1/admin/ingest", json={"source": "loopnet-seed"})
-
-        assert r.status_code == 500
+        assert r.status_code == 502
