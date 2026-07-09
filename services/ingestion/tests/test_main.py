@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 from fastapi import HTTPException
 from fastapi.routing import APIRoute
 
+from app.core.db_safe import SupabaseRequestError
 from app.main import create_app
 
 
@@ -26,6 +27,11 @@ async def client():
     @app.get("/test/unhandled")
     async def _unhandled():
         raise RuntimeError("kaboom")
+
+    # Route that raises a Supabase request failure
+    @app.get("/test/supabase-error")
+    async def _supabase_error():
+        raise SupabaseRequestError("could not reach Supabase")
 
     async with AsyncClient(
         transport=ASGITransport(app=app, raise_app_exceptions=False),
@@ -49,6 +55,19 @@ class TestHttpExceptionHandler:
     async def test_5xx_returns_correct_status(self, client):
         r = await client.get("/test/http-500")
         assert r.status_code == 503
+
+
+class TestSupabaseRequestErrorHandler:
+    @pytest.mark.asyncio
+    async def test_returns_502(self, client):
+        r = await client.get("/test/supabase-error")
+        assert r.status_code == 502
+
+    @pytest.mark.asyncio
+    async def test_returns_generic_message(self, client):
+        r = await client.get("/test/supabase-error")
+        assert "detail" in r.json()
+        assert "database" in r.json()["detail"].lower()
 
 
 class TestUnhandledExceptionHandler:

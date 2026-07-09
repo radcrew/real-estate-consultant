@@ -9,6 +9,7 @@ from starlette.exceptions import HTTPException
 from app.api.router import api_router
 from app.api.system import router as system_router
 from app.core.config import settings
+from app.core.db_safe import SupabaseRequestError
 from app.core.logging import configure_logging
 from app.core.middleware import RequestLoggingMiddleware
 
@@ -30,6 +31,21 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         lifespan=lifespan,
     )
+
+    @app.exception_handler(SupabaseRequestError)
+    async def supabase_request_error_handler(
+        request: Request,
+        exc: SupabaseRequestError,
+    ) -> JSONResponse:
+        logger.warning(
+            "Supabase request failed: %s",
+            exc,
+            extra={"error": type(exc).__name__, "path": request.url.path, "method": request.method},
+        )
+        return JSONResponse(
+            status_code=502,
+            content={"detail": "We couldn't reach the database. Please try again shortly."},
+        )
 
     @app.exception_handler(HTTPException)
     async def http_exception_logging_handler(request: Request, exc: HTTPException) -> JSONResponse:
