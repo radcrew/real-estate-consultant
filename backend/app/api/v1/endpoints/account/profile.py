@@ -16,7 +16,7 @@ from app.repositories.account import (
 )
 from app.repositories.profiles import (
     PROFILE_PATCH_DB_COLUMNS,
-    fetch_profile_row,
+    get_profile_row,
     upsert_profile_patch,
 )
 from app.schemas.account import (
@@ -36,7 +36,7 @@ async def get_account_profile(
     user_id = UUID(current_user.id)
 
     user = await get_auth_user(client, current_user.id)
-    raw = await fetch_profile_row(client, user_id)
+    raw = await get_profile_row(client, user_id)
     return account_profile_response(user=user, profile=profile_from_row(raw))
 
 
@@ -65,5 +65,5 @@ async def update_account_profile(
         await update_auth_user(client, current_user.id, auth_user_updates)
 
     user = await get_auth_user(client, current_user.id)
-    raw = await fetch_profile_row(client, user_id)
+    raw = await get_profile_row(client, user_id)
     return account_profile_response(user=user, profile=profile_from_row(raw))

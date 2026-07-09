@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.models.intake_sessions import IntakeSession
 from app.repositories.intake_sessions import (
-    load_intake_session_row,
+    get_intake_session_row,
     parse_intake_session,
     update_intake_session_completed,
 )
@@ -30,7 +30,7 @@ async def complete_intake_session(
     client: SupabaseSdkDep,
     current_user: CurrentUser,
 ) -> IntakeSession:
-    session_row = await load_intake_session_row(client, session_id)
+    session_row = await get_intake_session_row(client, session_id)
     search_profile_id = await ensure_search_profile_access(
         client,
         session_row.get("search_profile_id"),

@@ -33,7 +33,7 @@ class TestGetAccountProfile:
                 return_value=auth_user,
             ),
             patch(
-                "app.api.v1.endpoints.account.profile.fetch_profile_row",
+                "app.api.v1.endpoints.account.profile.get_profile_row",
                 new_callable=AsyncMock,
                 return_value={"id": _UID, "first_name": "Alice", "last_name": "Smith"},
             ),
@@ -53,7 +53,7 @@ class TestGetAccountProfile:
                 return_value=auth_user,
             ),
             patch(
-                "app.api.v1.endpoints.account.profile.fetch_profile_row",
+                "app.api.v1.endpoints.account.profile.get_profile_row",
                 new_callable=AsyncMock,
                 return_value=None,
             ),
@@ -75,7 +75,7 @@ class TestUpdateAccountProfile:
                 return_value=auth_user,
             ),
             patch(
-                "app.api.v1.endpoints.account.profile.fetch_profile_row",
+                "app.api.v1.endpoints.account.profile.get_profile_row",
                 new_callable=AsyncMock,
                 return_value={"id": _UID, "first_name": "Bob"},
             ),

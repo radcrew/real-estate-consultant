@@ -18,11 +18,11 @@ from app.llm import (
 )
 from app.repositories.intake_sessions import (
     create_intake_session_row,
-    load_intake_session_row,
+    get_intake_session_row,
     parse_intake_session,
 )
 from app.repositories.questions import (
-    load_intake_questions,
+    list_intake_questions,
     map_question_to_model,
 )
 from app.repositories.search_profiles import ensure_search_profile_access
@@ -53,7 +53,7 @@ async def create_intake_session(
     ),
 ) -> CreateIntakeSessionResponse:
     created_session = await create_intake_session_row(client)
-    questions = await load_intake_questions(client)
+    questions = await list_intake_questions(client)
     total_questions = len(questions)
 
     if not questions:
@@ -112,14 +112,14 @@ async def get_intake_session(
     client: SupabaseSdkDep,
     current_user: CurrentUser,
 ) -> GetIntakeSessionResponse:
-    session_row = await load_intake_session_row(client, session_id)
+    session_row = await get_intake_session_row(client, session_id)
     await ensure_search_profile_access(
         client,
         session_row.get("search_profile_id"),
         current_user.id,
     )
     session = parse_intake_session(session_row)
-    questions = await load_intake_questions(client)
+    questions = await list_intake_questions(client)
     criteria = session.criteria if isinstance(session.criteria, dict) else {}
 
     question_history: list[IntakeSessionFirstQuestion] = []

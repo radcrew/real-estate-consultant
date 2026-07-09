@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from app.api.v1.endpoints.admin.exceptions import raise_job_already_queued
 from app.core.deps import CurrentAdmin, SupabaseSdkDep
-from app.repositories.jobs import find_active_job_by_idempotency_key, insert_job_row
+from app.repositories.jobs import get_active_job_by_idempotency_key, insert_job_row
 from app.services.ingestion import wake_processor
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -42,7 +42,7 @@ async def enqueue_ingest(
     source = body.source
     idem_key = f"{source}:{date.today().isoformat()}"
 
-    existing = await find_active_job_by_idempotency_key(client, idem_key)
+    existing = await get_active_job_by_idempotency_key(client, idem_key)
     if existing is not None:
         raise_job_already_queued(source, existing["status"])
 

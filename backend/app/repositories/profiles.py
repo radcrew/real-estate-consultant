@@ -44,7 +44,7 @@ _PROFILE_SELECT = ",".join(
 _LOAD_PROFILE_ERROR = "Unexpected response from Supabase when loading profile."
 
 
-async def fetch_profile_row(client: AsyncClient, user_id: UUID) -> dict[str, Any] | None:
+async def get_profile_row(client: AsyncClient, user_id: UUID) -> dict[str, Any] | None:
     result = await execute_db_safe(
         client.table("profiles")
         .select(_PROFILE_SELECT)
@@ -76,7 +76,7 @@ async def upsert_profile_patch(
     if not patch:
         return
 
-    existing = await fetch_profile_row(client, user_id)
+    existing = await get_profile_row(client, user_id)
     if existing is None:
         insert_row: dict[str, Any] = {"id": str(user_id), **patch}
         await execute_db_safe(client.table("profiles").insert(insert_row).execute())
@@ -93,7 +93,7 @@ async def set_profile_avatar_url(
     avatar_url: str,
 ) -> None:
     """Insert or update only the ``avatar_url`` column for a profile."""
-    existing = await fetch_profile_row(client, user_id)
+    existing = await get_profile_row(client, user_id)
     if existing is None:
         await execute_db_safe(
             client.table("profiles")

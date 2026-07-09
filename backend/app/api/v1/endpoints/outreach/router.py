@@ -11,12 +11,12 @@ from app.api.v1.endpoints.outreach.exceptions import raise_outreach_draft_not_fo
 from app.core.deps import CurrentUser, DbSession, SupabaseSdkDep
 from app.llm.outreach.service import generate_broker_outreach_draft
 from app.repositories.outreach_drafts import (
-    fetch_latest_outreach_draft_for_property,
-    fetch_outreach_draft_for_user,
+    get_latest_outreach_draft_for_property,
+    get_outreach_draft_for_user,
     insert_outreach_draft,
     update_outreach_draft_email,
 )
-from app.repositories.profiles import fetch_profile_row
+from app.repositories.profiles import get_profile_row
 from app.repositories.properties import get_property_by_id
 from app.schemas.outreach import (
     CreateOutreachDraftRequest,
@@ -44,7 +44,7 @@ async def create_outreach_draft(
     if row is None:
         raise_listing_not_found()
 
-    profile = await fetch_profile_row(client, user_id)
+    profile = await get_profile_row(client, user_id)
     auth_email = getattr(current_user, "email", None)
     if isinstance(auth_email, str):
         auth_email = auth_email.strip() or None
@@ -71,13 +71,13 @@ async def create_outreach_draft(
     response_model_exclude_none=True,
     summary="Latest saved draft for a property (current user)",
 )
-async def get_latest_outreach_draft_for_property(
+async def get_latest_outreach_draft(
     current_user: CurrentUser,
     client: SupabaseSdkDep,
     property_id: UUID = Query(..., description="Property UUID"),
 ) -> OutreachDraftResponse:
     user_id = UUID(current_user.id)
-    found = await fetch_latest_outreach_draft_for_property(
+    found = await get_latest_outreach_draft_for_property(
         client,
         user_id=user_id,
         property_id=property_id,
@@ -99,7 +99,7 @@ async def get_outreach_draft(
     client: SupabaseSdkDep,
 ) -> OutreachDraftResponse:
     user_id = UUID(current_user.id)
-    found = await fetch_outreach_draft_for_user(client, draft_id=draft_id, user_id=user_id)
+    found = await get_outreach_draft_for_user(client, draft_id=draft_id, user_id=user_id)
     if found is None:
         raise_outreach_draft_not_found()
     return OutreachDraftResponse.model_validate(found)

@@ -69,9 +69,9 @@ class TestSearchListings:
 
         with (
             patch("app.api.v1.endpoints.search.router.ensure_search_profile_access", new_callable=AsyncMock),
-            patch("app.api.v1.endpoints.search.router.load_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.search.router.get_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
             patch("app.api.v1.endpoints.search.router.search_properties", new_callable=AsyncMock, return_value=([(_PROPERTY_ROW, 85.0)], 1)),
-            patch("app.api.v1.endpoints.search.router.fetch_first_image_url", new_callable=AsyncMock, return_value=None),
+            patch("app.api.v1.endpoints.search.router.get_first_image_url", new_callable=AsyncMock, return_value=None),
             patch("app.api.v1.endpoints.search.router.normalize_criteria", new_callable=AsyncMock, return_value={"location": criteria_field}),
         ):
             r = await client.get(f"/api/v1/search/{_PROFILE_UUID}")
@@ -84,7 +84,7 @@ class TestSearchListings:
     async def test_empty_results(self, client):
         with (
             patch("app.api.v1.endpoints.search.router.ensure_search_profile_access", new_callable=AsyncMock),
-            patch("app.api.v1.endpoints.search.router.load_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.search.router.get_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
             patch("app.api.v1.endpoints.search.router.search_properties", new_callable=AsyncMock, return_value=([], 0)),
             patch("app.api.v1.endpoints.search.router.normalize_criteria", new_callable=AsyncMock, return_value={}),
         ):
@@ -104,7 +104,7 @@ class TestUpdateSearchCriteria:
 
         with (
             patch("app.api.v1.endpoints.search.router.ensure_search_profile_access", new_callable=AsyncMock),
-            patch("app.api.v1.endpoints.search.router.load_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.search.router.get_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
             patch("app.api.v1.endpoints.search.router.save_intake_criteria", new_callable=AsyncMock, return_value=_SESSION_ROW),
             patch("app.api.v1.endpoints.search.router.parse_intake_session", return_value=session),
             patch("app.api.v1.endpoints.search.router.normalize_criteria", new_callable=AsyncMock, return_value={"location": criteria_field}),
@@ -126,7 +126,7 @@ class TestExplainFit:
 
         with (
             patch("app.api.v1.endpoints.search.fit.ensure_search_profile_access", new_callable=AsyncMock),
-            patch("app.api.v1.endpoints.search.fit.load_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.search.fit.get_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
             patch("app.api.v1.endpoints.search.fit.get_property_match_breakdown", new_callable=AsyncMock, return_value=breakdown),
             patch("app.api.v1.endpoints.search.fit.generate_fit_explanation", new_callable=AsyncMock, return_value=parsed),
         ):
@@ -142,7 +142,7 @@ class TestExplainFit:
     async def test_unknown_property_returns_404(self, client):
         with (
             patch("app.api.v1.endpoints.search.fit.ensure_search_profile_access", new_callable=AsyncMock),
-            patch("app.api.v1.endpoints.search.fit.load_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.search.fit.get_profile_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
             patch("app.api.v1.endpoints.search.fit.get_property_match_breakdown", new_callable=AsyncMock, return_value=None),
         ):
             r = await client.post(f"/api/v1/search/{_PROFILE_UUID}/fit/{_PROP_UUID}")

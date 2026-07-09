@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from supabase import AsyncClient
 
 from app.db.property_row import PropertyRow
-from app.repositories.questions import load_question_key_metadata
+from app.repositories.questions import list_question_key_metadata
 from app.schemas.search import CriteriaFieldItem
 from app.utils.search_sql import (
     component_score_exprs,
@@ -118,7 +118,7 @@ async def normalize_criteria(
     """Merge session ``criteria`` with every configured question key (insertion order preserved)."""
     normalized: dict[str, CriteriaFieldItem] = {}
 
-    types, titles, units = await load_question_key_metadata(client)
+    types, titles, units = await list_question_key_metadata(client)
 
     for key in types:
         qtype = types[key]

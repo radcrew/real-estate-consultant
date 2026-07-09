@@ -13,7 +13,7 @@ _ACTIVE_STATUSES = ("pending", "running")
 _INSERT_ERROR = "Unexpected response from Supabase when creating ingestion job."
 
 
-async def find_active_job_by_idempotency_key(
+async def get_active_job_by_idempotency_key(
     client: AsyncClient,
     idempotency_key: str,
 ) -> dict[str, Any] | None:

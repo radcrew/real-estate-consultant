@@ -32,7 +32,7 @@ class TestCreateIntakeSession:
         session = _make_session()
         with (
             patch("app.api.v1.endpoints.intake_sessions.sessions.create_intake_session_row", new_callable=AsyncMock, return_value=session),
-            patch("app.api.v1.endpoints.intake_sessions.sessions.load_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
+            patch("app.api.v1.endpoints.intake_sessions.sessions.list_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
         ):
             r = await client.post("/api/v1/intake-sessions/")
         assert r.status_code == 201
@@ -45,7 +45,7 @@ class TestCreateIntakeSession:
         session = _make_session()
         with (
             patch("app.api.v1.endpoints.intake_sessions.sessions.create_intake_session_row", new_callable=AsyncMock, return_value=session),
-            patch("app.api.v1.endpoints.intake_sessions.sessions.load_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
+            patch("app.api.v1.endpoints.intake_sessions.sessions.list_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
             patch("app.api.v1.endpoints.intake_sessions.sessions.generate_opening_question", new_callable=AsyncMock, return_value="Tell me where you're looking?"),
         ):
             r = await client.post("/api/v1/intake-sessions/?mode=llm")
@@ -58,7 +58,7 @@ class TestCreateIntakeSession:
         session = _make_session()
         with (
             patch("app.api.v1.endpoints.intake_sessions.sessions.create_intake_session_row", new_callable=AsyncMock, return_value=session),
-            patch("app.api.v1.endpoints.intake_sessions.sessions.load_intake_questions", new_callable=AsyncMock, return_value=[]),
+            patch("app.api.v1.endpoints.intake_sessions.sessions.list_intake_questions", new_callable=AsyncMock, return_value=[]),
         ):
             r = await client.post("/api/v1/intake-sessions/")
         assert r.status_code == 502
@@ -68,7 +68,7 @@ class TestCreateIntakeSession:
         session = _make_session()
         with (
             patch("app.api.v1.endpoints.intake_sessions.sessions.create_intake_session_row", new_callable=AsyncMock, return_value=session),
-            patch("app.api.v1.endpoints.intake_sessions.sessions.load_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
+            patch("app.api.v1.endpoints.intake_sessions.sessions.list_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
             patch("app.api.v1.endpoints.intake_sessions.sessions.generate_opening_question", new_callable=AsyncMock, side_effect=HTTPException(status_code=502, detail="LLM down")),
         ):
             r = await client.post("/api/v1/intake-sessions/?mode=llm")
@@ -80,10 +80,10 @@ class TestGetIntakeSession:
     async def test_returns_session_with_history(self, client):
         session = _make_session(criteria={"location": "Austin"})
         with (
-            patch("app.api.v1.endpoints.intake_sessions.sessions.load_intake_session_row", new_callable=AsyncMock, return_value={**_SESSION_ROW, "criteria": {"location": "Austin"}}),
+            patch("app.api.v1.endpoints.intake_sessions.sessions.get_intake_session_row", new_callable=AsyncMock, return_value={**_SESSION_ROW, "criteria": {"location": "Austin"}}),
             patch("app.api.v1.endpoints.intake_sessions.sessions.ensure_search_profile_access", new_callable=AsyncMock),
             patch("app.api.v1.endpoints.intake_sessions.sessions.parse_intake_session", return_value=session),
-            patch("app.api.v1.endpoints.intake_sessions.sessions.load_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
+            patch("app.api.v1.endpoints.intake_sessions.sessions.list_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
         ):
             r = await client.get(f"/api/v1/intake-sessions/{_SESSION_UUID}")
         assert r.status_code == 200
@@ -99,7 +99,7 @@ class TestCompleteIntakeSession:
         session = _make_session()
         updated_row = {**_SESSION_ROW, "status": "complete", "search_profile_id": _PROFILE_UUID}
         with (
-            patch("app.api.v1.endpoints.intake_sessions.actions.load_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.intake_sessions.actions.get_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
             patch("app.api.v1.endpoints.intake_sessions.actions.ensure_search_profile_access", new_callable=AsyncMock, return_value=uuid.UUID(_PROFILE_UUID)),
             patch("app.api.v1.endpoints.intake_sessions.actions.update_intake_session_completed", new_callable=AsyncMock, return_value=updated_row),
             patch("app.api.v1.endpoints.intake_sessions.actions.parse_intake_session", return_value=session),
@@ -111,7 +111,7 @@ class TestCompleteIntakeSession:
         session = _make_session()
         updated_row = {**_SESSION_ROW, "status": "complete"}
         with (
-            patch("app.api.v1.endpoints.intake_sessions.actions.load_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.intake_sessions.actions.get_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
             patch("app.api.v1.endpoints.intake_sessions.actions.ensure_search_profile_access", new_callable=AsyncMock, return_value=None),
             patch("app.api.v1.endpoints.intake_sessions.actions.create_search_profile", new_callable=AsyncMock, return_value=uuid.UUID(_PROFILE_UUID)),
             patch("app.api.v1.endpoints.intake_sessions.actions.update_intake_session_completed", new_callable=AsyncMock, return_value=updated_row),
@@ -125,8 +125,8 @@ class TestSubmitGuidedAnswer:
     async def test_success_returns_next_question(self, client):
         session = _make_session(criteria={"location": "Austin"})
         with (
-            patch("app.api.v1.endpoints.intake_sessions.answers.guided.load_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
-            patch("app.api.v1.endpoints.intake_sessions.answers.guided.load_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
+            patch("app.api.v1.endpoints.intake_sessions.answers.guided.get_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.intake_sessions.answers.guided.list_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
             patch("app.api.v1.endpoints.intake_sessions.answers.guided.append_intake_criteria_answer", return_value={"location": "Austin"}),
             patch("app.api.v1.endpoints.intake_sessions.answers.guided.order_for_question_key", return_value=0),
             patch("app.api.v1.endpoints.intake_sessions.answers.guided.next_question_row_after_order", return_value=_QUESTIONS[1]),
@@ -143,8 +143,8 @@ class TestSubmitGuidedAnswer:
 
     async def test_unknown_key_returns_400(self, client):
         with (
-            patch("app.api.v1.endpoints.intake_sessions.answers.guided.load_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
-            patch("app.api.v1.endpoints.intake_sessions.answers.guided.load_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
+            patch("app.api.v1.endpoints.intake_sessions.answers.guided.get_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.intake_sessions.answers.guided.list_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
             patch("app.api.v1.endpoints.intake_sessions.answers.guided.append_intake_criteria_answer", return_value={}),
             patch("app.api.v1.endpoints.intake_sessions.answers.guided.order_for_question_key", return_value=None),
         ):

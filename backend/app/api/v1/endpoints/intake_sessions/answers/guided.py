@@ -12,12 +12,12 @@ from app.api.v1.endpoints.intake_sessions.answers.exceptions import (
 from app.core.deps import SupabaseSdkDep
 from app.repositories.intake_sessions import (
     append_intake_criteria_answer,
-    load_intake_session_row,
+    get_intake_session_row,
     parse_intake_session,
     save_intake_criteria,
 )
 from app.repositories.questions import (
-    load_intake_questions,
+    list_intake_questions,
     map_question_to_model,
     next_question_row_after_order,
     order_for_question_key,
@@ -40,8 +40,8 @@ async def submit_intake_session_answers(
     client: SupabaseSdkDep,
 ) -> UpdateIntakeSessionAnswersResponse:
     answer_key = body.key.strip()
-    session_row = await load_intake_session_row(client, session_id)
-    questions = await load_intake_questions(client)
+    session_row = await get_intake_session_row(client, session_id)
+    questions = await list_intake_questions(client)
 
     merged_criteria = append_intake_criteria_answer(
         session_row.get("criteria"),

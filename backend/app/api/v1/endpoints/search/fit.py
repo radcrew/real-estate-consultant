@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints.listings.exceptions import raise_listing_not_found
 from app.core.deps import CurrentUser, DbSession, SupabaseSdkDep
 from app.llm.fit.service import generate_fit_explanation
-from app.repositories.intake_sessions import load_profile_session_row
+from app.repositories.intake_sessions import get_profile_session_row
 from app.repositories.properties import get_property_match_breakdown
 from app.repositories.search_profiles import ensure_search_profile_access
 from app.schemas.fit import FitExplanationResponse, FitScoreBreakdown
@@ -32,7 +32,7 @@ async def explain_fit(
 ) -> FitExplanationResponse:
     await ensure_search_profile_access(client, session_profile_id, current_user.id)
 
-    session_row = await load_profile_session_row(client, session_profile_id)
+    session_row = await get_profile_session_row(client, session_profile_id)
     raw_criteria = session_row.get("criteria")
     criteria = dict(raw_criteria) if isinstance(raw_criteria, dict) else {}
 

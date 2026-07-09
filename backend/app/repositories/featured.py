@@ -16,7 +16,7 @@ _FEATURED_COUNT = 6
 _POOL_SIZE = 60
 
 
-async def get_featured_property_rows(
+async def list_featured_property_rows(
     session: AsyncSession,
 ) -> list[dict[str, Any]]:
     """Return _FEATURED_COUNT listings, stable within a UTC day, rotating daily."""

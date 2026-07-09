@@ -34,7 +34,7 @@ class TestEnqueueIngest:
     async def test_success_enqueues_job(self, admin_client, mock_supabase):
         with (
             patch(
-                "app.api.v1.endpoints.admin.router.find_active_job_by_idempotency_key",
+                "app.api.v1.endpoints.admin.router.get_active_job_by_idempotency_key",
                 new_callable=AsyncMock,
                 return_value=None,
             ),
@@ -54,7 +54,7 @@ class TestEnqueueIngest:
 
     async def test_duplicate_job_returns_409(self, admin_client):
         with patch(
-            "app.api.v1.endpoints.admin.router.find_active_job_by_idempotency_key",
+            "app.api.v1.endpoints.admin.router.get_active_job_by_idempotency_key",
             new_callable=AsyncMock,
             return_value={"id": "job-1", "status": "running"},
         ):
@@ -65,7 +65,7 @@ class TestEnqueueIngest:
     async def test_insert_no_data_returns_502(self, admin_client):
         with (
             patch(
-                "app.api.v1.endpoints.admin.router.find_active_job_by_idempotency_key",
+                "app.api.v1.endpoints.admin.router.get_active_job_by_idempotency_key",
                 new_callable=AsyncMock,
                 return_value=None,
             ),
