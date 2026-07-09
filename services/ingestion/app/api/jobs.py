@@ -13,7 +13,7 @@ from app.connectors.base import ConnectorBase
 from app.connectors.loopnet_seed import LoopNetSeedConnector
 from app.core.auth import require_internal_token
 from app.core.config import settings
-from app.core.db_safe import execute_db_safe
+from app.repositories.jobs import claim_next_job, insert_job_row, update_job_status
 
 router = APIRouter(
     prefix="/jobs",
@@ -49,7 +49,7 @@ async def process_next_job() -> ProcessResponse:
             settings.supabase_service_role_key,
         ) as client:
 
-        job = await _claim_job(client)
+        job = await claim_next_job(client)
         if job is None:
             return ProcessResponse(processed=False, message="No pending jobs.")
 
@@ -60,7 +60,7 @@ async def process_next_job() -> ProcessResponse:
 
         connector_cls = _CONNECTORS.get(source)
         if connector_cls is None:
-            await _update_job(client, job_id, "failed", error=f"Unknown source: {source!r}")
+            await update_job_status(client, job_id, "failed", error=f"Unknown source: {source!r}")
             return ProcessResponse(processed=True, job_id=job_id, source=source, status="failed")
 
         status = await _run_connector(client, job_id, source, attempts, connector_cls)
@@ -84,24 +84,13 @@ async def run_job(
             settings.supabase_service_role_key,
         ) as client:
 
-        result = await execute_db_safe(
-            client.table("jobs").insert({"source": source}).execute()
-        )
-        if not result.data:
-            raise HTTPException(status_code=500, detail="Failed to enqueue job.")
-
-        job = result.data[0]
+        job = await insert_job_row(client, source)
         job_id: str = job["id"]
         attempts: int = job.get("attempts", 0)
         logger.info("job_run_triggered", extra={"job_id": job_id, "source": source})
 
         status = await _run_connector(client, job_id, source, attempts, _CONNECTORS[source])
         return ProcessResponse(processed=True, job_id=job_id, source=source, status=status)
-
-
-async def _claim_job(client: AsyncClient) -> dict | None:
-    result = await execute_db_safe(client.rpc("claim_next_job").execute())
-    return result.data[0] if result.data else None
 
 
 async def _run_connector(
@@ -115,7 +104,7 @@ async def _run_connector(
     try:
         report = await connector_cls(client).run()
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
-        await _update_job(
+        await update_job_status(
             client,
             job_id,
             "done",
@@ -137,21 +126,5 @@ async def _run_connector(
         logger.error("job_error", extra={"job_id": job_id, "source": source, "error": str(exc)})
         # Retry if under the attempt cap; otherwise fail permanently.
         retry_status = "pending" if attempts < _MAX_ATTEMPTS else "failed"
-        await _update_job(client, job_id, retry_status, error=str(exc))
+        await update_job_status(client, job_id, retry_status, error=str(exc))
         return retry_status
-
-
-async def _update_job(
-    client: AsyncClient,
-    job_id: str,
-    status: str,
-    *,
-    result: dict | None = None,
-    error: str | None = None,
-) -> None:
-    payload = {"status": status}
-    if result is not None:
-        payload["result"] = result
-    if error is not None:
-        payload["error"] = error
-    await execute_db_safe(client.table("jobs").update(payload).eq("id", job_id).execute())
