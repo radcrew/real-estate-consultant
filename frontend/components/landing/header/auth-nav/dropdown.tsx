@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, type RefObject } from "react";
 import { Popover, Transition } from "@headlessui/react";
 import { Heart, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
@@ -20,8 +20,38 @@ const ITEM_CLASS =
 const ICON_WRAP =
   "flex flex-shrink-0 items-center justify-center text-neutral-500 dark:text-neutral-300";
 
+/**
+ * Headless UI's Popover is supposed to close on outside click on its own,
+ * but that only fires reliably when the click lands on a focusable/loosely
+ * focusable element. Plain clicks on inert page content (empty divs, text)
+ * were leaving the panel open, so we close it explicitly here instead of
+ * relying on that internal detection.
+ */
+const CloseOnOutsideClick = ({
+  containerRef,
+  close,
+}: {
+  containerRef: RefObject<HTMLDivElement | null>;
+  close: () => void;
+}) => {
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        close();
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [containerRef, close]);
+
+  return null;
+};
+
 export const ProfileDropdown = () => {
   const { session, signOut } = useAuth();
+  const containerRef = useRef<HTMLDivElement>(null);
+
   if (!session) {
     return null;
   }
@@ -30,9 +60,10 @@ export const ProfileDropdown = () => {
   const avatarUrl = session.user.avatarUrl?.trim() || undefined;
 
   return (
-    <Popover className="relative flex">
+    <Popover ref={containerRef} className="relative flex">
       {({ close }) => (
         <>
+          <CloseOnOutsideClick containerRef={containerRef} close={close} />
           <Popover.Button
             aria-label="Account menu"
             className="flex size-10 items-center justify-center self-center rounded-full text-neutral-700 hover:bg-neutral-100 focus:outline-none dark:text-neutral-300 dark:hover:bg-neutral-800 sm:size-12"
