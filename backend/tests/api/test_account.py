@@ -99,7 +99,7 @@ class TestChangePassword:
             patch("app.api.v1.endpoints.account.password.update_auth_user_password", new_callable=AsyncMock),
         ):
             r = await client.post(
-                "/api/v1/account/account/password",
+                "/api/v1/account/password",
                 json={"current_password": "oldpass1", "new_password": "newpass1"},
             )
         assert r.status_code == 204
@@ -107,7 +107,7 @@ class TestChangePassword:
     async def test_same_password_returns_422(self, client, mock_user):
         mock_user.email = "user@example.com"
         r = await client.post(
-            "/api/v1/account/account/password",
+            "/api/v1/account/password",
             json={"current_password": "samepass", "new_password": "samepass"},
         )
         assert r.status_code == 422
@@ -115,7 +115,7 @@ class TestChangePassword:
     async def test_no_email_returns_400(self, client, mock_user):
         mock_user.email = ""
         r = await client.post(
-            "/api/v1/account/account/password",
+            "/api/v1/account/password",
             json={"current_password": "oldpass1", "new_password": "newpass1"},
         )
         assert r.status_code == 400

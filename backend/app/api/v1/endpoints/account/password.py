@@ -14,7 +14,7 @@ from app.repositories.account import (
 )
 from app.schemas.account import AccountPasswordChangeRequest
 
-router = APIRouter(prefix="/account", tags=["account"])
+router = APIRouter(tags=["account"])
 
 @router.post("/password", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def change_account_password(
