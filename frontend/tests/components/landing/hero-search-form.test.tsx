@@ -15,12 +15,6 @@ vi.mock("@components/landing/hero/search-form/property-type-select", () => ({
   DEFAULT_PROPERTY_TYPES: [{ name: "Warehouse", checked: true }],
   PropertyTypeSelect: () => <div data-testid="type-select" />,
 }));
-vi.mock("@components/landing/hero/search-form/price-range-input", () => ({
-  PriceRangeInput: ({ onSubmit, submitting }: { onSubmit: () => void; submitting: boolean }) => (
-    <button onClick={onSubmit} disabled={submitting}>Search</button>
-  ),
-}));
-
 const mockQuickSearch = vi.fn();
 vi.mock("@services/search", () => ({
   searchService: { quickSearch: (...a: unknown[]) => mockQuickSearch(...a) },
@@ -49,5 +43,12 @@ describe("HeroRealEstateSearchForm", () => {
     render(<HeroRealEstateSearchForm />);
     fireEvent.click(screen.getByRole("button", { name: /search/i }));
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/search/prof-42"));
+  });
+
+  it("submits only once per click (button click + native form submit must not double-fire)", async () => {
+    mockQuickSearch.mockResolvedValue({ search_profile_id: "prof-42" });
+    render(<HeroRealEstateSearchForm />);
+    fireEvent.click(screen.getByRole("button", { name: /search/i }));
+    await waitFor(() => expect(mockQuickSearch).toHaveBeenCalledTimes(1));
   });
 });
