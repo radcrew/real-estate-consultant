@@ -1,5 +1,4 @@
-import pytest
-from app.utils.criteria_search import (
+from app.domain.criteria_search import (
     gaussian_target_sigma,
     ilike_pattern,
     parse_location_fields,

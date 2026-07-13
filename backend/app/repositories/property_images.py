@@ -10,7 +10,7 @@ from app.core.db_safe import execute_db_safe
 from app.utils.supabase.response import as_row_list
 
 
-async def fetch_first_image_url(
+async def get_first_image_url(
     client: AsyncClient,
     property_id: UUID,
 ) -> str | None:
@@ -32,7 +32,7 @@ async def fetch_first_image_url(
     return raw_url.strip()
 
 
-async def fetch_all_image_urls(
+async def list_all_image_urls(
     client: AsyncClient,
     property_id: UUID,
 ) -> list[str]:

@@ -43,7 +43,7 @@ def append_intake_criteria_answer(
     return {**base, key: answers}
 
 
-async def load_intake_session_row(client: AsyncClient, session_id: UUID) -> dict[str, Any]:
+async def get_intake_session_row(client: AsyncClient, session_id: UUID) -> dict[str, Any]:
     result = await execute_db_safe(
         client.table("intake_sessions")
         .select(_INTAKE_SESSION_SELECT)
@@ -56,7 +56,7 @@ async def load_intake_session_row(client: AsyncClient, session_id: UUID) -> dict
     return get_single_row(result, detail=_LOAD_SESSION_ERROR)
 
 
-async def load_profile_session_row(
+async def get_profile_session_row(
     client: AsyncClient,
     search_profile_id: UUID,
 ) -> dict[str, Any]:

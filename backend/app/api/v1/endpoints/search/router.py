@@ -8,16 +8,17 @@ from uuid import UUID
 from fastapi import APIRouter, Query
 
 from app.core.deps import CurrentUser, DbSession, SupabaseSdkDep
+from app.domain.listings import format_listing_type_label
 from app.models.properties import Properties
 from app.repositories.intake_sessions import (
     create_intake_session_row,
-    load_profile_session_row,
+    get_profile_session_row,
     parse_intake_session,
     save_intake_criteria,
     update_intake_session_completed,
 )
 from app.repositories.properties import normalize_criteria, search_properties
-from app.repositories.property_images import fetch_first_image_url
+from app.repositories.property_images import get_first_image_url
 from app.repositories.search_profiles import create_search_profile, ensure_search_profile_access
 from app.schemas.search import (
     PropertyMatch,
@@ -27,7 +28,6 @@ from app.schemas.search import (
     SearchPropertiesResponse,
     UpdateSearchCriteriaBody,
 )
-from app.utils.listings import format_listing_type_label
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -76,7 +76,7 @@ async def search_listings(
         current_user.id,
     )
 
-    session_row = await load_profile_session_row(client, session_profile_id)
+    session_row = await get_profile_session_row(client, session_profile_id)
     raw_criteria = session_row.get("criteria")
     criteria: dict[str, Any] = dict(raw_criteria) if isinstance(raw_criteria, dict) else {}
 
@@ -84,7 +84,7 @@ async def search_listings(
     results: list[PropertyMatch] = []
     for row, score in rows_with_scores:
         property_id = row["id"]
-        image_url = await fetch_first_image_url(client, property_id)
+        image_url = await get_first_image_url(client, property_id)
         payload = {**row, "image": image_url}
         payload["listing_type"] = format_listing_type_label(row.get("listing_type"))
         results.append(
@@ -123,7 +123,7 @@ async def update_search_criteria(
         current_user.id,
     )
 
-    session_row = await load_profile_session_row(client, session_profile_id)
+    session_row = await get_profile_session_row(client, session_profile_id)
     criteria = dict(body.root)
     updated_session_row = await save_intake_criteria(client, UUID(str(session_row["id"])), criteria)
     session = parse_intake_session(updated_session_row)

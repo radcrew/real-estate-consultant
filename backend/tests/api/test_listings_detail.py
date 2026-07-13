@@ -36,7 +36,7 @@ class TestGetListingDetail:
                 return_value=_ROW,
             ),
             patch(
-                "app.api.v1.endpoints.listings.router.fetch_all_image_urls",
+                "app.api.v1.endpoints.listings.router.list_all_image_urls",
                 new_callable=AsyncMock,
                 return_value=["https://example.com/img1.jpg", "https://example.com/img2.jpg"],
             ),
@@ -56,7 +56,7 @@ class TestGetListingDetail:
                 return_value=_ROW,
             ),
             patch(
-                "app.api.v1.endpoints.listings.router.fetch_all_image_urls",
+                "app.api.v1.endpoints.listings.router.list_all_image_urls",
                 new_callable=AsyncMock,
                 return_value=[],
             ),

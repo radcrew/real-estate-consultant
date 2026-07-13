@@ -52,6 +52,21 @@ export type UpdateSearchCriteriaBody = Record<string, unknown>;
 
 export type SearchFiltersResponse = Record<string, unknown>;
 
+export type FitScoreBreakdown = {
+  location: number;
+  price: number;
+  size: number;
+  total: number;
+};
+
+export type FitExplanation = {
+  property_id: string;
+  score: FitScoreBreakdown;
+  summary: string;
+  strengths: string[];
+  considerations: string[];
+};
+
 export class SearchService {
   constructor(private readonly http: AxiosInstance) {}
 
@@ -75,6 +90,19 @@ export class SearchService {
     criteria: UpdateSearchCriteriaBody,
   ): Promise<void> {
     await this.http.put(`/search/${sessionProfileId}`, criteria);
+  }
+
+  async explainFit(
+    sessionProfileId: string,
+    propertyId: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<FitExplanation> {
+    const { data } = await this.http.post<FitExplanation>(
+      `/search/${sessionProfileId}/fit/${propertyId}`,
+      undefined,
+      { signal: options?.signal },
+    );
+    return data;
   }
 }
 

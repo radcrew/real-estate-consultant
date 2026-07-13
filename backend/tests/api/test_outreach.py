@@ -44,7 +44,7 @@ class TestCreateOutreachDraft:
     async def test_success_returns_draft(self, client):
         with (
             patch("app.api.v1.endpoints.outreach.router.get_property_by_id", new_callable=AsyncMock, return_value=_PROPERTY_ROW),
-            patch("app.api.v1.endpoints.outreach.router.fetch_profile_row", new_callable=AsyncMock, return_value=None),
+            patch("app.api.v1.endpoints.outreach.router.get_profile_row", new_callable=AsyncMock, return_value=None),
             patch("app.api.v1.endpoints.outreach.router.generate_broker_outreach_draft", new_callable=AsyncMock, return_value="Dear broker..."),
             patch("app.api.v1.endpoints.outreach.router.insert_outreach_draft", new_callable=AsyncMock, return_value=_DRAFT_ROW),
         ):
@@ -61,7 +61,7 @@ class TestCreateOutreachDraft:
 class TestGetLatestOutreachDraft:
     async def test_returns_draft(self, client):
         with patch(
-            "app.api.v1.endpoints.outreach.router.fetch_latest_outreach_draft_for_property",
+            "app.api.v1.endpoints.outreach.router.get_latest_outreach_draft_for_property",
             new_callable=AsyncMock,
             return_value=_DRAFT_ROW,
         ):
@@ -71,7 +71,7 @@ class TestGetLatestOutreachDraft:
 
     async def test_not_found_returns_404(self, client):
         with patch(
-            "app.api.v1.endpoints.outreach.router.fetch_latest_outreach_draft_for_property",
+            "app.api.v1.endpoints.outreach.router.get_latest_outreach_draft_for_property",
             new_callable=AsyncMock,
             return_value=None,
         ):
@@ -82,7 +82,7 @@ class TestGetLatestOutreachDraft:
 class TestGetOutreachDraft:
     async def test_returns_draft(self, client):
         with patch(
-            "app.api.v1.endpoints.outreach.router.fetch_outreach_draft_for_user",
+            "app.api.v1.endpoints.outreach.router.get_outreach_draft_for_user",
             new_callable=AsyncMock,
             return_value=_DRAFT_ROW,
         ):
@@ -91,7 +91,7 @@ class TestGetOutreachDraft:
 
     async def test_not_found_returns_404(self, client):
         with patch(
-            "app.api.v1.endpoints.outreach.router.fetch_outreach_draft_for_user",
+            "app.api.v1.endpoints.outreach.router.get_outreach_draft_for_user",
             new_callable=AsyncMock,
             return_value=None,
         ):

@@ -39,8 +39,8 @@ class TestSubmitLlmAnswer:
             type="multiselect",
         )
         with (
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.load_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.load_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
+            patch("app.api.v1.endpoints.intake_sessions.answers.llm.get_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.intake_sessions.answers.llm.list_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
             patch("app.api.v1.endpoints.intake_sessions.answers.llm.parse_user_input", new_callable=AsyncMock, return_value=_LLM_RESULT),
             patch("app.api.v1.endpoints.intake_sessions.answers.llm.save_intake_criteria", new_callable=AsyncMock, return_value=_SESSION_ROW),
             patch("app.api.v1.endpoints.intake_sessions.answers.llm.resolve_next_intake_question", return_value=next_q),
@@ -59,8 +59,8 @@ class TestSubmitLlmAnswer:
     async def test_complete_session_is_marked(self, client):
         complete_result = {**_LLM_RESULT, "missing_fields": [], "is_complete": True}
         with (
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.load_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.load_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
+            patch("app.api.v1.endpoints.intake_sessions.answers.llm.get_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
+            patch("app.api.v1.endpoints.intake_sessions.answers.llm.list_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
             patch("app.api.v1.endpoints.intake_sessions.answers.llm.parse_user_input", new_callable=AsyncMock, return_value=complete_result),
             patch("app.api.v1.endpoints.intake_sessions.answers.llm.save_intake_criteria", new_callable=AsyncMock, return_value=_SESSION_ROW),
             patch("app.api.v1.endpoints.intake_sessions.answers.llm.resolve_next_intake_question", return_value=None),
