@@ -1,4 +1,4 @@
-from app.utils.intake_validation import (
+from app.domain.intake_validation import (
     compute_current_index,
     has_answer,
     merge_missing_fields,

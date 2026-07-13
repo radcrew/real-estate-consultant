@@ -94,7 +94,7 @@ def next_question_row_after_order(questions: list[dict], *, after_order: int) ->
     return None
 
 
-async def load_question_key_metadata(
+async def list_question_key_metadata(
     client: AsyncClient,
 ) -> tuple[dict[str, str], dict[str, str], dict[str, str | None]]:
     result = await execute_db_safe(
@@ -117,7 +117,7 @@ async def load_question_key_metadata(
     return types, titles, units
 
 
-async def load_intake_questions(client: AsyncClient) -> list[dict[str, Any]]:
+async def list_intake_questions(client: AsyncClient) -> list[dict[str, Any]]:
     result = await execute_db_safe(
         client.table("questions")
         .select(_QUESTION_SELECT)

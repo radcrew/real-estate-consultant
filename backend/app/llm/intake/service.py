@@ -5,6 +5,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.domain.intake_next_question import (
+    find_question_row_by_key,
+    first_question_row_in_missing,
+    match_row_for_text_suggestion,
+    suggested_question_as_dict,
+)
+from app.domain.intake_validation import merge_missing_fields
 from app.llm.intake.exceptions import raise_hf_opening_response_missing_text
 from app.llm.intake.schema import extract_question_keys, render_intake_response_schema
 from app.llm.providers import huggingface_provider
@@ -17,13 +24,6 @@ from app.llm.providers.prompts import (
 from app.repositories.questions import map_question_to_model
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.schemas.llm_intake_parse import LlmOpeningQuestionOutput, LlmParseModelOutput
-from app.utils.intake_next_question import (
-    find_question_row_by_key,
-    first_question_row_in_missing,
-    match_row_for_text_suggestion,
-    suggested_question_as_dict,
-)
-from app.utils.intake_validation import merge_missing_fields
 
 QuestionRow = dict[str, Any]
 

@@ -36,7 +36,7 @@ async def insert_outreach_draft(
     return get_single_row(result, detail=_UNEXPECTED)
 
 
-async def fetch_outreach_draft_for_user(
+async def get_outreach_draft_for_user(
     client: AsyncClient,
     *,
     draft_id: UUID,
@@ -59,7 +59,7 @@ async def fetch_outreach_draft_for_user(
     return row
 
 
-async def fetch_latest_outreach_draft_for_property(
+async def get_latest_outreach_draft_for_property(
     client: AsyncClient,
     *,
     user_id: UUID,

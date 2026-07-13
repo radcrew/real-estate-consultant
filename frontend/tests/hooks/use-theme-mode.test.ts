@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { useThemeMode } from "@components/ui/use-theme-mode";
+import { useThemeMode } from "@hooks/use-theme-mode";
 
 beforeEach(() => {
   localStorage.clear();

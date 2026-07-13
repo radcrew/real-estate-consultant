@@ -29,7 +29,7 @@ _PROPERTY_ROW = {
 class TestFeaturedListings:
     async def test_returns_empty_list_when_no_rows(self, client):
         with patch(
-            "app.api.v1.endpoints.listings.featured.get_featured_property_rows",
+            "app.api.v1.endpoints.listings.featured.list_featured_property_rows",
             new_callable=AsyncMock,
             return_value=[],
         ):
@@ -40,12 +40,12 @@ class TestFeaturedListings:
     async def test_returns_listing_with_image(self, client):
         with (
             patch(
-                "app.api.v1.endpoints.listings.featured.get_featured_property_rows",
+                "app.api.v1.endpoints.listings.featured.list_featured_property_rows",
                 new_callable=AsyncMock,
                 return_value=[_PROPERTY_ROW],
             ),
             patch(
-                "app.api.v1.endpoints.listings.featured.fetch_first_image_url",
+                "app.api.v1.endpoints.listings.featured.get_first_image_url",
                 new_callable=AsyncMock,
                 return_value="https://example.com/img.jpg",
             ),
@@ -62,12 +62,12 @@ class TestFeaturedListings:
     async def test_returns_listing_without_image(self, client):
         with (
             patch(
-                "app.api.v1.endpoints.listings.featured.get_featured_property_rows",
+                "app.api.v1.endpoints.listings.featured.list_featured_property_rows",
                 new_callable=AsyncMock,
                 return_value=[_PROPERTY_ROW],
             ),
             patch(
-                "app.api.v1.endpoints.listings.featured.fetch_first_image_url",
+                "app.api.v1.endpoints.listings.featured.get_first_image_url",
                 new_callable=AsyncMock,
                 return_value=None,
             ),
@@ -81,12 +81,12 @@ class TestFeaturedListings:
         row2 = {**_PROPERTY_ROW, "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901", "city": "Dallas"}
         with (
             patch(
-                "app.api.v1.endpoints.listings.featured.get_featured_property_rows",
+                "app.api.v1.endpoints.listings.featured.list_featured_property_rows",
                 new_callable=AsyncMock,
                 return_value=[_PROPERTY_ROW, row2],
             ),
             patch(
-                "app.api.v1.endpoints.listings.featured.fetch_first_image_url",
+                "app.api.v1.endpoints.listings.featured.get_first_image_url",
                 new_callable=AsyncMock,
                 return_value=None,
             ),

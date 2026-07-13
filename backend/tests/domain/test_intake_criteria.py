@@ -1,4 +1,4 @@
-from app.utils.intake_criteria import (
+from app.domain.intake_criteria import (
     normalize_intake_value,
     normalize_merged_criteria,
 )

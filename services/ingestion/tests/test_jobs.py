@@ -59,8 +59,8 @@ class TestProcessNextJob:
         mock_sb = _mock_supabase_client()
 
         with patch("app.api.jobs.acreate_client", return_value=mock_sb), \
-             patch("app.api.jobs._claim_job", new_callable=AsyncMock, return_value=job), \
-             patch("app.api.jobs._update_job", new_callable=AsyncMock):
+             patch("app.api.jobs.claim_next_job", new_callable=AsyncMock, return_value=job), \
+             patch("app.api.jobs.update_job_status", new_callable=AsyncMock):
             r = await client.post("/api/v1/jobs/process", headers=_AUTH)
 
         assert r.status_code == 200
@@ -77,8 +77,8 @@ class TestProcessNextJob:
         mock_connector = AsyncMock(return_value=report)
 
         with patch("app.api.jobs.acreate_client", return_value=mock_sb), \
-             patch("app.api.jobs._claim_job", new_callable=AsyncMock, return_value=job), \
-             patch("app.api.jobs._update_job", new_callable=AsyncMock), \
+             patch("app.api.jobs.claim_next_job", new_callable=AsyncMock, return_value=job), \
+             patch("app.api.jobs.update_job_status", new_callable=AsyncMock), \
              patch.dict("app.api.jobs._CONNECTORS", {"loopnet-seed": MagicMock(return_value=MagicMock(run=mock_connector))}):
             r = await client.post("/api/v1/jobs/process", headers=_AUTH)
 
@@ -110,15 +110,13 @@ class TestRunJob:
     async def test_known_source_runs_and_returns_done(self, client):
         job_row = {"id": "j-3", "attempts": 0}
         mock_sb = _mock_supabase_client()
-        mock_sb.table.return_value.insert.return_value.execute = AsyncMock(
-            return_value=MagicMock(data=[job_row])
-        )
 
         report = IngestionReport(source="loopnet-seed", fetched=3, normalized=3)
         mock_connector = AsyncMock(return_value=report)
 
         with patch("app.api.jobs.acreate_client", return_value=mock_sb), \
-             patch("app.api.jobs.execute_db_safe", new_callable=AsyncMock, return_value=MagicMock(data=[job_row])), \
+             patch("app.api.jobs.insert_job_row", new_callable=AsyncMock, return_value=job_row), \
+             patch("app.api.jobs.update_job_status", new_callable=AsyncMock), \
              patch.dict("app.api.jobs._CONNECTORS", {"loopnet-seed": MagicMock(return_value=MagicMock(run=mock_connector))}):
             r = await client.post("/api/v1/jobs/run/loopnet-seed", headers=_AUTH)
 
@@ -143,7 +141,7 @@ class TestRunConnectorRetry:
         mock_client = MagicMock()
         failing_connector = MagicMock(return_value=MagicMock(run=AsyncMock(side_effect=RuntimeError("fail"))))
 
-        with patch("app.api.jobs._update_job", new_callable=AsyncMock):
+        with patch("app.api.jobs.update_job_status", new_callable=AsyncMock):
             status = await _run_connector(mock_client, "j-1", "loopnet-seed", 1, failing_connector)
 
         assert status == "pending"
@@ -155,7 +153,7 @@ class TestRunConnectorRetry:
         mock_client = MagicMock()
         failing_connector = MagicMock(return_value=MagicMock(run=AsyncMock(side_effect=RuntimeError("fail"))))
 
-        with patch("app.api.jobs._update_job", new_callable=AsyncMock):
+        with patch("app.api.jobs.update_job_status", new_callable=AsyncMock):
             status = await _run_connector(mock_client, "j-1", "loopnet-seed", _MAX_ATTEMPTS, failing_connector)
 
         assert status == "failed"

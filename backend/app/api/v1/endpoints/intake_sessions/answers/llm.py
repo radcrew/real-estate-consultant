@@ -7,22 +7,22 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from app.core.deps import SupabaseSdkDep
+from app.domain.intake_criteria import normalize_merged_criteria
+from app.domain.intake_validation import compute_current_index
 from app.llm import (
     parse_user_input,
     resolve_next_intake_question,
 )
 from app.llm.intake.service import SKIPPED_FIELDS_KEY
 from app.repositories.intake_sessions import (
-    load_intake_session_row,
+    get_intake_session_row,
     save_intake_criteria,
 )
-from app.repositories.questions import load_intake_questions
+from app.repositories.questions import list_intake_questions
 from app.schemas.intake_sessions import (
     SubmitLlmIntakeInputRequest,
     SubmitLlmIntakeInputResponse,
 )
-from app.utils.intake_criteria import normalize_merged_criteria
-from app.utils.intake_validation import compute_current_index
 
 router = APIRouter()
 
@@ -36,8 +36,8 @@ async def submit_llm_intake_input(
     body: SubmitLlmIntakeInputRequest,
     client: SupabaseSdkDep,
 ) -> SubmitLlmIntakeInputResponse:
-    session_row = await load_intake_session_row(client, session_id)
-    questions = await load_intake_questions(client)
+    session_row = await get_intake_session_row(client, session_id)
+    questions = await list_intake_questions(client)
 
     current_criteria = session_row.get("criteria")
     current_criteria_dict = dict(current_criteria) if isinstance(current_criteria, dict) else {}

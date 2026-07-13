@@ -1,4 +1,4 @@
-from app.utils.intake_next_question import (
+from app.domain.intake_next_question import (
     find_question_row_by_key,
     first_question_row_in_missing,
     match_row_for_text_suggestion,
