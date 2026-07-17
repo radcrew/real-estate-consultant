@@ -1,0 +1,5 @@
+Fix (in the Supabase Dashboard, not code):
+
+Go to your project → Authentication → URL Configuration:
+1. Set Site URL to https://real-estate-consultant-fe.vercel.app
+2. Add https://real-estate-consultant-fe.vercel.app/auth/callback to Redirect URLs (you can also keep http://localhost:3000/** there for local dev)
