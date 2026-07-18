@@ -34,8 +34,8 @@ describe("GoogleAuthButton", () => {
   });
 
   it("renders a custom label", () => {
-    render(<GoogleAuthButton label="Sign up with Google" />);
-    expect(screen.getByRole("button", { name: /sign up with google/i })).toBeInTheDocument();
+    render(<GoogleAuthButton label="Continue with Google" />);
+    expect(screen.getByRole("button", { name: /continue with google/i })).toBeInTheDocument();
   });
 
   it("calls signInWithGoogle when clicked", async () => {

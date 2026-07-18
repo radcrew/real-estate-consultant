@@ -29,6 +29,10 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
+vi.mock("next/image", () => ({
+  default: ({ alt }: { alt: string }) => <img alt={alt} />,
+}));
+
 beforeEach(() => {
   mockAuth.signUp = vi.fn();
   mockAuth.error = null;
