@@ -38,7 +38,7 @@ type TestimonialsProps = {
 
 export const Testimonials = ({ className }: TestimonialsProps) => (
   <div className={className}>
-    <SectionHeading isCenter desc="Why CRE professionals choose RadEstate.">
+    <SectionHeading desc="Why CRE professionals choose RadEstate.">
       What clients say
     </SectionHeading>
 
