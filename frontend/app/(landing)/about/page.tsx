@@ -87,32 +87,6 @@ const AboutPage = () => (
         </div>
       </div>
 
-      {/* Team */}
-      <div className="relative">
-        <SectionHeading desc="The people building RadEstate.">⛱ Team</SectionHeading>
-        <div className="grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:gap-x-8">
-          {TEAM.map((item) => (
-            <div key={item.id} className="max-w-sm">
-              <div className="relative aspect-square overflow-hidden rounded-xl">
-                <Image
-                  fill
-                  className="object-cover"
-                  src={item.avatar}
-                  alt={item.name}
-                  sizes="(max-width: 768px) 100vw, 30vw"
-                />
-              </div>
-              <h3 className="mt-4 text-lg font-semibold text-neutral-900 md:text-xl dark:text-neutral-200">
-                {item.name}
-              </h3>
-              <span className="block text-sm text-neutral-500 sm:text-base dark:text-neutral-400">
-                {item.job}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
       <Testimonials />
     </div>
   </div>
