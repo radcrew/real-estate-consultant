@@ -31,16 +31,6 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     ],
   },
   {
-    id: "account",
-    title: "Account",
-    items: [
-      { label: "Sign in", href: "/sign-in" },
-      { label: "Get started", href: "/sign-up" },
-      { label: "Your account", href: "/account" },
-      { label: "Saved", href: "/saved" },
-    ],
-  },
-  {
     id: "company",
     title: "Company",
     items: [
