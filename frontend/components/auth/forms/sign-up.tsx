@@ -109,7 +109,7 @@ export const SignUpForm = () => {
 
       <AuthFormDivider />
 
-      <GoogleAuthButton label="Sign up with Google" />
+      <GoogleAuthButton label="Continue with Google" />
     </div>
   );
 };
