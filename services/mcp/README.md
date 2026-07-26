@@ -1,14 +1,14 @@
 # MCP adapter for the radestate commercial real-estate platform.
 
-Phase 0 skeleton: stdio transport + one tool (`ping_backend`) that calls
-`GET /api/v1/ping` on the FastAPI backend. Domain logic stays in `backend/`.
-
-See repo root `MCP_SERVER_PLAN.md` for the full roadmap.
+Phase 1: stdio FastMCP adapter over the FastAPI backend. Domain logic stays in
+`backend/`. See repo root `MCP_SERVER_PLAN.md` for the full roadmap.
 
 ## Requirements
 
 - Python 3.11+
 - Backend reachable at `BACKEND_API_URL` (default `http://127.0.0.1:8888`)
+- For authenticated tools: a short-lived Supabase **user** access token in
+  `MCP_USER_ACCESS_TOKEN` (never the service role key)
 
 ## Setup
 
@@ -26,53 +26,24 @@ On macOS/Linux: `source .venv/bin/activate`, then the same `python -m pip` lines
 
 ## Run (stdio)
 
-With the venv activated and cwd still `services/mcp/`:
-
 ```powershell
 python -m app.main
 ```
 
-Or via the console script after editable install:
+Or: `radestate-mcp`
 
-```powershell
-radestate-mcp
-```
-
-The process speaks MCP over stdin/stdout. **Do not** `print()` to stdout — logging
-goes to stderr only.
+Logging goes to **stderr** only (stdout is the MCP JSON-RPC wire).
 
 ## Smoke test with MCP Inspector
-
-With deps installed (`mcp[cli]`):
 
 ```powershell
 mcp dev app/main.py
 ```
 
-In the Inspector UI, list tools and call `ping_backend`. Expect a JSON payload
-like `{"message": "pong"}` when the backend is up.
+Try `ping_backend`, then with a real JWT + search session id: `search_properties`
+→ `get_listing` → `explain_fit`.
 
 ## Cursor host config
-
-Project or user MCP settings example:
-
-```json
-{
-  "mcpServers": {
-    "radestate": {
-      "command": "python",
-      "args": ["-m", "app.main"],
-      "cwd": "D:/work/real-estate-consultant/services/mcp",
-      "env": {
-        "BACKEND_API_URL": "http://127.0.0.1:8888"
-      }
-    }
-  }
-}
-```
-
-Prefer pointing `command` at this package’s `.venv` Python so Cursor uses the
-editable install:
 
 ```json
 {
@@ -82,18 +53,26 @@ editable install:
       "args": ["-m", "app.main"],
       "cwd": "D:/work/real-estate-consultant/services/mcp",
       "env": {
-        "BACKEND_API_URL": "http://127.0.0.1:8888"
+        "BACKEND_API_URL": "http://127.0.0.1:8888",
+        "MCP_USER_ACCESS_TOKEN": "<supabase-access-token>"
       }
     }
   }
 }
 ```
 
-## Tools (Phase 0)
+## Tools (Phase 1)
 
-| Tool | Backend | Auth |
-|------|---------|------|
-| `ping_backend` | `GET /api/v1/ping` | None |
+| Tool | Backend | Auth | Side effects |
+|------|---------|------|--------------|
+| `ping_backend` | `GET /api/v1/ping` | No | None |
+| `search_properties` | `GET /api/v1/search/{id}` | Yes | None |
+| `update_search_criteria` | `PUT /api/v1/search/{id}` | Yes | Replaces criteria |
+| `get_listing` | `GET /api/v1/listings/{id}` | No | None |
+| `get_featured_listings` | `GET /api/v1/listings/featured` | No | None |
+| `explain_fit` | `POST /api/v1/search/{id}/fit/{property_id}` | Yes | LLM call (not persisted) |
+| `list_saved_listings` | `GET /api/v1/account/saved` | Yes | None |
+| `get_agent` | `GET /api/v1/agents/{broker}` | Yes | None |
 
 ## Tests
 

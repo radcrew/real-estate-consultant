@@ -544,10 +544,10 @@ Same idea: spawn `python -m app.main` with cwd + env. Document in
 
 ### Phase 1 — Core read tools (1–2 days)
 
-- [ ] `httpx` backend client with auth header injection
-- [ ] Implement Phase 1 tools (search, listing, fit, saved, agent)
-- [ ] Stable JSON text responses; `isError: true` on failures (don’t throw)
-- [ ] Unit tests with mocked HTTP
+- [x] `httpx` backend client with auth header injection
+- [x] Implement Phase 1 tools (search, listing, fit, saved, agent)
+- [x] Stable JSON text responses; `isError: true` on failures (don’t throw)
+- [x] Unit tests with mocked HTTP
 - [ ] Manual Cursor smoke: search session → get listing → explain fit
 
 ### Phase 2 — Intake + outreach (1–2 days)
