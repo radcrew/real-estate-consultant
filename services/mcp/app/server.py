@@ -5,11 +5,15 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 
 from app.config import settings
+from app.prompts import register_prompts
+from app.resources import register_resources
 from app.tools import (
     register_account_tools,
     register_agents_tools,
     register_fit_tools,
+    register_intake_tools,
     register_listings_tools,
+    register_outreach_tools,
     register_ping_tools,
     register_search_tools,
 )
@@ -21,9 +25,14 @@ def create_server() -> FastMCP:
         instructions=(
             "Radestate commercial real-estate assistant tools. "
             "You act as the authenticated user (MCP_USER_ACCESS_TOKEN). "
-            "Prefer search_properties → get_listing → explain_fit for research. "
-            "update_search_criteria writes/replaces session criteria. "
-            "Outreach and intake tools arrive in a later phase. "
+            "READ: ping_backend, search_properties, get_listing, get_featured_listings, "
+            "explain_fit, list_saved_listings, get_agent, get_intake_session, "
+            "get_outreach_draft. "
+            "WRITE: update_search_criteria, start_intake_session, answer_intake, "
+            "complete_intake, generate_outreach_draft, update_outreach_draft. "
+            "Outreach is draft-only — never claim email was sent. "
+            "Typical flow: start_intake_session → answer_intake → complete_intake → "
+            "search_properties → get_listing → explain_fit → generate_outreach_draft. "
             "All tools call the FastAPI backend — this process holds no domain logic."
         ),
     )
@@ -33,4 +42,8 @@ def create_server() -> FastMCP:
     register_fit_tools(mcp)
     register_account_tools(mcp)
     register_agents_tools(mcp)
+    register_intake_tools(mcp)
+    register_outreach_tools(mcp)
+    register_resources(mcp)
+    register_prompts(mcp)
     return mcp

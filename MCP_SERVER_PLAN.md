@@ -552,10 +552,10 @@ Same idea: spawn `python -m app.main` with cwd + env. Document in
 
 ### Phase 2 — Intake + outreach (1–2 days)
 
-- [ ] Intake tools (start / answer / complete / get)
-- [ ] Outreach draft tools (generate / get / update)
-- [ ] Optional resources + `cre_property_search` prompt
-- [ ] Harden tool descriptions so write vs read is obvious
+- [x] Intake tools (start / answer / complete / get)
+- [x] Outreach draft tools (generate / get / update)
+- [x] Optional resources + `cre_property_search` prompt
+- [x] Harden tool descriptions so write vs read is obvious
 
 ### Phase 3 — Hardening & remote (as needed)
 

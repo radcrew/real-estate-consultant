@@ -48,8 +48,8 @@ def register_search_tools(mcp: FastMCP) -> None:
     ) -> dict:
         """Replace search criteria on the session's linked intake (WRITE).
 
-        Requires MCP_USER_ACCESS_TOKEN. Body keys are question keys; values are
-        answers (same shape the product UI sends). This overwrites prior criteria.
+        Overwrites prior criteria. Requires MCP_USER_ACCESS_TOKEN. Prefer asking
+        the user before calling when criteria changes are consequential.
 
         Args:
             session_profile_id: Search profile UUID.

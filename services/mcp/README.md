@@ -1,18 +1,15 @@
 # MCP adapter for the radestate commercial real-estate platform.
 
-Phase 1: stdio FastMCP adapter over the FastAPI backend. Domain logic stays in
-`backend/`. See repo root `MCP_SERVER_PLAN.md` for the full roadmap.
+Phase 2: intake + draft-only outreach tools, plus resources/prompts. Domain
+logic stays in `backend/`. See repo root `MCP_SERVER_PLAN.md`.
 
 ## Requirements
 
 - Python 3.11+
-- Backend reachable at `BACKEND_API_URL` (default `http://127.0.0.1:8888`)
-- For authenticated tools: a short-lived Supabase **user** access token in
-  `MCP_USER_ACCESS_TOKEN` (never the service role key)
+- Backend at `BACKEND_API_URL` (default `http://127.0.0.1:8888`)
+- Supabase **user** JWT in `MCP_USER_ACCESS_TOKEN` (never the service role key)
 
 ## Setup
-
-From this directory (`services/mcp/`):
 
 ```powershell
 python -m venv .venv
@@ -22,26 +19,14 @@ python -m pip install -e ".[dev]"
 copy .env.example .env
 ```
 
-On macOS/Linux: `source .venv/bin/activate`, then the same `python -m pip` lines.
-
 ## Run (stdio)
 
 ```powershell
 python -m app.main
+# or: radestate-mcp
 ```
 
-Or: `radestate-mcp`
-
-Logging goes to **stderr** only (stdout is the MCP JSON-RPC wire).
-
-## Smoke test with MCP Inspector
-
-```powershell
-mcp dev app/main.py
-```
-
-Try `ping_backend`, then with a real JWT + search session id: `search_properties`
-→ `get_listing` → `explain_fit`.
+Logging → **stderr** only.
 
 ## Cursor host config
 
@@ -61,18 +46,34 @@ Try `ping_backend`, then with a real JWT + search session id: `search_properties
 }
 ```
 
-## Tools (Phase 1)
+## Tools
 
-| Tool | Backend | Auth | Side effects |
-|------|---------|------|--------------|
-| `ping_backend` | `GET /api/v1/ping` | No | None |
-| `search_properties` | `GET /api/v1/search/{id}` | Yes | None |
-| `update_search_criteria` | `PUT /api/v1/search/{id}` | Yes | Replaces criteria |
-| `get_listing` | `GET /api/v1/listings/{id}` | No | None |
-| `get_featured_listings` | `GET /api/v1/listings/featured` | No | None |
-| `explain_fit` | `POST /api/v1/search/{id}/fit/{property_id}` | Yes | LLM call (not persisted) |
-| `list_saved_listings` | `GET /api/v1/account/saved` | Yes | None |
-| `get_agent` | `GET /api/v1/agents/{broker}` | Yes | None |
+| Tool | Side effects | Auth |
+|------|--------------|------|
+| `ping_backend` | None | No |
+| `search_properties` | None (read) | Yes |
+| `update_search_criteria` | **WRITE** replaces criteria | Yes |
+| `get_listing` / `get_featured_listings` | None | No |
+| `explain_fit` | LLM call, not persisted | Yes |
+| `list_saved_listings` / `get_agent` | None | Yes |
+| `start_intake_session` | **WRITE** creates session | Yes |
+| `answer_intake` | **WRITE** mutates criteria | Yes |
+| `complete_intake` | **WRITE** creates search profile | Yes |
+| `get_intake_session` | None | Yes |
+| `generate_outreach_draft` | **WRITE** draft only (never sends) | Yes |
+| `get_outreach_draft` | None | Yes |
+| `update_outreach_draft` | **WRITE** edits draft text only | Yes |
+
+## Resources
+
+- `listing://{property_id}`
+- `search://{session_profile_id}`
+- `intake://{session_id}`
+
+## Prompts
+
+- `cre_property_search` — intake → search → explain fits
+- `draft_broker_outreach` — draft-only email workflow
 
 ## Tests
 
