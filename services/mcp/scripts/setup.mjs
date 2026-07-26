@@ -2,7 +2,7 @@
  * Cross-platform MCP launcher for local concurrent dev (Streamable HTTP).
  * Stdio mode stays for Cursor via run-mcp.cmd / mcp.json.
  */
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
@@ -28,6 +28,29 @@ function exitWith(message) {
   process.exit(1);
 }
 
+/** Load services/mcp/.env into env, skipping blank values so they do not wipe secrets. */
+function loadDotEnv(env) {
+  const envPath = path.join(mcpRoot, ".env");
+  if (!existsSync(envPath)) {
+    return env;
+  }
+  const next = { ...env };
+  for (const raw of readFileSync(envPath, "utf8").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#") || !line.includes("=")) {
+      continue;
+    }
+    const eq = line.indexOf("=");
+    const key = line.slice(0, eq).trim();
+    const value = line.slice(eq + 1).trim();
+    if (!key || !value) {
+      continue;
+    }
+    next[key] = value;
+  }
+  return next;
+}
+
 if (!existsSync(venvPython)) {
   exitWith(
     `Missing MCP virtual environment.\n` +
@@ -50,17 +73,18 @@ if (check.status !== 0) {
 
 const host = process.env.MCP_HTTP_HOST || "127.0.0.1";
 const port = process.env.MCP_HTTP_PORT || "8900";
+const childEnv = loadDotEnv({
+  ...process.env,
+  PYTHONPATH: mcpRoot,
+  MCP_TRANSPORT: "streamable-http",
+  MCP_HTTP_HOST: host,
+  MCP_HTTP_PORT: String(port),
+});
 
 const child = spawn(venvPython, ["-m", "app.main"], {
   cwd: mcpRoot,
   stdio: "inherit",
-  env: {
-    ...process.env,
-    PYTHONPATH: mcpRoot,
-    MCP_TRANSPORT: "streamable-http",
-    MCP_HTTP_HOST: host,
-    MCP_HTTP_PORT: String(port),
-  },
+  env: childEnv,
 });
 
 console.error(

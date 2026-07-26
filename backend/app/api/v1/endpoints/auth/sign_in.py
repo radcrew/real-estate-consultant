@@ -9,14 +9,14 @@ from app.api.v1.endpoints.auth.exceptions import (
     raise_sign_in_no_session,
     raise_sign_in_transport_unavailable,
 )
-from app.core.deps import SupabaseSdkDep
+from app.core.deps import SupabaseAuthDep
 from app.schemas.auth import SignInRequest, SignInResponse, SignInUser
 
 router = APIRouter()
 
 
 @router.post("/sign-in")
-async def sign_in(body: SignInRequest, client: SupabaseSdkDep) -> SignInResponse:
+async def sign_in(body: SignInRequest, client: SupabaseAuthDep) -> SignInResponse:
     try:
         result = await client.auth.sign_in_with_password(
             {

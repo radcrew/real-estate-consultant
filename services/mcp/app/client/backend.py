@@ -140,6 +140,26 @@ class BackendClient:
         logger.info("backend ping → %s/api/v1/ping", self._base_url)
         return await self.get_json("/api/v1/ping")
 
+    async def quick_search(
+        self,
+        *,
+        location: str | None = None,
+        property_types: list[str] | None = None,
+        price_min: int | None = None,
+        price_max: int | None = None,
+    ) -> dict[str, Any]:
+        """POST /api/v1/search/quick — create a search profile from hero filters."""
+        body: dict[str, Any] = {}
+        if location:
+            body["location"] = location
+        if property_types:
+            body["property_types"] = property_types
+        if price_min is not None:
+            body["price_min"] = price_min
+        if price_max is not None:
+            body["price_max"] = price_max
+        return await self.post_json("/api/v1/search/quick", body, auth=True)
+
     async def search_properties(
         self,
         session_profile_id: str,

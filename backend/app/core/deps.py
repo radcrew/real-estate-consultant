@@ -14,7 +14,7 @@ from app.core.exceptions import (
     raise_auth_missing_bearer,
     raise_auth_user_not_returned,
 )
-from app.core.supabase_sdk import get_supabase_sdk_client
+from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
 from app.repositories.profiles import get_profile_row
 from app.utils.exceptions import raise_forbidden, raise_service_unavailable
 
@@ -23,6 +23,8 @@ DbSession = Annotated[AsyncSession, Depends(get_session)]
 # get_supabase_sdk_client is a plain sync function returning the singleton client —
 # FastAPI handles both sync and async callables as dependencies.
 SupabaseSdkDep = Annotated[AsyncClient, Depends(get_supabase_sdk_client)]
+# Password grants only — must not share the service-role data client (SIGNED_IN poisons it).
+SupabaseAuthDep = Annotated[AsyncClient, Depends(get_supabase_auth_client)]
 
 _http_bearer = HTTPBearer(auto_error=False)
 

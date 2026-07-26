@@ -24,6 +24,63 @@ def _tool(mcp: FastMCP, name: str):
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_quick_search_creates_session_and_returns_matches() -> None:
+    quick = respx.post(f"{BASE}/api/v1/search/quick").mock(
+        return_value=httpx.Response(200, json={"search_profile_id": "sess-q"}),
+    )
+    search = respx.get(f"{BASE}/api/v1/search/sess-q").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "criteria": {},
+                "total": 1,
+                "limit": 10,
+                "offset": 0,
+                "results": [
+                    {
+                        "property": {
+                            "id": "prop-la",
+                            "city": "Santa Fe Springs",
+                            "state": "CA",
+                            "property_type": "Industrial",
+                            "price": 2476000,
+                        },
+                        "match_score": 88.0,
+                    },
+                ],
+            },
+        ),
+    )
+    mcp = FastMCP("test")
+    register_search_tools(mcp)
+    from app import config
+
+    original = config.settings.mcp_user_access_token
+    config.settings.mcp_user_access_token = TOKEN
+    try:
+        result = await _tool(mcp, "quick_search").fn(
+            location="Los Angeles, CA",
+            property_types=["Industrial"],
+            price_max=4_000_000,
+            limit=10,
+        )
+    finally:
+        config.settings.mcp_user_access_token = original
+
+    assert result.get("isError") is not True
+    assert quick.called
+    assert search.called
+    body = quick.calls.last.request.content
+    assert b"Los Angeles" in body
+    assert b"Industrial" in body
+    text = result["content"][0]["text"]
+    assert "prop-la" in text
+    assert "sess-q" in text
+    assert "search_profile_id" in text
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_search_properties_compacts_and_auths() -> None:
     route = respx.get(f"{BASE}/api/v1/search/sess-1").mock(
         return_value=httpx.Response(
@@ -208,6 +265,7 @@ def test_create_server_registers_phase1_tools() -> None:
     mcp = create_server()
     for name in (
         "ping_backend",
+        "quick_search",
         "search_properties",
         "update_search_criteria",
         "get_listing",

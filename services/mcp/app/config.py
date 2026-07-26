@@ -11,6 +11,8 @@ class Settings(BaseSettings):
         env_file=_SVC_ROOT / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        # Empty process env (common from Cursor mcp.json) must not wipe .env values.
+        env_ignore_empty=True,
     )
 
     app_name: str = "radestate"
