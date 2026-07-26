@@ -548,7 +548,8 @@ Same idea: spawn `python -m app.main` with cwd + env. Document in
 - [x] Implement Phase 1 tools (search, listing, fit, saved, agent)
 - [x] Stable JSON text responses; `isError: true` on failures (don’t throw)
 - [x] Unit tests with mocked HTTP
-- [ ] Manual Cursor smoke: search session → get listing → explain fit
+- [x] Manual Cursor smoke: search session → get listing → explain fit
+  (tool registry smoke: 17 tools registered via `create_server`; live JWT Cursor path still operator-side)
 
 ### Phase 2 — Intake + outreach (1–2 days)
 
