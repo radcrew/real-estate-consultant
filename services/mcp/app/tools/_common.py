@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable
@@ -10,19 +11,28 @@ from typing import Any
 import httpx
 
 from app.client.errors import AuthRequiredError
+from app.config import settings
+from app.middleware import RateLimitError, SlidingWindowRateLimiter, sanitize_tool_text
 
 logger = logging.getLogger(__name__)
+
+_rate_limiter = SlidingWindowRateLimiter(
+    max_calls=settings.rate_limit_per_minute,
+    window_seconds=60.0,
+)
 
 
 def ok_text(payload: Any) -> dict[str, Any]:
     text = payload if isinstance(payload, str) else json.dumps(payload, indent=2, default=str)
+    text = sanitize_tool_text(text, max_chars=settings.max_tool_output_chars)
     return {"content": [{"type": "text", "text": text}]}
 
 
 def error_text(message: str) -> dict[str, Any]:
+    text = sanitize_tool_text(message, max_chars=2_000)
     return {
         "isError": True,
-        "content": [{"type": "text", "text": message}],
+        "content": [{"type": "text", "text": text}],
     }
 
 
@@ -34,8 +44,16 @@ async def run_backend(
 ) -> dict[str, Any]:
     """Execute a backend call and map failures to MCP `isError` results."""
     try:
-        data = await action()
+        _rate_limiter.acquire()
+        data = await asyncio.wait_for(action(), timeout=settings.http_timeout_seconds)
         return ok_text(transform(data) if transform else data)
+    except RateLimitError as exc:
+        return error_text(str(exc))
+    except TimeoutError:
+        logger.warning("%s timed out after %ss", label, settings.http_timeout_seconds)
+        return error_text(
+            f"Timed out calling backend after {settings.http_timeout_seconds:.0f}s ({label}).",
+        )
     except AuthRequiredError as exc:
         return error_text(str(exc))
     except httpx.HTTPStatusError as exc:
@@ -45,7 +63,10 @@ async def run_backend(
         if status == 401:
             return error_text("Unauthorized — check MCP_USER_ACCESS_TOKEN is a valid user JWT.")
         if status == 403:
-            return error_text("Forbidden — this user cannot access that resource.")
+            return error_text(
+                "Forbidden — this user cannot access that resource "
+                "(admin tools require profiles.is_admin).",
+            )
         if status == 404:
             return error_text(f"Not found ({label}).")
         return error_text(f"Backend returned HTTP {status}: {body}")

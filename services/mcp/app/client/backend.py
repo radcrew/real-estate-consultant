@@ -257,3 +257,23 @@ class BackendClient:
             {"draft_email": draft_email},
             auth=True,
         )
+
+    async def enqueue_ingest(self, source: str = "loopnet-seed") -> dict[str, Any]:
+        """POST /api/v1/admin/ingest — admin JWT required (backend enforces)."""
+        return await self.post_json(
+            "/api/v1/admin/ingest",
+            {"source": source},
+            auth=True,
+        )
+
+    async def list_listing_submissions(self) -> list[Any]:
+        """GET /api/v1/listing-submissions — admin JWT required."""
+        data = await self._request_json(
+            "GET",
+            "/api/v1/listing-submissions",
+            auth=True,
+        )
+        if not isinstance(data, list):
+            msg = f"Expected JSON array from listing-submissions, got {type(data).__name__}"
+            raise TypeError(msg)
+        return data

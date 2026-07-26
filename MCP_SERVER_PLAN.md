@@ -559,12 +559,12 @@ Same idea: spawn `python -m app.main` with cwd + env. Document in
 
 ### Phase 3 — Hardening & remote (as needed)
 
-- [ ] Streamable HTTP transport for hosted agents
-- [ ] Rate limits / timeouts per tool
-- [ ] Sanitize tool outputs before they re-enter model context (injection hygiene)
-- [ ] Admin-gated tools
-- [ ] CI job: lint + pytest for `services/mcp`
-- [ ] Optional: link from root `README.md` and `FEATURE_IDEAS.md`
+- [x] Streamable HTTP transport for hosted agents
+- [x] Rate limits / timeouts per tool
+- [x] Sanitize tool outputs before they re-enter model context (injection hygiene)
+- [x] Admin-gated tools
+- [x] CI job: lint + pytest for `services/mcp`
+- [x] Optional: link from root `README.md` and `FEATURE_IDEAS.md`
 
 ---
 
@@ -593,13 +593,13 @@ No need to run the Next.js app for MCP-only verification.
 
 ## Security checklist
 
-- [ ] User-scoped JWT only; no service role in MCP
-- [ ] Draft-only outreach; no send tool
-- [ ] Admin tools require admin JWT (backend enforces)
-- [ ] Stdio: no `print`/`console.log` on stdout
-- [ ] Timeouts on all outbound HTTP
-- [ ] Do not echo secrets in tool results or logs
-- [ ] Treat listing/description text as untrusted when feeding back to the model
+- [x] User-scoped JWT only; no service role in MCP
+- [x] Draft-only outreach; no send tool
+- [x] Admin tools require admin JWT (backend enforces)
+- [x] Stdio: no `print`/`console.log` on stdout
+- [x] Timeouts on all outbound HTTP
+- [x] Do not echo secrets in tool results or logs
+- [x] Treat listing/description text as untrusted when feeding back to the model
 
 ---
 

@@ -18,8 +18,12 @@ class Settings(BaseSettings):
 
     backend_api_url: str = "http://127.0.0.1:8888"
     mcp_user_access_token: str = ""
-    mcp_transport: str = "stdio"
+    mcp_transport: str = "stdio"  # stdio | streamable-http
+    mcp_http_host: str = "127.0.0.1"
+    mcp_http_port: int = Field(default=8900, ge=1, le=65535)
     http_timeout_seconds: float = Field(default=60.0, gt=0)
+    rate_limit_per_minute: int = Field(default=60, ge=1)
+    max_tool_output_chars: int = Field(default=24_000, ge=1000)
     log_level: str = "INFO"
 
 

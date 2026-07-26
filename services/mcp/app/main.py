@@ -1,4 +1,4 @@
-"""MCP process entry — stdio by default (stdout is the JSON-RPC wire)."""
+"""MCP process entry — stdio by default; streamable-http for remote hosts."""
 
 from __future__ import annotations
 
@@ -8,27 +8,19 @@ import sys
 from app.config import settings
 from app.logging import configure_logging
 from app.server import create_server
+from app.transport import run_transport
 
 logger = logging.getLogger(__name__)
 
 
 def main() -> None:
     configure_logging(settings.log_level)
-    transport = settings.mcp_transport.strip().lower()
-    if transport != "stdio":
-        logger.error(
-            "Unsupported MCP_TRANSPORT=%r (Phase 0 supports stdio only)",
-            settings.mcp_transport,
-        )
+    try:
+        mcp = create_server()
+        run_transport(mcp, settings)
+    except ValueError as exc:
+        logger.error("%s", exc)
         sys.exit(1)
-
-    logger.info(
-        "starting radestate MCP server transport=stdio backend=%s",
-        settings.backend_api_url,
-    )
-    mcp = create_server()
-    # FastMCP.run defaults to stdio; do not log to stdout after this.
-    mcp.run(transport="stdio")
 
 
 if __name__ == "__main__":

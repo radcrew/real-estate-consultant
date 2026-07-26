@@ -1,7 +1,7 @@
 # MCP adapter for the radestate commercial real-estate platform.
 
-Phase 2: intake + draft-only outreach tools, plus resources/prompts. Domain
-logic stays in `backend/`. See repo root `MCP_SERVER_PLAN.md`.
+Thin FastMCP process over the FastAPI backend (`/api/v1`). Domain logic stays in
+`backend/`. Roadmap: repo root `MCP_SERVER_PLAN.md`.
 
 ## Requirements
 
@@ -19,16 +19,27 @@ python -m pip install -e ".[dev]"
 copy .env.example .env
 ```
 
-## Run (stdio)
+## Run
+
+**stdio** (Cursor / Claude Desktop):
 
 ```powershell
 python -m app.main
 # or: radestate-mcp
 ```
 
-Logging → **stderr** only.
+**Streamable HTTP** (remote / multi-client):
 
-## Cursor host config
+```powershell
+$env:MCP_TRANSPORT="streamable-http"
+$env:MCP_HTTP_HOST="127.0.0.1"
+$env:MCP_HTTP_PORT="8900"
+python -m app.main
+```
+
+Endpoint path defaults to `/mcp` on the configured host/port. Logging → **stderr**.
+
+## Cursor host config (stdio)
 
 ```json
 {
@@ -46,37 +57,32 @@ Logging → **stderr** only.
 }
 ```
 
-## Tools
+## Hardening
 
-| Tool | Side effects | Auth |
-|------|--------------|------|
-| `ping_backend` | None | No |
-| `search_properties` | None (read) | Yes |
-| `update_search_criteria` | **WRITE** replaces criteria | Yes |
-| `get_listing` / `get_featured_listings` | None | No |
-| `explain_fit` | LLM call, not persisted | Yes |
-| `list_saved_listings` / `get_agent` | None | Yes |
-| `start_intake_session` | **WRITE** creates session | Yes |
-| `answer_intake` | **WRITE** mutates criteria | Yes |
-| `complete_intake` | **WRITE** creates search profile | Yes |
-| `get_intake_session` | None | Yes |
-| `generate_outreach_draft` | **WRITE** draft only (never sends) | Yes |
-| `get_outreach_draft` | None | Yes |
-| `update_outreach_draft` | **WRITE** edits draft text only | Yes |
+- Per-process rate limit (`RATE_LIMIT_PER_MINUTE`)
+- Tool call timeout (`HTTP_TIMEOUT_SECONDS`)
+- Output sanitization (secret redaction, injection-phrase filter, truncation)
+- Admin tools (`enqueue_ingest`, `list_listing_submissions`) — backend enforces `is_admin`
 
-## Resources
+## Tools (summary)
 
-- `listing://{property_id}`
-- `search://{session_profile_id}`
-- `intake://{session_id}`
+| Area | Tools |
+|------|-------|
+| Health | `ping_backend` |
+| Search | `search_properties`, `update_search_criteria`, `explain_fit` |
+| Listings | `get_listing`, `get_featured_listings`, `get_agent`, `list_saved_listings` |
+| Intake | `start_intake_session`, `answer_intake`, `complete_intake`, `get_intake_session` |
+| Outreach | `generate_outreach_draft`, `get_outreach_draft`, `update_outreach_draft` (draft only) |
+| Admin | `enqueue_ingest`, `list_listing_submissions` |
 
-## Prompts
-
-- `cre_property_search` — intake → search → explain fits
-- `draft_broker_outreach` — draft-only email workflow
+Resources: `listing://`, `search://`, `intake://`.  
+Prompts: `cre_property_search`, `draft_broker_outreach`.
 
 ## Tests
 
 ```powershell
 pytest
+ruff check app tests
 ```
+
+CI: `.github/workflows/mcp.yml`.
