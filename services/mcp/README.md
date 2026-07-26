@@ -41,21 +41,36 @@ Endpoint path defaults to `/mcp` on the configured host/port. Logging → **stde
 
 ## Cursor host config (stdio)
 
+On Windows, Cursor launches MCP servers through `cmd.exe`. Pointing `command`
+straight at `.venv\\Scripts\\python.exe` often fails with *not recognized as an
+internal or external command*. Use the repo launcher instead:
+
+- Project config: [`.cursor/mcp.json`](../../.cursor/mcp.json) (uses
+  `${workspaceFolder}`)
+- Or user config (`%USERPROFILE%\\.cursor\\mcp.json`):
+
 ```json
 {
   "mcpServers": {
     "radestate": {
-      "command": "D:/work/real-estate-consultant/services/mcp/.venv/Scripts/python.exe",
-      "args": ["-m", "app.main"],
-      "cwd": "D:/work/real-estate-consultant/services/mcp",
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "D:\\work\\real-estate-consultant\\services\\mcp\\run-mcp.cmd"
+      ],
+      "cwd": "D:\\work\\real-estate-consultant\\services\\mcp",
       "env": {
         "BACKEND_API_URL": "http://127.0.0.1:8888",
+        "MCP_TRANSPORT": "stdio",
         "MCP_USER_ACCESS_TOKEN": "<supabase-access-token>"
       }
     }
   }
 }
 ```
+
+`run-mcp.cmd` runs `.venv\\Scripts\\radestate-mcp.exe` (or `python -m app.main`).
+Create the venv first (`python -m venv .venv` then `pip install -e .`).
 
 ## Hardening
 
