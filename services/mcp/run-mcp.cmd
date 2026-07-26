@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 cd /d "%~dp0"
 
 if not exist ".venv\Scripts\python.exe" (
@@ -7,9 +7,12 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 
-REM Prefer the console script when present; fall back to python -m.
-if exist ".venv\Scripts\radestate-mcp.exe" (
-  ".venv\Scripts\radestate-mcp.exe"
-) else (
-  ".venv\Scripts\python.exe" -m app.main
+REM Load services/mcp/.env into this process (overrides empty Cursor-injected vars).
+if exist ".env" (
+  for /f "usebackq eol=# tokens=1,* delims==" %%A in (".env") do (
+    if not "%%A"=="" set "%%A=%%B"
+  )
 )
+
+set "PYTHONPATH=%CD%;%PYTHONPATH%"
+".venv\Scripts\python.exe" -m app.main

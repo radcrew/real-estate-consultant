@@ -19,16 +19,51 @@ python -m pip install -e ".[dev]"
 copy .env.example .env
 ```
 
+### One-shot local auth (recommended)
+
+With the FastAPI backend running and `backend/.env` configured, mint a user JWT
+into `services/mcp/.env` (gitignored):
+
+```powershell
+.\.venv\Scripts\python.exe scripts\setup_local_auth.py
+.\.venv\Scripts\python.exe scripts\verify_local_setup.py
+```
+
+Then reload the `radestate` MCP server in Cursor. `run-mcp.cmd` loads `.env`
+automatically (so you do not need to paste the token into `mcp.json`).
+
 ## Run
 
-**stdio** (Cursor / Claude Desktop):
+MCP is a **separate** process from the Next.js app and FastAPI backend. It only
+calls `BACKEND_API_URL` over HTTP.
+
+### From the monorepo root (concurrent)
+
+```powershell
+# App only (frontend + backend) — default
+pnpm run dev
+
+# App + MCP Streamable HTTP on :8900
+pnpm run dev:all
+
+# MCP HTTP alone (backend should already be up)
+pnpm run dev:mcp
+```
+
+`dev:mcp` / `dev:all` start MCP in **streamable-http** mode
+(`http://127.0.0.1:8900/mcp`). Cursor’s default config still uses **stdio** via
+`run-mcp.cmd` (Cursor spawns that itself — do not also put stdio MCP in
+`concurrently`).
+
+### stdio (Cursor / Claude Desktop)
 
 ```powershell
 python -m app.main
 # or: radestate-mcp
+# or: run-mcp.cmd
 ```
 
-**Streamable HTTP** (remote / multi-client):
+### Streamable HTTP (manual)
 
 ```powershell
 $env:MCP_TRANSPORT="streamable-http"
@@ -37,7 +72,10 @@ $env:MCP_HTTP_PORT="8900"
 python -m app.main
 ```
 
-Endpoint path defaults to `/mcp` on the configured host/port. Logging → **stderr**.
+Endpoint path defaults to `/mcp` on the configured host/port. Logging → **stderr**
+(stdout is the JSON-RPC wire). Cursor’s MCP panel labels stderr as `[error]` even
+for INFO lines; the server quiets MCP SDK protocol logs (Ping/ListTools/etc.) to
+WARNING+ so those do not look like failures.
 
 ## Cursor host config (stdio)
 
@@ -69,8 +107,14 @@ internal or external command*. Use the repo launcher instead:
 }
 ```
 
-`run-mcp.cmd` runs `.venv\\Scripts\\radestate-mcp.exe` (or `python -m app.main`).
-Create the venv first (`python -m venv .venv` then `pip install -e .`).
+`run-mcp.cmd` runs `.venv\\Scripts\\python.exe -m app.main` with `PYTHONPATH`
+set to `services/mcp` (avoids `ModuleNotFoundError: app` from a broken
+`radestate-mcp.exe` editable install). Create the venv first:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+```
 
 ## Hardening
 

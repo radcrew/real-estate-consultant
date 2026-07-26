@@ -1,0 +1,28 @@
+{
+  "executionEnvironments": [
+    {
+      "root": "services/mcp",
+      "pythonVersion": "3.11",
+      "extraPaths": [
+        "services/mcp",
+        "services/mcp/.venv/Lib/site-packages"
+      ]
+    },
+    {
+      "root": "backend",
+      "pythonVersion": "3.11",
+      "extraPaths": [
+        "backend",
+        "backend/.venv/Lib/site-packages"
+      ]
+    },
+    {
+      "root": "services/ingestion",
+      "pythonVersion": "3.11",
+      "extraPaths": [
+        "services/ingestion",
+        "services/ingestion/.venv/Lib/site-packages"
+      ]
+    }
+  ]
+}

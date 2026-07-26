@@ -83,3 +83,13 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### Concurrent from repo root
+
+| Command | Processes |
+|---------|-----------|
+| `pnpm run dev` | Frontend + backend |
+| `pnpm run dev:all` | Frontend + backend + MCP (HTTP `:8900`) |
+| `pnpm run dev:mcp` | MCP HTTP only |
+
+MCP stays a separate service (`services/mcp/`). Cursor still uses stdio via `.cursor/mcp.json`; `dev:all` runs the HTTP transport for shared/local clients. See [`services/mcp/README.md`](services/mcp/README.md).

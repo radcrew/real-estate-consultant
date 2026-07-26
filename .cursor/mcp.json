@@ -9,8 +9,7 @@
       "cwd": "${workspaceFolder}/services/mcp",
       "env": {
         "BACKEND_API_URL": "http://127.0.0.1:8888",
-        "MCP_TRANSPORT": "stdio",
-        "MCP_USER_ACCESS_TOKEN": ""
+        "MCP_TRANSPORT": "stdio"
       }
     }
   }
