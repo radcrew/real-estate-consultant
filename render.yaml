@@ -27,8 +27,9 @@ services:
         value: .
       - key: LOG_LEVEL
         value: INFO
+      # MCP → backend client timeout. 120s covers dual cold starts (MCP + API).
       - key: HTTP_TIMEOUT_SECONDS
-        value: "60"
+        value: "120"
       - key: RATE_LIMIT_PER_MINUTE
         value: "60"
       - key: MAX_TOOL_OUTPUT_CHARS

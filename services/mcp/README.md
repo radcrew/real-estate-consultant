@@ -131,6 +131,9 @@ Or create a Web Service manually:
 | Root Directory | `services/mcp` |
 | Build | `pip install -U pip && pip install .` |
 | Start | `MCP_TRANSPORT=streamable-http python -m app.main` |
+| Plan | `starter` (Blueprint; avoids free-tier sleep) |
+| Health | `/healthz` |
+| Client timeout | `HTTP_TIMEOUT_SECONDS=120` |
 
 **Required env on Render**
 

@@ -77,7 +77,8 @@ Remote Render MCP is an *additional* surface, not a replacement for
 | DB / Supabase | **No** MCP env for Supabase keys |
 | Instance type | Start with Render **Web Service** (not cron / static) |
 | Region | Same region as backend when possible (latency) |
-| Autosleep | Prefer a paid instance that does not sleep if agents need low latency; free tier cold starts are OK for a pilot |
+| Autosleep | **Starter** (Blueprint default) — avoids free-tier spin-down for agent use; Free only for short pilots |
+| Backend client timeout | Production Blueprint: `HTTP_TIMEOUT_SECONDS=120` (dual cold start headroom) |
 
 ---
 
@@ -164,7 +165,7 @@ manually instead (below).
 | Build Command | `pip install -U pip && pip install .` |
 | Start Command | `MCP_TRANSPORT=streamable-http python -m app.main` |
 | Health check path | `/healthz` |
-| Instance | Starter (or Free for pilot) |
+| Instance | **Starter** (Blueprint default; use Free only for a short pilot) |
 | Auto-Deploy | `main` (or a `deploy/mcp` branch for safer rollouts) |
 
 ### Environment variables (Render dashboard)
@@ -176,7 +177,7 @@ manually instead (below).
 | `MCP_TRANSPORT` | `streamable-http` | Required |
 | `MCP_HTTP_HOST` | `0.0.0.0` | Required on Render |
 | `MCP_HTTP_PORT` | *(omit — use Render `PORT`)* | Honored via `AliasChoices` in `app/config.py` |
-| `HTTP_TIMEOUT_SECONDS` | `60` | Raise if backend cold-starts |
+| `HTTP_TIMEOUT_SECONDS` | `120` (Blueprint) | Headroom when MCP and backend both cold-start |
 | `RATE_LIMIT_PER_MINUTE` | `60` | Process-local; raise carefully |
 | `MAX_TOOL_OUTPUT_CHARS` | `24000` | |
 | `LOG_LEVEL` | `INFO` | |
@@ -290,8 +291,8 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 
 - [x] Health check path settled (`GET /healthz`, Blueprint `healthCheckPath`)
 - [x] Pin Python `3.11.11` (`PYTHON_VERSION` + `services/mcp/.python-version`)
-- [ ] Timeouts tuned for backend cold start
-- [ ] Instance size / no-sleep decision
+- [x] Timeouts tuned for backend cold start (`HTTP_TIMEOUT_SECONDS=120` in Blueprint)
+- [x] Instance size / no-sleep decision (**Starter** in Blueprint; Free = pilot only)
 - [x] README + host config samples updated (Render section)
 - [ ] Optional: GitHub Action deploy on `services/mcp/**` changes
 
@@ -334,7 +335,7 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 
 | Risk | Mitigation |
 |------|------------|
-| Free tier cold start + backend cold start | Longer `HTTP_TIMEOUT_SECONDS`; paid always-on for pilot users |
+| Free tier cold start + backend cold start | Blueprint uses Starter + `HTTP_TIMEOUT_SECONDS=120` |
 | Shared env API key on MCP | Never set; header-only auth |
 | Pepper rotation on backend | Document: recreate all MCP keys |
 | In-process rate limit with multiple MCP instances | Sticky single instance until Redis/shared limiter |
