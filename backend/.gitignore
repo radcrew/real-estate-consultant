@@ -11,3 +11,4 @@ dist/
 .python-version
 .vercel/
 .vercel
+.env*
