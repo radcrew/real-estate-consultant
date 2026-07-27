@@ -208,12 +208,12 @@ Mirror frontend/backend workflows.
 
 ### Phase 4 — Hardening & observability (½–1 day)
 
-- [ ] Align MCP timeouts with backend cold starts + search/intake latency.
-- [ ] Structured logs: never print `rad_…` (scrubber already on backend; add MCP-side redaction if missing).
-- [ ] Confirm scopes/rate limits still enforced on **prod** backend.
-- [ ] Runbook: cold start, 401 (bad key), 429, backend 502.
-- [ ] Update `services/mcp/README.md` + root README “Deploy MCP (Vercel)” section.
-- [ ] Keep local `pnpm run dev:mcp` / stdio path working for developers.
+- [x] Align MCP timeouts with backend (`HTTP_TIMEOUT_SECONDS=55` < `maxDuration` 60)
+- [x] MCP-side redaction of `rad_…` / JWT in tool output **and** log filter
+- [x] Clearer MCP errors for 429 / 502–504 (backend scopes/rate limits remain SoT)
+- [x] Runbook in `services/mcp/README.md`
+- [x] Root README “Deploy MCP (Vercel)” section (Phase 3)
+- [x] Local `pnpm run dev:mcp` / stdio path unchanged
 
 ---
 

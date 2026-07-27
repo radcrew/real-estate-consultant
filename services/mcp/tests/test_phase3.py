@@ -23,6 +23,12 @@ def test_redact_secrets_hf_key() -> None:
     assert "[REDACTED]" in redact_secrets("hf_abcdefghijklmnopqrstuvwxyz123456")
 
 
+def test_redact_secrets_mcp_api_key() -> None:
+    raw = "Authorization Bearer rad_abcdefghijklmnopQRSTUV"
+    assert "rad_abcdefghijklmnopQRSTUV" not in redact_secrets(raw)
+    assert "[REDACTED]" in redact_secrets(raw)
+
+
 def test_ok_text_truncates() -> None:
     huge = "x" * 50_000
     result = ok_text(huge)

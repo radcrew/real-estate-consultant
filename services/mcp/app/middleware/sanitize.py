@@ -7,6 +7,7 @@ import re
 # Patterns that look like secrets accidentally echoed from upstream errors/payloads.
 _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"),  # JWT
+    re.compile(r"\brad_[A-Za-z0-9_-]{16,}\b"),  # MCP API keys
     re.compile(r"\bsk-[A-Za-z0-9]{20,}\b"),
     re.compile(r"\bhf_[A-Za-z0-9]{20,}\b"),
     re.compile(r"(?i)service[_-]?role[_-]?key\s*[:=]\s*\S+"),

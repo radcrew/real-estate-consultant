@@ -253,10 +253,24 @@ for the current remote-auth field names.
 
 - Backend per-key rate limit (`MCP_API_KEY_RATE_LIMIT_PER_MINUTE`)
 - MCP per-process rate limit (`RATE_LIMIT_PER_MINUTE`)
-- Tool call timeout (`HTTP_TIMEOUT_SECONDS`)
-- Output sanitization (secret redaction, injection-phrase filter, truncation)
+- Tool call timeout (`HTTP_TIMEOUT_SECONDS`, keep ≤ Vercel `maxDuration`)
+- Output + log sanitization (JWT / `rad_…` / HF key redaction, injection filter, truncation)
 - Admin tools (`enqueue_ingest`, `list_listing_submissions`) — backend enforces
   `mcp:admin` (API key) and `profiles.is_admin`
+
+## Runbook (remote MCP)
+
+| Symptom | Likely cause | What to do |
+|---------|----------------|------------|
+| First tool call slow / timeout | Vercel cold start (MCP and/or backend) | Retry once; raise `maxDuration` / Fluid Compute if persistent |
+| `401` / invalid token | Missing/wrong `rad_…`, revoked key, or pepper mismatch on backend | Recreate key against **prod** backend; confirm `MCP_API_KEY_PEPPER` on BE |
+| `403` Forbidden | User lacks access or API key lacks `mcp:admin` for admin tools | Use a key with the right scopes; confirm `profiles.is_admin` |
+| `429` rate limited | Backend per-key limit or MCP process limiter | Back off; raise limits only if needed |
+| `502` / `503` / unavailable | Backend cold start, RLS, or upstream error | Check BE `/health` and Vercel BE logs; retry |
+| HTML instead of JSON from `/mcp` | Vercel Deployment Protection | Disable protection or use bypass secret for automation |
+| `Task group is not initialized` | ASGI lifespan not running | Confirm Vercel Python ASGI lifespan; see deploy plan Phase 0 note |
+
+Local stdio (`run-mcp.cmd` / `pnpm run dev:mcp`) remains the default for contributors.
 
 ## Tools (summary)
 

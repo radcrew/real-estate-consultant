@@ -13,6 +13,7 @@ import httpx
 from app.auth import AuthInvalidError, AuthRequiredError
 from app.config import settings
 from app.middleware import RateLimitError, SlidingWindowRateLimiter, sanitize_tool_text
+from app.middleware.sanitize import redact_secrets
 
 logger = logging.getLogger(__name__)
 
@@ -60,17 +61,27 @@ async def run_backend(
         return error_text(str(exc))
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
-        body = (exc.response.text or "")[:300]
+        body = redact_secrets((exc.response.text or "")[:300])
         logger.warning("%s HTTP %s: %s", label, status, body)
         if status == 401:
             return error_text(str(AuthInvalidError()))
         if status == 403:
             return error_text(
                 "Forbidden — this user cannot access that resource "
-                "(admin tools require profiles.is_admin).",
+                "(admin tools require mcp:admin scope and profiles.is_admin).",
             )
         if status == 404:
             return error_text(f"Not found ({label}).")
+        if status == 429:
+            return error_text(
+                "Rate limited by the backend (MCP API key or server limit). "
+                "Wait a moment and retry.",
+            )
+        if status in {502, 503, 504}:
+            return error_text(
+                f"Backend unavailable (HTTP {status}) for {label}. "
+                "Often a cold start or upstream outage — retry once.",
+            )
         return error_text(f"Backend returned HTTP {status}: {body}")
     except httpx.RequestError as exc:
         logger.warning("%s request failed: %s", label, exc)
