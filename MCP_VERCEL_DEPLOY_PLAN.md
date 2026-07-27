@@ -107,7 +107,7 @@ Prove the runtime before wiring CI.
 **Tasks**
 
 - [x] Confirm FastMCP exposes an ASGI app via `mcp.streamable_http_app()` (already used locally).
-- [x] Research / set **stateless** Streamable HTTP mode (`stateless_http=True` on ASGI entry).
+- [x] Research / set **stateless** Streamable HTTP mode (`stateless_http=True` on ASGI entry) + **`json_response=True`** for Functions.
 - [x] Add minimal Vercel entry (draft):
 
 ```text
@@ -119,9 +119,11 @@ services/mcp/
   requirements.txt
 ```
 
-- [ ] Local check: `vercel dev` from `services/mcp` hits `/mcp` (or chosen path).
-- [ ] Deploy a preview; connect MCP Inspector (Streamable HTTP) with a real `rad_…` key.
-- [ ] One successful `ping_backend` → production backend `/api/v1/ping`.
+- [x] Local ASGI check: Starlette `TestClient` POST `/mcp` initialize → 200 JSON (`radestate`).
+- [x] Document `vercel link` / `vercel dev` / deploy commands in `services/mcp/README.md`.
+- [ ] Create/link Vercel MCP project; deploy a preview; Inspector + `ping_backend` against prod BE.
+
+**Note:** FastMCP requires ASGI **lifespan** so the session manager task group starts — even in `stateless_http` mode. Vercel’s Python ASGI runtime must invoke lifespan (same as Starlette). If a preview fails with `Task group is not initialized`, that is the first failure mode to debug.
 
 **Exit criteria:** Inspector lists tools and `ping_backend` returns pong against prod BE.
 

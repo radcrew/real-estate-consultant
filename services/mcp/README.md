@@ -109,6 +109,48 @@ Endpoint path defaults to `/mcp` on the configured host/port. Logging → **stde
 for INFO lines; the server quiets MCP SDK protocol logs (Ping/ListTools/etc.) to
 WARNING+ so those do not look like failures.
 
+### Vercel (Streamable HTTP, no Docker)
+
+Same pattern as the FastAPI backend: Python ASGI on Vercel Functions.
+
+```text
+services/mcp/api/index.py  →  app.asgi:app  (stateless + JSON MCP)
+vercel.json                →  rewrite /* → /api/index, maxDuration 60
+```
+
+**One-time project setup**
+
+```powershell
+cd services/mcp
+npx vercel link   # Root Directory = services/mcp (new Vercel project)
+```
+
+Set project env in the Vercel dashboard:
+
+| Variable | Value |
+|----------|--------|
+| `BACKEND_API_URL` | `https://real-estate-consultant-be.vercel.app` |
+
+Do **not** set a shared `MCP_API_KEY` on the deployment — clients send `Authorization: Bearer rad_…` or `X-API-Key` per request.
+
+**Local Vercel runtime check** (after link):
+
+```powershell
+cd services/mcp
+npx vercel dev
+# then POST http://127.0.0.1:3000/mcp  (or the port vercel prints)
+```
+
+**Preview / prod**
+
+```powershell
+npx vercel deploy
+npx vercel deploy --prod
+```
+
+Public path: `https://<mcp-project>.vercel.app/mcp`. Plan: repo root
+[`MCP_VERCEL_DEPLOY_PLAN.md`](../../MCP_VERCEL_DEPLOY_PLAN.md).
+
 ## Cursor host config (stdio)
 
 On Windows, Cursor launches MCP servers through `cmd.exe`. Pointing `command`
