@@ -1,6 +1,6 @@
 -- MCP API keys: long-lived credentials bound to auth.users for agent hosts.
 -- Backend resolves raw key → user_id; only key_hash is stored (never plaintext).
--- Design freeze: see MCP_AUTH_PLAN.md (Phase 0).
+-- Key create/list/revoke: JWT session via FastAPI; mutations are service_role only.
 
 create table if not exists public.mcp_api_keys (
   id uuid primary key default gen_random_uuid(),

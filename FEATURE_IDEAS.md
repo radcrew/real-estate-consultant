@@ -111,7 +111,7 @@ connectors; these are natural next ones plus enrichment steps in the pipeline.
 
 ## 8. MCP / agent surface
 
-Shipped baseline lives in `services/mcp/` (see `MCP_SERVER_PLAN.md`). Ideas on top:
+Shipped baseline lives in `services/mcp/` (see `services/mcp/README.md`). Ideas on top:
 
 - **OAuth / `mcp login` UX** — exchange Supabase session for a stored refresh
   token instead of pasting JWTs into `.env`.

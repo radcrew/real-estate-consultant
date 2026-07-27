@@ -1,7 +1,7 @@
 # MCP adapter for the radestate commercial real-estate platform.
 
 Thin FastMCP process over the FastAPI backend (`/api/v1`). Domain logic stays in
-`backend/`. Roadmap: repo root `MCP_SERVER_PLAN.md`.
+`backend/`. Setup, auth, tools, and deploy notes are documented in this README.
 
 ## Requirements
 
@@ -57,8 +57,8 @@ mutating methods→`mcp:write`; admin routes also need `mcp:admin` plus
 1. Create a new key (`create_mcp_api_key.py` or `POST /api/v1/account/api-keys`).
 2. Update `MCP_API_KEY` in `services/mcp/.env` (stdio) or client headers (HTTP).
 3. Reload the MCP server / host so it picks up the new value.
-4. Revoke the old key: `DELETE /api/v1/account/api-keys/{id}` (JWT or a key with
-   `mcp:write` / `*`).
+4. Revoke the old key: `DELETE /api/v1/account/api-keys/{id}` with a **user
+   session JWT** (API keys cannot manage keys).
 
 Legacy JWT bootstrap (migration only): `scripts\setup_local_auth.py`.
 
@@ -154,8 +154,8 @@ npx vercel deploy
 npx vercel deploy --prod
 ```
 
-Public path: `https://<mcp-project>.vercel.app/mcp`. Plan: repo root
-[`MCP_VERCEL_DEPLOY_PLAN.md`](../../MCP_VERCEL_DEPLOY_PLAN.md).
+Public path: `https://<mcp-project>.vercel.app/mcp`. More deploy detail below
+and in the monorepo root README (“Deploy MCP”).
 
 Linked project: **`real-estate-consultant-mcp`** (`prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs`,
 team `chris-silva-s-projects`). GitHub repo connected; **Root Directory** = `services/mcp`.

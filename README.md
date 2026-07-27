@@ -17,7 +17,7 @@ The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with 
 
 Ingestion may integrate additional tools (for example **Apify** or similar) behind FastAPI; those are implementation details of each connector, not replacements for the core stack above.
 
-**MCP adapter:** `services/mcp/` exposes the FastAPI `/api/v1` surface to AI hosts (Cursor, Claude Desktop, remote Streamable HTTP). See [`services/mcp/README.md`](services/mcp/README.md) and [`MCP_SERVER_PLAN.md`](MCP_SERVER_PLAN.md).
+**MCP adapter:** `services/mcp/` exposes the FastAPI `/api/v1` surface to AI hosts (Cursor, Claude Desktop, remote Streamable HTTP). See [`services/mcp/README.md`](services/mcp/README.md).
 
 ---
 
@@ -74,7 +74,7 @@ The FastAPI API deploys as a **second Vercel project** via `.github/workflows/ba
 ## Deploy MCP (Vercel)
 
 The MCP adapter is a **third Vercel project** (`real-estate-consultant-mcp`) with
-**Root Directory** = `services/mcp`. See [`MCP_VERCEL_DEPLOY_PLAN.md`](MCP_VERCEL_DEPLOY_PLAN.md).
+**Root Directory** = `services/mcp`. Details: [`services/mcp/README.md`](services/mcp/README.md).
 
 1. In Vercel (same team as the API-key-capable backend), create/import the project and set **Root Directory** = `services/mcp` (or `cd services/mcp && npx vercel link`). Connect the GitHub repo so Vercel deploys on push/PR.
 2. GitHub Actions (`.github/workflows/mcp.yml`) only **lints/tests** — it does **not** call `vercel pull` with `VERCEL_TOKEN` (that secret is the frontend/backend team and cannot see this MCP project).
