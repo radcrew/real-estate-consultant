@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 
-from app.client.errors import AuthRequiredError
+from app.auth import AuthInvalidError, AuthRequiredError
 from app.config import settings
 from app.middleware import RateLimitError, SlidingWindowRateLimiter, sanitize_tool_text
 
@@ -56,12 +56,14 @@ async def run_backend(
         )
     except AuthRequiredError as exc:
         return error_text(str(exc))
+    except AuthInvalidError as exc:
+        return error_text(str(exc))
     except httpx.HTTPStatusError as exc:
         status = exc.response.status_code
         body = (exc.response.text or "")[:300]
         logger.warning("%s HTTP %s: %s", label, status, body)
         if status == 401:
-            return error_text("Unauthorized — check MCP_USER_ACCESS_TOKEN is a valid user JWT.")
+            return error_text(str(AuthInvalidError()))
         if status == 403:
             return error_text(
                 "Forbidden — this user cannot access that resource "

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
 
     backend_api_url: str = "http://127.0.0.1:8888"
+    mcp_api_key: str = ""
+    # Deprecated fallback — prefer mcp_api_key (rad_…).
     mcp_user_access_token: str = ""
     mcp_transport: str = "stdio"  # stdio | streamable-http
     mcp_http_host: str = "127.0.0.1"

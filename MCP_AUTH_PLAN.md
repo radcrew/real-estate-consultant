@@ -277,13 +277,13 @@ Migration file: `backend/supabase/migrations/20260727_mcp_api_keys.sql`.
 
 ### Phase 2 — MCP wiring — 1 day
 
-- [ ] `app/auth/` + `MCP_API_KEY` settings
-- [ ] `BackendClient` uses API key; legacy JWT fallback
-- [ ] Stdio: load from `.env` via existing launchers
-- [ ] HTTP: per-request key from headers; reject if missing on protected tools
-- [ ] Clear `AuthRequired` / `AuthInvalid` tool errors
-- [ ] Update `services/mcp/README.md`, `.env.example`, Cursor/Claude samples
-- [ ] Tests in `services/mcp/tests/` for missing/invalid key mapping
+- [x] `app/auth/` + `MCP_API_KEY` settings
+- [x] `BackendClient` uses API key; legacy JWT fallback
+- [x] Stdio: load from `.env` via existing launchers
+- [x] HTTP: per-request key from headers; reject if missing on protected tools
+- [x] Clear `AuthRequired` / `AuthInvalid` tool errors
+- [x] Update `services/mcp/README.md`, `.env.example`, Cursor/Claude samples
+- [x] Tests in `services/mcp/tests/` for missing/invalid key mapping
 
 ### Phase 3 — Operator UX — ½–1 day
 

@@ -137,14 +137,20 @@ async def test_search_requires_auth() -> None:
     register_search_tools(mcp)
     from app import config
 
-    original = config.settings.mcp_user_access_token
+    original_jwt = config.settings.mcp_user_access_token
+    original_key = config.settings.mcp_api_key
+    original_transport = config.settings.mcp_transport
     config.settings.mcp_user_access_token = ""
+    config.settings.mcp_api_key = ""
+    config.settings.mcp_transport = "stdio"
     try:
         result = await _tool(mcp, "search_properties").fn(session_profile_id="sess-1")
     finally:
-        config.settings.mcp_user_access_token = original
+        config.settings.mcp_user_access_token = original_jwt
+        config.settings.mcp_api_key = original_key
+        config.settings.mcp_transport = original_transport
     assert result["isError"] is True
-    assert "MCP_USER_ACCESS_TOKEN" in result["content"][0]["text"]
+    assert "MCP_API_KEY" in result["content"][0]["text"]
 
 
 @pytest.mark.asyncio

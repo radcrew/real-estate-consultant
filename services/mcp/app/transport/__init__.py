@@ -7,6 +7,7 @@ from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
 
+from app.auth.http_middleware import CaptureApiKeyMiddleware
 from app.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,22 @@ def apply_http_bind_settings(mcp: FastMCP, settings: Settings) -> None:
     mcp.settings.port = settings.mcp_http_port
 
 
+async def _run_streamable_http(mcp: FastMCP) -> None:
+    """Run Streamable HTTP with API-key capture middleware."""
+    import uvicorn
+
+    app = CaptureApiKeyMiddleware(mcp.streamable_http_app())
+
+    config = uvicorn.Config(
+        app,
+        host=mcp.settings.host,
+        port=mcp.settings.port,
+        log_level=mcp.settings.log_level.lower(),
+    )
+    server = uvicorn.Server(config)
+    await server.serve()
+
+
 def run_transport(mcp: FastMCP, settings: Settings) -> None:
     transport = settings.mcp_transport.strip().lower().replace("_", "-")
     if transport in {"streamable-http", "streamablehttp", "http"}:
@@ -29,7 +46,9 @@ def run_transport(mcp: FastMCP, settings: Settings) -> None:
             settings.mcp_http_port,
             mcp.settings.streamable_http_path,
         )
-        mcp.run(transport="streamable-http")
+        import anyio
+
+        anyio.run(_run_streamable_http, mcp)
         return
 
     if transport != "stdio":

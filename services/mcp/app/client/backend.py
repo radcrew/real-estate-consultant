@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 import httpx
 
-from app.client.errors import AuthRequiredError
+from app.auth import AuthRequiredError, get_backend_credential
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -25,21 +25,27 @@ class BackendClient:
         timeout: float | None = None,
     ) -> None:
         self._base_url = (base_url or settings.backend_api_url).rstrip("/")
-        self._access_token = (
-            access_token if access_token is not None else settings.mcp_user_access_token
-        )
+        # Explicit token wins (tests); otherwise resolve API key / JWT / request header.
+        self._access_token = access_token
         self._timeout = timeout if timeout is not None else settings.http_timeout_seconds
 
+    def _credential(self) -> str:
+        if self._access_token is not None:
+            token = self._access_token.strip()
+            if not token:
+                raise AuthRequiredError()
+            return token
+        return get_backend_credential()
+
     def require_auth(self) -> None:
-        if not (self._access_token and self._access_token.strip()):
-            raise AuthRequiredError()
+        self._credential()
 
     def _headers(self, *, auth: bool = False) -> dict[str, str]:
-        if auth:
-            self.require_auth()
         headers = {"Accept": "application/json"}
-        if self._access_token:
-            headers["Authorization"] = f"Bearer {self._access_token}"
+        if auth:
+            headers["Authorization"] = f"Bearer {self._credential()}"
+        elif self._access_token is not None and self._access_token.strip():
+            headers["Authorization"] = f"Bearer {self._access_token.strip()}"
         return headers
 
     async def _request_json(

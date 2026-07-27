@@ -25,7 +25,7 @@ def create_server() -> FastMCP:
         name=settings.app_name,
         instructions=(
             "Radestate commercial real-estate assistant tools. "
-            "You act as the authenticated user (MCP_USER_ACCESS_TOKEN). "
+            "You act as the authenticated user (MCP_API_KEY / legacy JWT). "
             "READ: ping_backend, search_properties, get_listing, get_featured_listings, "
             "explain_fit, list_saved_listings, get_agent, get_intake_session, "
             "get_outreach_draft, list_listing_submissions (admin). "

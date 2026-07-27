@@ -7,7 +7,9 @@ Thin FastMCP process over the FastAPI backend (`/api/v1`). Domain logic stays in
 
 - Python 3.11+
 - Backend at `BACKEND_API_URL` (default `http://127.0.0.1:8888`)
-- Supabase **user** JWT in `MCP_USER_ACCESS_TOKEN` (never the service role key)
+- **`MCP_API_KEY`** (`rad_…`) in `services/mcp/.env` for stdio — create via
+  `POST /api/v1/account/api-keys` while signed in (JWT). Never the service role key.
+- Legacy fallback: `MCP_USER_ACCESS_TOKEN` (short-lived Supabase user JWT)
 
 ## Setup
 
@@ -19,18 +21,22 @@ python -m pip install -e ".[dev]"
 copy .env.example .env
 ```
 
-### One-shot local auth (recommended)
+### Auth (API key)
 
-With the FastAPI backend running and `backend/.env` configured, mint a user JWT
-into `services/mcp/.env` (gitignored):
+1. Sign in to the API (or use `scripts/setup_local_auth.py` once to get a JWT).
+2. Create a key:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\setup_local_auth.py
-.\.venv\Scripts\python.exe scripts\verify_local_setup.py
+# Example with a user JWT in $token
+curl -X POST http://127.0.0.1:8888/api/v1/account/api-keys `
+  -H "Authorization: Bearer $token" `
+  -H "Content-Type: application/json" `
+  -d "{\"name\":\"cursor\"}"
 ```
 
-Then reload the `radestate` MCP server in Cursor. `run-mcp.cmd` loads `.env`
-automatically (so you do not need to paste the token into `mcp.json`).
+3. Put the returned `api_key` into `services/mcp/.env` as `MCP_API_KEY=rad_…`.
+4. Reload the `radestate` MCP server in Cursor. `run-mcp.cmd` loads `.env`
+   automatically (do not commit keys; do not paste into `mcp.json`).
 
 ## Run
 
@@ -51,7 +57,9 @@ pnpm run dev:mcp
 ```
 
 `dev:mcp` / `dev:all` start MCP in **streamable-http** mode
-(`http://127.0.0.1:8900/mcp`). Cursor’s default config still uses **stdio** via
+(`http://127.0.0.1:8900/mcp`). HTTP tool calls require
+`Authorization: Bearer rad_…` or `X-API-Key` **per request** (env credentials are
+not used for HTTP). Cursor’s default config still uses **stdio** via
 `run-mcp.cmd` (Cursor spawns that itself — do not also put stdio MCP in
 `concurrently`).
 
@@ -99,8 +107,7 @@ internal or external command*. Use the repo launcher instead:
       "cwd": "D:\\work\\real-estate-consultant\\services\\mcp",
       "env": {
         "BACKEND_API_URL": "http://127.0.0.1:8888",
-        "MCP_TRANSPORT": "stdio",
-        "MCP_USER_ACCESS_TOKEN": "<supabase-access-token>"
+        "MCP_TRANSPORT": "stdio"
       }
     }
   }

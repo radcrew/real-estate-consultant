@@ -1,17 +1,7 @@
-"""Client-side errors mapped to MCP `isError` payloads (never crash stdio)."""
+"""Client-side errors — re-exported from ``app.auth`` for compatibility."""
 
 from __future__ import annotations
 
+from app.auth.errors import AuthInvalidError, AuthRequiredError
 
-class AuthRequiredError(Exception):
-    """Raised when an authenticated backend call is attempted without a user JWT."""
-
-    def __init__(
-        self,
-        message: str = (
-            "MCP_USER_ACCESS_TOKEN is not set. Sign in via the app or Supabase, "
-            "paste a short-lived user access token into services/mcp/.env "
-            "(never the service role key), then retry."
-        ),
-    ) -> None:
-        super().__init__(message)
+__all__ = ["AuthInvalidError", "AuthRequiredError"]
