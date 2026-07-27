@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 
+from app.api.v1.endpoints.account import api_keys as account_api_keys
 from app.api.v1.endpoints.account.router import router as account_router
 from app.api.v1.endpoints.admin.router import router as admin_router
 from app.api.v1.endpoints.agents import router as agents_router
@@ -13,7 +14,7 @@ from app.api.v1.endpoints.questions.router import router as questions_router
 from app.api.v1.endpoints.search.fit import router as search_fit_router
 from app.api.v1.endpoints.search.router import router as search_router
 from app.api.v1.endpoints.submissions import router as submissions_router
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_current_user_jwt
 
 router = APIRouter()
 router.include_router(admin_router)
@@ -22,6 +23,14 @@ router.include_router(ping_router)
 router.include_router(submissions_router)
 router.include_router(featured_router)
 router.include_router(listings_router)
+
+# Key management: JWT session only (never accept rad_… / X-API-Key).
+account_api_keys_router = APIRouter(
+    prefix="/account",
+    dependencies=[Depends(get_current_user_jwt)],
+)
+account_api_keys_router.include_router(account_api_keys.router)
+router.include_router(account_api_keys_router)
 
 protected = APIRouter(dependencies=[Depends(get_current_user)])
 protected.include_router(questions_router)

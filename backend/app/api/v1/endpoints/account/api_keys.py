@@ -1,15 +1,21 @@
-"""CRUD for MCP API keys under ``/api/v1/account/api-keys``."""
+"""CRUD for MCP API keys under ``/api/v1/account/api-keys``.
+
+These routes require a user session JWT (``CurrentUserJwt``). MCP API keys are
+rejected so a write-scoped ``rad_…`` credential cannot mint, list, or revoke keys.
+"""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Depends, Response, status
+from supabase_auth.types import User
 
 from app.api.v1.endpoints.account.exceptions import raise_mcp_api_key_not_found
 from app.core.db_safe import SupabaseRequestError
-from app.core.deps import CurrentUser, SupabaseSdkDep
+from app.core.deps import SupabaseSdkDep, get_current_user_jwt
 from app.repositories.mcp_api_keys import (
     create_mcp_api_key,
     list_mcp_api_keys,
@@ -24,6 +30,9 @@ from app.schemas.account import (
 from app.utils.exceptions import raise_service_unavailable, raise_unprocessable_entity
 
 router = APIRouter(prefix="/api-keys", tags=["account"])
+
+# Explicit Depends — avoid Annotated aliases under postponed evaluation.
+RequireUserJwt = Annotated[User, Depends(get_current_user_jwt)]
 
 
 def _meta_response(row: dict) -> McpApiKeyResponse:
@@ -42,7 +51,7 @@ def _meta_response(row: dict) -> McpApiKeyResponse:
 @router.post("", response_model=McpApiKeyCreatedResponse, status_code=status.HTTP_201_CREATED)
 async def create_account_mcp_api_key(
     body: McpApiKeyCreateRequest,
-    current_user: CurrentUser,
+    current_user: RequireUserJwt,
     client: SupabaseSdkDep,
 ) -> McpApiKeyCreatedResponse:
     expires_at = None
@@ -75,7 +84,7 @@ async def create_account_mcp_api_key(
 
 @router.get("", response_model=McpApiKeyListResponse)
 async def list_account_mcp_api_keys(
-    current_user: CurrentUser,
+    current_user: RequireUserJwt,
     client: SupabaseSdkDep,
 ) -> McpApiKeyListResponse:
     try:
@@ -88,7 +97,7 @@ async def list_account_mcp_api_keys(
 @router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def revoke_account_mcp_api_key(
     key_id: UUID,
-    current_user: CurrentUser,
+    current_user: RequireUserJwt,
     client: SupabaseSdkDep,
 ) -> Response:
     try:

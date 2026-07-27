@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 from uuid import UUID
 
@@ -25,7 +25,7 @@ def _make_auth_user(email: str = "user@example.com"):
         app_metadata={},
         user_metadata={},
         aud="authenticated",
-        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2024, 1, 1, tzinfo=UTC),
         email=email,
     )
 
@@ -181,6 +181,39 @@ class TestDualAuthApiKey:
                     json={"name": "x"},
                 )
         assert r.status_code == 403
+        assert "JWT" in r.json()["detail"]
+
+    async def test_write_key_cannot_manage_keys(self, mock_db, mock_supabase):
+        """Even mcp:write / * keys must not create, list, or revoke via API key auth."""
+        app = create_app()
+        app.dependency_overrides[get_session] = lambda: mock_db
+        app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
+        app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
+
+        headers = {"Authorization": "Bearer rad_abcdefghijklmnop"}
+        with patch(
+            "app.core.deps.resolve_mcp_api_key",
+            new_callable=AsyncMock,
+            return_value=_resolved(scopes=["mcp:write"]),
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+            ) as ac:
+                create = await ac.post(
+                    "/api/v1/account/api-keys",
+                    headers=headers,
+                    json={"name": "escalated", "scopes": ["*"]},
+                )
+                listed = await ac.get("/api/v1/account/api-keys", headers=headers)
+                revoked = await ac.delete(
+                    f"/api/v1/account/api-keys/{_KID}",
+                    headers=headers,
+                )
+        assert create.status_code == 403
+        assert listed.status_code == 403
+        assert revoked.status_code == 403
+        assert "JWT" in create.json()["detail"]
 
     async def test_invalid_api_key_returns_401(self, mock_db, mock_supabase):
         app = create_app()

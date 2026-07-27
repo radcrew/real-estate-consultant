@@ -109,6 +109,45 @@ async def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+async def get_current_user_jwt(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],
+    client: Annotated[AsyncClient, Depends(get_supabase_sdk_client)],
+) -> User:
+    """JWT session only — MCP API keys are rejected.
+
+    Key-management routes must not accept ``rad_…`` / ``X-API-Key``. A write-scoped
+    key must not be able to mint ``*`` keys or list/revoke siblings.
+    """
+    _api_key_ctx.set(None)
+    for header in ("X-API-Key", "x-api-key"):
+        if request.headers.get(header, "").strip():
+            raise_forbidden(
+                "MCP API key management requires a user session JWT, not an API key.",
+            )
+
+    if credentials is None or not credentials.credentials.strip():
+        raise_auth_missing_bearer()
+
+    token = credentials.credentials.strip()
+    if looks_like_mcp_api_key(token):
+        raise_forbidden(
+            "MCP API key management requires a user session JWT, not an API key.",
+        )
+
+    try:
+        response = await client.auth.get_user(token)
+    except AuthApiError as exc:
+        raise_auth_invalid_access_token(cause=exc)
+
+    if response is None or response.user is None:
+        raise_auth_user_not_returned()
+    return response.user
+
+
+CurrentUserJwt = Annotated[User, Depends(get_current_user_jwt)]
+
+
 async def get_current_admin(
     user: CurrentUser,
     client: SupabaseSdkDep,
