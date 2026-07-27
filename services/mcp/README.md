@@ -157,6 +157,9 @@ npx vercel deploy --prod
 Public path: `https://<mcp-project>.vercel.app/mcp`. Plan: repo root
 [`MCP_VERCEL_DEPLOY_PLAN.md`](../../MCP_VERCEL_DEPLOY_PLAN.md).
 
+Linked project (local `npx vercel link`): **`real-estate-consultant-mcp`**  
+Project ID for GitHub secret `VERCEL_MCP_PROJECT_ID`: `prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs`
+
 ### Production API keys (for remote MCP)
 
 Create keys against the **production** backend (pepper must already be set on

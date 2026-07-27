@@ -10,6 +10,10 @@ frontend/out
 .env*.local
 services/mcp/.auth.json
 
+# Vercel local link metadata
+.vercel
+**/.vercel
+
 # OS / editor
 .DS_Store
 Thumbs.db
