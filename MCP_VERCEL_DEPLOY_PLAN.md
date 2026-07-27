@@ -135,27 +135,27 @@ services/mcp/
 
 **Code / config**
 
-- [ ] `services/mcp/api/index.py` — build server, wrap `CaptureApiKeyMiddleware`, export `app`.
-- [ ] `services/mcp/vercel.json` — rewrite all traffic to the ASGI entry; set `maxDuration` (start **60s**, raise if intake/outreach times out).
-- [ ] Enable **Fluid Compute** on the Vercel MCP project (recommended by Vercel for MCP-like workloads).
-- [ ] Env on Vercel MCP project:
+- [x] `services/mcp/api/index.py` — build server, wrap `CaptureApiKeyMiddleware`, export `app`.
+- [x] `services/mcp/vercel.json` — rewrite all traffic to the ASGI entry; set `maxDuration` (start **60s**).
+- [x] `GET /health` + CORS middleware for Inspector / browser hosts.
+- [x] `runtime.txt` (Python 3.12) + prod-oriented `.env.example` (`HTTP_TIMEOUT_SECONDS=55`).
+- [ ] Enable **Fluid Compute** on the Vercel MCP project (dashboard).
+- [ ] Env on Vercel MCP project (`BACKEND_API_URL`, timeouts) — must use the **same Vercel team** that owns `real-estate-consultant-be`.
 
 | Variable | Value |
 |----------|--------|
 | `BACKEND_API_URL` | `https://real-estate-consultant-be.vercel.app` |
-| `MCP_TRANSPORT` | not required if entry always serves HTTP ASGI |
 | `HTTP_TIMEOUT_SECONDS` | `55` (below function maxDuration) |
 | `LOG_LEVEL` | `INFO` |
 | `RATE_LIMIT_PER_MINUTE` | keep or raise for prod |
 
-- [ ] Do **not** set `MCP_API_KEY` / `MCP_USER_ACCESS_TOKEN` on the shared deployment (header-only auth).
-- [ ] CORS: allow MCP Inspector / browser clients if needed (OPTIONS + ACAO for tool hosts).
-- [ ] Health: lightweight `GET /health` or rely on MCP initialize; document the public base URL.
+- [x] Do **not** set `MCP_API_KEY` / `MCP_USER_ACCESS_TOKEN` on the shared deployment (header-only auth) — documented.
+- [x] CORS: allow MCP Inspector / browser clients.
+- [x] Health: `GET /health`.
 
 **Backend checklist (prod)**
 
 - [ ] `MCP_API_KEY_PEPPER` set on **backend** Vercel env (already needed for API keys).
-- [ ] CORS / allowlist on backend accepts the MCP Vercel origin if browser-based clients call BE through MCP only (server-to-server usually fine).
 - [ ] Confirm `POST /api/v1/account/api-keys` works on prod for operators.
 
 ---

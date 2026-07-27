@@ -125,13 +125,19 @@ cd services/mcp
 npx vercel link   # Root Directory = services/mcp (new Vercel project)
 ```
 
-Set project env in the Vercel dashboard:
+Set project env in the Vercel dashboard (or `npx vercel env add`):
 
 | Variable | Value |
 |----------|--------|
 | `BACKEND_API_URL` | `https://real-estate-consultant-be.vercel.app` |
+| `HTTP_TIMEOUT_SECONDS` | `55` |
+| `LOG_LEVEL` | `INFO` |
+
+Optional: `RATE_LIMIT_PER_MINUTE`. Enable **Fluid Compute** on the project for bursty MCP traffic.
 
 Do **not** set a shared `MCP_API_KEY` on the deployment — clients send `Authorization: Bearer rad_…` or `X-API-Key` per request.
+
+Health check: `GET https://<mcp-project>.vercel.app/health`
 
 **Local Vercel runtime check** (after link):
 

@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from starlette.testclient import TestClient
 
+from app.asgi import create_asgi_app
+
 
 def test_asgi_app_exports_callable() -> None:
-    from app.asgi import app
-
-    assert callable(app)
+    assert callable(create_asgi_app())
 
 
 def test_create_server_stateless_flag() -> None:
@@ -22,9 +22,7 @@ def test_create_server_stateless_flag() -> None:
 
 def test_mcp_initialize_over_asgi() -> None:
     """Lifespan must start the StreamableHTTP session manager (Vercel runs lifespan)."""
-    from app.asgi import app
-
-    with TestClient(app) as client:
+    with TestClient(create_asgi_app()) as client:
         response = client.post(
             "/mcp",
             json={
@@ -47,3 +45,27 @@ def test_mcp_initialize_over_asgi() -> None:
     payload = response.json()
     assert payload["result"]["serverInfo"]["name"] == "radestate"
     assert "protocolVersion" in payload["result"]
+
+
+def test_health_endpoint() -> None:
+    with TestClient(create_asgi_app()) as client:
+        response = client.get("/health")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["service"] == "radestate"
+    assert "backend_api_url" in body
+
+
+def test_cors_preflight_mcp() -> None:
+    with TestClient(create_asgi_app()) as client:
+        response = client.options(
+            "/mcp",
+            headers={
+                "Origin": "http://localhost:6274",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "authorization,content-type",
+            },
+        )
+    assert response.status_code in {200, 204}
+    assert response.headers.get("access-control-allow-origin") == "*"
