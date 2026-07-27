@@ -50,25 +50,8 @@ create policy "Users can select own mcp api keys"
   to authenticated
   using (auth.uid() = user_id);
 
-drop policy if exists "Users can insert own mcp api keys" on public.mcp_api_keys;
-create policy "Users can insert own mcp api keys"
-  on public.mcp_api_keys
-  for insert
-  to authenticated
-  with check (auth.uid() = user_id);
-
-drop policy if exists "Users can update own mcp api keys" on public.mcp_api_keys;
-create policy "Users can update own mcp api keys"
-  on public.mcp_api_keys
-  for update
-  to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
-
--- Deletes discouraged; revoke via revoked_at. Allow delete of own rows for cleanup.
-drop policy if exists "Users can delete own mcp api keys" on public.mcp_api_keys;
-create policy "Users can delete own mcp api keys"
-  on public.mcp_api_keys
-  for delete
-  to authenticated
-  using (auth.uid() = user_id);
+-- No INSERT/UPDATE/DELETE for authenticated: browser PostgREST must not
+-- create keys, un-revoke, change scopes/expiry, or delete rows. Mutations are
+-- service_role only (FastAPI account/api-keys + auth resolve). See
+-- 20260729_mcp_api_keys_lock_mutations.sql for deploys that already applied
+-- the older write policies.
