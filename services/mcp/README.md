@@ -147,6 +147,15 @@ request). Public URL shape: `https://<service>.onrender.com/mcp`.
 Liveness for Render: `GET /healthz` (also `/health`) returns `{"status":"ok"}`
 without an API key. Blueprint sets `healthCheckPath: /healthz`.
 
+After deploy, from `services/mcp`:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\smoke_render.py `
+  --base-url https://<mcp>.onrender.com `
+  --backend-url https://<backend>.onrender.com `
+  --api-key rad_…
+```
+
 Local Cursor **stdio** (`run-mcp.cmd`) stays unchanged for day-to-day work.
 
 ## Cursor host config (stdio)

@@ -136,6 +136,10 @@ workspace you **own or belong to** (avoid old `srv-…` links from other account
    ```bash
    curl -sS "https://<mcp>.onrender.com/healthz"
    # expect: {"status":"ok"}
+
+   # or from services/mcp (optional key + backend check):
+   python scripts/smoke_render.py --base-url https://<mcp>.onrender.com \
+     --backend-url https://<backend>.onrender.com --api-key rad_…
    ```
 8. Logs should show
    `transport=streamable-http host=0.0.0.0 port=<PORT>`.
@@ -272,6 +276,7 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 
 - [x] Add repo `render.yaml` Blueprint for `radestate-mcp` (`services/mcp` root)
 - [x] Operator runbook: Apply Blueprint + smoke (`/healthz`, logs, `/mcp`)
+- [x] `scripts/smoke_render.py` post-deploy checker
 - [ ] Create / apply Blueprint (or Web Service) in Render Dashboard
 - [ ] Set `BACKEND_API_URL` (no shared `MCP_API_KEY`)
 - [ ] Deploy from `main` (or release branch)
