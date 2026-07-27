@@ -158,7 +158,10 @@ Public path: `https://<mcp-project>.vercel.app/mcp`. Plan: repo root
 [`MCP_VERCEL_DEPLOY_PLAN.md`](../../MCP_VERCEL_DEPLOY_PLAN.md).
 
 Linked project (local `npx vercel link`): **`real-estate-consultant-mcp`**  
-Project ID for GitHub secret `VERCEL_MCP_PROJECT_ID`: `prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs`
+Project ID for GitHub secret `VERCEL_MCP_PROJECT_ID`: `prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs`  
+**Production URL:** https://real-estate-consultant-mcp.vercel.app  
+Health: https://real-estate-consultant-mcp.vercel.app/health  
+MCP endpoint: https://real-estate-consultant-mcp.vercel.app/mcp
 
 ### Production API keys (for remote MCP)
 
