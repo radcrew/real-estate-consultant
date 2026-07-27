@@ -16,6 +16,9 @@ services:
     healthCheckPath: /healthz
     autoDeployTrigger: commit
     envVars:
+      # Fully qualified — Render defaults to 3.14+ which we have not validated.
+      - key: PYTHON_VERSION
+        value: "3.11.11"
       - key: MCP_TRANSPORT
         value: streamable-http
       - key: MCP_HTTP_HOST

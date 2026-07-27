@@ -171,6 +171,7 @@ manually instead (below).
 
 | Key | Value | Notes |
 |-----|--------|------|
+| `PYTHON_VERSION` | `3.11.11` | Avoid untested Render default (3.14+) |
 | `BACKEND_API_URL` | `https://<your-backend>.onrender.com` | No trailing slash |
 | `MCP_TRANSPORT` | `streamable-http` | Required |
 | `MCP_HTTP_HOST` | `0.0.0.0` | Required on Render |
@@ -288,6 +289,7 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 ### Phase 2 — Hardening (½ day)
 
 - [x] Health check path settled (`GET /healthz`, Blueprint `healthCheckPath`)
+- [x] Pin Python `3.11.11` (`PYTHON_VERSION` + `services/mcp/.python-version`)
 - [ ] Timeouts tuned for backend cold start
 - [ ] Instance size / no-sleep decision
 - [x] README + host config samples updated (Render section)

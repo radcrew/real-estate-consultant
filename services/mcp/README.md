@@ -136,6 +136,7 @@ Or create a Web Service manually:
 
 | Key | Value |
 |-----|--------|
+| `PYTHON_VERSION` | `3.11.11` | Pin native runtime (also `services/mcp/.python-version`) |
 | `BACKEND_API_URL` | Production backend URL (no trailing slash) |
 | `MCP_TRANSPORT` | `streamable-http` |
 | `MCP_HTTP_HOST` | `0.0.0.0` |
