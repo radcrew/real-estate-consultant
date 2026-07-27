@@ -42,5 +42,6 @@ def sanitize_tool_text(text: str, *, max_chars: int) -> str:
     """Redact secrets, soften injection markers, and cap size."""
     cleaned = neutralize_injection_phrases(redact_secrets(text))
     if len(cleaned) > max_chars:
-        cleaned = cleaned[: max_chars - 20] + "\n…[truncated]"
+        # Keep headroom for the suffix; avoid negative slices when max_chars is small.
+        cleaned = cleaned[: max(0, max_chars - 20)] + "\n…[truncated]"
     return cleaned
