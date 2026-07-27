@@ -10,6 +10,7 @@ _CHAINABLE_METHODS = (
     "eq",
     "neq",
     "in_",
+    "is_",
     "order",
     "limit",
     "insert",

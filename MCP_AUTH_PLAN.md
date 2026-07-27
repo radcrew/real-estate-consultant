@@ -267,13 +267,13 @@ Migration file: `backend/supabase/migrations/20260727_mcp_api_keys.sql`.
 
 ### Phase 1 — Backend API keys — 1–2 days
 
-- [ ] Apply / verify `mcp_api_keys` migration on target DB
-- [ ] Repository: create / list / revoke / resolve(raw_key) → user_id
-- [ ] `POST/GET/DELETE /api/v1/account/api-keys`
-- [ ] Extend `get_current_user` for API key **or** JWT
-- [ ] Log redaction for `rad_` secrets
-- [ ] Tests: create → call protected route with key → revoke → 401
-- [ ] Tests: JWT path still works for the web app
+- [x] Apply / verify `mcp_api_keys` migration on target DB
+- [x] Repository: create / list / revoke / resolve(raw_key) → user_id
+- [x] `POST/GET/DELETE /api/v1/account/api-keys`
+- [x] Extend `get_current_user` for API key **or** JWT
+- [x] Log redaction for `rad_` secrets
+- [x] Tests: create → call protected route with key → revoke → 401
+- [x] Tests: JWT path still works for the web app
 
 ### Phase 2 — MCP wiring — 1 day
 
