@@ -1,0 +1,4 @@
+# Vercel Python runtime installs from this file (keep in sync with pyproject.toml).
+httpx>=0.27.0
+mcp[cli]>=1.9.0
+pydantic-settings>=2.6.0

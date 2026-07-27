@@ -7,7 +7,6 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from supabase import AsyncClient
 
 from app.db.property_row import PropertyRow
 from app.domain.search_sql import (
@@ -18,6 +17,7 @@ from app.domain.search_sql import (
 )
 from app.repositories.questions import list_question_key_metadata
 from app.schemas.search import CriteriaFieldItem
+from supabase import AsyncClient
 
 
 async def search_properties(

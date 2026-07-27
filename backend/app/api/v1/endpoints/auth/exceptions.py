@@ -6,7 +6,6 @@ from collections.abc import Iterable
 from typing import NoReturn
 
 from fastapi import status
-from supabase import AuthApiError, AuthWeakPasswordError
 
 from app.utils.exceptions import (
     raise_client_error,
@@ -16,6 +15,7 @@ from app.utils.exceptions import (
     raise_unauthorized,
     raise_unprocessable_entity,
 )
+from supabase import AuthApiError, AuthWeakPasswordError
 
 
 def _weak_password_detail(message: str, reasons: Iterable[str] | None) -> str:

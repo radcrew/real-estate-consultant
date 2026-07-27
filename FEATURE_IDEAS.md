@@ -2,9 +2,10 @@
 
 Brainstormed additions for the AI-assisted CRE search app, grounded in what's already
 here: Next.js frontend, FastAPI backend, a separate ingestion service with pluggable
-connectors (`loopnet_seed` today), Supabase for data/auth, and OpenRouter-backed LLM
-services for intake parsing and **draft-only** outreach. Grouped by theme, roughly in
-order of "cheapest to bolt on" within each group.
+connectors (`loopnet_seed` today), Supabase for data/auth, OpenRouter/Hugging Face-backed
+LLM services for intake parsing and **draft-only** outreach, and an MCP adapter
+(`services/mcp/`) for AI hosts. Grouped by theme, roughly in order of "cheapest to bolt
+on" within each group.
 
 ---
 
@@ -107,6 +108,17 @@ connectors; these are natural next ones plus enrichment steps in the pipeline.
   shown on both listing cards and detail pages.
 - **Multi-language outreach drafts**: generate the same draft in a second
   language for international investors/tenants.
+
+## 8. MCP / agent surface
+
+Shipped baseline lives in `services/mcp/` (see `services/mcp/README.md`). Ideas on top:
+
+- **OAuth / `mcp login` UX** — exchange Supabase session for a stored refresh
+  token instead of pasting JWTs into `.env`.
+- **Deal-room agent prompt** — multi-step prompt that builds a shortlist + fit
+  brief + draft outreach packet for a named client.
+- **Second MCP server for admin-only** — isolate `enqueue_ingest` / submissions
+  from the user-facing tool list when tool count grows.
 
 ---
 

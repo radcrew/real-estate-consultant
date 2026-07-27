@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import NoReturn
 
-from app.utils.exceptions import raise_bad_request, raise_unprocessable_entity
+from app.utils.exceptions import raise_bad_request, raise_not_found, raise_unprocessable_entity
 
 
 def raise_account_no_fields_to_update() -> NoReturn:
@@ -19,3 +19,7 @@ def raise_account_no_email_for_password_change() -> NoReturn:
 
 def raise_account_new_password_same_as_current() -> NoReturn:
     raise_unprocessable_entity("New password must be different from your current password.")
+
+
+def raise_mcp_api_key_not_found() -> NoReturn:
+    raise_not_found("MCP API key not found.")

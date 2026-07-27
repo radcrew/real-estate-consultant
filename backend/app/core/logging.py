@@ -25,19 +25,21 @@ _NOISY_PATHS: frozenset[str] = frozenset({"/health"})
 # Keys whose values are always redacted, regardless of content.
 _REDACT_KEYS: frozenset[str] = frozenset({
     "password", "token", "access_token", "refresh_token", "authorization",
-    "api_key", "hf_token", "secret",
+    "api_key", "mcp_api_key", "hf_token", "secret", "key_hash",
 })
 
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_MCP_API_KEY_RE = re.compile(r"\brad_[A-Za-z0-9_-]{8,}\b")
 _REDACTED = "***"
 
 
 def _scrub(value: Any, key: str | None = None) -> Any:
-    """Redact sensitive keys and mask email addresses in log payloads."""
+    """Redact sensitive keys and mask email addresses / MCP API keys in log payloads."""
     if key is not None and key.lower() in _REDACT_KEYS:
         return _REDACTED
     if isinstance(value, str):
-        return _EMAIL_RE.sub(_REDACTED, value)
+        scrubbed = _EMAIL_RE.sub(_REDACTED, value)
+        return _MCP_API_KEY_RE.sub(_REDACTED, scrubbed)
     if isinstance(value, dict):
         return {k: _scrub(v, k) for k, v in value.items()}
     if isinstance(value, list):

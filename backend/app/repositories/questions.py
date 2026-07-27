@@ -4,13 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from supabase import AsyncClient
-
 from app.core.db_safe import execute_db_safe
 from app.repositories.exceptions import raise_intake_questions_load_empty
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.utils.exceptions import raise_bad_gateway
 from app.utils.supabase.response import as_row_list, get_single_row
+from supabase import AsyncClient
 
 _QUESTION_SELECT = "key, title, text, type, options, order_index, required"
 

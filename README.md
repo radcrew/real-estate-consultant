@@ -17,6 +17,8 @@ The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with 
 
 Ingestion may integrate additional tools (for example **Apify** or similar) behind FastAPI; those are implementation details of each connector, not replacements for the core stack above.
 
+**MCP adapter:** `services/mcp/` exposes the FastAPI `/api/v1` surface to AI hosts (Cursor, Claude Desktop, remote Streamable HTTP). See [`services/mcp/README.md`](services/mcp/README.md).
+
 ---
 
 ## Local backend (FastAPI)
@@ -69,6 +71,24 @@ The FastAPI API deploys as a **second Vercel project** via `.github/workflows/ba
 
 ---
 
+## Deploy MCP (Vercel)
+
+The MCP adapter is a **third Vercel project** (`real-estate-consultant-mcp`) with
+**Root Directory** = `services/mcp`. Details: [`services/mcp/README.md`](services/mcp/README.md).
+
+1. In Vercel (same team as the API-key-capable backend), create/import the project and set **Root Directory** = `services/mcp` (or `cd services/mcp && npx vercel link`). Connect the GitHub repo so Vercel deploys on push/PR.
+2. GitHub Actions (`.github/workflows/mcp.yml`) only **lints/tests** — it does **not** call `vercel pull` with `VERCEL_TOKEN` (that secret is the frontend/backend team and cannot see this MCP project).
+3. In the **MCP** Vercel project → **Environment Variables**:
+   - `BACKEND_API_URL` = `https://real-estate-consultant-be-nu.vercel.app` (or your API-key BE URL; no trailing slash)
+   - `HTTP_TIMEOUT_SECONDS` = `55`
+   - `LOG_LEVEL` = `INFO`
+   - Do **not** set `MCP_API_KEY` on the shared deployment (clients send `rad_…` per request)
+4. Enable **Fluid Compute** on the MCP project.
+
+**URL:** `https://real-estate-consultant-mcp.vercel.app/mcp` — health: `/health`. Host config template: [`.cursor/mcp.remote.example.json`](.cursor/mcp.remote.example.json). Details: [`services/mcp/README.md`](services/mcp/README.md).
+
+---
+
 ## Local frontend (Next.js)
 
 From `frontend/`:
@@ -81,3 +101,13 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### Concurrent from repo root
+
+| Command | Processes |
+|---------|-----------|
+| `pnpm run dev` | Frontend + backend |
+| `pnpm run dev:all` | Frontend + backend + MCP (HTTP `:8900`) |
+| `pnpm run dev:mcp` | MCP HTTP only |
+
+MCP stays a separate service (`services/mcp/`). Cursor still uses stdio via `.cursor/mcp.json`; `dev:all` runs the HTTP transport for shared/local clients. See [`services/mcp/README.md`](services/mcp/README.md).

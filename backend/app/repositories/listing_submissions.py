@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from supabase import AsyncClient
-
 from app.core.db_safe import execute_db_safe
 from app.utils.exceptions import raise_bad_gateway
 from app.utils.supabase.response import as_row_list
+from supabase import AsyncClient
 
 _INSERT_ERROR = "Unexpected response from Supabase when saving the submission."
 

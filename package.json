@@ -3,8 +3,10 @@
   "private": true,
   "scripts": {
     "dev": "concurrently --names \"FE,BE\" \"pnpm run dev:fe\" \"pnpm run dev:be\"",
+    "dev:all": "concurrently --names \"FE,BE,MCP\" \"pnpm run dev:fe\" \"pnpm run dev:be\" \"pnpm run dev:mcp\"",
     "dev:fe": "pnpm --filter radestate dev",
     "dev:be": "node backend/scripts/setup.mjs",
+    "dev:mcp": "node services/mcp/scripts/setup.mjs",
     "build": "pnpm --filter radestate build",
     "start": "pnpm --filter radestate start",
     "lint": "pnpm --filter radestate lint"

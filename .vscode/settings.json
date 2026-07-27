@@ -1,0 +1,16 @@
+{
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/services/mcp",
+    "${workspaceFolder}/services/mcp/.venv/Lib/site-packages",
+    "${workspaceFolder}/backend",
+    "${workspaceFolder}/backend/.venv/Lib/site-packages"
+  ],
+  "python.analysis.exclude": [
+    "**/node_modules",
+    "**/.next",
+    "**/frontend"
+  ],
+  "python.analysis.useLibraryCodeForTypes": true,
+  "python.analysis.indexing": true
+}

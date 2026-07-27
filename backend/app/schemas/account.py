@@ -44,3 +44,50 @@ class SavedListingsResponse(BaseModel):
 
 class SavedListingCreate(BaseModel):
     property_id: UUID
+
+
+class McpApiKeyCreateRequest(BaseModel):
+    name: str = Field(default="default", min_length=1, max_length=120)
+    scopes: list[str] | None = Field(
+        default=None,
+        description="Optional scopes; default ['*']. Allowed: *, mcp:read, mcp:write, mcp:admin",
+    )
+    expires_in_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=3650,
+        description="Optional TTL from now; omit for non-expiring keys",
+    )
+
+
+class McpApiKeyCreatedResponse(BaseModel):
+    """Returned only from create — includes plaintext ``api_key`` once."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    key_prefix: str
+    api_key: str
+    scopes: list[str]
+    created_at: str | None = None
+    expires_at: str | None = None
+
+
+class McpApiKeyResponse(BaseModel):
+    """List/revoke metadata — never includes plaintext or hash."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    key_prefix: str
+    scopes: list[str]
+    created_at: str | None = None
+    last_used_at: str | None = None
+    revoked_at: str | None = None
+    expires_at: str | None = None
+
+
+class McpApiKeyListResponse(BaseModel):
+    keys: list[McpApiKeyResponse]

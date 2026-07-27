@@ -5,9 +5,14 @@ node_modules
 frontend/.next
 frontend/out
 
-# Env
+# Env (never commit secrets — includes MCP_API_KEY / JWTs)
 .env
 .env*.local
+services/mcp/.auth.json
+
+# Vercel local link metadata
+.vercel
+**/.vercel
 
 # OS / editor
 .DS_Store
@@ -16,3 +21,6 @@ Thumbs.db
 
 # Tool-generated temp files (e.g. <file>.tmp.<pid>.<hash>)
 *.tmp.*
+
+# Claude Code local overrides (permissions, hooks) — not shared across clones
+.claude/settings.local.json

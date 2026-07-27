@@ -5,12 +5,11 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from supabase import AsyncClient
-
 from app.core.db_safe import execute_db_safe
 from app.models.intake_sessions import IntakeSession
 from app.repositories.exceptions import raise_intake_session_not_found
 from app.utils.supabase.response import as_row_list, get_single_row
+from supabase import AsyncClient
 
 INTAKE_SESSION_EMBEDDED_RELATION_KEYS: frozenset[str] = frozenset({"search_profiles"})
 

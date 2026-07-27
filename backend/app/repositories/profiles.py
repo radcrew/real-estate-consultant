@@ -5,12 +5,11 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from supabase import AsyncClient
-
 from app.core.db_safe import execute_db_safe
 from app.schemas.account import AccountProfileUpdate
 from app.utils.exceptions import raise_bad_gateway
 from app.utils.supabase.response import as_row_list
+from supabase import AsyncClient
 
 PROFILE_PATCH_DB_COLUMNS: frozenset[str] = frozenset(
     {

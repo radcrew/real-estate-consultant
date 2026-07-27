@@ -5,12 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
-from supabase import (
-    AsyncClient,
-    AuthApiError,
-    AuthInvalidCredentialsError,
-    AuthWeakPasswordError,
-)
 from supabase_auth.types import User
 
 from app.repositories.exceptions import (
@@ -21,6 +15,12 @@ from app.repositories.exceptions import (
     raise_password_verification_unavailable,
     raise_profile_service_unavailable,
     raise_weak_password,
+)
+from supabase import (
+    AsyncClient,
+    AuthApiError,
+    AuthInvalidCredentialsError,
+    AuthWeakPasswordError,
 )
 
 

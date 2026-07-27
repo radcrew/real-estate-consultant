@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # Bearer token sent to the ingestion service (must match its SERVICE_AUTH_TOKEN).
     ingestion_service_token: str = ""
 
+    # Pepper for MCP API key hashing (sha256 of pepper||raw_key). Empty allowed in local tests.
+    mcp_api_key_pepper: str = ""
+    # Per-key sliding-window limit for MCP API key auth (single process).
+    mcp_api_key_rate_limit_per_minute: int = 120
+
     # Populated automatically by Vercel; set manually for other hosts.
     git_sha: str = Field(
         default="", validation_alias=AliasChoices("GIT_SHA", "VERCEL_GIT_COMMIT_SHA")

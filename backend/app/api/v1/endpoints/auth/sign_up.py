@@ -1,7 +1,6 @@
 from uuid import UUID
 
 from fastapi import APIRouter, status
-from supabase import AuthApiError, AuthWeakPasswordError
 
 from app.api.v1.endpoints.auth.exceptions import (
     raise_auth_api_error,
@@ -15,6 +14,7 @@ from app.repositories.profiles import upsert_profile_patch
 from app.schemas.account import AccountProfileUpdate
 from app.schemas.auth import SignUpRequest, SignUpResponse
 from app.utils.exceptions import raise_bad_request
+from supabase import AuthApiError, AuthWeakPasswordError
 
 router = APIRouter()
 
