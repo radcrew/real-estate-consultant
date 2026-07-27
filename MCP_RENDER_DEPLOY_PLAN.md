@@ -103,9 +103,8 @@ Small adaptations so Render’s conventions work:
    - Or `pip install -e .` then `radestate-mcp` with the same env.
 
 4. **Optional health endpoint**
-   - Render health check: HTTP GET on `/mcp` may not be ideal (MCP protocol).
-   - Prefer a tiny `/healthz` (or reuse backend `ping` via a lightweight route)
-     if `/mcp` returns non-200 on bare GET. Validate during pilot.
+   - Render health check: HTTP GET `/healthz` (also `/health`) → `{"status":"ok"}`.
+   - Wired in `HealthzMiddleware` + `render.yaml` `healthCheckPath: /healthz`.
 
 5. **Docs**
    - Update `services/mcp/README.md` with production URL + client samples.
@@ -252,10 +251,10 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 
 ### Phase 2 — Hardening (½ day)
 
-- [ ] Health check path settled (Render green)
+- [x] Health check path settled (`GET /healthz`, Blueprint `healthCheckPath`)
 - [ ] Timeouts tuned for backend cold start
 - [ ] Instance size / no-sleep decision
-- [ ] README + host config samples updated
+- [x] README + host config samples updated (Render section)
 - [ ] Optional: GitHub Action deploy on `services/mcp/**` changes
 
 **Exit:** documented runbook; on-call knows how to rotate keys and redeploy.
@@ -301,7 +300,7 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 | Shared env API key on MCP | Never set; header-only auth |
 | Pepper rotation on backend | Document: recreate all MCP keys |
 | In-process rate limit with multiple MCP instances | Sticky single instance until Redis/shared limiter |
-| `/mcp` fails Render health GET | Add `/healthz` or configure check that accepts MCP response |
+| `/mcp` fails Render health GET | `GET /healthz` + Blueprint `healthCheckPath` |
 
 ---
 

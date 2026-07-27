@@ -13,6 +13,7 @@ services:
     rootDir: services/mcp
     buildCommand: pip install -U pip && pip install .
     startCommand: MCP_TRANSPORT=streamable-http python -m app.main
+    healthCheckPath: /healthz
     autoDeployTrigger: commit
     envVars:
       - key: MCP_TRANSPORT

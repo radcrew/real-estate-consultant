@@ -142,6 +142,9 @@ Omit `MCP_HTTP_PORT` — Render injects `PORT`. Do **not** set `MCP_API_KEY` on
 the service (HTTP clients send `Authorization: Bearer rad_…` or `X-API-Key` per
 request). Public URL shape: `https://<service>.onrender.com/mcp`.
 
+Liveness for Render: `GET /healthz` (also `/health`) returns `{"status":"ok"}`
+without an API key. Blueprint sets `healthCheckPath: /healthz`.
+
 Local Cursor **stdio** (`run-mcp.cmd`) stays unchanged for day-to-day work.
 
 ## Cursor host config (stdio)
