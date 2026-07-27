@@ -124,7 +124,11 @@ services/mcp/
 - [x] Create/link Vercel MCP project; deploy; `/health` + `/mcp` initialize OK against prod BE URL.
 - [x] Verified remote `tools/list` (18 tools) + `ping_backend` → pong via Streamable HTTP (user JWT Bearer).
 - [ ] **Blocked on backend deploy:** `POST /api/v1/account/api-keys` is **404** on the **existing** prod BE (`real-estate-consultant-be.vercel.app` on another Vercel team / older `main`).
-- [x] Linked a deployable BE project on the MCP team for shipping API keys: `chris-silva-s-projects/real-estate-consultant-be` (`prj_RarH0ycK5nywpSwX6HI7taMUBwA8`) from `backend/` + `feat/mcp-server` (next: env + deploy).
+- [x] Linked + deployed API-key-capable BE on the MCP team:
+  - Project: `chris-silva-s-projects/real-estate-consultant-be` (`prj_RarH0ycK5nywpSwX6HI7taMUBwA8`)
+  - URL: **https://real-estate-consultant-be-nu.vercel.app** (`/health`, `/api/v1/ping`, `POST /api/v1/account/api-keys` → 201)
+  - Note: original `real-estate-consultant-be.vercel.app` remains the older `main` deploy on another team (no api-keys yet).
+- [ ] Point MCP Vercel `BACKEND_API_URL` at `https://real-estate-consultant-be-nu.vercel.app`, redeploy MCP, verify `ping_backend` with `rad_…`.
 
 **Exit criteria:** Inspector lists tools and `ping_backend` returns pong against prod BE.
 

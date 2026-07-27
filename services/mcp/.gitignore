@@ -10,3 +10,5 @@ dist/
 *.egg-info/
 .python-version
 .vercel
+
+.vercel-smoke-key.tmp
