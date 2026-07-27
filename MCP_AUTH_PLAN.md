@@ -42,7 +42,7 @@ remains the authorization source of truth**.
 2. **Key → user** — every API key maps to exactly one `auth.users` id (the acting
    principal). Optional: `is_admin` still comes from `profiles`, not the key blob.
 3. **Store hashes only** — plaintext key shown once at creation; DB keeps
-   `sha256` / `argon2` hash + prefix for lookup.
+   `sha256(pepper \|\| key)` hex digest + prefix for lookup.
 4. **Same authorization path** — after key resolution, tool calls use the same
    ownership checks as JWT (`ensure_search_profile_access`, `get_current_admin`).
 5. **Fail closed** — missing/invalid/revoked key → clear MCP `isError` or HTTP
@@ -244,13 +244,30 @@ Unauthenticated tool calls → `401` + short body. `ping` may remain open.
 
 ### Phase 0 — Design freeze — ½ day
 
-- [ ] Finalize header names, key prefix, hash algorithm (`sha256` + pepper from env vs `argon2`)
-- [ ] Confirm dual-auth in `get_current_user` (not a separate router-only gate)
-- [ ] Add `mcp_api_keys` migration + RLS sketch
+- [x] Finalize header names, key prefix, hash algorithm (`sha256` + pepper from env vs `argon2`)
+- [x] Confirm dual-auth in `get_current_user` (not a separate router-only gate)
+- [x] Add `mcp_api_keys` migration + RLS sketch
+
+### Frozen decisions (Phase 0)
+
+| Topic | Choice |
+|-------|--------|
+| Credential model | **Pass-through** API key on every backend call (no JWT exchange in MCP) |
+| Key prefix | `rad_` |
+| Headers | `Authorization: Bearer rad_…` **and** `X-API-Key: rad_…` |
+| Hash | `sha256(hex)` of `pepper \|\| raw_key`; pepper = `MCP_API_KEY_PEPPER` (required in non-dev) |
+| TTL | No default expiry; nullable `expires_at` supported |
+| Scopes | Column present; v1 always `['*']` |
+| Dual auth | Extend `get_current_user` to accept API key **or** Supabase JWT |
+| MCP legacy JWT | Keep `MCP_USER_ACCESS_TOKEN` fallback one release, then docs-only remove |
+| Operator UX (Phase 3) | Script first; Settings UI optional |
+| OAuth for MCP | **Out of scope** on this track |
+
+Migration file: `backend/supabase/migrations/20260727_mcp_api_keys.sql`.
 
 ### Phase 1 — Backend API keys — 1–2 days
 
-- [ ] Migration for `mcp_api_keys`
+- [ ] Apply / verify `mcp_api_keys` migration on target DB
 - [ ] Repository: create / list / revoke / resolve(raw_key) → user_id
 - [ ] `POST/GET/DELETE /api/v1/account/api-keys`
 - [ ] Extend `get_current_user` for API key **or** JWT
@@ -362,11 +379,15 @@ MCP_API_KEY_PEPPER=
 
 ## Open decisions
 
-1. **Hash algorithm** — `sha256(pepper + key)` (simple, fast) vs `argon2` (harder to brute-force prefixes). Default proposal: **sha256 + server pepper** with high entropy keys.
-2. **Header** — support both `Authorization: Bearer` and `X-API-Key` (yes).
-3. **Key TTL** — none by default; optional `expires_at` on create.
-4. **UI in v1** — script-only is enough; Settings UI in Phase 3 if time.
-5. **Legacy JWT in MCP** — keep fallback for one transition period, then remove from README.
+_None blocking Phase 1 — see **Frozen decisions (Phase 0)** above._
+
+Historical options (resolved):
+
+1. ~~Hash algorithm~~ → **sha256 + `MCP_API_KEY_PEPPER`**
+2. ~~Header~~ → **Bearer and `X-API-Key`**
+3. ~~Key TTL~~ → **optional `expires_at`, none by default**
+4. ~~UI in v1~~ → **script in Phase 3; UI optional**
+5. ~~Legacy JWT in MCP~~ → **fallback one transition period**
 
 ---
 
