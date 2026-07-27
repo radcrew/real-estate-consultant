@@ -87,7 +87,13 @@ async def get_current_user(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],
     client: Annotated[AsyncClient, Depends(get_supabase_sdk_client)],
 ) -> User:
-    """Validate Bearer JWT **or** MCP API key (``rad_…`` / ``X-API-Key``)."""
+    """Validate Bearer JWT **or** MCP API key (``rad_…`` / ``X-API-Key``).
+
+    Dual-credential auth is intentional for tool/account routes under the
+    protected router. Credential **management** (``/account/api-keys``) must
+    opt out via :func:`get_current_user_jwt` so a write-scoped key cannot mint
+    or revoke keys.
+    """
     _api_key_ctx.set(None)
     token = _extract_credential(request, credentials)
     if not token:

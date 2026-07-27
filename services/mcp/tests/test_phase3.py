@@ -37,6 +37,13 @@ def test_ok_text_truncates() -> None:
     assert "truncated" in text
 
 
+def test_sanitize_truncates_with_small_max_chars() -> None:
+    """max_chars < suffix length must not use a negative slice (near-full string kept)."""
+    cleaned = sanitize_tool_text("x" * 100, max_chars=10)
+    assert cleaned == "\n…[truncated]"
+    assert "x" not in cleaned
+
+
 def test_rate_limiter_blocks() -> None:
     limiter = SlidingWindowRateLimiter(max_calls=2, window_seconds=60.0)
     limiter.acquire()

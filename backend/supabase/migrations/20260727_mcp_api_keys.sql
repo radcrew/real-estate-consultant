@@ -33,14 +33,16 @@ comment on column public.mcp_api_keys.key_prefix is
   'First characters of the key (including rad_) for indexed candidate lookup.';
 
 comment on column public.mcp_api_keys.key_hash is
-  'sha256 hex digest of (pepper || raw_key); pepper from MCP_API_KEY_PEPPER.';
+  'sha256 hex of (pepper || raw_key). Not protected by RLS alone — see column grants.';
 
 comment on column public.mcp_api_keys.scopes is
   'Optional scopes for later gating; v1 uses {*} full access.';
 
 alter table public.mcp_api_keys enable row level security;
 
--- Users may list/revoke their own key metadata (never never select key_hash via a view in API).
+-- Row ownership only. RLS does not hide columns: authenticated users can still
+-- SELECT key_hash on their own rows unless column privileges revoke it
+-- (see 20260728_mcp_api_keys_hide_key_hash.sql). API responses omit key_hash.
 drop policy if exists "Users can select own mcp api keys" on public.mcp_api_keys;
 create policy "Users can select own mcp api keys"
   on public.mcp_api_keys

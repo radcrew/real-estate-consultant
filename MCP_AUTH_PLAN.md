@@ -119,7 +119,9 @@ Table `public.mcp_api_keys` (name illustrative):
 | `expires_at` | timestamptz | nullable optional TTL |
 
 RLS: users can `SELECT` / `UPDATE` (revoke) **their own** rows; inserts via
-authenticated user or service role from API. Never return `key_hash` to clients.
+authenticated user or service role from API. RLS is row-level only — hide
+`key_hash` from `authenticated`/`anon` with column `REVOKE` (service role only).
+API responses must never return `key_hash`.
 
 ---
 
