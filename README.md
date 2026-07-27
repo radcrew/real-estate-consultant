@@ -71,6 +71,23 @@ The FastAPI API deploys as a **second Vercel project** via `.github/workflows/ba
 
 ---
 
+## Deploy MCP (Vercel)
+
+The MCP adapter deploys as a **third Vercel project** via `.github/workflows/mcp.yml` (Python ASGI, no Docker). See [`MCP_VERCEL_DEPLOY_PLAN.md`](MCP_VERCEL_DEPLOY_PLAN.md).
+
+1. In Vercel, create/import a project with **Root Directory** = `services/mcp` (or `cd services/mcp && npx vercel link`). Use the **same team** as `real-estate-consultant-be`.
+2. Add GitHub secret **`VERCEL_MCP_PROJECT_ID`** (MCP project ID). Reuse **`VERCEL_TOKEN`** / **`VERCEL_ORG_ID`**. Optional: **`VERCEL_AUTOMATION_BYPASS_SECRET`** for smoke tests behind Deployment Protection.
+3. In the **MCP** Vercel project → **Environment Variables**:
+   - `BACKEND_API_URL` = `https://real-estate-consultant-be.vercel.app` (no trailing slash)
+   - `HTTP_TIMEOUT_SECONDS` = `55`
+   - `LOG_LEVEL` = `INFO`
+   - Do **not** set `MCP_API_KEY` on the shared deployment (clients send `rad_…` per request)
+4. Enable **Fluid Compute** on the MCP project. Merge to **`main`** (or open a PR) to deploy.
+
+**URL:** `https://<mcp-project>.vercel.app/mcp` — health: `/health`. Host config template: [`.cursor/mcp.remote.example.json`](.cursor/mcp.remote.example.json). Details: [`services/mcp/README.md`](services/mcp/README.md).
+
+---
+
 ## Local frontend (Next.js)
 
 From `frontend/`:

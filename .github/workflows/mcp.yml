@@ -1,4 +1,12 @@
-# Lint + unit tests for the radestate MCP adapter (services/mcp).
+# MCP adapter: lint/test on every change; Vercel deploy on PR (preview) and main (production).
+#
+# Separate Vercel project with Root Directory = services/mcp (Settings → General).
+# Deploy runs from services/mcp/ (same pattern as backend/).
+#
+# GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_MCP_PROJECT_ID,
+#                 VERCEL_AUTOMATION_BYPASS_SECRET (optional — Deployment Protection bypass)
+# Production env in Vercel: BACKEND_API_URL=https://real-estate-consultant-be.vercel.app
+#   (see services/mcp/.env.example — do NOT set MCP_API_KEY on the shared deployment)
 name: MCP
 
 on:
@@ -12,6 +20,10 @@ on:
     paths:
       - "services/mcp/**"
       - ".github/workflows/mcp.yml"
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_MCP_PROJECT_ID }}
 
 jobs:
   lint-and-test:
@@ -37,3 +49,102 @@ jobs:
 
       - name: Pytest
         run: pytest -q
+
+  deploy:
+    name: Deploy to Vercel
+    needs: [lint-and-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mcp
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        id: deploy
+        run: |
+          url=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.url }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          smoke() {
+            local path="$1"
+            for i in 1 2 3; do
+              body=$(curl -s -w "\n%{http_code}" \
+                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+                "$BASE_URL$path")
+              status=$(echo "$body" | tail -1)
+              [ "$status" = "200" ] && { echo "OK $path"; return 0; }
+              [ $i -lt 3 ] && sleep 5
+            done
+            echo "FAIL $path — status $status — body:"
+            echo "$body" | head -5
+            exit 1
+          }
+          smoke /health
+
+  deploy-preview:
+    name: Deploy preview to Vercel
+    needs: [lint-and-test]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/mcp
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel environment
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy preview to Vercel
+        id: deploy
+        run: |
+          url=$(vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        env:
+          BASE_URL: ${{ steps.deploy.outputs.url }}
+          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          if [ -z "$BYPASS_SECRET" ]; then
+            echo "::warning::VERCEL_AUTOMATION_BYPASS_SECRET is not set — requests may be blocked by Vercel protection (401)."
+          fi
+          smoke() {
+            local path="$1"
+            for i in 1 2 3; do
+              body=$(curl -s -w "\n%{http_code}" \
+                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
+                "$BASE_URL$path")
+              status=$(echo "$body" | tail -1)
+              [ "$status" = "200" ] && { echo "OK $path"; return 0; }
+              [ $i -lt 3 ] && sleep 5
+            done
+            echo "FAIL $path — status $status — body:"
+            echo "$body" | head -5
+            exit 1
+          }
+          smoke /health
+
+      - name: Preview URL
+        run: echo "### Preview deployment\n${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"

@@ -279,4 +279,8 @@ pytest
 ruff check app tests
 ```
 
-CI: `.github/workflows/mcp.yml`.
+CI: `.github/workflows/mcp.yml` (lint/test on every change; Vercel preview on PR; prod deploy on `main`).
+
+Required GitHub secrets for deploy: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_MCP_PROJECT_ID`
+(optional `VERCEL_AUTOMATION_BYPASS_SECRET`). Create the Vercel project first
+(Root Directory = `services/mcp`) before expecting deploy jobs to succeed.

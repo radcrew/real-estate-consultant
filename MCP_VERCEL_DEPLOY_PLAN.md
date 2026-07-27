@@ -198,12 +198,11 @@ Mirror frontend/backend workflows.
 
 **Tasks**
 
-- [ ] Vercel project: Root Directory = `services/mcp`, link repo.
-- [ ] GitHub secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_MCP_PROJECT_ID` (name TBD).
-- [ ] Extend `.github/workflows/mcp.yml`:
-  - PR: `ruff` + `pytest` (existing)
-  - `main`: build/install + `vercel deploy --prod`
-- [ ] Preview deploys for MCP PRs (optional; protect with Deployment Protection).
+- [x] Workflow: `.github/workflows/mcp.yml` — lint/test; preview deploy on PR; prod deploy on `main`
+- [x] Smoke test `GET /health` after deploy (optional protection bypass secret)
+- [x] Document GitHub secret `VERCEL_MCP_PROJECT_ID` + Root Directory in root README / MCP README
+- [ ] Operator: create Vercel MCP project (Root = `services/mcp`) on the backend’s team and set `VERCEL_MCP_PROJECT_ID`
+- [ ] Operator: set Vercel env `BACKEND_API_URL` (+ Fluid Compute)
 
 ---
 
