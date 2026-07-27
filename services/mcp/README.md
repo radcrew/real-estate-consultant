@@ -230,4 +230,10 @@ pytest
 ruff check app tests
 ```
 
-CI: `.github/workflows/mcp.yml`.
+CI: `.github/workflows/mcp.yml` (Python 3.11, also watches `render.yaml`).
+Optional GitHub secrets on `main` / `workflow_dispatch`:
+
+| Secret | Purpose |
+|--------|---------|
+| `RENDER_MCP_DEPLOY_HOOK` | Render → service → Deploy Hook URL |
+| `MCP_SMOKE_BASE_URL` | e.g. `https://radestate-mcp.onrender.com` for `/healthz` smoke |

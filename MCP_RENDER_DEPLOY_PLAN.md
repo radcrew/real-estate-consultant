@@ -294,9 +294,10 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 - [x] Timeouts tuned for backend cold start (`HTTP_TIMEOUT_SECONDS=120` in Blueprint)
 - [x] Instance size / no-sleep decision (**Starter** in Blueprint; Free = pilot only)
 - [x] README + host config samples updated (Render section)
-- [ ] Optional: GitHub Action deploy on `services/mcp/**` changes
+- [x] Optional: GitHub Action deploy hook + smoke (`.github/workflows/mcp.yml`; secrets optional)
 
 **Exit:** documented runbook; on-call knows how to rotate keys and redeploy.
+CI covers lint/test; deploy hook + smoke run when optional secrets are set.
 
 ### Phase 3 — Optional follow-ups (later)
 
@@ -314,7 +315,7 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 | `services/mcp` config: prefer `PORT` | Render compatibility |
 | `render.yaml` | Declarative `radestate-mcp` Web Service Blueprint |
 | `services/mcp/README.md` | Production / Blueprint section |
-| `.github/workflows/mcp.yml` | Already tests; optionally add deploy job |
+| `.github/workflows/mcp.yml` | Lint/test; optional Render deploy hook + `/healthz` smoke |
 | This plan | Living checklist |
 
 ---
