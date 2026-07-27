@@ -22,4 +22,5 @@ Thumbs.db
 # Tool-generated temp files (e.g. <file>.tmp.<pid>.<hash>)
 *.tmp.*
 
-.claude/
+# Claude Code local overrides (permissions, hooks) — not shared across clones
+.claude/settings.local.json
