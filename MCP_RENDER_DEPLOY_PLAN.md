@@ -111,8 +111,7 @@ Small adaptations so Render’s conventions work:
    - Update `services/mcp/README.md` with production URL + client samples.
    - Keep local `dev:mcp` / `dev:all` unchanged.
 
-No Dockerfile is required for v1 (native Python Web Service). Add one later if
-build reproducibility becomes an issue.
+Native Python Web Service only — **no Docker** in this project.
 
 ---
 
@@ -304,7 +303,7 @@ CI covers lint/test; deploy hook + smoke run when optional secrets are set.
 - [ ] Private networking MCP → backend
 - [ ] OAuth for MCP hosts (out of scope for API-key track)
 - [ ] Multi-region / horizontal replicas (rate limiter is in-process today)
-- [ ] Dockerfile + pinned image for reproducible builds
+- [x] ~~Dockerfile~~ — **out of scope** (native Python runtime only)
 
 ---
 
@@ -351,6 +350,7 @@ CI covers lint/test; deploy hook + smoke run when optional secrets are set.
 - Replacing Cursor stdio for local development
 - MCP → Supabase direct access
 - OAuth 2.1 for MCP hosts (deferred)
+- Docker / container images for MCP (native Render Python runtime only)
 
 ---
 
