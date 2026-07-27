@@ -1,16 +1,3 @@
 {
-  "mcpServers": {
-    "radestate": {
-      "command": "cmd.exe",
-      "args": [
-        "/c",
-        "${workspaceFolder}/services/mcp/run-mcp.cmd"
-      ],
-      "cwd": "${workspaceFolder}/services/mcp",
-      "env": {
-        "BACKEND_API_URL": "http://127.0.0.1:8888",
-        "MCP_TRANSPORT": "stdio"
-      }
-    }
-  }
+  "mcpServers": {}
 }

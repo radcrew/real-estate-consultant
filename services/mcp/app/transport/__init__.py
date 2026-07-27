@@ -25,8 +25,6 @@ async def _run_streamable_http(mcp: FastMCP) -> None:
     import uvicorn
 
     # Prefer shared ASGI factory when already configured for HTTP (stateless optional).
-    from app.auth.http_middleware import CaptureApiKeyMiddleware
-
     app = CaptureApiKeyMiddleware(mcp.streamable_http_app())
 
     config = uvicorn.Config(
