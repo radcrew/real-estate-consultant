@@ -121,8 +121,10 @@ calls `BACKEND_API_URL` over HTTPS. Full checklist:
 [`MCP_RENDER_DEPLOY_PLAN.md`](../../MCP_RENDER_DEPLOY_PLAN.md).
 
 **Blueprint:** repo-root [`render.yaml`](../../render.yaml) defines
-`radestate-mcp`. In Render: **New → Blueprint**, connect this repo, set
-`BACKEND_API_URL` when prompted. Or create a Web Service manually:
+`radestate-mcp`. Apply steps (push → New → Blueprint → set `BACKEND_API_URL` →
+smoke `/healthz`): see
+[`MCP_RENDER_DEPLOY_PLAN.md`](../../MCP_RENDER_DEPLOY_PLAN.md#apply-blueprint-preferred).
+Or create a Web Service manually:
 
 | Setting | Value |
 |---------|--------|

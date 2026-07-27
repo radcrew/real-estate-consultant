@@ -117,7 +117,36 @@ build reproducibility becomes an issue.
 
 ## Render service blueprint
 
-### Create service
+Repo file: [`render.yaml`](render.yaml) (`radestate-mcp`).
+
+### Apply Blueprint (preferred)
+
+Prereqs: MCP deploy commits are on the branch Render will build (usually `main`),
+and you can open [dashboard.render.com](https://dashboard.render.com) in a
+workspace you **own or belong to** (avoid old `srv-…` links from other accounts).
+
+1. Push the MCP Render commits to GitHub (`radcrew/real-estate-consultant`).
+2. Dashboard → **New → Blueprint**.
+3. Connect the GitHub repo; Blueprint path = `render.yaml` (repo root).
+4. When prompted for `BACKEND_API_URL`, paste your **production FastAPI** URL
+   with **no trailing slash** (e.g. `https://<backend>.onrender.com`).
+5. Apply / create. Wait for the first deploy (Events tab).
+6. Open the `radestate-mcp` service → copy the `*.onrender.com` URL.
+7. Smoke:
+   ```bash
+   curl -sS "https://<mcp>.onrender.com/healthz"
+   # expect: {"status":"ok"}
+   ```
+8. Logs should show
+   `transport=streamable-http host=0.0.0.0 port=<PORT>`.
+9. Authenticated MCP smoke (Inspector or host) against
+   `https://<mcp>.onrender.com/mcp` with `Authorization: Bearer rad_…`
+   (key created against the **same** production backend).
+
+If Blueprint apply is blocked (workspace permissions), create the Web Service
+manually instead (below).
+
+### Create service (manual)
 
 1. Render Dashboard → **New → Web Service**.
 2. Connect the GitHub repo `real-estate-consultant`.
@@ -130,6 +159,7 @@ build reproducibility becomes an issue.
 | Runtime | Python 3 |
 | Build Command | `pip install -U pip && pip install .` |
 | Start Command | `MCP_TRANSPORT=streamable-http python -m app.main` |
+| Health check path | `/healthz` |
 | Instance | Starter (or Free for pilot) |
 | Auto-Deploy | `main` (or a `deploy/mcp` branch for safer rollouts) |
 
@@ -230,7 +260,7 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 
 - [ ] Confirm production backend URL and `/api/v1/ping`
 - [ ] Confirm a production user can create `rad_…` keys against prod backend
-- [ ] Freeze decisions in this doc
+- [x] Freeze decisions in this doc (Streamable HTTP, header-only keys, `PORT` / `0.0.0.0`)
 - [x] Implement `PORT` + document `0.0.0.0` bind locally (`dev:mcp` still works)
   - [x] Honor `PORT` / `MCP_HTTP_PORT` in `app/config.py`
   - [x] Document `0.0.0.0` bind + Render env in README
@@ -241,6 +271,7 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 ### Phase 1 — First Render deploy (½–1 day)
 
 - [x] Add repo `render.yaml` Blueprint for `radestate-mcp` (`services/mcp` root)
+- [x] Operator runbook: Apply Blueprint + smoke (`/healthz`, logs, `/mcp`)
 - [ ] Create / apply Blueprint (or Web Service) in Render Dashboard
 - [ ] Set `BACKEND_API_URL` (no shared `MCP_API_KEY`)
 - [ ] Deploy from `main` (or release branch)
