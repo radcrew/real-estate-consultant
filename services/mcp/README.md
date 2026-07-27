@@ -157,14 +157,14 @@ npx vercel deploy --prod
 Public path: `https://<mcp-project>.vercel.app/mcp`. Plan: repo root
 [`MCP_VERCEL_DEPLOY_PLAN.md`](../../MCP_VERCEL_DEPLOY_PLAN.md).
 
-Linked project (local `npx vercel link`): **`real-estate-consultant-mcp`**  
-Project ID for GitHub secret `VERCEL_MCP_PROJECT_ID`: `prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs`  
+Linked project: **`real-estate-consultant-mcp`** (`prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs`,
+team `chris-silva-s-projects`). GitHub repo connected; **Root Directory** = `services/mcp`.
+Deploys via Vercel’s Git integration (not `secrets.VERCEL_TOKEN` — that token is the
+frontend/backend team and cannot access this project).
+
 **Production URL:** https://real-estate-consultant-mcp.vercel.app  
 Health: https://real-estate-consultant-mcp.vercel.app/health  
-MCP endpoint: https://real-estate-consultant-mcp.vercel.app/mcp  
-
-Verified: `tools/list` + `ping_backend` against this URL with **`rad_…` API key**
-(MCP → `https://real-estate-consultant-be-nu.vercel.app`).
+MCP endpoint: https://real-estate-consultant-mcp.vercel.app/mcp
 
 ### Production API keys (for remote MCP)
 
@@ -302,8 +302,6 @@ pytest
 ruff check app tests
 ```
 
-CI: `.github/workflows/mcp.yml` (lint/test on every change; Vercel preview on PR; prod deploy on `main`).
-
-Required GitHub secrets for deploy: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_MCP_PROJECT_ID`
-(optional `VERCEL_AUTOMATION_BYPASS_SECRET`). Create the Vercel project first
-(Root Directory = `services/mcp`) before expecting deploy jobs to succeed.
+CI: `.github/workflows/mcp.yml` (lint/test only). Production/preview deploys come from
+the Vercel GitHub integration on `real-estate-consultant-mcp` (Root Directory =
+`services/mcp`).

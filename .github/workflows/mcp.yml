@@ -1,15 +1,13 @@
-# MCP adapter: lint/test on every change; Vercel deploy on PR (preview) and main (production).
+# MCP adapter: lint/test on PR and main.
 #
-# Separate Vercel project with Root Directory = services/mcp (Settings → General).
-# Deploy runs from services/mcp/ (same pattern as backend/).
+# Deploys are handled by the Vercel GitHub integration for project
+# `real-estate-consultant-mcp` (Chris Silva's projects / team_GGqKP4vcYS6Z1tP94DfMSzaB,
+# Root Directory = services/mcp). Do not use secrets.VERCEL_TOKEN here — that token
+# belongs to the frontend/backend Vercel team and cannot see this MCP project
+# ("Project not found").
 #
-# GitHub secrets: VERCEL_TOKEN (must access Chris Silva's projects / team below),
-#                 VERCEL_AUTOMATION_BYPASS_SECRET (optional — Deployment Protection bypass)
-# VERCEL_ORG_ID / VERCEL_PROJECT_ID are pinned to real-estate-consultant-mcp
-# (team_GGqKP4vcYS6Z1tP94DfMSzaB / prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs) — do not reuse the
-# frontend/backend org secret; that team does not own this MCP project.
-# Production env in Vercel: BACKEND_API_URL=https://real-estate-consultant-be.vercel.app
-#   (see services/mcp/.env.example — do NOT set MCP_API_KEY on the shared deployment)
+# Production env in Vercel: BACKEND_API_URL (see services/mcp/.env.example).
+# Do NOT set MCP_API_KEY on the shared deployment.
 name: MCP
 
 on:
@@ -23,12 +21,6 @@ on:
     paths:
       - "services/mcp/**"
       - ".github/workflows/mcp.yml"
-
-env:
-  # Org + project IDs are not sensitive. Pin both — secrets.VERCEL_ORG_ID is the
-  # frontend team and does not contain this MCP project ("Project not found").
-  VERCEL_ORG_ID: team_GGqKP4vcYS6Z1tP94DfMSzaB
-  VERCEL_PROJECT_ID: prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs
 
 jobs:
   lint-and-test:
@@ -54,118 +46,3 @@ jobs:
 
       - name: Pytest
         run: pytest -q
-
-  deploy:
-    name: Deploy to Vercel
-    needs: [lint-and-test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/mcp
-    environment:
-      name: production
-      url: ${{ steps.deploy.outputs.url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Require Vercel project id
-        run: |
-          if [ -z "$VERCEL_PROJECT_ID" ] || [ -z "$VERCEL_ORG_ID" ]; then
-            echo "::error::Missing VERCEL_ORG_ID or VERCEL_PROJECT_ID (expected pinned MCP team/project in workflow env)."
-            exit 1
-          fi
-          echo "Using VERCEL_ORG_ID=$VERCEL_ORG_ID VERCEL_PROJECT_ID=$VERCEL_PROJECT_ID"
-
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy to Vercel
-        id: deploy
-        run: |
-          url=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-
-      - name: Smoke test
-        env:
-          BASE_URL: ${{ steps.deploy.outputs.url }}
-          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          smoke() {
-            local path="$1"
-            for i in 1 2 3; do
-              body=$(curl -s -w "\n%{http_code}" \
-                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
-                "$BASE_URL$path")
-              status=$(echo "$body" | tail -1)
-              [ "$status" = "200" ] && { echo "OK $path"; return 0; }
-              [ $i -lt 3 ] && sleep 5
-            done
-            echo "FAIL $path — status $status — body:"
-            echo "$body" | head -5
-            exit 1
-          }
-          smoke /health
-
-  deploy-preview:
-    name: Deploy preview to Vercel
-    needs: [lint-and-test]
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/mcp
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Require Vercel project id
-        run: |
-          if [ -z "$VERCEL_PROJECT_ID" ] || [ -z "$VERCEL_ORG_ID" ]; then
-            echo "::error::Missing VERCEL_ORG_ID or VERCEL_PROJECT_ID (expected pinned MCP team/project in workflow env)."
-            exit 1
-          fi
-          echo "Using VERCEL_ORG_ID=$VERCEL_ORG_ID VERCEL_PROJECT_ID=$VERCEL_PROJECT_ID"
-
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy preview to Vercel
-        id: deploy
-        run: |
-          url=$(vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-
-      - name: Smoke test
-        env:
-          BASE_URL: ${{ steps.deploy.outputs.url }}
-          BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-        run: |
-          if [ -z "$BYPASS_SECRET" ]; then
-            echo "::warning::VERCEL_AUTOMATION_BYPASS_SECRET is not set — requests may be blocked by Vercel protection (401)."
-          fi
-          smoke() {
-            local path="$1"
-            for i in 1 2 3; do
-              body=$(curl -s -w "\n%{http_code}" \
-                -H "x-vercel-protection-bypass: $BYPASS_SECRET" \
-                "$BASE_URL$path")
-              status=$(echo "$body" | tail -1)
-              [ "$status" = "200" ] && { echo "OK $path"; return 0; }
-              [ $i -lt 3 ] && sleep 5
-            done
-            echo "FAIL $path — status $status — body:"
-            echo "$body" | head -5
-            exit 1
-          }
-          smoke /health
-
-      - name: Preview URL
-        run: echo "### Preview deployment\n${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"

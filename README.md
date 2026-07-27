@@ -73,18 +73,19 @@ The FastAPI API deploys as a **second Vercel project** via `.github/workflows/ba
 
 ## Deploy MCP (Vercel)
 
-The MCP adapter deploys as a **third Vercel project** via `.github/workflows/mcp.yml` (Python ASGI, no Docker). See [`MCP_VERCEL_DEPLOY_PLAN.md`](MCP_VERCEL_DEPLOY_PLAN.md).
+The MCP adapter is a **third Vercel project** (`real-estate-consultant-mcp`) with
+**Root Directory** = `services/mcp`. See [`MCP_VERCEL_DEPLOY_PLAN.md`](MCP_VERCEL_DEPLOY_PLAN.md).
 
-1. In Vercel, create/import a project with **Root Directory** = `services/mcp` (or `cd services/mcp && npx vercel link`). Use the **same team** as `real-estate-consultant-be`.
-2. Add GitHub secret **`VERCEL_MCP_PROJECT_ID`** (MCP project ID). Reuse **`VERCEL_TOKEN`** / **`VERCEL_ORG_ID`**. Optional: **`VERCEL_AUTOMATION_BYPASS_SECRET`** for smoke tests behind Deployment Protection.
+1. In Vercel (same team as the API-key-capable backend), create/import the project and set **Root Directory** = `services/mcp` (or `cd services/mcp && npx vercel link`). Connect the GitHub repo so Vercel deploys on push/PR.
+2. GitHub Actions (`.github/workflows/mcp.yml`) only **lints/tests** — it does **not** call `vercel pull` with `VERCEL_TOKEN` (that secret is the frontend/backend team and cannot see this MCP project).
 3. In the **MCP** Vercel project → **Environment Variables**:
-   - `BACKEND_API_URL` = `https://real-estate-consultant-be.vercel.app` (no trailing slash)
+   - `BACKEND_API_URL` = `https://real-estate-consultant-be-nu.vercel.app` (or your API-key BE URL; no trailing slash)
    - `HTTP_TIMEOUT_SECONDS` = `55`
    - `LOG_LEVEL` = `INFO`
    - Do **not** set `MCP_API_KEY` on the shared deployment (clients send `rad_…` per request)
-4. Enable **Fluid Compute** on the MCP project. Merge to **`main`** (or open a PR) to deploy.
+4. Enable **Fluid Compute** on the MCP project.
 
-**URL:** `https://<mcp-project>.vercel.app/mcp` — health: `/health`. Host config template: [`.cursor/mcp.remote.example.json`](.cursor/mcp.remote.example.json). Details: [`services/mcp/README.md`](services/mcp/README.md).
+**URL:** `https://real-estate-consultant-mcp.vercel.app/mcp` — health: `/health`. Host config template: [`.cursor/mcp.remote.example.json`](.cursor/mcp.remote.example.json). Details: [`services/mcp/README.md`](services/mcp/README.md).
 
 ---
 
