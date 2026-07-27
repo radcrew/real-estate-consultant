@@ -1,11 +1,16 @@
-# MCP Authorization Plan
+# MCP Authorization Plan (API Key)
 
-Plan for implementing **authorization** for the radestate MCP adapter
+Plan for implementing **API-key authorization** for the radestate MCP adapter
 (`services/mcp/`). Complements [`MCP_SERVER_PLAN.md`](MCP_SERVER_PLAN.md).
 
-**Goal:** Every MCP tool call runs as a real Supabase **user**, with a clear
-login/refresh story for local hosts and a spec-aligned OAuth path for remote
-Streamable HTTP — while **`backend/` remains the authorization source of truth**.
+**Decision:** Authorize MCP hosts with a **long-lived API key** bound to a
+Supabase user (or machine principal). OAuth / refresh-token login is **out of
+scope** for this plan (may return later for browser agents).
+
+**Goal:** Cursor, Claude Desktop, and Streamable HTTP clients authenticate with
+`MCP_API_KEY` (or equivalent header). Backend resolves the key to a user and
+enforces the same ownership/admin rules as JWT sessions — while **`backend/`
+remains the authorization source of truth**.
 
 ---
 
@@ -13,215 +18,305 @@ Streamable HTTP — while **`backend/` remains the authorization source of truth
 
 | Piece | Status |
 |-------|--------|
-| User JWT forwarded as `Authorization: Bearer` to FastAPI | Done (`BackendClient`) |
-| Env token `MCP_USER_ACCESS_TOKEN` (stdio / `.env`) | Done |
-| Local bootstrap `scripts/setup_local_auth.py` | Done (dev only) |
-| Backend enforces user/admin (`get_current_user`, `get_current_admin`, profile ownership) | Done |
-| Service role **never** in MCP tool path | Done (by design) |
-| Dedicated `app/auth/` package | **Missing** (token still read ad hoc from settings) |
-| Token refresh / expiry handling | **Missing** (JWTs expire → 401; operator re-runs setup) |
-| Streamable HTTP MCP OAuth (RFC 9728 / OAuth 2.1 + PKCE) | **Missing** (HTTP mode trusts process env only) |
-| Per-request identity on multi-client HTTP | **Missing** (one process-level token) |
+| User JWT forwarded as `Authorization: Bearer` to FastAPI | Done |
+| Env `MCP_USER_ACCESS_TOKEN` (short-lived Supabase JWT) | Done — **painful** (expires) |
+| Local bootstrap `scripts/setup_local_auth.py` | Done (JWT mint for local only) |
+| Backend JWT auth (`get_current_user`) | Done |
+| Service role **never** in MCP tool path | Done |
+| First-class API keys (create / hash / revoke / resolve) | **Missing** |
+| MCP `app/auth/` package | **Missing** |
+| HTTP gateway requiring a key | **Missing** (process env JWT only) |
 
-**Pain we already hit in practice**
+**Pain this plan removes**
 
-1. Expired JWT → all write/search tools 401 until `setup_local_auth.py` is re-run.
-2. Empty Cursor-injected env can wipe `.env` values (mitigated with `env_ignore_empty` + launcher loaders; keep that invariant).
-3. HTTP (`pnpm run dev:mcp` / `dev:all`) is not multi-user-safe: one shared token for the process.
+1. Expired JWT → 401 until re-bootstrap.
+2. Pasting JWTs into host configs.
+3. Ambiguous identity on shared HTTP MCP (`dev:mcp`).
 
 ---
 
 ## Principles (non-negotiable)
 
-1. **Backend is SoT** — MCP never invents roles, never uses `SUPABASE_SERVICE_ROLE_KEY` for tool calls, never bypasses `ensure_search_profile_access` / admin checks.
-2. **Edge auth only** — MCP authenticates the *host/user*, then obtains or selects a **user** Supabase access token to call `/api/v1`.
-3. **Transport-specific**
-   - **stdio:** OS process isolation + local secrets (env / keychain file). OAuth optional.
-   - **streamable-http:** treat MCP as an **OAuth 2.1 resource server** (MCP auth guidance).
-4. **No secret sprawl** — HF / ingestion / service-role keys stay in `backend/` only.
-5. **Fail closed** — missing/invalid/expired auth → MCP `isError` with a recoverable message; never crash stdio.
-6. **Least privilege** — tools act as the signed-in user; admin tools remain backend-gated.
+1. **Backend is SoT** — issue, hash, validate, and revoke keys in `backend/`.
+   MCP never invents roles and never uses `SUPABASE_SERVICE_ROLE_KEY` for tools.
+2. **Key → user** — every API key maps to exactly one `auth.users` id (the acting
+   principal). Optional: `is_admin` still comes from `profiles`, not the key blob.
+3. **Store hashes only** — plaintext key shown once at creation; DB keeps
+   `sha256` / `argon2` hash + prefix for lookup.
+4. **Same authorization path** — after key resolution, tool calls use the same
+   ownership checks as JWT (`ensure_search_profile_access`, `get_current_admin`).
+5. **Fail closed** — missing/invalid/revoked key → clear MCP `isError` or HTTP
+   `401`; never crash stdio.
+6. **No secret sprawl** — HF / ingestion / service-role stay in `backend/` only.
+7. **Transport-agnostic credential** — same key works for stdio env and HTTP
+   `Authorization` / `X-API-Key`.
 
 ---
 
 ## Target architecture
 
 ```text
-┌─────────────────┐     token / OAuth      ┌──────────────────┐
-│ Cursor / Claude │ ─────────────────────► │ services/mcp     │
-│ (MCP host)      │                        │  auth edge       │
-└─────────────────┘                        └────────┬─────────┘
-                                                    │ Bearer user JWT
-                                                    ▼
-                                           ┌──────────────────┐
-                                           │ backend FastAPI  │
-                                           │  get_current_*   │
-                                           └────────┬─────────┘
-                                                    │
-                                                    ▼
-                                              Supabase Auth
-                                              + Postgres RLS
+┌─────────────────┐   MCP_API_KEY /     ┌──────────────────┐
+│ Cursor / Claude │   X-API-Key         │ services/mcp     │
+│ or HTTP client  │ ──────────────────► │  pass-through    │
+└─────────────────┘                     └────────┬─────────┘
+                                                 │ Authorization: Bearer <api_key>
+                                                 │ (or X-API-Key)
+                                                 ▼
+                                        ┌──────────────────┐
+                                        │ backend FastAPI  │
+                                        │  resolve key →   │
+                                        │  user principal  │
+                                        └────────┬─────────┘
+                                                 │
+                                                 ▼
+                                           Postgres
+                                           mcp_api_keys
+                                           + profiles
 ```
 
-### Module layout (new)
+**Preferred model (pass-through):** MCP does **not** exchange the key for a
+JWT. It forwards the API key on every backend call. Backend accepts **either**
+Supabase JWT **or** API key in `get_current_user` (or a sibling dependency).
+
+Alternative (not preferred): MCP edge validates key and swaps to a short-lived
+internal JWT — more moving parts, skip unless we must hide keys from logs at
+the proxy boundary.
+
+---
+
+## Credential format
+
+| Item | Convention |
+|------|------------|
+| Prefix | `rad_` (or `rk_live_` / `rk_test_`) for easy detection + log redaction |
+| Entropy | ≥ 32 bytes random (`secrets.token_urlsafe`) |
+| Display | `{prefix}{secret}` once at create time |
+| Storage | `key_prefix` (first 8 chars) + `key_hash` |
+| Header (HTTP) | `Authorization: Bearer rad_…` **or** `X-API-Key: rad_…` |
+| Env (stdio) | `MCP_API_KEY=rad_…` |
+
+Redact anything matching `rad_` / `rk_` in MCP + backend logs (extend existing
+log scrubbers).
+
+---
+
+## Data model (backend)
+
+Table `public.mcp_api_keys` (name illustrative):
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid PK | |
+| `user_id` | uuid FK → `auth.users` | acting principal |
+| `name` | text | e.g. "Cursor laptop" |
+| `key_prefix` | text | indexed; for lookup candidates |
+| `key_hash` | text | unique; verify with constant-time compare |
+| `scopes` | text[] / jsonb | optional; default `["*"]` or `["mcp:tools"]` |
+| `created_at` | timestamptz | |
+| `last_used_at` | timestamptz | nullable; update throttled |
+| `revoked_at` | timestamptz | nullable |
+| `expires_at` | timestamptz | nullable optional TTL |
+
+RLS: users can `SELECT` / `UPDATE` (revoke) **their own** rows; inserts via
+authenticated user or service role from API. Never return `key_hash` to clients.
+
+---
+
+## Backend API surface
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/api/v1/account/api-keys` | Create key (returns plaintext **once**) |
+| `GET` | `/api/v1/account/api-keys` | List metadata (prefix, name, dates) — no secret |
+| `DELETE` | `/api/v1/account/api-keys/{id}` | Revoke |
+| — | all existing `/api/v1/*` | Accept API key **or** user JWT |
+
+### Auth dependency change
+
+```text
+get_current_user:
+  1. Read Bearer / X-API-Key
+  2. If looks like API key (prefix) → lookup by prefix, verify hash,
+     reject if revoked/expired → User(id=key.user_id)
+  3. Else → existing Supabase get_user(jwt)
+```
+
+Browser app keeps using JWTs. MCP and automation use API keys.
+
+### Optional scopes (v1.1)
+
+| Scope | Tools |
+|-------|--------|
+| `mcp:read` | listings, search read, featured, ping |
+| `mcp:write` | quick_search, intake, criteria, outreach drafts |
+| `mcp:admin` | ingest + listing-submissions (still requires `profiles.is_admin`) |
+
+v1 may ship with a single full-access key per user (`scopes = ["*"]`).
+
+---
+
+## MCP adapter changes
+
+### Module layout
 
 ```text
 services/mcp/app/auth/
   __init__.py
-  context.py          # AuthContext: access_token, user_id?, expires_at?, source
-  providers.py        # EnvTokenProvider | RefreshTokenProvider | HttpBearerProvider
-  store.py            # local encrypted/plain file for refresh token (stdio)
-  refresh.py          # Supabase refresh_token → new access_token
-  http_oauth.py       # Phase C: PRM + bearer validation for Streamable HTTP
-  errors.py           # AuthRequired / AuthExpired / AuthForbidden
+  context.py       # AuthContext(api_key, source=env|header)
+  providers.py     # EnvApiKeyProvider | HttpHeaderApiKeyProvider
+  errors.py        # AuthRequired / AuthInvalid
 ```
 
-Wire `BackendClient` to take token from `AuthContext` (request-scoped for HTTP,
-process-scoped for stdio) instead of only `settings.mcp_user_access_token`.
+### Behavior
 
----
+| Transport | How key is supplied |
+|-----------|---------------------|
+| **stdio** | `MCP_API_KEY` from `services/mcp/.env` (loaded by `run-mcp.cmd`) |
+| **streamable-http** | Require `Authorization: Bearer` or `X-API-Key` **per request**; do not use a process-global user JWT |
 
-## Auth modes
+`BackendClient`:
 
-### Mode A — Local stdio (default for Cursor / Claude Desktop)
+- Prefer `MCP_API_KEY` over legacy `MCP_USER_ACCESS_TOKEN`.
+- Send as `Authorization: Bearer <api_key>` (backend accepts both shapes).
+- On `401`, return actionable error: “API key missing/invalid/revoked — create one via POST /api/v1/account/api-keys”.
 
-**Who:** single operator on a workstation.
-
-| Step | Behavior |
-|------|----------|
-| Bootstrap | `mcp login` (or keep `setup_local_auth.py`) obtains access + **refresh** tokens |
-| Storage | `services/mcp/.auth.json` (gitignored) or OS keychain; never commit |
-| Runtime | Provider returns access token; on 401 from backend, try refresh once, then `AuthExpired` |
-| Host config | `.cursor/mcp.json` / Claude config: **no** long-lived JWT in env — only `BACKEND_API_URL` |
-
-**Authorization:** unchanged — backend JWT validation + ownership checks.
-
-### Mode B — Streamable HTTP (remote / `dev:mcp`)
-
-**Who:** one or more MCP clients over the network.
-
-MCP server is an **OAuth 2.1 resource server**:
-
-1. Unauthenticated call → `401` + `WWW-Authenticate` pointing at **Protected Resource Metadata** (RFC 9728).
-2. Client discovers Authorization Server metadata (RFC 8414).
-3. Authorization Code + **PKCE**; resource indicator bound to MCP URL (RFC 8707).
-4. MCP validates bearer (issuer, exp, audience) **or** exchanges it for a Supabase user JWT.
-5. Tools call backend with that **user** JWT.
-
-**Recommended IdP choice for radestate**
-
-| Option | Pros | Cons |
-|--------|------|------|
-| **B1. Supabase Auth as AS** (prefer if host support is enough) | One identity system already used by the app | MCP OAuth metadata / PKCE quirks; may need a thin broker |
-| **B2. Backend broker** `POST /api/v1/mcp/token` (or `/auth/mcp/...`) | Full control; map host token → Supabase session; audit | Extra backend surface to design + harden |
-| **B3. External IdP (Auth0/Clerk) later** | Enterprise SSO | Out of scope for v1 |
-
-**v1 recommendation:** implement **B2 (backend broker)** behind MCP HTTP:
-
-- MCP validates the inbound MCP-access token (or session cookie from broker callback).
-- Broker endpoint uses existing Supabase sign-in / refresh (anon client — **not** the poisoned service-role data client pattern we already fixed).
-- MCP stores a short-lived mapping `mcp_session → supabase_access_token` in memory (or Redis later).
-
-### Mode C — Tool-level authorization (always)
+### Tool classes
 
 | Class | Examples | Rule |
 |-------|----------|------|
-| Public / health | `ping_backend` | No user JWT required |
-| User read | `get_listing`, `search_properties`, `get_featured_listings` | User JWT; backend may allow some reads anonymously — MCP still prefers user context when available |
-| User write | `quick_search`, intake, outreach drafts, `update_search_criteria` | User JWT required |
-| Admin | `enqueue_ingest`, `list_listing_submissions` | User JWT + `profiles.is_admin` (backend 403) |
+| Public | `ping_backend` | No key (liveness) |
+| User | search, intake, outreach, saved, agents | Valid API key (or legacy JWT during migration) |
+| Admin | `enqueue_ingest`, `list_listing_submissions` | Valid key whose user has `profiles.is_admin` |
 
-Optional later: declare MCP **scopes** (`radestate:search`, `radestate:outreach`, `radestate:admin`) and refuse tools before calling backend if scope missing. Backend remains final enforcer.
+---
+
+## Host wiring
+
+### Cursor / Claude (stdio)
+
+```json
+{
+  "mcpServers": {
+    "radestate": {
+      "command": "cmd.exe",
+      "args": ["/c", "${workspaceFolder}/services/mcp/run-mcp.cmd"],
+      "cwd": "${workspaceFolder}/services/mcp",
+      "env": {
+        "BACKEND_API_URL": "http://127.0.0.1:8888",
+        "MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}
+```
+
+Put the secret only in gitignored `services/mcp/.env`:
+
+```env
+BACKEND_API_URL=http://127.0.0.1:8888
+MCP_API_KEY=rad_xxxxxxxx
+# MCP_USER_ACCESS_TOKEN=   # deprecated after migration
+```
+
+### Streamable HTTP
+
+```http
+POST /mcp HTTP/1.1
+Authorization: Bearer rad_xxxxxxxx
+```
+
+Unauthenticated tool calls → `401` + short body. `ping` may remain open.
+
+---
+
+## Migration from JWT env tokens
+
+1. Ship API keys alongside JWT auth (dual accept in `get_current_user`).
+2. Document: create a key while signed in (UI or `curl` with JWT).
+3. Replace `MCP_USER_ACCESS_TOKEN` with `MCP_API_KEY` in local `.env`.
+4. Deprecate `setup_local_auth.py` for daily use (keep for minting a JWT **only** to call `POST /account/api-keys` once, or add a small `scripts/create_mcp_api_key.py`).
+5. After one release: warn in MCP logs if only JWT is set; later remove JWT path from MCP docs.
 
 ---
 
 ## Implementation phases
 
-### Phase A — Auth package + expiry UX (local) — 1 day
+### Phase 0 — Design freeze — ½ day
 
-**Ship**
+- [ ] Finalize header names, key prefix, hash algorithm (`sha256` + pepper from env vs `argon2`)
+- [ ] Confirm dual-auth in `get_current_user` (not a separate router-only gate)
+- [ ] Add `mcp_api_keys` migration + RLS sketch
 
-- [ ] Create `app/auth/` with `AuthContext` + `EnvTokenProvider`
-- [ ] Centralize “require user token” (replace ad hoc `AuthRequiredError` strings)
-- [ ] On backend `401`, return clear `AuthExpired` guidance (`mcp login` / re-bootstrap)
-- [ ] Document: never paste JWT into committed `mcp.json`; load from `.env` / `.auth.json`
-- [ ] Tests: missing token, expired → refresh miss → error text
+### Phase 1 — Backend API keys — 1–2 days
 
-**Out of scope:** OAuth, multi-user HTTP.
+- [ ] Migration for `mcp_api_keys`
+- [ ] Repository: create / list / revoke / resolve(raw_key) → user_id
+- [ ] `POST/GET/DELETE /api/v1/account/api-keys`
+- [ ] Extend `get_current_user` for API key **or** JWT
+- [ ] Log redaction for `rad_` secrets
+- [ ] Tests: create → call protected route with key → revoke → 401
+- [ ] Tests: JWT path still works for the web app
 
-### Phase B — Login CLI + refresh tokens — 1–2 days
+### Phase 2 — MCP wiring — 1 day
 
-**Ship**
+- [ ] `app/auth/` + `MCP_API_KEY` settings
+- [ ] `BackendClient` uses API key; legacy JWT fallback
+- [ ] Stdio: load from `.env` via existing launchers
+- [ ] HTTP: per-request key from headers; reject if missing on protected tools
+- [ ] Clear `AuthRequired` / `AuthInvalid` tool errors
+- [ ] Update `services/mcp/README.md`, `.env.example`, Cursor/Claude samples
+- [ ] Tests in `services/mcp/tests/` for missing/invalid key mapping
 
-- [ ] `radestate-mcp login` (or `python -m app.auth.cli login`) → email/password or browser link against backend `/api/v1/auth/sign-in`
-- [ ] Persist `access_token`, `refresh_token`, `expires_at` under `services/mcp/.auth.json` (gitignore)
-- [ ] `RefreshTokenProvider`: proactive refresh if `expires_at` within N minutes; reactive refresh on 401 once
-- [ ] `radestate-mcp logout` clears store
-- [ ] Keep `setup_local_auth.py` as thin wrapper or deprecate in favor of CLI
-- [ ] Ensure `run-mcp.cmd` / `scripts/setup.mjs` do not require JWT in Cursor env
+### Phase 3 — Operator UX — ½–1 day
 
-**Acceptance:** overnight Cursor session still works without re-pasting a JWT.
+- [ ] Script or CLI: `python scripts/create_mcp_api_key.py` (signs in once / uses existing JWT, prints key)
+- [ ] Optional: Settings page in Next.js “MCP API keys” (list / create / revoke)
+- [ ] Gitignore notes; never commit keys
 
-### Phase C — HTTP authorization (resource server + broker) — 2–4 days
+### Phase 4 — Hardening (optional)
 
-**Ship**
-
-- [ ] Backend: minimal broker endpoints (names illustrative)
-  - `POST /api/v1/mcp/oauth/token` — exchange auth code / refresh for MCP session + Supabase tokens  
-  - or reuse Supabase grant and issue a signed MCP session JWT whose `sub` is the user id
-- [ ] MCP HTTP middleware: require `Authorization` on tool calls (except discovery + `ping`)
-- [ ] Protected Resource Metadata document at well-known URL
-- [ ] Per-request `AuthContext` (no process-global user token for HTTP)
-- [ ] Rate-limit auth failures; never log raw tokens
-- [ ] Integration test: HTTP client without token → 401; with token → `quick_search` works
-
-**Hardening already required in backend (done / keep)**
-
-- Password grants must use the **anon/auth client**, not the service-role data client
-  (see recent `supabase_sdk` split) so PostgREST is not poisoned by `SIGNED_IN`.
-
-### Phase D — Scopes, admin step-up, multi-tenant (optional)
-
-- [ ] Scope map on tools; advertise in OAuth consent
-- [ ] Step-up / re-consent for admin tools
-- [ ] Multi-tenant MCP deploy (separate `BACKEND_API_URL` + IdP per env)
-- [ ] Audit log: `request_id`, `user_id`, tool name, status (no PII bodies)
+- [ ] Key scopes (`mcp:read` / `mcp:write` / `mcp:admin`)
+- [ ] Per-key rate limits
+- [ ] `last_used_at` updates (sampled)
+- [ ] Key expiration + rotation docs
+- [ ] Audit rows: key_id, tool name, status (no payloads)
 
 ---
 
-## Config additions
+## Config
+
+### `services/mcp/.env.example`
 
 ```env
-# existing
 BACKEND_API_URL=http://127.0.0.1:8888
-MCP_USER_ACCESS_TOKEN=          # optional override; prefer .auth.json after Phase B
-MCP_TRANSPORT=stdio             # stdio | streamable-http
-
-# Phase B+
-MCP_AUTH_STORE=./.auth.json     # gitignored
-MCP_AUTH_REFRESH_SKEW_SECONDS=120
-
-# Phase C+
-MCP_HTTP_PUBLIC_URL=http://127.0.0.1:8900/mcp
-MCP_OAUTH_ISSUER=https://<supabase-or-broker>
-MCP_OAUTH_AUDIENCE=radestate-mcp
-# backend
-SUPABASE_ANON_KEY=              # required for password/refresh grants on auth client
+MCP_API_KEY=
+# Deprecated — temporary fallback during migration:
+# MCP_USER_ACCESS_TOKEN=
+MCP_TRANSPORT=stdio
+MCP_HTTP_HOST=127.0.0.1
+MCP_HTTP_PORT=8900
 ```
 
-Update [`.gitignore`](.gitignore) for `services/mcp/.auth.json`.
+### `backend/.env.example` (additions)
+
+```env
+# Optional pepper for API key hashing (if using sha256+pepper)
+MCP_API_KEY_PEPPER=
+```
 
 ---
 
 ## Security checklist
 
-- [ ] No service role in MCP env for tools
-- [ ] No tokens in git, logs, tool outputs, or commit messages
-- [ ] Refresh tokens only on disk with restrictive permissions (Windows ACL / `0600`)
-- [ ] HTTP: validate `aud` / `exp` / `iss` before accepting a bearer
-- [ ] HTTP: bind tokens to MCP resource URL (RFC 8707) when using full OAuth
-- [ ] Admin tools: backend `403` is enough for v1; do not soft-allow in MCP
-- [ ] Outreach remains draft-only (auth does not imply send)
+- [ ] Hash at rest; plaintext only in create response
+- [ ] Constant-time hash compare
+- [ ] Revoke is immediate
+- [ ] No keys in git, MCP tool outputs, or commit messages
+- [ ] Log scrubber covers API key prefixes
+- [ ] HTTP MCP: no fallback to a shared process JWT when a request omits the key
+- [ ] Admin tools still require `profiles.is_admin` after key → user resolution
+- [ ] Outreach remains draft-only
 
 ---
 
@@ -229,55 +324,55 @@ Update [`.gitignore`](.gitignore) for `services/mcp/.auth.json`.
 
 | Layer | What |
 |-------|------|
-| Unit | Providers, refresh skew, 401→refresh→retry once, scope gate |
-| MCP tools | `quick_search` / intake with valid token; clear error when missing |
-| API | Broker token exchange; reject bad audience |
-| Manual | Cursor stdio after `mcp login`; Inspector against HTTP with/without bearer |
-| Regression | Sign-in must not break `intake_sessions` inserts (service-role client isolation) |
+| Unit | Hash/verify, prefix detection, revoked/expired rejection |
+| API | CRUD keys; dual auth on a protected route; JWT regression |
+| MCP | Tool with key succeeds; without key fails; HTTP header path |
+| Manual | Cursor stdio with `MCP_API_KEY`; Inspector HTTP with `Authorization` |
 
 ---
 
 ## Rollout sequence
 
-1. **Phase A** behind existing env token (low risk).
-2. **Phase B** for all local developers; update `services/mcp/README.md` + Cursor/Claude samples.
-3. **Phase C** only after HTTP is used beyond localhost, or when a second user must share `dev:mcp`.
-4. **Phase D** when product needs scoped third-party agents.
+1. **Phase 1** to production/backend — dual auth, no MCP break.
+2. **Phase 2** — developers switch `.env` to `MCP_API_KEY`.
+3. **Phase 3** — one-command key creation; optional UI.
+4. **Phase 4** — scopes/rotation when needed.
 
 ---
 
 ## Non-goals
 
-- Replacing Supabase Auth for the Next.js app
-- Putting RLS / fit scoring / admin policy into MCP
-- Long-lived PATs that skip Supabase user identity
-- Impersonation APIs in MCP (support/debug stays in backend admin tools)
+- OAuth 2.1 / PKCE for MCP hosts (deferred; not part of this API-key track)
+- Replacing Supabase Auth for the Next.js cookie/JWT session
+- Service-role or HF tokens inside MCP
+- Impersonation (“act as user X”) via a master key
+- Putting RLS / fit / admin policy into the MCP process
 
 ---
 
 ## Success criteria
 
-1. Local Cursor users authenticate once (`mcp login`) and keep working across JWT expiry via refresh.
-2. No JWT required in committed host config files.
-3. Streamable HTTP rejects unauthenticated tool calls; authenticated calls reach backend as that user.
-4. Admin and ownership rules still enforced solely by FastAPI + Supabase.
-5. Docs in `services/mcp/README.md` describe stdio vs HTTP auth clearly.
+1. MCP tools work with `MCP_API_KEY` and **do not** require a fresh Supabase JWT daily.
+2. Backend resolves key → user; ownership and admin checks unchanged.
+3. Revoked keys fail immediately on the next request.
+4. Streamable HTTP rejects unauthenticated tool calls; stdio loads key from `.env`.
+5. Docs describe create → configure → revoke without mentioning JWT paste (except migration).
 
 ---
 
 ## Open decisions
 
-1. **Broker vs pure Supabase AS for HTTP** — default **backend broker (B2)** unless Cursor/Claude HTTP OAuth against Supabase proves straightforward.
-2. **Auth store** — file vs OS keychain first; file is enough for Phase B.
-3. **Whether `ping_backend` stays anonymous on HTTP** — yes for liveness; everything else authenticated.
-4. **Scopes in v1** — defer to Phase D unless a partner integration needs them immediately.
+1. **Hash algorithm** — `sha256(pepper + key)` (simple, fast) vs `argon2` (harder to brute-force prefixes). Default proposal: **sha256 + server pepper** with high entropy keys.
+2. **Header** — support both `Authorization: Bearer` and `X-API-Key` (yes).
+3. **Key TTL** — none by default; optional `expires_at` on create.
+4. **UI in v1** — script-only is enough; Settings UI in Phase 3 if time.
+5. **Legacy JWT in MCP** — keep fallback for one transition period, then remove from README.
 
 ---
 
 ## References
 
-- Repo: [`MCP_SERVER_PLAN.md`](MCP_SERVER_PLAN.md) (Auth model section)
-- MCP authorization (OAuth 2.1 resource server, Streamable HTTP) — current MCP spec auth guidance
-- RFC 9728 Protected Resource Metadata, RFC 8414 AS metadata, RFC 8707 Resource Indicators
-- Existing backend auth: `backend/app/api/v1/endpoints/auth/`, `backend/app/core/deps.py`
-- Existing MCP token injection: `services/mcp/app/client/backend.py`
+- Repo: [`MCP_SERVER_PLAN.md`](MCP_SERVER_PLAN.md)
+- Backend auth today: `backend/app/core/deps.py`, `backend/app/api/v1/endpoints/auth/`
+- MCP client: `services/mcp/app/client/backend.py`
+- Prior local JWT bootstrap (migration only): `services/mcp/scripts/setup_local_auth.py`
