@@ -5,9 +5,10 @@ node_modules
 frontend/.next
 frontend/out
 
-# Env
+# Env (never commit secrets — includes MCP_API_KEY / JWTs)
 .env
 .env*.local
+services/mcp/.auth.json
 
 # OS / editor
 .DS_Store

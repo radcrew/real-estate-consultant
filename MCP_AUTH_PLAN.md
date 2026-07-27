@@ -287,9 +287,9 @@ Migration file: `backend/supabase/migrations/20260727_mcp_api_keys.sql`.
 
 ### Phase 3 — Operator UX — ½–1 day
 
-- [ ] Script or CLI: `python scripts/create_mcp_api_key.py` (signs in once / uses existing JWT, prints key)
-- [ ] Optional: Settings page in Next.js “MCP API keys” (list / create / revoke)
-- [ ] Gitignore notes; never commit keys
+- [x] Script or CLI: `python scripts/create_mcp_api_key.py` (signs in once / uses existing JWT, prints key)
+- [ ] Optional: Settings page in Next.js “MCP API keys” (list / create / revoke) — deferred
+- [x] Gitignore notes; never commit keys
 
 ### Phase 4 — Hardening (optional)
 

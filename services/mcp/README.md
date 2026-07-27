@@ -23,20 +23,31 @@ copy .env.example .env
 
 ### Auth (API key)
 
-1. Sign in to the API (or use `scripts/setup_local_auth.py` once to get a JWT).
-2. Create a key:
+**Recommended (one command):** with the backend running:
 
 ```powershell
-# Example with a user JWT in $token
+.\.venv\Scripts\python.exe scripts\create_mcp_api_key.py
+```
+
+That signs in as the local MCP user, calls `POST /api/v1/account/api-keys`, and
+writes `MCP_API_KEY` into gitignored `services/mcp/.env`. Then reload the
+`radestate` MCP server in Cursor.
+
+Manual alternative:
+
+```powershell
+# With a user JWT in $token
 curl -X POST http://127.0.0.1:8888/api/v1/account/api-keys `
   -H "Authorization: Bearer $token" `
   -H "Content-Type: application/json" `
   -d "{\"name\":\"cursor\"}"
 ```
 
-3. Put the returned `api_key` into `services/mcp/.env` as `MCP_API_KEY=rad_…`.
-4. Reload the `radestate` MCP server in Cursor. `run-mcp.cmd` loads `.env`
-   automatically (do not commit keys; do not paste into `mcp.json`).
+Put the returned `api_key` into `services/mcp/.env` as `MCP_API_KEY=rad_…`.
+Never commit keys or paste them into `mcp.json`. Set `MCP_API_KEY_PEPPER` in
+`backend/.env` (long random string) before creating production keys.
+
+Legacy JWT bootstrap (migration only): `scripts\setup_local_auth.py`.
 
 ## Run
 
