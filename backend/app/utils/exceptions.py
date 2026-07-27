@@ -54,6 +54,15 @@ def raise_service_unavailable(detail: str, *, cause: BaseException | None = None
     raise_http_exception(status.HTTP_503_SERVICE_UNAVAILABLE, detail, cause=cause)
 
 
+def raise_too_many_requests(
+    detail: str,
+    *,
+    cause: BaseException | None = None,
+    headers: dict[str, str] | None = None,
+) -> NoReturn:
+    raise_http_exception(status.HTTP_429_TOO_MANY_REQUESTS, detail, cause=cause, headers=headers)
+
+
 def raise_gateway_timeout(detail: str, *, cause: BaseException | None = None) -> NoReturn:
     raise_http_exception(status.HTTP_504_GATEWAY_TIMEOUT, detail, cause=cause)
 

@@ -291,13 +291,13 @@ Migration file: `backend/supabase/migrations/20260727_mcp_api_keys.sql`.
 - [ ] Optional: Settings page in Next.js “MCP API keys” (list / create / revoke) — deferred
 - [x] Gitignore notes; never commit keys
 
-### Phase 4 — Hardening (optional)
+### Phase 4 — Hardening
 
-- [ ] Key scopes (`mcp:read` / `mcp:write` / `mcp:admin`)
-- [ ] Per-key rate limits
-- [ ] `last_used_at` updates (sampled)
-- [ ] Key expiration + rotation docs
-- [ ] Audit rows: key_id, tool name, status (no payloads)
+- [x] Key scopes (`mcp:read` / `mcp:write` / `mcp:admin`); HTTP method maps to read vs write; admin routes also need `mcp:admin` + `profiles.is_admin`
+- [x] Per-key rate limits (`MCP_API_KEY_RATE_LIMIT_PER_MINUTE`, default 120)
+- [x] `last_used_at` updates (sampled ~10%, min 5 minutes)
+- [x] Key expiration (`expires_in_days` on create) + rotation docs in MCP README
+- [x] Auth audit log line `mcp_api_key_auth` (key_id, prefix, user_id, scopes; no payloads)
 
 ---
 
@@ -320,20 +320,23 @@ MCP_HTTP_PORT=8900
 ```env
 # Optional pepper for API key hashing (if using sha256+pepper)
 MCP_API_KEY_PEPPER=
+# Per-key MCP API auth limit (requests/minute, single process)
+MCP_API_KEY_RATE_LIMIT_PER_MINUTE=120
 ```
 
 ---
 
 ## Security checklist
 
-- [ ] Hash at rest; plaintext only in create response
-- [ ] Constant-time hash compare
-- [ ] Revoke is immediate
-- [ ] No keys in git, MCP tool outputs, or commit messages
-- [ ] Log scrubber covers API key prefixes
-- [ ] HTTP MCP: no fallback to a shared process JWT when a request omits the key
-- [ ] Admin tools still require `profiles.is_admin` after key → user resolution
-- [ ] Outreach remains draft-only
+- [x] Hash at rest; plaintext only in create response
+- [x] Constant-time hash compare
+- [x] Revoke is immediate
+- [x] No keys in git, MCP tool outputs, or commit messages
+- [x] Log scrubber covers API key prefixes
+- [x] HTTP MCP: no fallback to a shared process JWT when a request omits the key
+- [x] Admin tools still require `profiles.is_admin` after key → user resolution
+- [x] Outreach remains draft-only
+- [x] Per-key rate limit + sampled `last_used_at` + optional expiration
 
 ---
 
@@ -353,7 +356,7 @@ MCP_API_KEY_PEPPER=
 1. **Phase 1** to production/backend — dual auth, no MCP break.
 2. **Phase 2** — developers switch `.env` to `MCP_API_KEY`.
 3. **Phase 3** — one-command key creation; optional UI.
-4. **Phase 4** — scopes/rotation when needed.
+4. **Phase 4** — scopes, rate limits, expiration, rotation docs (done).
 
 ---
 

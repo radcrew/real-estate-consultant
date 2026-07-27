@@ -47,6 +47,19 @@ Put the returned `api_key` into `services/mcp/.env` as `MCP_API_KEY=rad_…`.
 Never commit keys or paste them into `mcp.json`. Set `MCP_API_KEY_PEPPER` in
 `backend/.env` (long random string) before creating production keys.
 
+Optional create body fields: `scopes` (`*`, `mcp:read`, `mcp:write`, `mcp:admin`)
+and `expires_in_days`. Default scope is `["*"]`. Backend maps GET→`mcp:read`,
+mutating methods→`mcp:write`; admin routes also need `mcp:admin` plus
+`profiles.is_admin`.
+
+### Rotate a key
+
+1. Create a new key (`create_mcp_api_key.py` or `POST /api/v1/account/api-keys`).
+2. Update `MCP_API_KEY` in `services/mcp/.env` (stdio) or client headers (HTTP).
+3. Reload the MCP server / host so it picks up the new value.
+4. Revoke the old key: `DELETE /api/v1/account/api-keys/{id}` (JWT or a key with
+   `mcp:write` / `*`).
+
 Legacy JWT bootstrap (migration only): `scripts\setup_local_auth.py`.
 
 ## Run
@@ -136,10 +149,12 @@ python -m venv .venv
 
 ## Hardening
 
-- Per-process rate limit (`RATE_LIMIT_PER_MINUTE`)
+- Backend per-key rate limit (`MCP_API_KEY_RATE_LIMIT_PER_MINUTE`)
+- MCP per-process rate limit (`RATE_LIMIT_PER_MINUTE`)
 - Tool call timeout (`HTTP_TIMEOUT_SECONDS`)
 - Output sanitization (secret redaction, injection-phrase filter, truncation)
-- Admin tools (`enqueue_ingest`, `list_listing_submissions`) — backend enforces `is_admin`
+- Admin tools (`enqueue_ingest`, `list_listing_submissions`) — backend enforces
+  `mcp:admin` (API key) and `profiles.is_admin`
 
 ## Tools (summary)
 

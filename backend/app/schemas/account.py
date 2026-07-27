@@ -48,6 +48,16 @@ class SavedListingCreate(BaseModel):
 
 class McpApiKeyCreateRequest(BaseModel):
     name: str = Field(default="default", min_length=1, max_length=120)
+    scopes: list[str] | None = Field(
+        default=None,
+        description="Optional scopes; default ['*']. Allowed: *, mcp:read, mcp:write, mcp:admin",
+    )
+    expires_in_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=3650,
+        description="Optional TTL from now; omit for non-expiring keys",
+    )
 
 
 class McpApiKeyCreatedResponse(BaseModel):

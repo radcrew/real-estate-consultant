@@ -6,13 +6,12 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
 from uuid import UUID
 
-import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.core.database import get_session
-from app.core.deps import get_current_user
 from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
 from app.main import create_app
+from app.repositories.mcp_api_keys import ResolvedMcpApiKey
 
 _UID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 _KID = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
@@ -31,6 +30,15 @@ def _make_auth_user(email: str = "user@example.com"):
     )
 
 
+def _resolved(*, scopes: list[str] | None = None) -> ResolvedMcpApiKey:
+    return ResolvedMcpApiKey(
+        user_id=UUID(_UID),
+        key_id=UUID(_KID),
+        key_prefix="rad_abcdefgh",
+        scopes=scopes or ["*"],
+    )
+
+
 class TestMcpApiKeysCrud:
     async def test_create_returns_plaintext_once(self, client):
         meta = {
@@ -45,14 +53,32 @@ class TestMcpApiKeysCrud:
             "app.api.v1.endpoints.account.api_keys.create_mcp_api_key",
             new_callable=AsyncMock,
             return_value=("rad_abcdefSECRET", meta),
-        ):
-            r = await client.post("/api/v1/account/api-keys", json={"name": "Cursor"})
+        ) as create:
+            r = await client.post(
+                "/api/v1/account/api-keys",
+                json={"name": "Cursor", "scopes": ["mcp:read"], "expires_in_days": 30},
+            )
         assert r.status_code == 201
         body = r.json()
         assert body["api_key"] == "rad_abcdefSECRET"
         assert body["key_prefix"] == "rad_abcdef"
         assert body["name"] == "Cursor"
         assert "key_hash" not in body
+        kwargs = create.await_args.kwargs
+        assert kwargs["scopes"] == ["mcp:read"]
+        assert kwargs["expires_at"] is not None
+
+    async def test_create_rejects_bad_scopes(self, client):
+        with patch(
+            "app.api.v1.endpoints.account.api_keys.create_mcp_api_key",
+            new_callable=AsyncMock,
+            side_effect=ValueError("Unsupported MCP API key scopes: nope"),
+        ):
+            r = await client.post(
+                "/api/v1/account/api-keys",
+                json={"name": "bad", "scopes": ["nope"]},
+            )
+        assert r.status_code == 422
 
     async def test_list_keys(self, client):
         with patch(
@@ -104,14 +130,13 @@ class TestDualAuthApiKey:
         app.dependency_overrides[get_session] = lambda: mock_db
         app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
         app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
-        # Do NOT override get_current_user — exercise real dual-auth.
 
         auth_user = _make_auth_user()
         with (
             patch(
-                "app.core.deps.resolve_mcp_api_key_user_id",
+                "app.core.deps.resolve_mcp_api_key",
                 new_callable=AsyncMock,
-                return_value=UUID(_UID),
+                return_value=_resolved(),
             ),
             patch(
                 "app.core.deps.get_auth_user",
@@ -135,6 +160,28 @@ class TestDualAuthApiKey:
         assert r.status_code == 200
         assert r.json()["first_name"] == "Api"
 
+    async def test_read_only_key_forbidden_on_post(self, mock_db, mock_supabase):
+        app = create_app()
+        app.dependency_overrides[get_session] = lambda: mock_db
+        app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
+        app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
+
+        with patch(
+            "app.core.deps.resolve_mcp_api_key",
+            new_callable=AsyncMock,
+            return_value=_resolved(scopes=["mcp:read"]),
+        ):
+            async with AsyncClient(
+                transport=ASGITransport(app=app),
+                base_url="http://test",
+            ) as ac:
+                r = await ac.post(
+                    "/api/v1/account/api-keys",
+                    headers={"X-API-Key": "rad_abcdefghijklmnop"},
+                    json={"name": "x"},
+                )
+        assert r.status_code == 403
+
     async def test_invalid_api_key_returns_401(self, mock_db, mock_supabase):
         app = create_app()
         app.dependency_overrides[get_session] = lambda: mock_db
@@ -142,7 +189,7 @@ class TestDualAuthApiKey:
         app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
 
         with patch(
-            "app.core.deps.resolve_mcp_api_key_user_id",
+            "app.core.deps.resolve_mcp_api_key",
             new_callable=AsyncMock,
             return_value=None,
         ):

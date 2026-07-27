@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Response, status
@@ -20,7 +21,7 @@ from app.schemas.account import (
     McpApiKeyListResponse,
     McpApiKeyResponse,
 )
-from app.utils.exceptions import raise_service_unavailable
+from app.utils.exceptions import raise_service_unavailable, raise_unprocessable_entity
 
 router = APIRouter(prefix="/api-keys", tags=["account"])
 
@@ -44,12 +45,19 @@ async def create_account_mcp_api_key(
     current_user: CurrentUser,
     client: SupabaseSdkDep,
 ) -> McpApiKeyCreatedResponse:
+    expires_at = None
+    if body.expires_in_days is not None:
+        expires_at = datetime.now(timezone.utc) + timedelta(days=body.expires_in_days)
     try:
         raw, row = await create_mcp_api_key(
             client,
             user_id=UUID(current_user.id),
             name=body.name,
+            scopes=body.scopes,
+            expires_at=expires_at,
         )
+    except ValueError as exc:
+        raise_unprocessable_entity(str(exc), cause=exc)
     except SupabaseRequestError as exc:
         raise_service_unavailable("Could not create MCP API key.", cause=exc)
 

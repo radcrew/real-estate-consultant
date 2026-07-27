@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextvars import ContextVar
 from typing import Annotated
 from uuid import UUID
 
@@ -9,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from supabase import AsyncClient, AuthApiError
 from supabase_auth.types import User
 
+from app.core.api_key_rate_limit import ApiKeyRateLimiter
+from app.core.config import settings
 from app.core.database import get_session
 from app.core.db_safe import SupabaseRequestError
 from app.core.exceptions import (
@@ -17,21 +20,28 @@ from app.core.exceptions import (
     raise_auth_user_not_returned,
 )
 from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
-from app.domain.mcp_api_keys import looks_like_mcp_api_key
+from app.domain.mcp_api_keys import looks_like_mcp_api_key, mcp_scopes_allow
 from app.repositories.account import get_auth_user
-from app.repositories.mcp_api_keys import resolve_mcp_api_key_user_id
+from app.repositories.mcp_api_keys import ResolvedMcpApiKey, resolve_mcp_api_key
 from app.repositories.profiles import get_profile_row
-from app.utils.exceptions import raise_forbidden, raise_service_unavailable
+from app.utils.exceptions import raise_forbidden, raise_service_unavailable, raise_too_many_requests
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 
-# get_supabase_sdk_client is a plain sync function returning the singleton client —
-# FastAPI handles both sync and async callables as dependencies.
 SupabaseSdkDep = Annotated[AsyncClient, Depends(get_supabase_sdk_client)]
-# Password grants only — must not share the service-role data client (SIGNED_IN poisons it).
 SupabaseAuthDep = Annotated[AsyncClient, Depends(get_supabase_auth_client)]
 
 _http_bearer = HTTPBearer(auto_error=False)
+
+_api_key_ctx: ContextVar[ResolvedMcpApiKey | None] = ContextVar("mcp_api_key_ctx", default=None)
+_api_key_limiter = ApiKeyRateLimiter(
+    max_calls=settings.mcp_api_key_rate_limit_per_minute,
+    window_seconds=60.0,
+)
+
+
+def get_request_mcp_api_key() -> ResolvedMcpApiKey | None:
+    return _api_key_ctx.get()
 
 
 def _extract_credential(
@@ -47,14 +57,29 @@ def _extract_credential(
     return None
 
 
-async def _user_from_api_key(client: AsyncClient, raw_key: str) -> User:
+def _enforce_request_scope(request: Request, scopes: list[str]) -> None:
+    """Map HTTP method to mcp:read vs mcp:write (admin/* cover both)."""
+    method = request.method.upper()
+    if method in {"GET", "HEAD", "OPTIONS"}:
+        if not mcp_scopes_allow(scopes, "mcp:read"):
+            raise_forbidden("MCP API key lacks mcp:read scope.")
+        return
+    if not mcp_scopes_allow(scopes, "mcp:write"):
+        raise_forbidden("MCP API key lacks mcp:write scope.")
+
+
+async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str) -> User:
     try:
-        user_id = await resolve_mcp_api_key_user_id(client, raw_key)
+        resolved = await resolve_mcp_api_key(client, raw_key)
     except SupabaseRequestError as exc:
         raise_service_unavailable("API key service unavailable.", cause=exc)
-    if user_id is None:
+    if resolved is None:
         raise_auth_invalid_access_token()
-    return await get_auth_user(client, str(user_id))
+    if not _api_key_limiter.allow(resolved.key_id):
+        raise_too_many_requests("MCP API key rate limit exceeded. Try again shortly.")
+    _enforce_request_scope(request, resolved.scopes)
+    _api_key_ctx.set(resolved)
+    return await get_auth_user(client, str(resolved.user_id))
 
 
 async def get_current_user(
@@ -63,12 +88,13 @@ async def get_current_user(
     client: Annotated[AsyncClient, Depends(get_supabase_sdk_client)],
 ) -> User:
     """Validate Bearer JWT **or** MCP API key (``rad_…`` / ``X-API-Key``)."""
+    _api_key_ctx.set(None)
     token = _extract_credential(request, credentials)
     if not token:
         raise_auth_missing_bearer()
 
     if looks_like_mcp_api_key(token):
-        return await _user_from_api_key(client, token)
+        return await _user_from_api_key(request, client, token)
 
     try:
         response = await client.auth.get_user(token)
@@ -87,7 +113,11 @@ async def get_current_admin(
     user: CurrentUser,
     client: SupabaseSdkDep,
 ) -> User:
-    """Require the authenticated user to have ``profiles.is_admin = true``."""
+    """Require admin profile; API keys also need ``mcp:admin`` or ``*`` scope."""
+    api_key = get_request_mcp_api_key()
+    if api_key is not None and not mcp_scopes_allow(api_key.scopes, "mcp:admin"):
+        raise_forbidden("MCP API key lacks mcp:admin scope.")
+
     try:
         raw = await get_profile_row(client, UUID(user.id))
     except SupabaseRequestError as exc:
