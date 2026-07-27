@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, Response, status
 
 from app.api.v1.endpoints.account.exceptions import raise_mcp_api_key_not_found
-from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.core.db_safe import SupabaseRequestError
+from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.repositories.mcp_api_keys import (
     create_mcp_api_key,
     list_mcp_api_keys,
@@ -47,7 +47,7 @@ async def create_account_mcp_api_key(
 ) -> McpApiKeyCreatedResponse:
     expires_at = None
     if body.expires_in_days is not None:
-        expires_at = datetime.now(timezone.utc) + timedelta(days=body.expires_in_days)
+        expires_at = datetime.now(UTC) + timedelta(days=body.expires_in_days)
     try:
         raw, row = await create_mcp_api_key(
             client,

@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from supabase import AsyncClient
-
 from app.core.db_safe import execute_db_safe
 from app.utils.supabase.response import as_row_list, get_single_row
+from supabase import AsyncClient
 
 _ACTIVE_STATUSES = ("pending", "running")
 _INSERT_ERROR = "Unexpected response from Supabase when creating ingestion job."

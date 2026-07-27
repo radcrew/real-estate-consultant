@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import NoReturn
 
-from supabase import AuthApiError
-
 from app.utils.exceptions import raise_unauthorized
+from supabase import AuthApiError
 
 _WWW_BEARER = {"WWW-Authenticate": "Bearer"}
 

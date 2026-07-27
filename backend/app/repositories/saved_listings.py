@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from supabase import AsyncClient
-
 from app.core.db_safe import execute_db_safe
 from app.utils.supabase.response import as_row_list
+from supabase import AsyncClient
 
 
 async def list_saved_property_ids(client: AsyncClient, user_id: UUID) -> list[str]:

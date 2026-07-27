@@ -5,11 +5,9 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
-
-from supabase import AsyncClient
 
 from app.core.config import settings
 from app.core.db_safe import execute_db_safe
@@ -21,6 +19,7 @@ from app.domain.mcp_api_keys import (
     verify_mcp_api_key,
 )
 from app.utils.supabase.response import as_row_list, get_single_row
+from supabase import AsyncClient
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +52,8 @@ def _is_expired(row: dict[str, Any], *, now: datetime | None = None) -> bool:
     if isinstance(expires_at, str):
         expires_at = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
     if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    ref = now or datetime.now(timezone.utc)
+        expires_at = expires_at.replace(tzinfo=UTC)
+    ref = now or datetime.now(UTC)
     return expires_at <= ref
 
 
@@ -62,10 +61,10 @@ def _parse_dt(value: Any) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
     return None
 
 
@@ -128,7 +127,7 @@ async def revoke_mcp_api_key(
     key_id: UUID,
 ) -> dict[str, Any] | None:
     """Soft-revoke. Returns updated row or ``None`` if not found / not owned."""
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     result = await execute_db_safe(
         client.table("mcp_api_keys")
         .update({"revoked_at": now})
@@ -144,7 +143,7 @@ async def revoke_mcp_api_key(
 
 
 async def touch_mcp_api_key_last_used(client: AsyncClient, key_id: UUID) -> None:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     await execute_db_safe(
         client.table("mcp_api_keys")
         .update({"last_used_at": now})
@@ -167,7 +166,7 @@ async def resolve_mcp_api_key(
         .execute(),
     )
     pepper = _pepper()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for row in as_row_list(result.data):
         key_hash = row.get("key_hash")
         if not isinstance(key_hash, str):

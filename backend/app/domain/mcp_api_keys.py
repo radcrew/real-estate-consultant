@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
-from typing import Iterable
+from collections.abc import Iterable
 
 MCP_API_KEY_PREFIX = "rad_"
 # Indexed lookup prefix: "rad_" + first 8 chars of the secret body.
@@ -36,7 +36,7 @@ def mcp_api_key_prefix(raw_key: str) -> str:
 
 
 def hash_mcp_api_key(raw_key: str, *, pepper: str) -> str:
-    material = f"{pepper}{raw_key}".encode("utf-8")
+    material = f"{pepper}{raw_key}".encode()
     return hashlib.sha256(material).hexdigest()
 
 

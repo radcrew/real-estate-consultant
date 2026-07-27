@@ -7,7 +7,6 @@ from uuid import UUID
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from supabase import AsyncClient, AuthApiError
 from supabase_auth.types import User
 
 from app.core.api_key_rate_limit import ApiKeyRateLimiter
@@ -25,6 +24,7 @@ from app.repositories.account import get_auth_user
 from app.repositories.mcp_api_keys import ResolvedMcpApiKey, resolve_mcp_api_key
 from app.repositories.profiles import get_profile_row
 from app.utils.exceptions import raise_forbidden, raise_service_unavailable, raise_too_many_requests
+from supabase import AsyncClient, AuthApiError
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 

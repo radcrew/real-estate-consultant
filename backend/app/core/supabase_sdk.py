@@ -1,8 +1,8 @@
 import httpx
-from supabase import AsyncClient, acreate_client
 from supabase.lib.client_options import AsyncClientOptions
 
 from app.core.config import settings
+from supabase import AsyncClient, acreate_client
 
 _SUPABASE_HTTP_TIMEOUT = httpx.Timeout(connect=30.0, read=120.0, write=30.0, pool=15.0)
 

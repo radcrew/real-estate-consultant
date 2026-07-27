@@ -5,11 +5,10 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from supabase import AsyncClient
-
 from app.core.db_safe import execute_db_safe
 from app.utils.exceptions import raise_bad_gateway
 from app.utils.supabase.response import as_row_list, get_single_row
+from supabase import AsyncClient
 
 _SELECT = "id,property_id,user_id,draft_email,created_at"
 _UNEXPECTED = "Unexpected response from Supabase when loading outreach draft."
