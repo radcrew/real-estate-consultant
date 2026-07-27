@@ -21,3 +21,5 @@ Thumbs.db
 
 # Tool-generated temp files (e.g. <file>.tmp.<pid>.<hash>)
 *.tmp.*
+
+.claude/
