@@ -141,7 +141,7 @@ build reproducibility becomes an issue.
 | `BACKEND_API_URL` | `https://<your-backend>.onrender.com` | No trailing slash |
 | `MCP_TRANSPORT` | `streamable-http` | Required |
 | `MCP_HTTP_HOST` | `0.0.0.0` | Required on Render |
-| `MCP_HTTP_PORT` | *(omit — use Render `PORT`)* | After PORT wiring lands |
+| `MCP_HTTP_PORT` | *(omit — use Render `PORT`)* | Honored via `AliasChoices` in `app/config.py` |
 | `HTTP_TIMEOUT_SECONDS` | `60` | Raise if backend cold-starts |
 | `RATE_LIMIT_PER_MINUTE` | `60` | Process-local; raise carefully |
 | `MAX_TOOL_OUTPUT_CHARS` | `24000` | |
@@ -232,9 +232,9 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 - [ ] Confirm production backend URL and `/api/v1/ping`
 - [ ] Confirm a production user can create `rad_…` keys against prod backend
 - [ ] Freeze decisions in this doc
-- [ ] Implement `PORT` + document `0.0.0.0` bind locally (`dev:mcp` still works)
+- [x] Implement `PORT` + document `0.0.0.0` bind locally (`dev:mcp` still works)
   - [x] Honor `PORT` / `MCP_HTTP_PORT` in `app/config.py`
-  - [ ] Document `0.0.0.0` bind + Render env in README
+  - [x] Document `0.0.0.0` bind + Render env in README
 
 **Exit:** local HTTP MCP can target **prod** `BACKEND_API_URL` with a prod key
 (optional smoke; careful with real data).

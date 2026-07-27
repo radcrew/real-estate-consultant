@@ -1,7 +1,8 @@
 # MCP adapter for the radestate commercial real-estate platform.
 
 Thin FastMCP process over the FastAPI backend (`/api/v1`). Domain logic stays in
-`backend/`. Roadmap: repo root `MCP_SERVER_PLAN.md`.
+`backend/`. Roadmap: repo root `MCP_SERVER_PLAN.md`. Deploy plan:
+[`MCP_RENDER_DEPLOY_PLAN.md`](../../MCP_RENDER_DEPLOY_PLAN.md).
 
 ## Requirements
 
@@ -104,10 +105,40 @@ $env:MCP_HTTP_PORT="8900"
 python -m app.main
 ```
 
+For a PaaS-like local check (public bind), use `MCP_HTTP_HOST=0.0.0.0`.
+On Render, set `MCP_HTTP_HOST=0.0.0.0` and **omit** `MCP_HTTP_PORT` so the
+platform `PORT` is used (see `app/config.py`).
+
 Endpoint path defaults to `/mcp` on the configured host/port. Logging → **stderr**
 (stdout is the JSON-RPC wire). Cursor’s MCP panel labels stderr as `[error]` even
 for INFO lines; the server quiets MCP SDK protocol logs (Ping/ListTools/etc.) to
 WARNING+ so those do not look like failures.
+
+## Deploy (Render)
+
+MCP on Render is a **separate Web Service** from the FastAPI backend. It only
+calls `BACKEND_API_URL` over HTTPS. Full checklist:
+[`MCP_RENDER_DEPLOY_PLAN.md`](../../MCP_RENDER_DEPLOY_PLAN.md).
+
+| Setting | Value |
+|---------|--------|
+| Root Directory | `services/mcp` |
+| Build | `pip install -U pip && pip install .` |
+| Start | `MCP_TRANSPORT=streamable-http python -m app.main` |
+
+**Required env on Render**
+
+| Key | Value |
+|-----|--------|
+| `BACKEND_API_URL` | Production backend URL (no trailing slash) |
+| `MCP_TRANSPORT` | `streamable-http` |
+| `MCP_HTTP_HOST` | `0.0.0.0` |
+
+Omit `MCP_HTTP_PORT` — Render injects `PORT`. Do **not** set `MCP_API_KEY` on
+the service (HTTP clients send `Authorization: Bearer rad_…` or `X-API-Key` per
+request). Public URL shape: `https://<service>.onrender.com/mcp`.
+
+Local Cursor **stdio** (`run-mcp.cmd`) stays unchanged for day-to-day work.
 
 ## Cursor host config (stdio)
 
