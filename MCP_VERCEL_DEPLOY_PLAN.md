@@ -122,7 +122,8 @@ services/mcp/
 - [x] Local ASGI check: Starlette `TestClient` POST `/mcp` initialize → 200 JSON (`radestate`).
 - [x] Document `vercel link` / `vercel dev` / deploy commands in `services/mcp/README.md`.
 - [x] Create/link Vercel MCP project; deploy; `/health` + `/mcp` initialize OK against prod BE URL.
-- [ ] Create a prod `rad_…` key and verify `ping_backend` / `quick_search` via Inspector or Cursor remote.
+- [x] Verified remote `tools/list` (18 tools) + `ping_backend` → pong via Streamable HTTP (user JWT Bearer).
+- [ ] **Blocked on backend deploy:** `POST /api/v1/account/api-keys` is **404** on prod BE — ship the MCP API-key backend work, then create a prod `rad_…` and re-verify with API-key headers.
 
 **Exit criteria:** Inspector lists tools and `ping_backend` returns pong against prod BE.
 
