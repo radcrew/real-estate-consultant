@@ -3,9 +3,11 @@
 # Separate Vercel project with Root Directory = services/mcp (Settings → General).
 # Deploy runs from services/mcp/ (same pattern as backend/).
 #
-# GitHub secrets: VERCEL_TOKEN, VERCEL_ORG_ID,
+# GitHub secrets: VERCEL_TOKEN (must access Chris Silva's projects / team below),
 #                 VERCEL_AUTOMATION_BYPASS_SECRET (optional — Deployment Protection bypass)
-# VERCEL_PROJECT_ID is set in-workflow to prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs (real-estate-consultant-mcp).
+# VERCEL_ORG_ID / VERCEL_PROJECT_ID are pinned to real-estate-consultant-mcp
+# (team_GGqKP4vcYS6Z1tP94DfMSzaB / prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs) — do not reuse the
+# frontend/backend org secret; that team does not own this MCP project.
 # Production env in Vercel: BACKEND_API_URL=https://real-estate-consultant-be.vercel.app
 #   (see services/mcp/.env.example — do NOT set MCP_API_KEY on the shared deployment)
 name: MCP
@@ -23,9 +25,9 @@ on:
       - ".github/workflows/mcp.yml"
 
 env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  # Project IDs are not sensitive. Do not use secrets.* here — an unset secret
-  # makes the whole expression empty in Actions, which breaks vercel pull.
+  # Org + project IDs are not sensitive. Pin both — secrets.VERCEL_ORG_ID is the
+  # frontend team and does not contain this MCP project ("Project not found").
+  VERCEL_ORG_ID: team_GGqKP4vcYS6Z1tP94DfMSzaB
   VERCEL_PROJECT_ID: prj_dZS9H4Ne4VpVIMHiz5XaDohRxRvs
 
 jobs:
@@ -74,10 +76,10 @@ jobs:
       - name: Require Vercel project id
         run: |
           if [ -z "$VERCEL_PROJECT_ID" ] || [ -z "$VERCEL_ORG_ID" ]; then
-            echo "::error::Missing VERCEL_ORG_ID or VERCEL_PROJECT_ID. Set GitHub secret VERCEL_ORG_ID (project id is pinned in this workflow)."
+            echo "::error::Missing VERCEL_ORG_ID or VERCEL_PROJECT_ID (expected pinned MCP team/project in workflow env)."
             exit 1
           fi
-          echo "Using VERCEL_PROJECT_ID=$VERCEL_PROJECT_ID"
+          echo "Using VERCEL_ORG_ID=$VERCEL_ORG_ID VERCEL_PROJECT_ID=$VERCEL_PROJECT_ID"
 
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
@@ -127,10 +129,10 @@ jobs:
       - name: Require Vercel project id
         run: |
           if [ -z "$VERCEL_PROJECT_ID" ] || [ -z "$VERCEL_ORG_ID" ]; then
-            echo "::error::Missing VERCEL_ORG_ID or VERCEL_PROJECT_ID. Set GitHub secret VERCEL_ORG_ID (project id is pinned in this workflow)."
+            echo "::error::Missing VERCEL_ORG_ID or VERCEL_PROJECT_ID (expected pinned MCP team/project in workflow env)."
             exit 1
           fi
-          echo "Using VERCEL_PROJECT_ID=$VERCEL_PROJECT_ID"
+          echo "Using VERCEL_ORG_ID=$VERCEL_ORG_ID VERCEL_PROJECT_ID=$VERCEL_PROJECT_ID"
 
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
