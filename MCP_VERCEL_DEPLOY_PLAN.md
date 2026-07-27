@@ -128,7 +128,7 @@ services/mcp/
   - Project: `chris-silva-s-projects/real-estate-consultant-be` (`prj_RarH0ycK5nywpSwX6HI7taMUBwA8`)
   - URL: **https://real-estate-consultant-be-nu.vercel.app** (`/health`, `/api/v1/ping`, `POST /api/v1/account/api-keys` → 201)
   - Note: original `real-estate-consultant-be.vercel.app` remains the older `main` deploy on another team (no api-keys yet).
-- [ ] Point MCP Vercel `BACKEND_API_URL` at `https://real-estate-consultant-be-nu.vercel.app`, redeploy MCP, verify `ping_backend` with `rad_…`.
+- [x] Pointed MCP `BACKEND_API_URL` at `https://real-estate-consultant-be-nu.vercel.app`, redeployed MCP, verified `ping_backend` with **`rad_…` Bearer** → pong.
 
 **Exit criteria:** Inspector lists tools and `ping_backend` returns pong against prod BE.
 

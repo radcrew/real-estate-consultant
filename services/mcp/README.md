@@ -163,8 +163,8 @@ Project ID for GitHub secret `VERCEL_MCP_PROJECT_ID`: `prj_dZS9H4Ne4VpVIMHiz5XaD
 Health: https://real-estate-consultant-mcp.vercel.app/health  
 MCP endpoint: https://real-estate-consultant-mcp.vercel.app/mcp  
 
-Verified: `tools/list` + `ping_backend` against this URL (auth via user JWT until
-prod backend exposes `/api/v1/account/api-keys` for `rad_…` keys).
+Verified: `tools/list` + `ping_backend` against this URL with **`rad_…` API key**
+(MCP → `https://real-estate-consultant-be-nu.vercel.app`).
 
 ### Production API keys (for remote MCP)
 
