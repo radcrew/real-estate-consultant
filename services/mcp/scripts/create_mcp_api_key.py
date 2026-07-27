@@ -1,9 +1,14 @@
-"""Create an MCP API key and write MCP_API_KEY into services/mcp/.env.
+"""Create an MCP API key (local or production backend).
 
-Uses backend sign-in (same local user as setup_local_auth.py), then
-POST /api/v1/account/api-keys. Requires backend on :8888 and mcp_api_keys table.
+Signs in as the local MCP bootstrap user (or uses --access-token), then
+POST /api/v1/account/api-keys. Never commits the key.
 
-Never commits the key — services/mcp/.env is gitignored.
+Examples:
+  # Local backend → write services/mcp/.env
+  python scripts/create_mcp_api_key.py
+
+  # Production backend → print once for Cursor / Vercel HTTP headers
+  python scripts/create_mcp_api_key.py --backend-url https://real-estate-consultant-be.vercel.app --print-only --name cursor-prod
 """
 
 from __future__ import annotations
@@ -20,9 +25,8 @@ REPO_ROOT = SVC_ROOT.parents[1]
 ENV_PATH = SVC_ROOT / ".env"
 ENV_EXAMPLE = SVC_ROOT / ".env.example"
 BACKEND_ENV = REPO_ROOT / "backend" / ".env"
-BACKEND_HEALTH = "http://127.0.0.1:8888/health"
-BASE = "http://127.0.0.1:8888/api/v1"
 
+DEFAULT_BACKEND = "http://127.0.0.1:8888"
 EMAIL = "mcp.local@radestate.dev"
 PASSWORD = "McpLocalPass123!"
 
@@ -60,17 +64,18 @@ def upsert_env(path: Path, updates: dict[str, str], *, example: Path | None = No
     path.write_text(text, encoding="utf-8")
 
 
-def backend_reachable() -> bool:
+def backend_reachable(base: str) -> bool:
+    health = base.rstrip("/") + "/health"
     try:
-        response = httpx.get(BACKEND_HEALTH, timeout=3.0, trust_env=False)
+        response = httpx.get(health, timeout=5.0, trust_env=False)
     except httpx.HTTPError:
         return False
     return response.status_code == 200
 
 
-def obtain_user_jwt() -> str | None:
+def obtain_user_jwt(api_base: str) -> str | None:
     """Sign in (and sign up if needed) via backend auth."""
-    with httpx.Client(base_url=BASE, timeout=30.0, trust_env=False) as client:
+    with httpx.Client(base_url=api_base, timeout=30.0, trust_env=False) as client:
         client.post(
             "/auth/sign-up",
             json={
@@ -87,8 +92,8 @@ def obtain_user_jwt() -> str | None:
         return si.json()["access_token"]
 
 
-def create_api_key(jwt: str, *, name: str) -> dict:
-    with httpx.Client(base_url=BASE, timeout=30.0, trust_env=False) as client:
+def create_api_key(api_base: str, jwt: str, *, name: str) -> dict:
+    with httpx.Client(base_url=api_base, timeout=30.0, trust_env=False) as client:
         response = client.post(
             "/account/api-keys",
             headers={"Authorization": f"Bearer {jwt}"},
@@ -101,8 +106,18 @@ def create_api_key(jwt: str, *, name: str) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create MCP API key and update services/mcp/.env")
+    parser = argparse.ArgumentParser(description="Create MCP API key")
     parser.add_argument("--name", default="cursor-local", help="Key label stored in mcp_api_keys")
+    parser.add_argument(
+        "--backend-url",
+        default=DEFAULT_BACKEND,
+        help="Backend origin (no trailing slash). Use prod URL for Vercel MCP hosts.",
+    )
+    parser.add_argument(
+        "--access-token",
+        default="",
+        help="Optional existing user JWT (skip email/password sign-in).",
+    )
     parser.add_argument(
         "--print-only",
         action="store_true",
@@ -110,25 +125,38 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not backend_reachable():
-        print("Backend not reachable at http://127.0.0.1:8888 — start pnpm run dev:be (or dev:all)")
+    backend = args.backend_url.rstrip("/")
+    api_base = f"{backend}/api/v1"
+    is_local = backend.startswith("http://127.0.0.1") or backend.startswith("http://localhost")
+
+    if not backend_reachable(backend):
+        print(f"Backend not reachable at {backend}/health")
+        if is_local:
+            print("Start pnpm run dev:be (or dev:all) first.")
         return 1
 
-    be = load_dotenv(BACKEND_ENV)
-    if not (be.get("MCP_API_KEY_PEPPER") or "").strip():
-        print(
-            "WARNING: backend/.env has empty MCP_API_KEY_PEPPER. "
-            "Keys will hash with an empty pepper — set a long random pepper before production.",
-        )
+    if is_local:
+        be = load_dotenv(BACKEND_ENV)
+        if not (be.get("MCP_API_KEY_PEPPER") or "").strip():
+            print(
+                "WARNING: backend/.env has empty MCP_API_KEY_PEPPER. "
+                "Keys will hash with an empty pepper — set a long random pepper before production.",
+            )
 
-    print(f"signing in as {EMAIL} …")
-    jwt = obtain_user_jwt()
+    jwt = (args.access_token or "").strip()
     if not jwt:
-        return 1
+        print(f"signing in as {EMAIL} @ {backend} …")
+        jwt = obtain_user_jwt(api_base)
+        if not jwt:
+            print(
+                "Tip: for production, pass a user JWT from the app: "
+                "--access-token <supabase_user_jwt>",
+            )
+            return 1
 
     print(f"creating MCP API key name={args.name!r} …")
     try:
-        created = create_api_key(jwt, name=args.name)
+        created = create_api_key(api_base, jwt, name=args.name)
     except httpx.HTTPError:
         return 1
 
@@ -140,14 +168,17 @@ def main() -> int:
     print(f"OK id={created.get('id')} prefix={created.get('key_prefix')}")
     print(f"api_key={api_key[:12]}… (full value written to .env unless --print-only)")
 
-    if args.print_only:
+    if args.print_only or not is_local:
+        if not args.print_only and not is_local:
+            print("Non-local backend: printing key only (not writing .env).")
         print(api_key)
+        print("Put this in Cursor mcp.json headers (Bearer) — never commit it.")
         return 0
 
     upsert_env(
         ENV_PATH,
         {
-            "BACKEND_API_URL": "http://127.0.0.1:8888",
+            "BACKEND_API_URL": backend,
             "MCP_API_KEY": api_key,
             "MCP_TRANSPORT": "stdio",
         },

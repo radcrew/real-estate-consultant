@@ -179,14 +179,14 @@ Keep **API-key pass-through** (already implemented). Defer full MCP OAuth/`mcp-h
 }
 ```
 
-(Exact `headers` support depends on Cursor version — document fallback via `mcp-remote` or Inspector.)
+Template checked in: [`.cursor/mcp.remote.example.json`](.cursor/mcp.remote.example.json).
 
 **Tasks**
 
-- [ ] Document create-key flow against **prod** backend (script or curl with user JWT).
-- [ ] Document rotation (create → update host headers → revoke old).
-- [ ] Verify Deployment Protection: either disable for MCP prod URL or use protection bypass for known hosts.
-- [ ] Optional: Vercel Firewall rate rules in front of `/mcp`.
+- [x] Document create-key flow against **prod** backend (`create_mcp_api_key.py --backend-url … --print-only`)
+- [x] Document rotation (create → update host headers → revoke old)
+- [x] Document Deployment Protection / bypass notes for MCP hosts
+- [ ] Optional: Vercel Firewall rate rules in front of `/mcp` (dashboard)
 
 **Out of scope for this phase:** OAuth 2.1 / PKCE for MCP hosts (see auth plan non-goals). Revisit if Claude/Cursor require AS metadata endpoints.
 

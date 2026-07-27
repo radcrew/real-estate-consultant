@@ -157,6 +157,37 @@ npx vercel deploy --prod
 Public path: `https://<mcp-project>.vercel.app/mcp`. Plan: repo root
 [`MCP_VERCEL_DEPLOY_PLAN.md`](../../MCP_VERCEL_DEPLOY_PLAN.md).
 
+### Production API keys (for remote MCP)
+
+Create keys against the **production** backend (pepper must already be set on
+that Vercel project as `MCP_API_KEY_PEPPER`):
+
+```powershell
+cd services/mcp
+# Prefer a real user JWT from the signed-in app:
+.\.venv\Scripts\python.exe scripts\create_mcp_api_key.py `
+  --backend-url https://real-estate-consultant-be.vercel.app `
+  --access-token "<user_jwt>" `
+  --name cursor-prod `
+  --print-only
+```
+
+Copy the printed `rad_…` into your host config headers only. Rotate by creating
+a new key, updating the host, then `DELETE /api/v1/account/api-keys/{id}` with
+JWT or a write-scoped key.
+
+### Deployment Protection
+
+If the MCP Vercel project has **Deployment Protection** (SSO / password), MCP
+hosts and Inspector will get HTML challenges instead of JSON-RPC. For the
+production MCP URL either:
+
+- disable protection on that project, or
+- use a [protection bypass](https://vercel.com/docs/security/deployment-protection/methods-to-bypass-deployment-protection)
+  header/secret only for trusted automation (not a substitute for `rad_…`).
+
+Standard Protection Bypass is optional; **API key auth remains required**.
+
 ## Cursor host config (stdio)
 
 On Windows, Cursor launches MCP servers through `cmd.exe`. Pointing `command`
@@ -194,6 +225,29 @@ set to `services/mcp` (avoids `ModuleNotFoundError: app` from a broken
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
 ```
+
+## Cursor host config (remote / Vercel)
+
+After the MCP project is deployed, use Streamable HTTP instead of stdio.
+Example template (no secrets): [`.cursor/mcp.remote.example.json`](../../.cursor/mcp.remote.example.json).
+
+```json
+{
+  "mcpServers": {
+    "radestate-remote": {
+      "url": "https://<mcp-project>.vercel.app/mcp",
+      "headers": {
+        "Authorization": "Bearer rad_…"
+      }
+    }
+  }
+}
+```
+
+Keep local stdio (`radestate`) for day-to-day repo work; use `radestate-remote`
+when you want the deployed adapter. If your Cursor build ignores `headers`, use
+MCP Inspector with the same URL + Bearer token to verify, then check Cursor docs
+for the current remote-auth field names.
 
 ## Hardening
 

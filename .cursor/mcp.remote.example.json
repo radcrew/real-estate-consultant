@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "radestate-remote": {
+      "url": "https://REPLACE_WITH_MCP_PROJECT.vercel.app/mcp",
+      "headers": {
+        "Authorization": "Bearer rad_REPLACE_WITH_YOUR_KEY"
+      }
+    }
+  }
+}
