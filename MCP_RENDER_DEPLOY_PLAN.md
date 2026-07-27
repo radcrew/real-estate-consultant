@@ -241,8 +241,9 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 
 ### Phase 1 — First Render deploy (½–1 day)
 
-- [ ] Create Render Web Service (`services/mcp` root)
-- [ ] Set env vars (no shared `MCP_API_KEY`)
+- [x] Add repo `render.yaml` Blueprint for `radestate-mcp` (`services/mcp` root)
+- [ ] Create / apply Blueprint (or Web Service) in Render Dashboard
+- [ ] Set `BACKEND_API_URL` (no shared `MCP_API_KEY`)
 - [ ] Deploy from `main` (or release branch)
 - [ ] Verify process logs: `transport=streamable-http host=0.0.0.0 port=<PORT>`
 - [ ] Smoke: Inspector / curl authenticated session → `ping_backend` → search
@@ -273,29 +274,10 @@ Same URL + Bearer header pattern. Do not paste keys into committed JSON.
 | Artifact | Purpose |
 |----------|---------|
 | `services/mcp` config: prefer `PORT` | Render compatibility |
-| `render.yaml` (optional Blueprint) | Declarative MCP service next to docs |
-| `services/mcp/README.md` | Production section |
+| `render.yaml` | Declarative `radestate-mcp` Web Service Blueprint |
+| `services/mcp/README.md` | Production / Blueprint section |
 | `.github/workflows/mcp.yml` | Already tests; optionally add deploy job |
 | This plan | Living checklist |
-
-Example Blueprint sketch (optional):
-
-```yaml
-services:
-  - type: web
-    name: radestate-mcp
-    runtime: python
-    rootDir: services/mcp
-    buildCommand: pip install -U pip && pip install .
-    startCommand: MCP_TRANSPORT=streamable-http python -m app.main
-    envVars:
-      - key: MCP_TRANSPORT
-        value: streamable-http
-      - key: MCP_HTTP_HOST
-        value: 0.0.0.0
-      - key: BACKEND_API_URL
-        sync: false
-```
 
 ---
 

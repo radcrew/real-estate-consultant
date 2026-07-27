@@ -120,6 +120,10 @@ MCP on Render is a **separate Web Service** from the FastAPI backend. It only
 calls `BACKEND_API_URL` over HTTPS. Full checklist:
 [`MCP_RENDER_DEPLOY_PLAN.md`](../../MCP_RENDER_DEPLOY_PLAN.md).
 
+**Blueprint:** repo-root [`render.yaml`](../../render.yaml) defines
+`radestate-mcp`. In Render: **New → Blueprint**, connect this repo, set
+`BACKEND_API_URL` when prompted. Or create a Web Service manually:
+
 | Setting | Value |
 |---------|--------|
 | Root Directory | `services/mcp` |

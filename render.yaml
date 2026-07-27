@@ -1,0 +1,35 @@
+# Render Blueprint — MCP Streamable HTTP service.
+# Docs: MCP_RENDER_DEPLOY_PLAN.md
+# Apply: Dashboard → New → Blueprint → this repo, or sync an existing Blueprint.
+#
+# Does not define the FastAPI backend (already deployed separately).
+# Set BACKEND_API_URL in the dashboard when prompted (sync: false).
+
+services:
+  - type: web
+    name: radestate-mcp
+    runtime: python
+    plan: starter
+    rootDir: services/mcp
+    buildCommand: pip install -U pip && pip install .
+    startCommand: MCP_TRANSPORT=streamable-http python -m app.main
+    autoDeployTrigger: commit
+    envVars:
+      - key: MCP_TRANSPORT
+        value: streamable-http
+      - key: MCP_HTTP_HOST
+        value: "0.0.0.0"
+      - key: PYTHONPATH
+        value: .
+      - key: LOG_LEVEL
+        value: INFO
+      - key: HTTP_TIMEOUT_SECONDS
+        value: "60"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "60"
+      - key: MAX_TOOL_OUTPUT_CHARS
+        value: "24000"
+      # Production FastAPI base URL (no trailing slash). Prompted on first apply.
+      - key: BACKEND_API_URL
+        sync: false
+      # Do NOT set MCP_API_KEY here — clients send rad_… per request.
