@@ -1,8 +1,7 @@
 # MCP adapter for the radestate commercial real-estate platform.
 
 Thin FastMCP process over the FastAPI backend (`/api/v1`). Domain logic stays in
-`backend/`. Roadmap: repo root `MCP_SERVER_PLAN.md`. Deploy plan:
-[`MCP_RENDER_DEPLOY_PLAN.md`](../../MCP_RENDER_DEPLOY_PLAN.md).
+`backend/`. Roadmap: repo root `MCP_SERVER_PLAN.md`.
 
 ## Requirements
 
@@ -105,62 +104,10 @@ $env:MCP_HTTP_PORT="8900"
 python -m app.main
 ```
 
-For a PaaS-like local check (public bind), use `MCP_HTTP_HOST=0.0.0.0`.
-On Render, set `MCP_HTTP_HOST=0.0.0.0` and **omit** `MCP_HTTP_PORT` so the
-platform `PORT` is used (see `app/config.py`).
-
 Endpoint path defaults to `/mcp` on the configured host/port. Logging → **stderr**
 (stdout is the JSON-RPC wire). Cursor’s MCP panel labels stderr as `[error]` even
 for INFO lines; the server quiets MCP SDK protocol logs (Ping/ListTools/etc.) to
 WARNING+ so those do not look like failures.
-
-## Deploy (Render)
-
-MCP on Render is a **separate Web Service** from the FastAPI backend. It only
-calls `BACKEND_API_URL` over HTTPS. Full checklist:
-[`MCP_RENDER_DEPLOY_PLAN.md`](../../MCP_RENDER_DEPLOY_PLAN.md).
-
-**Blueprint:** repo-root [`render.yaml`](../../render.yaml) defines
-`radestate-mcp`. Apply steps (push → New → Blueprint → set `BACKEND_API_URL` →
-smoke `/healthz`): see
-[`MCP_RENDER_DEPLOY_PLAN.md`](../../MCP_RENDER_DEPLOY_PLAN.md#apply-blueprint-preferred).
-Or create a Web Service manually:
-
-| Setting | Value |
-|---------|--------|
-| Root Directory | `services/mcp` |
-| Build | `pip install -U pip && pip install .` |
-| Start | `MCP_TRANSPORT=streamable-http python -m app.main` |
-| Plan | `starter` (Blueprint; avoids free-tier sleep) |
-| Health | `/healthz` |
-| Client timeout | `HTTP_TIMEOUT_SECONDS=120` |
-
-**Required env on Render**
-
-| Key | Value |
-|-----|--------|
-| `PYTHON_VERSION` | `3.11.11` | Pin native runtime (also `services/mcp/.python-version`) |
-| `BACKEND_API_URL` | Production backend URL (no trailing slash) |
-| `MCP_TRANSPORT` | `streamable-http` |
-| `MCP_HTTP_HOST` | `0.0.0.0` |
-
-Omit `MCP_HTTP_PORT` — Render injects `PORT`. Do **not** set `MCP_API_KEY` on
-the service (HTTP clients send `Authorization: Bearer rad_…` or `X-API-Key` per
-request). Public URL shape: `https://<service>.onrender.com/mcp`.
-
-Liveness for Render: `GET /healthz` (also `/health`) returns `{"status":"ok"}`
-without an API key. Blueprint sets `healthCheckPath: /healthz`.
-
-After deploy, from `services/mcp`:
-
-```powershell
-.\.venv\Scripts\python.exe scripts\smoke_render.py `
-  --base-url https://<mcp>.onrender.com `
-  --backend-url https://<backend>.onrender.com `
-  --api-key rad_…
-```
-
-Local Cursor **stdio** (`run-mcp.cmd`) stays unchanged for day-to-day work.
 
 ## Cursor host config (stdio)
 
@@ -230,10 +177,4 @@ pytest
 ruff check app tests
 ```
 
-CI: `.github/workflows/mcp.yml` (Python 3.11, also watches `render.yaml`).
-Optional GitHub secrets on `main` / `workflow_dispatch`:
-
-| Secret | Purpose |
-|--------|---------|
-| `RENDER_MCP_DEPLOY_HOOK` | Render → service → Deploy Hook URL |
-| `MCP_SMOKE_BASE_URL` | e.g. `https://radestate-mcp.onrender.com` for `/healthz` smoke |
+CI: `.github/workflows/mcp.yml`.

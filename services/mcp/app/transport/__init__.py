@@ -6,9 +6,7 @@ import logging
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
-from starlette.types import ASGIApp
 
-from app.auth.healthz import HealthzMiddleware
 from app.auth.http_middleware import CaptureApiKeyMiddleware
 from app.config import Settings
 
@@ -22,16 +20,14 @@ def apply_http_bind_settings(mcp: FastMCP, settings: Settings) -> None:
     mcp.settings.port = settings.mcp_http_port
 
 
-def build_http_app(mcp: FastMCP) -> ASGIApp:
-    """Streamable HTTP ASGI app with healthz + API-key capture."""
-    return HealthzMiddleware(CaptureApiKeyMiddleware(mcp.streamable_http_app()))
-
-
 async def _run_streamable_http(mcp: FastMCP) -> None:
-    """Run Streamable HTTP with healthz and API-key capture middleware."""
+    """Run Streamable HTTP with API-key capture middleware."""
     import uvicorn
 
-    app = build_http_app(mcp)
+    # Prefer shared ASGI factory when already configured for HTTP (stateless optional).
+    from app.auth.http_middleware import CaptureApiKeyMiddleware
+
+    app = CaptureApiKeyMiddleware(mcp.streamable_http_app())
 
     config = uvicorn.Config(
         app,

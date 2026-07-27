@@ -1,9 +1,4 @@
 # Lint + unit tests for the radestate MCP adapter (services/mcp).
-# Optional: trigger a Render deploy hook + smoke /healthz when secrets are set.
-#
-# Secrets (optional, production smoke/deploy):
-#   RENDER_MCP_DEPLOY_HOOK — Deploy Hook URL from Render → radestate-mcp → Settings
-#   MCP_SMOKE_BASE_URL     — e.g. https://radestate-mcp.onrender.com
 name: MCP
 
 on:
@@ -12,12 +7,10 @@ on:
     branches: [main]
     paths:
       - "services/mcp/**"
-      - "render.yaml"
       - ".github/workflows/mcp.yml"
   pull_request:
     paths:
       - "services/mcp/**"
-      - "render.yaml"
       - ".github/workflows/mcp.yml"
 
 jobs:
@@ -34,8 +27,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          # Match Render Blueprint PYTHON_VERSION major.minor
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install dependencies
         run: python -m pip install -U pip && python -m pip install -e ".[dev]"
@@ -45,58 +37,3 @@ jobs:
 
       - name: Pytest
         run: pytest -q
-
-  # Render Blueprint already auto-deploys on commit; this hook is an explicit
-  # fallback (e.g. manual workflow_dispatch or when auto-deploy is off).
-  trigger-render-deploy:
-    name: Trigger Render deploy hook
-    needs: lint-and-test
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Call deploy hook
-        env:
-          HOOK: ${{ secrets.RENDER_MCP_DEPLOY_HOOK }}
-        run: |
-          if [ -z "$HOOK" ]; then
-            echo "RENDER_MCP_DEPLOY_HOOK not set — skipping (Blueprint auto-deploy may still run)."
-            exit 0
-          fi
-          curl -fsS -X POST "$HOOK"
-          echo "Deploy hook triggered."
-
-  smoke-healthz:
-    name: Smoke /healthz
-    needs: [lint-and-test, trigger-render-deploy]
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/mcp
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install httpx
-        run: python -m pip install -U pip httpx
-
-      - name: Wait for deploy then smoke
-        env:
-          BASE: ${{ secrets.MCP_SMOKE_BASE_URL }}
-        run: |
-          if [ -z "$BASE" ]; then
-            echo "MCP_SMOKE_BASE_URL not set — skipping smoke."
-            exit 0
-          fi
-          # Give Render a short window after the hook / auto-deploy.
-          sleep 45
-          python scripts/smoke_render.py --base-url "$BASE" --timeout 90
