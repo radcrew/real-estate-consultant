@@ -175,7 +175,7 @@ class TestGenerateOpeningQuestion:
     async def test_returns_stripped_text(self):
         mock_output = LlmOpeningQuestionOutput(text="  Hello! What city?  ")
         with patch(
-            "app.llm.intake.service.huggingface_provider.generate_structured_output",
+            "app.llm.intake.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=mock_output,
         ):
@@ -189,7 +189,7 @@ class TestGenerateOpeningQuestion:
     async def test_empty_text_raises_502(self):
         mock_output = LlmOpeningQuestionOutput(text="")
         with patch(
-            "app.llm.intake.service.huggingface_provider.generate_structured_output",
+            "app.llm.intake.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=mock_output,
         ):
@@ -204,7 +204,7 @@ class TestGenerateOpeningQuestion:
     async def test_options_appends_hint_to_system_prompt(self):
         mock_output = LlmOpeningQuestionOutput(text="Choose one:")
         with patch(
-            "app.llm.intake.service.huggingface_provider.generate_structured_output",
+            "app.llm.intake.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=mock_output,
         ) as mock_gen:
@@ -223,7 +223,7 @@ class TestGenerateOpeningQuestion:
     async def test_no_options_user_payload_excludes_options_field(self):
         mock_output = LlmOpeningQuestionOutput(text="Where?")
         with patch(
-            "app.llm.intake.service.huggingface_provider.generate_structured_output",
+            "app.llm.intake.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=mock_output,
         ) as mock_gen:
@@ -255,7 +255,7 @@ class TestParseUserInput:
             missing=["budget"],
         )
         with patch(
-            "app.llm.intake.service.huggingface_provider.generate_structured_output",
+            "app.llm.intake.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=mock_output,
         ):
@@ -271,7 +271,7 @@ class TestParseUserInput:
     async def test_previously_skipped_excluded_from_criteria_for_prompt(self):
         mock_output = _parsed_output()
         with patch(
-            "app.llm.intake.service.huggingface_provider.generate_structured_output",
+            "app.llm.intake.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=mock_output,
         ) as mock_gen:
@@ -293,7 +293,7 @@ class TestParseUserInput:
             is_complete=True,
         )
         with patch(
-            "app.llm.intake.service.huggingface_provider.generate_structured_output",
+            "app.llm.intake.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=mock_output,
         ):

@@ -7,7 +7,7 @@ from typing import Any
 from app.llm.outreach.exceptions import raise_outreach_email_empty
 from app.llm.outreach.prompts import OUTREACH_EMAIL_SYSTEM_PROMPT, build_outreach_user_message
 from app.llm.outreach.schema import OutreachDraftEmailLLM
-from app.llm.providers import huggingface_provider
+from app.llm.providers.chat import generate_structured_output
 
 
 async def generate_broker_outreach_draft(
@@ -26,7 +26,7 @@ async def generate_broker_outreach_draft(
         {"role": "system", "content": OUTREACH_EMAIL_SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
     ]
-    parsed = await huggingface_provider.generate_structured_output(
+    parsed = await generate_structured_output(
         messages=messages,
         response_format=OutreachDraftEmailLLM,
         temperature=0.35,

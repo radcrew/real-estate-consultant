@@ -8,7 +8,7 @@ from app.domain.criteria_search import parse_location_fields, parse_range
 from app.llm.fit.exceptions import raise_fit_explanation_empty
 from app.llm.fit.prompts import FIT_EXPLANATION_SYSTEM_PROMPT, build_fit_user_message
 from app.llm.fit.schema import FitExplanationLLM
-from app.llm.providers import huggingface_provider
+from app.llm.providers.chat import generate_structured_output
 
 _NO_CRITERIA_SUMMARY = (
     "No specific search criteria are set yet, so every listing scores neutrally. "
@@ -55,7 +55,7 @@ async def generate_fit_explanation(
         {"role": "system", "content": FIT_EXPLANATION_SYSTEM_PROMPT},
         {"role": "user", "content": user_content},
     ]
-    parsed = await huggingface_provider.generate_structured_output(
+    parsed = await generate_structured_output(
         messages=messages,
         response_format=FitExplanationLLM,
         temperature=0.2,
