@@ -14,11 +14,26 @@ from app.utils.exceptions import (
 )
 
 
+def raise_ai_unavailable() -> NoReturn:
+    raise_service_unavailable("AI unavailable")
+
+
 def raise_hf_api_key_not_configured() -> NoReturn:
     raise_service_unavailable("Hugging Face API key is not configured.")
 
 
+def raise_openrouter_api_key_not_configured() -> NoReturn:
+    raise_service_unavailable("OpenRouter API key is not configured.")
+
+
 def raise_hf_completion_parse_failed(*, cause: ValidationError) -> NoReturn:
+    raise_bad_gateway(
+        "We couldn't process the assistant's reply. Please try again in a moment.",
+        cause=cause,
+    )
+
+
+def raise_openrouter_completion_parse_failed(*, cause: ValidationError) -> NoReturn:
     raise_bad_gateway(
         "We couldn't process the assistant's reply. Please try again in a moment.",
         cause=cause,
@@ -29,7 +44,18 @@ def raise_hf_request_timeout(*, cause: APITimeoutError) -> NoReturn:
     raise_gateway_timeout("Timed out while calling Hugging Face API.", cause=cause)
 
 
+def raise_openrouter_request_timeout(*, cause: APITimeoutError) -> NoReturn:
+    raise_gateway_timeout("Timed out while calling OpenRouter API.", cause=cause)
+
+
 def raise_hf_openai_error(*, cause: OpenAIError) -> NoReturn:
+    raise_bad_gateway(
+        "The AI service is temporarily unavailable. Please try again later.",
+        cause=cause,
+    )
+
+
+def raise_openrouter_openai_error(*, cause: OpenAIError) -> NoReturn:
     raise_bad_gateway(
         "The AI service is temporarily unavailable. Please try again later.",
         cause=cause,
@@ -42,7 +68,20 @@ def raise_hf_structured_refusal(*, refusal: str) -> NoReturn:
     )
 
 
+def raise_openrouter_structured_refusal(*, refusal: str) -> NoReturn:
+    raise_bad_gateway(
+        "The AI service was unable to process this request. Please try again later.",
+    )
+
+
 def raise_hf_structured_reply_incomplete() -> NoReturn:
+    raise_bad_gateway(
+        "The assistant's reply didn't come through completely. "
+        "Please try again in a moment.",
+    )
+
+
+def raise_openrouter_structured_reply_incomplete() -> NoReturn:
     raise_bad_gateway(
         "The assistant's reply didn't come through completely. "
         "Please try again in a moment.",
