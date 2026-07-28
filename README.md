@@ -2,7 +2,7 @@
 
 Internal MVP for an **AI-assisted commercial real estate search** workflow: intake, lawful listing ingestion, property understanding, fit-based ranking, saved searches and watchlists, and **draft** broker outreach (no auto-send).
 
-The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with LLMs accessed through **OpenRouter**. Details are in [Stack](#stack) below.
+The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with chat LLMs routed through **OpenRouter** and/or **Hugging Face** on the backend. Details are in [Stack](#stack) below.
 
 ---
 
@@ -13,7 +13,7 @@ The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with 
 | **Frontend** | [Next.js](https://nextjs.org/) | Product UI, intake, results, watchlists; server components and Route Handlers as appropriate |
 | **Backend** | [FastAPI](https://fastapi.tiangolo.com/) | APIs, modular listing ingestion, normalization, and orchestration of model calls |
 | **Data & platform** | [Supabase](https://supabase.com/) | Postgres, authentication, and other Supabase features (e.g. Storage) as the project needs them |
-| **LLM** | [OpenRouter](https://openrouter.ai/) | Model routing and API for extraction, fit summaries, ranking explanations, and outreach drafts |
+| **LLM** | [OpenRouter](https://openrouter.ai/) and/or [Hugging Face](https://huggingface.co/) | Structured chat for intake, fit summaries, and outreach drafts (`OPENROUTER_API_KEY` preferred when both keys are set) |
 
 Ingestion may integrate additional tools (for example **Apify** or similar) behind FastAPI; those are implementation details of each connector, not replacements for the core stack above.
 
@@ -62,7 +62,7 @@ The FastAPI API deploys as a **second Vercel project** via `.github/workflows/ba
 
 1. In Vercel, create/import a project with **Root Directory** = `backend` (or `cd backend && npx vercel link`).
 2. Add GitHub secrets **`VERCEL_BACKEND_PROJECT_ID`** (backend project ID) and reuse **`VERCEL_TOKEN`** / **`VERCEL_ORG_ID`**. The frontend workflow uses **`VERCEL_FRONTEND_PROJECT_ID`**.
-3. In the **backend** Vercel project → **Environment Variables** (Production), set variables from `backend/.env.example` (at minimum `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `FRONTEND_ORIGIN` = your frontend Vercel URL).
+3. In the **backend** Vercel project → **Environment Variables** (Production), set variables from `backend/.env.example` (at minimum `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `FRONTEND_ORIGIN` = your frontend Vercel URL, and at least one of `OPENROUTER_API_KEY` or `HF_TOKEN` for chat).
 4. Merge to **`main`** to run production deploy (`vercel deploy --prebuilt --prod`).
 
 **URL:** `https://<backend-project-name>.vercel.app` — use this as `NEXT_PUBLIC_BACKEND_API_URL` on the frontend. Routes are unchanged (`/health`, `/api/v1/...`, `/docs`).
