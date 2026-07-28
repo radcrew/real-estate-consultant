@@ -21,6 +21,7 @@ def _make_provider(hf_token: str = "tok") -> HuggingFaceProvider:
     mock_settings = MagicMock()
     mock_settings.hf_token = hf_token
     mock_settings.hf_model = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    mock_settings.hf_embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
     mock_settings.hf_base_url = "https://router.huggingface.co/v1"
     mock_settings.hf_input_cost_per_1m = 0.2
     mock_settings.hf_output_cost_per_1m = 0.2
@@ -114,3 +115,27 @@ class TestHuggingFaceProvider:
                 messages=_MESSAGES, response_format=_Schema, temperature=0.5, max_tokens=100
             )
         assert info.value.status_code == 502
+
+
+class TestHuggingFaceEmbed:
+    async def test_empty_texts_returns_empty_without_call(self):
+        provider = _make_provider()
+        provider.client.embeddings.create = AsyncMock()
+        result = await provider.embed(texts=[])
+        assert result == []
+        provider.client.embeddings.create.assert_not_called()
+
+    async def test_no_api_key_raises_503(self):
+        provider = _make_provider(hf_token="   ")
+        with pytest.raises(HTTPException) as info:
+            await provider.embed(texts=["hello"])
+        assert info.value.status_code == 503
+
+    async def test_success_returns_ordered_vectors(self):
+        provider = _make_provider()
+        item0 = MagicMock(index=1, embedding=[0.3, 0.4])
+        item1 = MagicMock(index=0, embedding=[0.1, 0.2])
+        response = MagicMock(data=[item0, item1], usage=None)
+        provider.client.embeddings.create = AsyncMock(return_value=response)
+        result = await provider.embed(texts=["a", "b"])
+        assert result == [[0.1, 0.2], [0.3, 0.4]]

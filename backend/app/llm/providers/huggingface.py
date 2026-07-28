@@ -64,13 +64,18 @@ class HuggingFaceProvider:
         outcome: str,
         duration_ms: float,
         usage: CompletionUsage | None = None,
+        model: str | None = None,
     ) -> None:
         cost_usd = None
-        if usage is not None:
+        prompt_tokens = getattr(usage, "prompt_tokens", None) if usage is not None else None
+        completion_tokens = getattr(usage, "completion_tokens", None) if usage is not None else None
+        total_tokens = getattr(usage, "total_tokens", None) if usage is not None else None
+        if usage is not None and prompt_tokens is not None:
+            completion_for_cost = completion_tokens or 0
             cost_usd = round(
                 (
-                    usage.prompt_tokens * self.settings.hf_input_cost_per_1m
-                    + usage.completion_tokens * self.settings.hf_output_cost_per_1m
+                    prompt_tokens * self.settings.hf_input_cost_per_1m
+                    + completion_for_cost * self.settings.hf_output_cost_per_1m
                 )
                 / 1_000_000,
                 6,
@@ -79,12 +84,12 @@ class HuggingFaceProvider:
             "llm_call",
             extra={
                 "provider": "huggingface",
-                "model": self.settings.hf_model,
+                "model": model or self.settings.hf_model,
                 "outcome": outcome,
                 "duration_ms": round(duration_ms, 2),
-                "prompt_tokens": usage.prompt_tokens if usage else None,
-                "completion_tokens": usage.completion_tokens if usage else None,
-                "total_tokens": usage.total_tokens if usage else None,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
                 "estimated_cost_usd": cost_usd,
             },
         )
@@ -130,6 +135,37 @@ class HuggingFaceProvider:
             raise_hf_structured_refusal(refusal=str(message.refusal))
         self._log_call(outcome="incomplete", duration_ms=duration_ms, usage=completion.usage)
         raise_hf_structured_reply_incomplete()
+
+    async def embed(self, *, texts: list[str]) -> list[list[float]]:
+        """Return one embedding vector per input text via the Hugging Face router."""
+        if not texts:
+            return []
+        if not self.settings.hf_token.strip():
+            raise_hf_api_key_not_configured()
+
+        start = time.perf_counter()
+        try:
+            response = await self.client.embeddings.create(
+                model=self.settings.hf_embedding_model,
+                input=texts,
+            )
+        except APITimeoutError as exc:
+            self._log_call(outcome="timeout", duration_ms=(time.perf_counter() - start) * 1000)
+            raise_hf_request_timeout(cause=exc)
+        except OpenAIError as exc:
+            self._log_call(outcome="error", duration_ms=(time.perf_counter() - start) * 1000)
+            raise_hf_openai_error(cause=exc)
+
+        duration_ms = (time.perf_counter() - start) * 1000
+        # OpenAI returns data ordered by index; sort defensively.
+        ordered = sorted(response.data, key=lambda item: item.index)
+        self._log_call(
+            outcome="success",
+            duration_ms=duration_ms,
+            usage=response.usage,
+            model=self.settings.hf_embedding_model,
+        )
+        return [list(item.embedding) for item in ordered]
 
 
 huggingface_provider = HuggingFaceProvider(settings=settings)

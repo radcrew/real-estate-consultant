@@ -1,4 +1,4 @@
-"""Shared protocol for chat LLM providers."""
+"""Shared protocols for LLM providers."""
 
 from __future__ import annotations
 
@@ -21,4 +21,12 @@ class ChatProvider(Protocol):
         max_tokens: int,
     ) -> StructuredOutputT:
         """Return a typed structured completion for the given messages."""
+        ...
+
+
+class EmbeddingsProvider(Protocol):
+    """OpenAI-compatible text embeddings provider."""
+
+    async def embed(self, *, texts: list[str]) -> list[list[float]]:
+        """Return one embedding vector per input text, in order."""
         ...

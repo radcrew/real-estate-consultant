@@ -92,7 +92,17 @@ Smart Chat, intake parsing, fit explanations, and outreach drafts all call one c
 
 Optional tuning: `OPENROUTER_CHAT_MODEL`, `OPENROUTER_BASE_URL`, `HF_MODEL`, `HF_BASE_URL`, and per-provider cost telemetry vars (see `.env.example`).
 
-Embeddings (future semantic search) will use a **separate** resolver from chat; not implemented yet.
+### Embeddings (OpenRouter + Hugging Face)
+
+`app.llm.providers.embeddings` uses a **separate** priority from chat so both keys can be set with chat on OpenRouter and embeddings on Hugging Face:
+
+| Keys set | Embeddings provider |
+|----------|---------------------|
+| `HF_TOKEN` | **Hugging Face** (wins even if `OPENROUTER_API_KEY` is also set) |
+| `OPENROUTER_API_KEY` only | **OpenRouter** |
+| neither | **503** with `"Embeddings unavailable"` |
+
+Models: `HF_EMBEDDING_MODEL` (default `sentence-transformers/all-MiniLM-L6-v2`), `OPENROUTER_EMBEDDING_MODEL` (default `openai/text-embedding-3-small`). No product feature consumes embeddings yet; call `embed(texts=[...])` when adding semantic search / similarity.
 
 ## Dataset
 

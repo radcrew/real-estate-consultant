@@ -18,6 +18,10 @@ def raise_ai_unavailable() -> NoReturn:
     raise_service_unavailable("AI unavailable")
 
 
+def raise_embeddings_unavailable() -> NoReturn:
+    raise_service_unavailable("Embeddings unavailable")
+
+
 def raise_hf_api_key_not_configured() -> NoReturn:
     raise_service_unavailable("Hugging Face API key is not configured.")
 
