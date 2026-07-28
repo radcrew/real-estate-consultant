@@ -19,7 +19,7 @@ class TestGenerateFitExplanation:
             considerations=[],
         )
         with patch(
-            "app.llm.fit.service.huggingface_provider.generate_structured_output",
+            "app.llm.fit.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=parsed,
         ):
@@ -38,7 +38,7 @@ class TestGenerateFitExplanation:
         object.__setattr__(parsed, "strengths", [])
         object.__setattr__(parsed, "considerations", [])
         with patch(
-            "app.llm.fit.service.huggingface_provider.generate_structured_output",
+            "app.llm.fit.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=parsed,
         ):
@@ -54,7 +54,7 @@ class TestGenerateFitExplanation:
 
     async def test_no_criteria_short_circuits_without_llm_call(self):
         with patch(
-            "app.llm.fit.service.huggingface_provider.generate_structured_output",
+            "app.llm.fit.service.generate_structured_output",
             new_callable=AsyncMock,
         ) as mock_gen:
             result = await generate_fit_explanation(
@@ -74,7 +74,7 @@ class TestGenerateFitExplanation:
             considerations=["No price range set to compare against"],
         )
         with patch(
-            "app.llm.fit.service.huggingface_provider.generate_structured_output",
+            "app.llm.fit.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=parsed,
         ) as mock_gen:
