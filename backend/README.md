@@ -102,7 +102,9 @@ Optional tuning: `OPENROUTER_CHAT_MODEL`, `OPENROUTER_BASE_URL`, `HF_MODEL`, `HF
 | `OPENROUTER_API_KEY` only | **OpenRouter** |
 | neither | **503** with `"Embeddings unavailable"` |
 
-Models: `HF_EMBEDDING_MODEL` (default `sentence-transformers/all-MiniLM-L6-v2`), `OPENROUTER_EMBEDDING_MODEL` (default `openai/text-embedding-3-small`). No product feature consumes embeddings yet; call `embed(texts=[...])` when adding semantic search / similarity.
+Models: `HF_EMBEDDING_MODEL` (default `sentence-transformers/all-MiniLM-L6-v2`), `OPENROUTER_EMBEDDING_MODEL` (default `openai/text-embedding-3-small`).
+
+**First consumer:** `GET /api/v1/listings/{property_id}/similar` — loads a small candidate pool (same state/city/type preferred), embeds seed + candidates via `embed()`, ranks by cosine similarity, returns scores on the same 0–100 scale as search `match_score`. Requires an embeddings key (`HF_TOKEN` preferred). No stored vectors / pgvector yet.
 
 ## Dataset
 
