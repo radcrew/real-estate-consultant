@@ -195,6 +195,38 @@ async def test_get_listing_and_featured() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_get_similar_listings() -> None:
+    respx.get(f"{BASE}/api/v1/listings/prop-1/similar").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "results": [
+                    {
+                        "property": {
+                            "id": "near-1",
+                            "city": "Austin",
+                            "property_type": "Warehouse",
+                        },
+                        "match_score": 91.5,
+                    }
+                ],
+                "limit": 6,
+            },
+        ),
+    )
+    mcp = FastMCP("test")
+    register_listings_tools(mcp)
+
+    similar = await _tool(mcp, "get_similar_listings").fn(property_id="prop-1", limit=6)
+    assert similar.get("isError") is not True
+    text = similar["content"][0]["text"]
+    assert "near-1" in text
+    assert "91.5" in text
+    assert respx.calls.last.request.url.params["limit"] == "6"
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_explain_fit() -> None:
     respx.post(f"{BASE}/api/v1/search/sess-1/fit/prop-1").mock(
         return_value=httpx.Response(
@@ -276,6 +308,7 @@ def test_create_server_registers_phase1_tools() -> None:
         "update_search_criteria",
         "get_listing",
         "get_featured_listings",
+        "get_similar_listings",
         "explain_fit",
         "list_saved_listings",
         "get_agent",

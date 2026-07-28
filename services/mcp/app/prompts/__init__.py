@@ -16,7 +16,8 @@ def register_prompts(mcp: FastMCP) -> None:
             "(guided: key+answers; llm: text), then complete_intake.\n"
             "3. Take search_profile_id from complete_intake and call search_properties.\n"
             "4. For the top 2–3 matches, call get_listing and explain_fit.\n"
-            "5. Summarize tradeoffs; do not invent listing facts.\n"
+            "5. Optionally call get_similar_listings on a favorite to explore neighbors.\n"
+            "6. Summarize tradeoffs; do not invent listing facts.\n"
             "WRITE tools: start_intake_session, answer_intake, complete_intake, "
             "update_search_criteria. Prefer asking before writes when unsure."
         )

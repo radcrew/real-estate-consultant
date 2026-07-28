@@ -142,6 +142,24 @@ def compact_featured_response(data: dict[str, Any]) -> dict[str, Any]:
     return {"listings": listings, "count": len(listings)}
 
 
+def compact_similar_response(data: dict[str, Any]) -> dict[str, Any]:
+    results = []
+    for item in data.get("results") or []:
+        if not isinstance(item, dict):
+            continue
+        raw_prop = item.get("property")
+        prop = raw_prop if isinstance(raw_prop, dict) else {}
+        row = compact_property(prop)
+        row["match_score"] = item.get("match_score")
+        results.append(row)
+    return {
+        "results": results,
+        "count": len(results),
+        "limit": data.get("limit"),
+        "hint": "Call get_listing(property_id) for full detail on any result.",
+    }
+
+
 def compact_agent_response(data: dict[str, Any]) -> dict[str, Any]:
     props = []
     for prop in data.get("properties") or []:

@@ -196,6 +196,18 @@ class BackendClient:
         """GET /api/v1/listings/featured"""
         return await self.get_json("/api/v1/listings/featured")
 
+    async def get_similar_listings(
+        self,
+        property_id: str,
+        *,
+        limit: int = 6,
+    ) -> dict[str, Any]:
+        """GET /api/v1/listings/{property_id}/similar"""
+        return await self.get_json(
+            f"/api/v1/listings/{property_id}/similar",
+            params={"limit": limit},
+        )
+
     async def explain_fit(self, session_profile_id: str, property_id: str) -> dict[str, Any]:
         """POST /api/v1/search/{session_profile_id}/fit/{property_id}"""
         return await self.post_json(

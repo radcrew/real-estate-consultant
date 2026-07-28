@@ -63,3 +63,24 @@ def test_compact_property_and_featured() -> None:
     )
     assert featured["count"] == 1
     assert featured["listings"][0]["city"] == "Houston"
+
+
+def test_compact_similar_response() -> None:
+    from app.tools._common import compact_similar_response
+
+    out = compact_similar_response(
+        {
+            "results": [
+                {
+                    "property": {"id": "s1", "city": "Austin", "description": "long"},
+                    "match_score": 88.0,
+                }
+            ],
+            "limit": 6,
+        },
+    )
+    assert out["count"] == 1
+    assert out["limit"] == 6
+    assert out["results"][0]["property_id"] == "s1"
+    assert out["results"][0]["match_score"] == 88.0
+    assert "description" not in out["results"][0]
