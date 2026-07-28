@@ -1,13 +1,18 @@
 import type { AxiosInstance } from "axios";
 
 import { apiClient } from "@lib/api-client";
-import type { SearchProperty } from "@services/search";
+import type { SearchProperty, SearchPropertyMatch } from "@services/search";
 
 export type ListingProperty = SearchProperty;
 
 export type ListingDetailResponse = {
   property: ListingProperty;
   images: string[];
+};
+
+export type SimilarListingsResponse = {
+  results: SearchPropertyMatch[];
+  limit: number;
 };
 
 export type ListingSubmissionPayload = {
@@ -78,6 +83,20 @@ export class ListingsService {
     const { data } = await this.http.get<ListingDetailResponse>(`/listings/${propertyId}`, {
       signal: options?.signal,
     });
+    return data;
+  }
+
+  async getSimilarListings(
+    propertyId: string,
+    options?: { limit?: number; signal?: AbortSignal },
+  ): Promise<SimilarListingsResponse> {
+    const { data } = await this.http.get<SimilarListingsResponse>(
+      `/listings/${propertyId}/similar`,
+      {
+        signal: options?.signal,
+        params: { limit: options?.limit ?? 6 },
+      },
+    );
     return data;
   }
 
