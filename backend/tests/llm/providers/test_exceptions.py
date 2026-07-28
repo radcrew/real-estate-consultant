@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.llm.providers.exceptions import (
     raise_ai_unavailable,
+    raise_embeddings_unavailable,
     raise_hf_api_key_not_configured,
     raise_hf_completion_parse_failed,
     raise_hf_openai_error,
@@ -31,6 +32,12 @@ class TestLlmProviderExceptions:
             raise_ai_unavailable()
         assert info.value.status_code == 503
         assert info.value.detail == "AI unavailable"
+
+    def test_embeddings_unavailable_raises_503(self):
+        with pytest.raises(HTTPException) as info:
+            raise_embeddings_unavailable()
+        assert info.value.status_code == 503
+        assert info.value.detail == "Embeddings unavailable"
 
     def test_api_key_not_configured_raises_503(self):
         with pytest.raises(HTTPException) as info:

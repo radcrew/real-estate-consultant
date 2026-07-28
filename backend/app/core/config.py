@@ -48,17 +48,20 @@ class Settings(BaseSettings):
 
     hf_token: str = Field(default="", validation_alias=AliasChoices("HF_TOKEN", "hf_token"))
     hf_model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    hf_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     hf_base_url: str = "https://router.huggingface.co/v1"
     # USD per 1M tokens, for cost-attribution telemetry. 0 disables cost estimates.
     hf_input_cost_per_1m: float = 0.0
     hf_output_cost_per_1m: float = 0.0
 
     # Chat: OPENROUTER_API_KEY wins over HF_TOKEN when both are set (see llm.providers.chat).
+    # Embeddings: HF_TOKEN wins when both are set (see llm.providers.embeddings).
     openrouter_api_key: str = Field(
         default="", validation_alias=AliasChoices("OPENROUTER_API_KEY", "openrouter_api_key")
     )
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_chat_model: str = "meta-llama/llama-3.1-8b-instruct"
+    openrouter_embedding_model: str = "openai/text-embedding-3-small"
     openrouter_http_referer: str = ""
     openrouter_app_title: str = "Real Estate Consultant"
     openrouter_input_cost_per_1m: float = 0.0
