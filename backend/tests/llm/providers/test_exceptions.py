@@ -4,12 +4,14 @@ from openai import APITimeoutError, OpenAIError
 from pydantic import ValidationError
 
 from app.llm.providers.exceptions import (
+    raise_ai_unavailable,
     raise_hf_api_key_not_configured,
     raise_hf_completion_parse_failed,
     raise_hf_openai_error,
     raise_hf_request_timeout,
     raise_hf_structured_refusal,
     raise_hf_structured_reply_incomplete,
+    raise_openrouter_api_key_not_configured,
 )
 
 
@@ -24,9 +26,20 @@ def _make_validation_error():
 
 
 class TestLlmProviderExceptions:
+    def test_ai_unavailable_raises_503(self):
+        with pytest.raises(HTTPException) as info:
+            raise_ai_unavailable()
+        assert info.value.status_code == 503
+        assert info.value.detail == "AI unavailable"
+
     def test_api_key_not_configured_raises_503(self):
         with pytest.raises(HTTPException) as info:
             raise_hf_api_key_not_configured()
+        assert info.value.status_code == 503
+
+    def test_openrouter_api_key_not_configured_raises_503(self):
+        with pytest.raises(HTTPException) as info:
+            raise_openrouter_api_key_not_configured()
         assert info.value.status_code == 503
 
     def test_completion_parse_failed_raises_502(self):
