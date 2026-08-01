@@ -8,6 +8,7 @@ from app.api.v1.endpoints.auth.router import router as auth_router
 from app.api.v1.endpoints.intake_sessions.router import router as intake_sessions_router
 from app.api.v1.endpoints.listings.featured import router as featured_router
 from app.api.v1.endpoints.listings.router import router as listings_router
+from app.api.v1.endpoints.listings.similar import router as similar_listings_router
 from app.api.v1.endpoints.outreach.router import router as outreach_router
 from app.api.v1.endpoints.ping.router import router as ping_router
 from app.api.v1.endpoints.questions.router import router as questions_router
@@ -22,6 +23,7 @@ router.include_router(auth_router)
 router.include_router(ping_router)
 router.include_router(submissions_router)
 router.include_router(featured_router)
+router.include_router(similar_listings_router)
 router.include_router(listings_router)
 
 # Key management: JWT session only (never accept rad_… / X-API-Key).

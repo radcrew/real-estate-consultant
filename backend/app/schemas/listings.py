@@ -74,3 +74,21 @@ class AgentProfileResponse(BaseModel):
     email: str | None = None
     phone: str | None = None
     properties: list[Properties]
+
+
+class SimilarListingMatch(BaseModel):
+    """One similar listing plus embedding cosine score (0–100)."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    property: Properties
+    match_score: float = Field(..., ge=0.0, le=100.0)
+
+
+class SimilarListingsResponse(BaseModel):
+    """Body for ``GET /api/v1/listings/{id}/similar``."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    results: list[SimilarListingMatch]
+    limit: int

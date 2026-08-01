@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, literal, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.property_row import PropertyRow
@@ -77,6 +77,58 @@ async def get_property_by_id(session: AsyncSession, property_id: UUID) -> dict[s
     if row is None:
         return None
     return property_row_to_search_dict(row)
+
+
+async def list_similar_candidate_rows(
+    session: AsyncSession,
+    *,
+    seed_id: UUID,
+    state: str | None,
+    city: str | None,
+    property_type: str | None,
+    limit: int = 40,
+) -> list[dict[str, Any]]:
+    """Load a bounded candidate pool for embedding similarity ranking.
+
+    Prefers same state / city / property_type as the seed listing, then fills with
+    other rows. Excludes the seed id. Ranking by embedding cosine happens in Python.
+    """
+    if limit <= 0:
+        return []
+
+    state_key = state.strip().lower() if isinstance(state, str) and state.strip() else None
+    city_key = city.strip().lower() if isinstance(city, str) and city.strip() else None
+    type_key = (
+        property_type.strip().lower()
+        if isinstance(property_type, str) and property_type.strip()
+        else None
+    )
+
+    preference = literal(0)
+    if state_key:
+        preference = preference + case(
+            (func.lower(func.coalesce(PropertyRow.state, "")) == state_key, 4),
+            else_=0,
+        )
+    if city_key:
+        preference = preference + case(
+            (func.lower(func.coalesce(PropertyRow.city, "")) == city_key, 2),
+            else_=0,
+        )
+    if type_key:
+        preference = preference + case(
+            (func.lower(func.coalesce(PropertyRow.property_type, "")) == type_key, 1),
+            else_=0,
+        )
+
+    query = (
+        select(PropertyRow)
+        .where(PropertyRow.id != seed_id)
+        .order_by(preference.desc(), PropertyRow.id)
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    return [property_row_to_search_dict(row) for row in result.scalars().all()]
 
 
 async def get_property_match_breakdown(
