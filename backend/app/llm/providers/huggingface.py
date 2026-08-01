@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 import time
 from typing import Any, TypeVar
 
@@ -27,6 +29,11 @@ HF_READ_TIMEOUT = 75.0
 HF_WRITE_TIMEOUT = 30.0
 HF_POOL_TIMEOUT = 10.0
 HF_TRANSIENT_RETRIES = 3
+
+_JSON_FENCE_RE = re.compile(
+    r"```(?:json)?\s*([\s\S]*?)\s*```",
+    re.IGNORECASE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +102,35 @@ class HuggingFaceProvider:
             },
         )
 
+    @staticmethod
+    def _extract_json_object(text: str) -> str:
+        """Pull a JSON object out of model text (raw or fenced)."""
+        stripped = text.strip()
+        if not stripped:
+            return stripped
+        fenced = _JSON_FENCE_RE.search(stripped)
+        if fenced:
+            return fenced.group(1).strip()
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            return stripped[start : end + 1]
+        return stripped
+
+    def _structured_messages(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        response_format: type[BaseModel],
+    ) -> list[dict[str, Any]]:
+        schema = response_format.model_json_schema()
+        instruction = (
+            "Respond with a single JSON object that validates against this JSON Schema. "
+            "Do not wrap the JSON in markdown fences or add commentary.\n"
+            f"{json.dumps(schema, ensure_ascii=True)}"
+        )
+        return [{"role": "system", "content": instruction}, *messages]
+
     async def generate_structured_output(
         self,
         *,
@@ -103,22 +139,43 @@ class HuggingFaceProvider:
         temperature: float,
         max_tokens: int,
     ) -> StructuredOutputT:
-        """Request a typed structured output from the Hugging Face router."""
+        """Request typed JSON from Hugging Face and validate with Pydantic.
+
+        Avoids ``beta.chat.completions.parse`` / grammar-constrained structured
+        outputs: HF Inference Providers often return 422
+        ``grammar is not valid: failed to compile grammar`` depending on which
+        upstream provider the router selects for the same model id.
+        """
         if not self.settings.hf_token.strip():
             raise_hf_api_key_not_configured()
 
+        request_messages = self._structured_messages(
+            messages=messages,
+            response_format=response_format,
+        )
         start = time.perf_counter()
         try:
-            completion = await self.client.beta.chat.completions.parse(
-                model=self.settings.hf_model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                response_format=response_format,
-            )
-        except ValidationError as exc:
-            self._log_call(outcome="parse_failed", duration_ms=(time.perf_counter() - start) * 1000)
-            raise_hf_completion_parse_failed(cause=exc)
+            try:
+                completion = await self.client.chat.completions.create(
+                    model=self.settings.hf_model,
+                    messages=request_messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    response_format={"type": "json_object"},
+                )
+            except APITimeoutError:
+                raise
+            except OpenAIError as json_mode_exc:
+                # Some router backends reject json_object; retry unconstrained.
+                status = getattr(json_mode_exc, "status_code", None)
+                if status not in {400, 404, 422}:
+                    raise
+                completion = await self.client.chat.completions.create(
+                    model=self.settings.hf_model,
+                    messages=request_messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
         except APITimeoutError as exc:
             self._log_call(outcome="timeout", duration_ms=(time.perf_counter() - start) * 1000)
             raise_hf_request_timeout(cause=exc)
@@ -128,14 +185,28 @@ class HuggingFaceProvider:
 
         duration_ms = (time.perf_counter() - start) * 1000
         message = completion.choices[0].message
-        if message.parsed is not None:
-            self._log_call(outcome="success", duration_ms=duration_ms, usage=completion.usage)
-            return message.parsed
         if message.refusal:
             self._log_call(outcome="refusal", duration_ms=duration_ms, usage=completion.usage)
             raise_hf_structured_refusal(refusal=str(message.refusal))
-        self._log_call(outcome="incomplete", duration_ms=duration_ms, usage=completion.usage)
-        raise_hf_structured_reply_incomplete()
+        content = (message.content or "").strip()
+        if not content:
+            self._log_call(outcome="incomplete", duration_ms=duration_ms, usage=completion.usage)
+            raise_hf_structured_reply_incomplete()
+
+        try:
+            parsed = response_format.model_validate_json(self._extract_json_object(content))
+        except ValidationError as exc:
+            self._log_call(outcome="parse_failed", duration_ms=duration_ms, usage=completion.usage)
+            raise_hf_completion_parse_failed(cause=exc)
+        except (json.JSONDecodeError, ValueError) as exc:
+            self._log_call(outcome="parse_failed", duration_ms=duration_ms, usage=completion.usage)
+            raise_bad_gateway(
+                "We couldn't process the assistant's reply. Please try again in a moment.",
+                cause=exc,
+            )
+
+        self._log_call(outcome="success", duration_ms=duration_ms, usage=completion.usage)
+        return parsed
 
     def _feature_extraction_url(self) -> str:
         """HF OpenAI router (`…/v1`) is chat-only; embeddings use feature-extraction."""

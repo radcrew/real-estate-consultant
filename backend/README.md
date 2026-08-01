@@ -90,7 +90,7 @@ Smart Chat, intake parsing, fit explanations, and outreach drafts all call one c
 | `HF_TOKEN` only | **Hugging Face** |
 | neither | No LLM — API returns **503** with `"AI unavailable"` |
 
-Optional tuning: `OPENROUTER_CHAT_MODEL`, `OPENROUTER_BASE_URL`, `HF_MODEL`, `HF_BASE_URL`, and per-provider cost telemetry vars (see `.env.example`).
+Optional tuning: `OPENROUTER_CHAT_MODEL`, `OPENROUTER_BASE_URL`, `HF_MODEL`, `HF_BASE_URL`, and per-provider cost telemetry vars (see `.env.example`). Hugging Face chat uses JSON-object responses validated locally (avoids flaky grammar-constrained structured outputs on the Inference Providers router).
 
 ### Embeddings (OpenRouter + Hugging Face)
 
