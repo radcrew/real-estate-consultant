@@ -14,7 +14,7 @@ from app.domain.intake_next_question import (
 from app.domain.intake_validation import merge_missing_fields
 from app.llm.intake.exceptions import raise_hf_opening_response_missing_text
 from app.llm.intake.schema import extract_question_keys, render_intake_response_schema
-from app.llm.providers import huggingface_provider
+from app.llm.providers.chat import generate_structured_output
 from app.llm.providers.prompts import (
     INTAKE_PARSE_SYSTEM_PROMPT_HEADER,
     INTAKE_PARSE_SYSTEM_PROMPT_RULES,
@@ -59,7 +59,7 @@ async def parse_user_input(
         },
         ensure_ascii=True,
     )
-    parsed_output = await huggingface_provider.generate_structured_output(
+    parsed_output = await generate_structured_output(
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -97,7 +97,7 @@ async def generate_opening_question(
     if options is not None:
         user_payload["question_options"] = options
 
-    response_output = await huggingface_provider.generate_structured_output(
+    response_output = await generate_structured_output(
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": json.dumps(user_payload, ensure_ascii=True)},

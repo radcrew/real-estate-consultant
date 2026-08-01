@@ -67,11 +67,44 @@ Running `fastapi dev` from the repo root **without** the `backend/app/main.py` p
 
 Copy `.env.example` to `.env` in this same directory and adjust values as needed.
 
-| Variable   | Purpose |
-|------------|---------|
-| `APP_NAME` | Title shown in the OpenAPI metadata |
-
 Environment values are loaded from `backend/.env` by path, so loading does not depend on the shell’s current working directory.
+
+### Core
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DATABASE_URL` | yes | Postgres connection string (Supabase) |
+| `SUPABASE_URL` | yes | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | Service role key for server-side Supabase calls |
+| `SUPABASE_ANON_KEY` | recommended | Anon key where the backend needs it |
+| `FRONTEND_ORIGIN` | recommended | Comma-separated CORS origins (Next dev/prod URLs) |
+| `DB_SERVERLESS` | Vercel | Set `true` when `DATABASE_URL` uses Supabase pgbouncer (port 6543) |
+
+### Chat LLM (OpenRouter + Hugging Face)
+
+Smart Chat, intake parsing, fit explanations, and outreach drafts all call one chat entry point (`app.llm.providers.chat`). Provider selection is by API keys only:
+
+| Keys set | Chat provider |
+|----------|---------------|
+| `OPENROUTER_API_KEY` | **OpenRouter** (wins even if `HF_TOKEN` is also set) |
+| `HF_TOKEN` only | **Hugging Face** |
+| neither | No LLM — API returns **503** with `"AI unavailable"` |
+
+Optional tuning: `OPENROUTER_CHAT_MODEL`, `OPENROUTER_BASE_URL`, `HF_MODEL`, `HF_BASE_URL`, and per-provider cost telemetry vars (see `.env.example`). Hugging Face chat uses JSON-object responses validated locally (avoids flaky grammar-constrained structured outputs on the Inference Providers router).
+
+### Embeddings (OpenRouter + Hugging Face)
+
+`app.llm.providers.embeddings` uses a **separate** priority from chat so both keys can be set with chat on OpenRouter and embeddings on Hugging Face:
+
+| Keys set | Embeddings provider |
+|----------|---------------------|
+| `HF_TOKEN` | **Hugging Face** (wins even if `OPENROUTER_API_KEY` is also set) |
+| `OPENROUTER_API_KEY` only | **OpenRouter** |
+| neither | **503** with `"Embeddings unavailable"` |
+
+Models: `HF_EMBEDDING_MODEL` (default `sentence-transformers/all-MiniLM-L6-v2`), `OPENROUTER_EMBEDDING_MODEL` (default `openai/text-embedding-3-small`). Hugging Face embeddings use the Inference Providers **feature-extraction** pipeline (the OpenAI-compatible `…/v1` router is chat-only).
+
+**First consumer:** `GET /api/v1/listings/{property_id}/similar` — loads a small candidate pool (same state/city/type preferred), embeds seed + candidates via `embed()`, ranks by cosine similarity, returns scores on the same 0–100 scale as search `match_score`. Requires an embeddings key (`HF_TOKEN` preferred). No stored vectors / pgvector yet.
 
 ## Dataset
 
@@ -123,7 +156,7 @@ ruff check app
 Use a **separate Vercel project** from the Next.js frontend (Root Directory = `backend/`).
 
 1. `cd backend && npx vercel link`
-2. Set **Production** env vars in Vercel from `.env.example` (`DATABASE_URL`, Supabase keys, `FRONTEND_ORIGIN`, `HF_TOKEN`, …).
+2. Set **Production** env vars in Vercel from `.env.example` (`DATABASE_URL`, Supabase keys, `FRONTEND_ORIGIN`, and at least one of `OPENROUTER_API_KEY` or `HF_TOKEN` for chat, …).
 3. Push to `main` — `.github/workflows/backend.yml` deploys with `VERCEL_BACKEND_PROJECT_ID`, or deploy locally with `vercel deploy --prod`.
 
 Entrypoint for the serverless bundle: `api/index.py` → `app.main:app` (see `vercel.json`).

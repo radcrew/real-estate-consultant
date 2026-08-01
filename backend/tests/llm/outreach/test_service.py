@@ -20,7 +20,7 @@ class TestGenerateBrokerOutreachDraft:
     async def test_returns_draft_text(self):
         parsed = OutreachDraftEmailLLM(draft_email="Dear Bob,\n\nI am writing to inquire about your property at 100 Main St.")
         with patch(
-            "app.llm.outreach.service.huggingface_provider.generate_structured_output",
+            "app.llm.outreach.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=parsed,
         ):
@@ -31,7 +31,7 @@ class TestGenerateBrokerOutreachDraft:
         parsed = OutreachDraftEmailLLM.__new__(OutreachDraftEmailLLM)
         object.__setattr__(parsed, "draft_email", "   ")
         with patch(
-            "app.llm.outreach.service.huggingface_provider.generate_structured_output",
+            "app.llm.outreach.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=parsed,
         ):
@@ -43,7 +43,7 @@ class TestGenerateBrokerOutreachDraft:
         parsed = OutreachDraftEmailLLM(draft_email="Dear Bob,\n\nI saw your listing and wanted to reach out.")
         profile = {"first_name": "Alice", "email": "alice@example.com"}
         with patch(
-            "app.llm.outreach.service.huggingface_provider.generate_structured_output",
+            "app.llm.outreach.service.generate_structured_output",
             new_callable=AsyncMock,
             return_value=parsed,
         ) as mock_gen:
