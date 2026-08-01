@@ -58,12 +58,16 @@ class TestHuggingFaceProvider:
             )
         assert info.value.status_code == 503
 
-    async def test_success_returns_parsed(self):
+    async def test_success_returns_parsed_json(self):
         provider = _make_provider()
-        parsed = _Schema(text="hello")
-        provider.client.beta.chat.completions.parse = AsyncMock(
-            return_value=_make_completion(parsed=parsed)
+        completion = MagicMock()
+        completion.usage = MagicMock(
+            prompt_tokens=10, completion_tokens=20, total_tokens=30
         )
+        completion.choices = [
+            MagicMock(message=MagicMock(content='{"text":"hello"}', refusal=None))
+        ]
+        provider.client.chat.completions.create = AsyncMock(return_value=completion)
         result = await provider.generate_structured_output(
             messages=_MESSAGES,
             response_format=_Schema,
@@ -71,10 +75,49 @@ class TestHuggingFaceProvider:
             max_tokens=100,
         )
         assert result.text == "hello"
+        kwargs = provider.client.chat.completions.create.await_args.kwargs
+        assert kwargs["response_format"] == {"type": "json_object"}
+        assert kwargs["messages"][0]["role"] == "system"
+        assert "JSON Schema" in kwargs["messages"][0]["content"]
+
+    async def test_retries_without_json_object_when_unsupported(self):
+        provider = _make_provider()
+        completion = MagicMock()
+        completion.usage = None
+        completion.choices = [
+            MagicMock(message=MagicMock(content='{"text":"ok"}', refusal=None))
+        ]
+        unsupported = OpenAIError("json_object unsupported")
+        unsupported.status_code = 422
+        provider.client.chat.completions.create = AsyncMock(
+            side_effect=[unsupported, completion]
+        )
+        result = await provider.generate_structured_output(
+            messages=_MESSAGES,
+            response_format=_Schema,
+            temperature=0.5,
+            max_tokens=100,
+        )
+        assert result.text == "ok"
+        assert provider.client.chat.completions.create.await_count == 2
+        second_kwargs = provider.client.chat.completions.create.await_args_list[1].kwargs
+        assert "response_format" not in second_kwargs
+
+    async def test_non_json_mode_errors_do_not_retry(self):
+        provider = _make_provider()
+        boom = OpenAIError("upstream down")
+        boom.status_code = 500
+        provider.client.chat.completions.create = AsyncMock(side_effect=boom)
+        with pytest.raises(HTTPException) as info:
+            await provider.generate_structured_output(
+                messages=_MESSAGES, response_format=_Schema, temperature=0.5, max_tokens=100
+            )
+        assert info.value.status_code == 502
+        assert provider.client.chat.completions.create.await_count == 1
 
     async def test_timeout_raises_504(self):
         provider = _make_provider()
-        provider.client.beta.chat.completions.parse = AsyncMock(
+        provider.client.chat.completions.create = AsyncMock(
             side_effect=APITimeoutError(request=httpx.Request("POST", "https://api.example.com"))
         )
         with pytest.raises(HTTPException) as info:
@@ -85,7 +128,7 @@ class TestHuggingFaceProvider:
 
     async def test_openai_error_raises_502(self):
         provider = _make_provider()
-        provider.client.beta.chat.completions.parse = AsyncMock(
+        provider.client.chat.completions.create = AsyncMock(
             side_effect=OpenAIError("upstream down")
         )
         with pytest.raises(HTTPException) as info:
@@ -96,9 +139,12 @@ class TestHuggingFaceProvider:
 
     async def test_refusal_raises_502(self):
         provider = _make_provider()
-        provider.client.beta.chat.completions.parse = AsyncMock(
-            return_value=_make_completion(parsed=None, refusal="I cannot help with that.")
-        )
+        completion = MagicMock()
+        completion.usage = None
+        completion.choices = [
+            MagicMock(message=MagicMock(content=None, refusal="I cannot help with that."))
+        ]
+        provider.client.chat.completions.create = AsyncMock(return_value=completion)
         with pytest.raises(HTTPException) as info:
             await provider.generate_structured_output(
                 messages=_MESSAGES, response_format=_Schema, temperature=0.5, max_tokens=100
@@ -107,9 +153,24 @@ class TestHuggingFaceProvider:
 
     async def test_incomplete_reply_raises_502(self):
         provider = _make_provider()
-        provider.client.beta.chat.completions.parse = AsyncMock(
-            return_value=_make_completion(parsed=None, refusal=None)
-        )
+        completion = MagicMock()
+        completion.usage = None
+        completion.choices = [MagicMock(message=MagicMock(content="  ", refusal=None))]
+        provider.client.chat.completions.create = AsyncMock(return_value=completion)
+        with pytest.raises(HTTPException) as info:
+            await provider.generate_structured_output(
+                messages=_MESSAGES, response_format=_Schema, temperature=0.5, max_tokens=100
+            )
+        assert info.value.status_code == 502
+
+    async def test_invalid_json_raises_502(self):
+        provider = _make_provider()
+        completion = MagicMock()
+        completion.usage = None
+        completion.choices = [
+            MagicMock(message=MagicMock(content="not-json", refusal=None))
+        ]
+        provider.client.chat.completions.create = AsyncMock(return_value=completion)
         with pytest.raises(HTTPException) as info:
             await provider.generate_structured_output(
                 messages=_MESSAGES, response_format=_Schema, temperature=0.5, max_tokens=100
