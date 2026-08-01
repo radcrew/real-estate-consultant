@@ -287,7 +287,7 @@ Local stdio (`run-mcp.cmd` / `pnpm run dev:mcp`) remains the default for contrib
 |------|-------|
 | Health | `ping_backend` |
 | Search | `quick_search` (location/budget/type one-shot), `search_properties`, `update_search_criteria`, `explain_fit` |
-| Listings | `get_listing`, `get_featured_listings`, `get_agent`, `list_saved_listings` |
+| Listings | `get_listing`, `get_featured_listings`, `get_similar_listings`, `get_agent`, `list_saved_listings` |
 | Intake | `start_intake_session`, `answer_intake`, `complete_intake`, `get_intake_session` |
 | Outreach | `generate_outreach_draft`, `get_outreach_draft`, `update_outreach_draft` (draft only) |
 | Admin | `enqueue_ingest`, `list_listing_submissions` |

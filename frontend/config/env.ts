@@ -1,5 +1,7 @@
-export const BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_API_URL?.trim() || "http://localhost:8888";
+/** Backend origin without trailing slash (avoids `//api/v1` URLs that break CORS preflight). */
+export const BACKEND_BASE_URL = (
+  process.env.NEXT_PUBLIC_BACKEND_API_URL?.trim() || "http://localhost:8888"
+).replace(/\/+$/, "");
 
 export const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";

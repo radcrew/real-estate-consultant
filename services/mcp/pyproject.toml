@@ -5,7 +5,8 @@ description = "MCP adapter — exposes radestate backend APIs as MCP tools for A
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.27.0",
-    "mcp[cli]>=1.9.0",
+    # Stay on SDK v1: v2 renames FastMCP → MCPServer and drops mcp.server.fastmcp.
+    "mcp[cli]>=1.9.0,<2",
     "pydantic-settings>=2.6.0",
 ]
 

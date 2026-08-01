@@ -13,10 +13,12 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/listings",
 }));
 
-vi.mock("@headlessui/react", () => ({
-  Popover: ({ children }: { children: React.ReactNode }) => <li>{children}</li>,
-  PopoverButton: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
-  PopoverPanel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+vi.mock("@components/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => (
+    <button type="button">{children}</button>
+  ),
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
 const ITEM = { id: "listings", name: "Listings", href: "/listings" };
