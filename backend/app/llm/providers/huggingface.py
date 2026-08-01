@@ -20,6 +20,7 @@ from app.llm.providers.exceptions import (
     raise_hf_structured_refusal,
     raise_hf_structured_reply_incomplete,
 )
+from app.utils.exceptions import raise_bad_gateway, raise_gateway_timeout
 
 HF_CONNECT_TIMEOUT = 20.0
 HF_READ_TIMEOUT = 75.0
@@ -136,36 +137,106 @@ class HuggingFaceProvider:
         self._log_call(outcome="incomplete", duration_ms=duration_ms, usage=completion.usage)
         raise_hf_structured_reply_incomplete()
 
+    def _feature_extraction_url(self) -> str:
+        """HF OpenAI router (`…/v1`) is chat-only; embeddings use feature-extraction."""
+        root = self.settings.hf_base_url.rstrip("/").removesuffix("/v1")
+        model = self.settings.hf_embedding_model.strip().strip("/")
+        return f"{root}/hf-inference/models/{model}/pipeline/feature-extraction"
+
+    @staticmethod
+    def _normalize_feature_extraction(
+        payload: object,
+        *,
+        expected: int,
+    ) -> list[list[float]]:
+        """Normalize HF feature-extraction JSON into one float vector per input text."""
+        if not isinstance(payload, list) or not payload:
+            raise_bad_gateway("Hugging Face returned an empty embedding response.")
+
+        first = payload[0]
+        # Single sentence vector: [float, …]
+        if isinstance(first, (int, float)):
+            vectors = [[float(x) for x in payload]]
+        # Batch of sentence vectors: [[float, …], …]
+        elif isinstance(first, list) and first and isinstance(first[0], (int, float)):
+            vectors = [[float(x) for x in row] for row in payload if isinstance(row, list)]
+        # Token-level embeddings: [[[float, …], …], …] — mean-pool each sequence
+        elif isinstance(first, list) and first and isinstance(first[0], list):
+            vectors = []
+            for sequence in payload:
+                if not isinstance(sequence, list) or not sequence:
+                    continue
+                width = len(sequence[0]) if isinstance(sequence[0], list) else 0
+                if width == 0:
+                    continue
+                sums = [0.0] * width
+                count = 0
+                for token in sequence:
+                    if not isinstance(token, list) or len(token) != width:
+                        continue
+                    for i, value in enumerate(token):
+                        sums[i] += float(value)
+                    count += 1
+                if count:
+                    vectors.append([value / count for value in sums])
+        else:
+            raise_bad_gateway("Hugging Face returned an unexpected embedding shape.")
+
+        if len(vectors) != expected:
+            raise_bad_gateway(
+                "Hugging Face embedding count did not match the number of input texts.",
+            )
+        return vectors
+
     async def embed(self, *, texts: list[str]) -> list[list[float]]:
-        """Return one embedding vector per input text via the Hugging Face router."""
+        """Return one embedding vector per input text via HF feature-extraction.
+
+        ``router.huggingface.co/v1`` is chat-completions only; sentence embeddings
+        go through ``/hf-inference/models/.../pipeline/feature-extraction``.
+        """
         if not texts:
             return []
         if not self.settings.hf_token.strip():
             raise_hf_api_key_not_configured()
 
+        url = self._feature_extraction_url()
+        headers = {
+            "Authorization": f"Bearer {self.settings.hf_token.strip()}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
         start = time.perf_counter()
         try:
-            response = await self.client.embeddings.create(
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(url, headers=headers, json={"inputs": texts})
+                response.raise_for_status()
+                payload = response.json()
+        except httpx.TimeoutException as exc:
+            self._log_call(
+                outcome="timeout",
+                duration_ms=(time.perf_counter() - start) * 1000,
                 model=self.settings.hf_embedding_model,
-                input=texts,
             )
-        except APITimeoutError as exc:
-            self._log_call(outcome="timeout", duration_ms=(time.perf_counter() - start) * 1000)
-            raise_hf_request_timeout(cause=exc)
-        except OpenAIError as exc:
-            self._log_call(outcome="error", duration_ms=(time.perf_counter() - start) * 1000)
-            raise_hf_openai_error(cause=exc)
+            raise_gateway_timeout("Timed out while calling Hugging Face API.", cause=exc)
+        except httpx.HTTPError as exc:
+            self._log_call(
+                outcome="error",
+                duration_ms=(time.perf_counter() - start) * 1000,
+                model=self.settings.hf_embedding_model,
+            )
+            raise_bad_gateway(
+                "The AI service is temporarily unavailable. Please try again later.",
+                cause=exc,
+            )
 
+        vectors = self._normalize_feature_extraction(payload, expected=len(texts))
         duration_ms = (time.perf_counter() - start) * 1000
-        # OpenAI returns data ordered by index; sort defensively.
-        ordered = sorted(response.data, key=lambda item: item.index)
         self._log_call(
             outcome="success",
             duration_ms=duration_ms,
-            usage=response.usage,
             model=self.settings.hf_embedding_model,
         )
-        return [list(item.embedding) for item in ordered]
+        return vectors
 
 
 huggingface_provider = HuggingFaceProvider(settings=settings)

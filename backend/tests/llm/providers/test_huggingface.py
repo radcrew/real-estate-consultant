@@ -120,10 +120,10 @@ class TestHuggingFaceProvider:
 class TestHuggingFaceEmbed:
     async def test_empty_texts_returns_empty_without_call(self):
         provider = _make_provider()
-        provider.client.embeddings.create = AsyncMock()
-        result = await provider.embed(texts=[])
-        assert result == []
-        provider.client.embeddings.create.assert_not_called()
+        with patch("app.llm.providers.huggingface.httpx.AsyncClient") as client_cls:
+            result = await provider.embed(texts=[])
+            assert result == []
+            client_cls.assert_not_called()
 
     async def test_no_api_key_raises_503(self):
         provider = _make_provider(hf_token="   ")
@@ -131,11 +131,40 @@ class TestHuggingFaceEmbed:
             await provider.embed(texts=["hello"])
         assert info.value.status_code == 503
 
-    async def test_success_returns_ordered_vectors(self):
+    async def test_feature_extraction_url_strips_v1(self):
         provider = _make_provider()
-        item0 = MagicMock(index=1, embedding=[0.3, 0.4])
-        item1 = MagicMock(index=0, embedding=[0.1, 0.2])
-        response = MagicMock(data=[item0, item1], usage=None)
-        provider.client.embeddings.create = AsyncMock(return_value=response)
-        result = await provider.embed(texts=["a", "b"])
+        assert provider._feature_extraction_url() == (
+            "https://router.huggingface.co/hf-inference/models/"
+            "sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction"
+        )
+
+    async def test_success_returns_batch_vectors(self):
+        provider = _make_provider()
+        mock_response = MagicMock()
+        mock_response.raise_for_status = MagicMock()
+        mock_response.json = MagicMock(return_value=[[0.1, 0.2], [0.3, 0.4]])
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post = AsyncMock(return_value=mock_response)
+
+        with patch("app.llm.providers.huggingface.httpx.AsyncClient", return_value=mock_client):
+            result = await provider.embed(texts=["a", "b"])
+
         assert result == [[0.1, 0.2], [0.3, 0.4]]
+        mock_client.post.assert_awaited_once()
+        args, kwargs = mock_client.post.await_args
+        assert args[0].endswith("/pipeline/feature-extraction")
+        assert kwargs["json"] == {"inputs": ["a", "b"]}
+
+    async def test_http_error_raises_502(self):
+        provider = _make_provider()
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.__aexit__.return_value = None
+        mock_client.post = AsyncMock(side_effect=httpx.ConnectError("boom"))
+
+        with patch("app.llm.providers.huggingface.httpx.AsyncClient", return_value=mock_client):
+            with pytest.raises(HTTPException) as info:
+                await provider.embed(texts=["hello"])
+        assert info.value.status_code == 502
