@@ -60,6 +60,22 @@ describe("ListingsService", () => {
     });
   });
 
+  describe("getSimilarListings", () => {
+    it("calls GET /listings/{id}/similar with limit and returns data", async () => {
+      const payload = {
+        results: [{ property: detailResponse.property, match_score: 88.5 }],
+        limit: 6,
+      };
+      const http = makeHttp(payload);
+      const data = await new ListingsService(http).getSimilarListings("p-1", { limit: 6 });
+      expect(http.get).toHaveBeenCalledWith("/listings/p-1/similar", {
+        signal: undefined,
+        params: { limit: 6 },
+      });
+      expect(data).toEqual(payload);
+    });
+  });
+
   describe("submitListing", () => {
     it("calls POST /listing-submissions with payload and returns data", async () => {
       const http = makeHttp({ id: "sub-1", status: "pending" });

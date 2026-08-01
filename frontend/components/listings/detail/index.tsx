@@ -10,6 +10,7 @@ import { ListingActions } from "./actions";
 import { ListingMainSection } from "./main";
 import { ListingOverviewCard } from "./overview";
 import { ListingSpecsSection } from "./specs";
+import { ListingSimilarSection } from "./similar";
 import { ListingLocationSection } from "./location";
 import { ListingOutreachSection } from "./outreach";
 import { ListingDetailNotice, ListingDetailSkeleton } from "./status";
@@ -49,6 +50,8 @@ export const ListingDetailView = () => {
               <ListingSpecsSection property={property} />
 
               <ListingLocationSection model={model} />
+
+              <ListingSimilarSection listingId={model.id} />
 
               <ListingOutreachSection property={property} />
             </>
