@@ -17,7 +17,9 @@ The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with 
 
 Ingestion may integrate additional tools (for example **Apify** or similar) behind FastAPI; those are implementation details of each connector, not replacements for the core stack above.
 
-**MCP adapter:** `services/mcp/` exposes the FastAPI `/api/v1` surface to AI hosts (Cursor, Claude Desktop, remote Streamable HTTP). See [`services/mcp/README.md`](services/mcp/README.md).
+**MCP adapter:** `services/mcp/` exposes search, listings, and draft outreach
+from FastAPI `/api/v1` to AI hosts (Cursor, Claude Desktop, remote Streamable HTTP).
+See [`services/mcp/README.md`](services/mcp/README.md).
 
 ---
 
