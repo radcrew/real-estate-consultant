@@ -100,6 +100,41 @@ export const validatePasswordChange = (
   return errors;
 };
 
+export type ApiKeyFormValues = {
+  name: string;
+  /** Raw input — empty string means "never expires". */
+  expiresInDays: string;
+};
+
+export type ApiKeyFieldKey = keyof ApiKeyFormValues;
+
+/** Bounds mirror McpApiKeyCreateRequest in backend/app/schemas/account.py. */
+export const API_KEY_NAME_MAX = 120;
+export const API_KEY_EXPIRY_MIN = 1;
+export const API_KEY_EXPIRY_MAX = 3650;
+
+export const validateApiKeyForm = (
+  values: ApiKeyFormValues,
+): Partial<Record<ApiKeyFieldKey | "form", string>> => {
+  const errors: Partial<Record<ApiKeyFieldKey | "form", string>> = {};
+
+  const name = trim(values.name);
+  if (!name) errors.name = "Name your key so you can recognise it later.";
+  else if (name.length > API_KEY_NAME_MAX)
+    errors.name = `Use at most ${API_KEY_NAME_MAX} characters.`;
+
+  const expiry = trim(values.expiresInDays);
+  if (expiry) {
+    const days = Number(expiry);
+    if (!Number.isInteger(days))
+      errors.expiresInDays = "Enter a whole number of days, or leave blank.";
+    else if (days < API_KEY_EXPIRY_MIN || days > API_KEY_EXPIRY_MAX)
+      errors.expiresInDays = `Choose between ${API_KEY_EXPIRY_MIN} and ${API_KEY_EXPIRY_MAX} days.`;
+  }
+
+  return errors;
+};
+
 export const scorePasswordStrength = (password: string): 0 | 1 | 2 | 3 | 4 => {
   if (!password) return 0;
   let score = 0;

@@ -11,6 +11,7 @@ import { readSession, saveSession } from "@lib/auth-session";
 import {
   type ProfileFieldKey,
   type ProfileFormValues,
+  validateApiKeyForm,
   validatePasswordChange,
   validateProfileForm,
 } from "@utils/account/validation";
@@ -18,10 +19,14 @@ import {
   accountService,
   buildProfileUpdateBody,
   mapProfileResponseToForm,
+  type McpApiKey,
+  type McpApiKeyCreated,
 } from "@services/account";
 import { brand } from "@config/brand";
 
 import { AccountSidebar, type AccountTab } from "./sidebar";
+import { AccountApiKeysSection } from "./sections/api-keys";
+import { ApiKeyCreatedDialog } from "./sections/api-keys/created-dialog";
 import { AccountPasswordSection } from "./sections/password";
 import { AccountPersonalInfoSection } from "./sections/personal-info";
 
@@ -62,6 +67,19 @@ export const AccountPage = () => {
   const [passwordErrors, setPasswordErrors] = useState<Partial<Record<string, string>>>({});
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  const [apiKeys, setApiKeys] = useState<McpApiKey[]>([]);
+  const [apiKeysLoading, setApiKeysLoading] = useState(false);
+  const [apiKeysLoaded, setApiKeysLoaded] = useState(false);
+  const [apiKeysLoadError, setApiKeysLoadError] = useState<string | null>(null);
+  const [keyName, setKeyName] = useState("");
+  const [keyScope, setKeyScope] = useState("*");
+  const [keyExpiresInDays, setKeyExpiresInDays] = useState("");
+  const [keyErrors, setKeyErrors] = useState<Partial<Record<string, string>>>({});
+  const [keyCreating, setKeyCreating] = useState(false);
+  const [createdKey, setCreatedKey] = useState<McpApiKeyCreated | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [confirmingRevokeId, setConfirmingRevokeId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ready || session) return;
@@ -268,6 +286,106 @@ export const AccountPage = () => {
     setPasswordSuccess(false);
   }, []);
 
+  // Keys are fetched on first visit to the tab — most sessions never open it.
+  useEffect(() => {
+    if (!ready || !session || activeTab !== "api-keys" || apiKeysLoaded) {
+      return;
+    }
+
+    const ac = new AbortController();
+    setApiKeysLoading(true);
+    setApiKeysLoadError(null);
+
+    (async () => {
+      try {
+        const keys = await accountService.listApiKeys({ signal: ac.signal });
+        if (ac.signal.aborted) return;
+        setApiKeys(keys);
+        setApiKeysLoaded(true);
+      } catch (e) {
+        if (ac.signal.aborted) return;
+        setApiKeysLoadError(getApiErrorMessage(e));
+      } finally {
+        if (!ac.signal.aborted) {
+          setApiKeysLoading(false);
+        }
+      }
+    })();
+
+    return () => ac.abort();
+  }, [ready, session, activeTab, apiKeysLoaded]);
+
+  const submitCreateApiKey = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const errors = validateApiKeyForm({ name: keyName, expiresInDays: keyExpiresInDays });
+      if (Object.keys(errors).length > 0) {
+        setKeyErrors(errors);
+        return;
+      }
+      setKeyErrors({});
+      setKeyCreating(true);
+      try {
+        const expiry = keyExpiresInDays.trim();
+        const created = await accountService.createApiKey({
+          name: keyName.trim(),
+          scopes: [keyScope],
+          ...(expiry ? { expires_in_days: Number(expiry) } : {}),
+        });
+        // Show the plaintext key before anything else can navigate away.
+        setCreatedKey(created);
+        setKeyName("");
+        setKeyExpiresInDays("");
+        setKeyScope("*");
+        // Refetch rather than appending — the list shape omits api_key.
+        const keys = await accountService.listApiKeys();
+        setApiKeys(keys);
+      } catch (err) {
+        setKeyErrors({ form: getApiErrorMessage(err) });
+      } finally {
+        setKeyCreating(false);
+      }
+    },
+    [keyName, keyScope, keyExpiresInDays],
+  );
+
+  const confirmRevokeApiKey = useCallback(async (key: McpApiKey) => {
+    setRevokingId(key.id);
+    setKeyErrors({});
+    try {
+      await accountService.revokeApiKey(key.id);
+      const keys = await accountService.listApiKeys();
+      setApiKeys(keys);
+      setConfirmingRevokeId(null);
+    } catch (err) {
+      setKeyErrors({ form: getApiErrorMessage(err) });
+    } finally {
+      setRevokingId(null);
+    }
+  }, []);
+
+  const onChangeKeyName = useCallback((v: string) => {
+    setKeyName(v);
+    setKeyErrors((e) => {
+      if (!e.name && !e.form) return e;
+      const next = { ...e };
+      delete next.name;
+      delete next.form;
+      return next;
+    });
+  }, []);
+
+  const onChangeKeyExpiresInDays = useCallback((v: string) => {
+    setKeyExpiresInDays(v);
+    setKeyErrors((e) => {
+      if (!e.expiresInDays && !e.form) return e;
+      const next = { ...e };
+      delete next.expiresInDays;
+      delete next.form;
+      return next;
+    });
+  }, []);
+
   const onChangeConfirmPassword = useCallback((v: string) => {
     setConfirmPassword(v);
     setPasswordErrors((e) => {
@@ -330,7 +448,7 @@ export const AccountPage = () => {
                 onSave={saveProfile}
                 onChangeField={updateDraft}
               />
-            ) : (
+            ) : activeTab === "security" ? (
               <AccountPasswordSection
                 currentPassword={currentPassword}
                 newPassword={newPassword}
@@ -343,10 +461,32 @@ export const AccountPage = () => {
                 onChangeConfirm={onChangeConfirmPassword}
                 onSubmit={submitPasswordChange}
               />
+            ) : (
+              <AccountApiKeysSection
+                keys={apiKeys}
+                loading={apiKeysLoading}
+                loadError={apiKeysLoadError}
+                name={keyName}
+                scope={keyScope}
+                expiresInDays={keyExpiresInDays}
+                errors={keyErrors}
+                creating={keyCreating}
+                revokingId={revokingId}
+                confirmingRevokeId={confirmingRevokeId}
+                onChangeName={onChangeKeyName}
+                onChangeScope={setKeyScope}
+                onChangeExpiresInDays={onChangeKeyExpiresInDays}
+                onSubmit={submitCreateApiKey}
+                onRequestRevoke={(key) => setConfirmingRevokeId(key.id)}
+                onConfirmRevoke={confirmRevokeApiKey}
+                onCancelRevoke={() => setConfirmingRevokeId(null)}
+              />
             )}
           </div>
         </div>
       </main>
+
+      <ApiKeyCreatedDialog apiKey={createdKey} onDismiss={() => setCreatedKey(null)} />
     </div>
   );
 };

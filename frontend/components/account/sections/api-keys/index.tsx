@@ -29,11 +29,14 @@ export type AccountApiKeysSectionProps = {
   errors: Partial<Record<string, string>>;
   creating: boolean;
   revokingId: string | null;
+  confirmingRevokeId: string | null;
   onChangeName: (value: string) => void;
   onChangeScope: (value: string) => void;
   onChangeExpiresInDays: (value: string) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-  onRevoke: (key: McpApiKey) => void;
+  onRequestRevoke: (key: McpApiKey) => void;
+  onConfirmRevoke: (key: McpApiKey) => void;
+  onCancelRevoke: () => void;
 };
 
 const isRevoked = (key: McpApiKey) => Boolean(key.revoked_at);
@@ -50,11 +53,17 @@ const formatDate = (value: string | null) => {
 const KeyRow = ({
   apiKey,
   revoking,
-  onRevoke,
+  confirming,
+  onRequestRevoke,
+  onConfirmRevoke,
+  onCancelRevoke,
 }: {
   apiKey: McpApiKey;
   revoking: boolean;
-  onRevoke: (key: McpApiKey) => void;
+  confirming: boolean;
+  onRequestRevoke: (key: McpApiKey) => void;
+  onConfirmRevoke: (key: McpApiKey) => void;
+  onCancelRevoke: () => void;
 }) => {
   const revoked = isRevoked(apiKey);
   const expired = !revoked && isExpired(apiKey);
@@ -106,16 +115,31 @@ const KeyRow = ({
         </div>
       </dl>
 
-      {revoked ? null : (
+      {revoked ? null : confirming ? (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Revoke permanently?</span>
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={revoking}
+            onClick={() => onConfirmRevoke(apiKey)}
+            aria-label={`Confirm revoking ${apiKey.name}`}
+          >
+            {revoking ? "Revoking…" : "Confirm"}
+          </Button>
+          <Button variant="ghost" size="sm" disabled={revoking} onClick={onCancelRevoke}>
+            Cancel
+          </Button>
+        </div>
+      ) : (
         <Button
           variant="destructive"
           size="sm"
-          disabled={revoking}
-          onClick={() => onRevoke(apiKey)}
+          onClick={() => onRequestRevoke(apiKey)}
           aria-label={`Revoke ${apiKey.name}`}
         >
           <Trash2 aria-hidden />
-          {revoking ? "Revoking…" : "Revoke"}
+          Revoke
         </Button>
       )}
     </li>
@@ -132,11 +156,14 @@ export const AccountApiKeysSection = ({
   errors,
   creating,
   revokingId,
+  confirmingRevokeId,
   onChangeName,
   onChangeScope,
   onChangeExpiresInDays,
   onSubmit,
-  onRevoke,
+  onRequestRevoke,
+  onConfirmRevoke,
+  onCancelRevoke,
 }: AccountApiKeysSectionProps) => (
   <section className={ACCOUNT_SECTION_CARD_CLASS} aria-labelledby="api-keys-heading">
     <div className="border-b border-border pb-5">
@@ -228,7 +255,10 @@ export const AccountApiKeysSection = ({
               key={apiKey.id}
               apiKey={apiKey}
               revoking={revokingId === apiKey.id}
-              onRevoke={onRevoke}
+              confirming={confirmingRevokeId === apiKey.id}
+              onRequestRevoke={onRequestRevoke}
+              onConfirmRevoke={onConfirmRevoke}
+              onCancelRevoke={onCancelRevoke}
             />
           ))}
         </ul>
