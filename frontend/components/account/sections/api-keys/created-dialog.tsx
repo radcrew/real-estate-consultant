@@ -75,7 +75,11 @@ export const ApiKeyCreatedDialog = ({ apiKey, onDismiss }: ApiKeyCreatedDialogPr
               >
                 {apiKey?.api_key}
               </code>
-              <Button variant="outline" onClick={handleCopy} aria-label="Copy API key">
+              <Button
+                variant="outline"
+                onClick={handleCopy}
+                aria-label={copied ? "API key copied" : "Copy API key"}
+              >
                 {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
                 {copied ? "Copied" : "Copy"}
               </Button>
