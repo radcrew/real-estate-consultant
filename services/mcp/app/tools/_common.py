@@ -67,8 +67,7 @@ async def run_backend(
             return error_text(str(AuthInvalidError()))
         if status == 403:
             return error_text(
-                "Forbidden — this user cannot access that resource "
-                "(admin tools require mcp:admin scope and profiles.is_admin).",
+                "Forbidden — this user cannot access that resource.",
             )
         if status == 404:
             return error_text(f"Not found ({label}).")
@@ -157,18 +156,4 @@ def compact_similar_response(data: dict[str, Any]) -> dict[str, Any]:
         "count": len(results),
         "limit": data.get("limit"),
         "hint": "Call get_listing(property_id) for full detail on any result.",
-    }
-
-
-def compact_agent_response(data: dict[str, Any]) -> dict[str, Any]:
-    props = []
-    for prop in data.get("properties") or []:
-        if isinstance(prop, dict):
-            props.append(compact_property(prop))
-    return {
-        "name": data.get("name"),
-        "email": data.get("email"),
-        "phone": data.get("phone"),
-        "listings_count": len(props),
-        "listings": props,
     }

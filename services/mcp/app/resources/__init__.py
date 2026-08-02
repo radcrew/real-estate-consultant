@@ -39,16 +39,3 @@ def register_resources(mcp: FastMCP) -> None:
             logger.warning("search_resource failed: %s", exc)
             return json.dumps({"error": str(exc)}, default=str)
         return json.dumps(payload, indent=2, default=str)
-
-    @mcp.resource("intake://{session_id}")
-    async def intake_resource(session_id: str) -> str:
-        """Intake session status, criteria, and next question."""
-        client = BackendClient()
-        try:
-            data = await client.get_intake_session(session_id)
-        except AuthRequiredError as exc:
-            return json.dumps({"error": str(exc)})
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("intake_resource failed: %s", exc)
-            return json.dumps({"error": str(exc)}, default=str)
-        return json.dumps(data, indent=2, default=str)

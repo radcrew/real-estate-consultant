@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any
-from urllib.parse import quote
 
 import httpx
 
 from app.auth import AuthRequiredError, get_backend_credential
 from app.config import settings
-
-logger = logging.getLogger(__name__)
 
 
 class BackendClient:
@@ -107,13 +103,11 @@ class BackendClient:
         body: dict[str, Any] | None = None,
         *,
         auth: bool = True,
-        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         data = await self._request_json(
             "POST",
             path,
             auth=auth,
-            params=params,
             json_body=body,
         )
         if not isinstance(data, dict):
@@ -127,24 +121,17 @@ class BackendClient:
         body: dict[str, Any],
         *,
         auth: bool = True,
-        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         data = await self._request_json(
             "PATCH",
             path,
             auth=auth,
-            params=params,
             json_body=body,
         )
         if not isinstance(data, dict):
             msg = f"Expected JSON object from {path}, got {type(data).__name__}"
             raise TypeError(msg)
         return data
-
-    async def ping(self) -> dict[str, Any]:
-        """GET /api/v1/ping — backend liveness smoke check."""
-        logger.info("backend ping → %s/api/v1/ping", self._base_url)
-        return await self.get_json("/api/v1/ping")
 
     async def quick_search(
         self,
@@ -185,7 +172,7 @@ class BackendClient:
         session_profile_id: str,
         criteria: dict[str, Any],
     ) -> dict[str, Any]:
-        """PUT /api/v1/search/{session_profile_id} — replaces intake criteria."""
+        """PUT /api/v1/search/{session_profile_id} — replaces search criteria."""
         return await self.put_json(f"/api/v1/search/{session_profile_id}", criteria, auth=True)
 
     async def get_listing(self, property_id: str) -> dict[str, Any]:
@@ -206,66 +193,6 @@ class BackendClient:
         return await self.get_json(
             f"/api/v1/listings/{property_id}/similar",
             params={"limit": limit},
-        )
-
-    async def explain_fit(self, session_profile_id: str, property_id: str) -> dict[str, Any]:
-        """POST /api/v1/search/{session_profile_id}/fit/{property_id}"""
-        return await self.post_json(
-            f"/api/v1/search/{session_profile_id}/fit/{property_id}",
-            body=None,
-            auth=True,
-        )
-
-    async def list_saved_listings(self) -> dict[str, Any]:
-        """GET /api/v1/account/saved"""
-        return await self.get_json("/api/v1/account/saved", auth=True)
-
-    async def get_agent(self, broker: str) -> dict[str, Any]:
-        """GET /api/v1/agents/{broker}"""
-        encoded = quote(broker, safe="")
-        return await self.get_json(f"/api/v1/agents/{encoded}", auth=True)
-
-    async def start_intake_session(self, mode: str = "guided") -> dict[str, Any]:
-        """POST /api/v1/intake-sessions/?mode=guided|llm"""
-        return await self.post_json(
-            "/api/v1/intake-sessions/",
-            body=None,
-            auth=True,
-            params={"mode": mode},
-        )
-
-    async def get_intake_session(self, session_id: str) -> dict[str, Any]:
-        """GET /api/v1/intake-sessions/{session_id}"""
-        return await self.get_json(f"/api/v1/intake-sessions/{session_id}", auth=True)
-
-    async def answer_intake_guided(
-        self,
-        session_id: str,
-        *,
-        key: str,
-        answers: Any,
-    ) -> dict[str, Any]:
-        """PATCH /api/v1/intake-sessions/{session_id}/answers/guided"""
-        return await self.patch_json(
-            f"/api/v1/intake-sessions/{session_id}/answers/guided",
-            {"key": key, "answers": answers},
-            auth=True,
-        )
-
-    async def answer_intake_llm(self, session_id: str, *, text: str) -> dict[str, Any]:
-        """POST /api/v1/intake-sessions/{session_id}/answers/llm"""
-        return await self.post_json(
-            f"/api/v1/intake-sessions/{session_id}/answers/llm",
-            {"input": text, "mode": "llm"},
-            auth=True,
-        )
-
-    async def complete_intake_session(self, session_id: str) -> dict[str, Any]:
-        """POST /api/v1/intake-sessions/{session_id}/complete"""
-        return await self.post_json(
-            f"/api/v1/intake-sessions/{session_id}/complete",
-            body=None,
-            auth=True,
         )
 
     async def generate_outreach_draft(self, property_id: str) -> dict[str, Any]:
@@ -295,23 +222,3 @@ class BackendClient:
             {"draft_email": draft_email},
             auth=True,
         )
-
-    async def enqueue_ingest(self, source: str = "loopnet-seed") -> dict[str, Any]:
-        """POST /api/v1/admin/ingest — admin JWT required (backend enforces)."""
-        return await self.post_json(
-            "/api/v1/admin/ingest",
-            {"source": source},
-            auth=True,
-        )
-
-    async def list_listing_submissions(self) -> list[Any]:
-        """GET /api/v1/listing-submissions — admin JWT required."""
-        data = await self._request_json(
-            "GET",
-            "/api/v1/listing-submissions",
-            auth=True,
-        )
-        if not isinstance(data, list):
-            msg = f"Expected JSON array from listing-submissions, got {type(data).__name__}"
-            raise TypeError(msg)
-        return data

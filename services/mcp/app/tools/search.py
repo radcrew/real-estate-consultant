@@ -68,7 +68,7 @@ def register_search_tools(mcp: FastMCP) -> None:
         For a new location/budget query, prefer quick_search instead.
 
         Args:
-            session_profile_id: Search profile UUID from intake complete / quick search.
+            session_profile_id: Search profile UUID returned by quick_search.
             limit: Page size (1–100). Defaults to 10 to keep MCP context small.
             offset: Pagination offset.
         """
@@ -93,7 +93,7 @@ def register_search_tools(mcp: FastMCP) -> None:
         session_profile_id: str,
         criteria: dict[str, Any],
     ) -> dict:
-        """Replace search criteria on the session's linked intake (WRITE).
+        """Replace search criteria on an existing search profile (WRITE).
 
         Overwrites prior criteria. Requires MCP_USER_ACCESS_TOKEN. Prefer asking
         the user before calling when criteria changes are consequential.
