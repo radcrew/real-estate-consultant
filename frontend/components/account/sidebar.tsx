@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Heart, KeyRound, UserCircle } from "lucide-react";
+import { Building2, Heart, KeyRound, Plug, UserCircle } from "lucide-react";
 
 import { Avatar } from "@components/ui/avatar";
 import { brand } from "@config/brand";
@@ -11,10 +11,10 @@ import { cn } from "@utils/common";
 /**
  * Voyager `AccountSidebar` adapted to this app: dark workspace rail with the
  * brand block, the signed-in user's avatar, and a tabbed nav for the account
- * sections. Profile + Security are in-page tabs (switch the visible panel);
- * Saved is a real route since it lives on its own page.
+ * sections. Profile + Security + MCP API keys are in-page tabs (switch the
+ * visible panel); Saved is a real route since it lives on its own page.
  */
-export type AccountTab = "profile" | "security";
+export type AccountTab = "profile" | "security" | "api-keys";
 
 const TAB_ITEMS: {
   tab: AccountTab;
@@ -33,6 +33,12 @@ const TAB_ITEMS: {
     label: "Security",
     description: "Change your password",
     icon: KeyRound,
+  },
+  {
+    tab: "api-keys",
+    label: "MCP API keys",
+    description: "Connect AI tools to your account",
+    icon: Plug,
   },
 ];
 
