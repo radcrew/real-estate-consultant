@@ -86,31 +86,24 @@ const KeyRow = ({
   onConfirmRevoke: (key: McpApiKey) => void;
   onCancelRevoke: () => void;
 }) => {
-  const revoked = isRevoked(apiKey);
-  const expired = !revoked && isExpired(apiKey);
-  const inactive = revoked || expired;
+  const expired = isExpired(apiKey);
   const daysLeft = daysUntilExpiry(apiKey);
   const expiringSoon =
-    !inactive && daysLeft !== null && daysLeft <= API_KEY_EXPIRY_WARNING_DAYS;
+    !expired && daysLeft !== null && daysLeft <= API_KEY_EXPIRY_WARNING_DAYS;
 
   return (
     <li
       className={
-        inactive
+        expired
           ? "flex flex-wrap items-center gap-x-4 gap-y-1 py-4 opacity-60"
           : "flex flex-wrap items-center gap-x-4 gap-y-1 py-4"
       }
       data-testid="api-key-row"
-      data-inactive={inactive ? "true" : undefined}
+      data-inactive={expired ? "true" : undefined}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium text-foreground">{apiKey.name}</span>
-          {revoked ? (
-            <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
-              Revoked
-            </span>
-          ) : null}
           {expired ? (
             <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
               Expired
@@ -123,7 +116,7 @@ const KeyRow = ({
                 : `Expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`}
             </span>
           ) : null}
-          {replaced && !inactive ? (
+          {replaced && !expired ? (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">
               Replaced — still active
             </span>
@@ -151,7 +144,7 @@ const KeyRow = ({
         </div>
       </dl>
 
-      {revoked ? null : confirming ? (
+      {confirming ? (
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">Revoke permanently?</span>
           <Button
@@ -215,131 +208,142 @@ export const AccountApiKeysSection = ({
   onRequestRevoke,
   onConfirmRevoke,
   onCancelRevoke,
-}: AccountApiKeysSectionProps) => (
-  <section className={ACCOUNT_SECTION_CARD_CLASS} aria-labelledby="api-keys-heading">
-    <div className="border-b border-border pb-5">
-      <h2 id="api-keys-heading" className="text-lg font-semibold text-foreground">
-        MCP API keys
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Connect AI tools like Cursor or Claude to your RadEstate account. Each key acts as you —
-        treat it like a password.
-      </p>
-    </div>
+}: AccountApiKeysSectionProps) => {
+  // A revoked key is a dead credential: it cannot be rotated, revoked again or
+  // used, so listing it is noise that only makes the live keys harder to find.
+  // The API still returns them, so drop them here.
+  const visibleKeys = keys.filter((apiKey) => !isRevoked(apiKey));
 
-    <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-5">
-      <AccountField
-        id="api-key-name"
-        label="Key name"
-        value={name}
-        onChange={onChangeName}
-        error={errors.name}
-        autoComplete="off"
-      />
-
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="api-key-scope" className="text-sm font-medium text-foreground">
-          Access
-        </label>
-        <select
-          id="api-key-scope"
-          value={scope}
-          onChange={(e) => onChangeScope(e.target.value)}
-          className="h-10 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-foreground dark:border-neutral-700 dark:bg-neutral-900"
-        >
-          {SCOPE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label} — {option.hint}
-            </option>
-          ))}
-        </select>
+  return (
+    <section className={ACCOUNT_SECTION_CARD_CLASS} aria-labelledby="api-keys-heading">
+      <div className="border-b border-border pb-5">
+        <h2 id="api-keys-heading" className="text-lg font-semibold text-foreground">
+          MCP API keys
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Connect AI tools like Cursor or Claude to your RadEstate account. Each key acts as you —
+          treat it like a password.
+        </p>
       </div>
 
-      <AccountField
-        id="api-key-expires"
-        label="Expires in (days)"
-        type="number"
-        value={expiresInDays}
-        onChange={onChangeExpiresInDays}
-        error={errors.expiresInDays}
-        autoComplete="off"
-      />
-      <p className="-mt-3 text-xs text-muted-foreground">
-        Short-lived keys limit the damage if one leaks. Clear this field for a key that never
-        expires.
-      </p>
+      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-5">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <AccountField
+            id="api-key-name"
+            label="Key name"
+            value={name}
+            onChange={onChangeName}
+            error={errors.name}
+            autoComplete="off"
+          />
 
-      {errors.form ? (
-        <p className="text-sm text-destructive" role="alert">
-          {errors.form}
-        </p>
-      ) : null}
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="api-key-scope" className="text-sm font-medium text-foreground">
+              Access
+            </label>
+            <select
+              id="api-key-scope"
+              value={scope}
+              onChange={(e) => onChangeScope(e.target.value)}
+              className="h-10 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-foreground dark:border-neutral-700 dark:bg-neutral-900"
+            >
+              {SCOPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label} — {option.hint}
+                </option>
+              ))}
+            </select>
+          </div>
 
-      <div className="pt-1">
-        <Button type="submit" disabled={creating}>
-          <Plug aria-hidden />
-          {creating ? "Creating…" : "Create key"}
-        </Button>
-      </div>
-    </form>
-
-    <div className="mt-8 border-t border-border pt-6">
-      <h3 className="text-sm font-semibold text-foreground">Your keys</h3>
-
-      {replacedKeyId ? (
-        <p
-          className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
-          role="status"
-        >
-          A replacement key was created. Update your AI tool config with the new key first — the
-          old key keeps working until you revoke it.
-        </p>
-      ) : null}
-
-      {loadError ? (
-        <p className="mt-3 text-sm text-destructive" role="alert">
-          {loadError}
-        </p>
-      ) : null}
-
-      {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading keys…</p> : null}
-
-      {!loading && !loadError && keys.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          You have no API keys yet. Create one above to connect an AI tool.
-        </p>
-      ) : null}
-
-      {keys.length > 0 ? (
-        <ul className="mt-2 divide-y divide-border">
-          {keys.map((apiKey) => (
-            <KeyRow
-              key={apiKey.id}
-              apiKey={apiKey}
-              revoking={revokingId === apiKey.id}
-              confirming={confirmingRevokeId === apiKey.id}
-              rotating={rotatingId === apiKey.id}
-              replaced={replacedKeyId === apiKey.id}
-              onRotate={onRotate}
-              onRequestRevoke={onRequestRevoke}
-              onConfirmRevoke={onConfirmRevoke}
-              onCancelRevoke={onCancelRevoke}
+          <div className="flex flex-col gap-1.5">
+            <AccountField
+              id="api-key-expires"
+              label="Expires in (days)"
+              type="number"
+              value={expiresInDays}
+              onChange={onChangeExpiresInDays}
+              error={errors.expiresInDays}
+              autoComplete="off"
             />
-          ))}
-        </ul>
-      ) : null}
-    </div>
+            <p className="text-xs text-muted-foreground">
+              Short-lived keys limit the damage if one leaks. Clear this field for a key that never
+              expires.
+            </p>
+          </div>
+        </div>
 
-    {keys.length > 0 ? (
+        {errors.form ? (
+          <p className="text-sm text-destructive" role="alert">
+            {errors.form}
+          </p>
+        ) : null}
+
+        <div className="pt-1">
+          <Button type="submit" disabled={creating}>
+            <Plug aria-hidden />
+            {creating ? "Creating…" : "Create key"}
+          </Button>
+        </div>
+      </form>
+
       <div className="mt-8 border-t border-border pt-6">
-        <h3 className="text-sm font-semibold text-foreground">Connect an AI tool</h3>
-        <p className="mt-1 mb-3 text-sm text-muted-foreground">
-          Paste this into your host config, replacing{" "}
-          <code className="font-mono text-xs">{API_KEY_PLACEHOLDER}</code> with a key you saved
-          when you created it. Keys cannot be shown again.
-        </p>
-        <McpConfigTabs apiKey={API_KEY_PLACEHOLDER} />
+        <h3 className="text-sm font-semibold text-foreground">Your keys</h3>
+
+        {replacedKeyId ? (
+          <p
+            className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+            role="status"
+          >
+            A replacement key was created. Update your AI tool config with the new key first — the
+            old key keeps working until you revoke it.
+          </p>
+        ) : null}
+
+        {loadError ? (
+          <p className="mt-3 text-sm text-destructive" role="alert">
+            {loadError}
+          </p>
+        ) : null}
+
+        {loading ? <p className="mt-3 text-sm text-muted-foreground">Loading keys…</p> : null}
+
+        {!loading && !loadError && visibleKeys.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            You have no API keys yet. Create one above to connect an AI tool.
+          </p>
+        ) : null}
+
+        {visibleKeys.length > 0 ? (
+          <ul className="mt-2 divide-y divide-border">
+            {visibleKeys.map((apiKey) => (
+              <KeyRow
+                key={apiKey.id}
+                apiKey={apiKey}
+                revoking={revokingId === apiKey.id}
+                confirming={confirmingRevokeId === apiKey.id}
+                rotating={rotatingId === apiKey.id}
+                replaced={replacedKeyId === apiKey.id}
+                onRotate={onRotate}
+                onRequestRevoke={onRequestRevoke}
+                onConfirmRevoke={onConfirmRevoke}
+                onCancelRevoke={onCancelRevoke}
+              />
+            ))}
+          </ul>
+        ) : null}
       </div>
-    ) : null}
-  </section>
-);
+
+      {visibleKeys.length > 0 ? (
+        <div className="mt-8 border-t border-border pt-6">
+          <h3 className="text-sm font-semibold text-foreground">Connect an AI tool</h3>
+          <p className="mt-1 mb-3 text-sm text-muted-foreground">
+            Paste this into your host config, replacing{" "}
+            <code className="font-mono text-xs">{API_KEY_PLACEHOLDER}</code> with a key you saved
+            when you created it. Keys cannot be shown again.
+          </p>
+          <McpConfigTabs apiKey={API_KEY_PLACEHOLDER} />
+        </div>
+      ) : null}
+    </section>
+  );
+};

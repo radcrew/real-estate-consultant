@@ -126,13 +126,6 @@ describe("AccountApiKeysSection", () => {
       expect(onRotate).toHaveBeenCalledTimes(1);
     });
 
-    it("does not offer rotation on a revoked key", () => {
-      render(
-        <AccountApiKeysSection {...BASE} keys={[key({ revoked_at: "2026-02-01T00:00:00Z" })]} />,
-      );
-      expect(screen.queryByRole("button", { name: /rotate cursor/i })).not.toBeInTheDocument();
-    });
-
     it("keeps the replaced key revocable rather than revoking it automatically", () => {
       render(<AccountApiKeysSection {...BASE} keys={[key()]} replacedKeyId="key-1" />);
       expect(screen.getByText(/replaced — still active/i)).toBeInTheDocument();
@@ -180,26 +173,33 @@ describe("AccountApiKeysSection", () => {
       expect(screen.getByText(/^expired$/i)).toBeInTheDocument();
       expect(screen.queryByText(/expires in \d+ day/i)).not.toBeInTheDocument();
     });
-
-    it("does not warn about a revoked key inside the window", () => {
-      render(
-        <AccountApiKeysSection
-          {...BASE}
-          keys={[key({ expires_at: inDays(3), revoked_at: "2026-02-01T00:00:00Z" })]}
-        />,
-      );
-      expect(screen.queryByText(/expires in \d+ day/i)).not.toBeInTheDocument();
-    });
   });
 
   describe("inactive keys", () => {
-    it("keeps revoked keys visible but marked, with no revoke button", () => {
+    it("hides revoked keys", () => {
       render(
         <AccountApiKeysSection {...BASE} keys={[key({ revoked_at: "2026-02-01T00:00:00Z" })]} />,
       );
-      expect(screen.getByText("cursor")).toBeInTheDocument();
-      expect(screen.getByText(/revoked/i)).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /revoke cursor/i })).not.toBeInTheDocument();
+      expect(screen.queryByText("cursor")).not.toBeInTheDocument();
+      expect(screen.queryAllByTestId("api-key-row")).toHaveLength(0);
+    });
+
+    it("shows the empty state when every key has been revoked", () => {
+      render(
+        <AccountApiKeysSection {...BASE} keys={[key({ revoked_at: "2026-02-01T00:00:00Z" })]} />,
+      );
+      expect(screen.getByText(/no api keys yet/i)).toBeInTheDocument();
+    });
+
+    it("keeps listing the live keys alongside a revoked one", () => {
+      render(
+        <AccountApiKeysSection
+          {...BASE}
+          keys={[key({ revoked_at: "2026-02-01T00:00:00Z" }), key({ id: "key-2", name: "claude" })]}
+        />,
+      );
+      expect(screen.getAllByTestId("api-key-row")).toHaveLength(1);
+      expect(screen.getByText("claude")).toBeInTheDocument();
     });
 
     it("marks a key whose expiry has passed without an explicit revoke", () => {
