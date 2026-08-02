@@ -152,6 +152,46 @@ describe("AccountApiKeysSection", () => {
     });
   });
 
+  describe("expiry", () => {
+    const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString();
+
+    it("warns when a key is inside the expiry window", () => {
+      render(<AccountApiKeysSection {...BASE} keys={[key({ expires_at: inDays(5) })]} />);
+      expect(screen.getByText(/expires in 5 days/i)).toBeInTheDocument();
+    });
+
+    it("uses the singular for a key with one day left", () => {
+      render(<AccountApiKeysSection {...BASE} keys={[key({ expires_at: inDays(1) })]} />);
+      expect(screen.getByText(/expires in 1 day$/i)).toBeInTheDocument();
+    });
+
+    it("does not warn for a key well outside the window", () => {
+      render(<AccountApiKeysSection {...BASE} keys={[key({ expires_at: inDays(90) })]} />);
+      expect(screen.queryByText(/expires in \d+ day/i)).not.toBeInTheDocument();
+    });
+
+    it("does not warn for a key that never expires", () => {
+      render(<AccountApiKeysSection {...BASE} keys={[key({ expires_at: null })]} />);
+      expect(screen.queryByText(/expires in \d+ day/i)).not.toBeInTheDocument();
+    });
+
+    it("shows Expired rather than a warning once the date has passed", () => {
+      render(<AccountApiKeysSection {...BASE} keys={[key({ expires_at: inDays(-1) })]} />);
+      expect(screen.getByText(/^expired$/i)).toBeInTheDocument();
+      expect(screen.queryByText(/expires in \d+ day/i)).not.toBeInTheDocument();
+    });
+
+    it("does not warn about a revoked key inside the window", () => {
+      render(
+        <AccountApiKeysSection
+          {...BASE}
+          keys={[key({ expires_at: inDays(3), revoked_at: "2026-02-01T00:00:00Z" })]}
+        />,
+      );
+      expect(screen.queryByText(/expires in \d+ day/i)).not.toBeInTheDocument();
+    });
+  });
+
   describe("inactive keys", () => {
     it("keeps revoked keys visible but marked, with no revoke button", () => {
       render(

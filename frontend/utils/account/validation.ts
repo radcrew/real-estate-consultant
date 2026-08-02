@@ -113,6 +113,12 @@ export const API_KEY_NAME_MAX = 120;
 export const API_KEY_EXPIRY_MIN = 1;
 export const API_KEY_EXPIRY_MAX = 3650;
 
+/** Pre-filled on the create form — a non-expiring credential should be a choice, not the default. */
+export const API_KEY_EXPIRY_DEFAULT_DAYS = 90;
+
+/** Keys inside this window are flagged in the list so rotation can happen before expiry. */
+export const API_KEY_EXPIRY_WARNING_DAYS = 14;
+
 export const validateApiKeyForm = (
   values: ApiKeyFormValues,
 ): Partial<Record<ApiKeyFieldKey | "form", string>> => {

@@ -9,6 +9,7 @@ import { useAuth } from "@contexts/auth";
 import { getApiErrorMessage } from "@utils/common";
 import { readSession, saveSession } from "@lib/auth-session";
 import {
+  API_KEY_EXPIRY_DEFAULT_DAYS,
   API_KEY_NAME_MAX,
   type ProfileFieldKey,
   type ProfileFormValues,
@@ -75,7 +76,7 @@ export const AccountPage = () => {
   const [apiKeysLoadError, setApiKeysLoadError] = useState<string | null>(null);
   const [keyName, setKeyName] = useState("");
   const [keyScope, setKeyScope] = useState("*");
-  const [keyExpiresInDays, setKeyExpiresInDays] = useState("");
+  const [keyExpiresInDays, setKeyExpiresInDays] = useState(String(API_KEY_EXPIRY_DEFAULT_DAYS));
   const [keyErrors, setKeyErrors] = useState<Partial<Record<string, string>>>({});
   const [keyCreating, setKeyCreating] = useState(false);
   const [createdKey, setCreatedKey] = useState<McpApiKeyCreated | null>(null);
@@ -338,7 +339,7 @@ export const AccountPage = () => {
         // Show the plaintext key before anything else can navigate away.
         setCreatedKey(created);
         setKeyName("");
-        setKeyExpiresInDays("");
+        setKeyExpiresInDays(String(API_KEY_EXPIRY_DEFAULT_DAYS));
         setKeyScope("*");
         // Refetch rather than appending — the list shape omits api_key.
         const keys = await accountService.listApiKeys();
@@ -364,6 +365,10 @@ export const AccountPage = () => {
       const created = await accountService.createApiKey({
         name: `${key.name} (rotated)`.slice(0, API_KEY_NAME_MAX),
         scopes: key.scopes,
+        // Carry the expiry policy across: a key that expired must not be
+        // replaced by one that never does. The original TTL is unknowable
+        // from expires_at alone, so fall back to the default window.
+        ...(key.expires_at ? { expires_in_days: API_KEY_EXPIRY_DEFAULT_DAYS } : {}),
       });
       setCreatedKey(created);
       setReplacedKeyId(key.id);

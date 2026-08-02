@@ -5,6 +5,7 @@ import { Plug, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@components/ui/button-variants";
 import type { McpApiKey } from "@services/account";
 import { API_KEY_PLACEHOLDER } from "@utils/account/mcp-config";
+import { API_KEY_EXPIRY_WARNING_DAYS } from "@utils/account/validation";
 
 import { AccountField } from "../../field";
 import { ACCOUNT_SECTION_CARD_CLASS } from "../../styles";
@@ -50,6 +51,14 @@ const isRevoked = (key: McpApiKey) => Boolean(key.revoked_at);
 const isExpired = (key: McpApiKey) =>
   Boolean(key.expires_at) && new Date(String(key.expires_at)).getTime() < Date.now();
 
+/** Whole days until expiry, or null when the key never expires or the date is unusable. */
+const daysUntilExpiry = (key: McpApiKey): number | null => {
+  if (!key.expires_at) return null;
+  const at = new Date(String(key.expires_at)).getTime();
+  if (Number.isNaN(at)) return null;
+  return Math.ceil((at - Date.now()) / 86_400_000);
+};
+
 const formatDate = (value: string | null) => {
   if (!value) return "—";
   const parsed = new Date(value);
@@ -80,6 +89,9 @@ const KeyRow = ({
   const revoked = isRevoked(apiKey);
   const expired = !revoked && isExpired(apiKey);
   const inactive = revoked || expired;
+  const daysLeft = daysUntilExpiry(apiKey);
+  const expiringSoon =
+    !inactive && daysLeft !== null && daysLeft <= API_KEY_EXPIRY_WARNING_DAYS;
 
   return (
     <li
@@ -102,6 +114,13 @@ const KeyRow = ({
           {expired ? (
             <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
               Expired
+            </span>
+          ) : null}
+          {expiringSoon ? (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">
+              {daysLeft !== null && daysLeft <= 0
+                ? "Expires today"
+                : `Expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`}
             </span>
           ) : null}
           {replaced && !inactive ? (
@@ -246,7 +265,8 @@ export const AccountApiKeysSection = ({
         autoComplete="off"
       />
       <p className="-mt-3 text-xs text-muted-foreground">
-        Leave blank for a key that never expires.
+        Short-lived keys limit the damage if one leaks. Clear this field for a key that never
+        expires.
       </p>
 
       {errors.form ? (
