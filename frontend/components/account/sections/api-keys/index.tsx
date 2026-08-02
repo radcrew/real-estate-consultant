@@ -1,6 +1,6 @@
 "use client";
 
-import { Plug, Trash2 } from "lucide-react";
+import { Plug, RefreshCw, Trash2 } from "lucide-react";
 
 import { Button } from "@components/ui/button-variants";
 import type { McpApiKey } from "@services/account";
@@ -32,10 +32,14 @@ export type AccountApiKeysSectionProps = {
   creating: boolean;
   revokingId: string | null;
   confirmingRevokeId: string | null;
+  rotatingId: string | null;
+  /** Key that has just been replaced and is waiting to be revoked. */
+  replacedKeyId: string | null;
   onChangeName: (value: string) => void;
   onChangeScope: (value: string) => void;
   onChangeExpiresInDays: (value: string) => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  onRotate: (key: McpApiKey) => void;
   onRequestRevoke: (key: McpApiKey) => void;
   onConfirmRevoke: (key: McpApiKey) => void;
   onCancelRevoke: () => void;
@@ -56,6 +60,9 @@ const KeyRow = ({
   apiKey,
   revoking,
   confirming,
+  rotating,
+  replaced,
+  onRotate,
   onRequestRevoke,
   onConfirmRevoke,
   onCancelRevoke,
@@ -63,6 +70,9 @@ const KeyRow = ({
   apiKey: McpApiKey;
   revoking: boolean;
   confirming: boolean;
+  rotating: boolean;
+  replaced: boolean;
+  onRotate: (key: McpApiKey) => void;
   onRequestRevoke: (key: McpApiKey) => void;
   onConfirmRevoke: (key: McpApiKey) => void;
   onCancelRevoke: () => void;
@@ -92,6 +102,11 @@ const KeyRow = ({
           {expired ? (
             <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-700 dark:bg-neutral-700 dark:text-neutral-200">
               Expired
+            </span>
+          ) : null}
+          {replaced && !inactive ? (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-950/60 dark:text-amber-200">
+              Replaced — still active
             </span>
           ) : null}
         </div>
@@ -134,15 +149,27 @@ const KeyRow = ({
           </Button>
         </div>
       ) : (
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => onRequestRevoke(apiKey)}
-          aria-label={`Revoke ${apiKey.name}`}
-        >
-          <Trash2 aria-hidden />
-          Revoke
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={rotating}
+            onClick={() => onRotate(apiKey)}
+            aria-label={`Rotate ${apiKey.name}`}
+          >
+            <RefreshCw aria-hidden />
+            {rotating ? "Rotating…" : "Rotate"}
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => onRequestRevoke(apiKey)}
+            aria-label={`Revoke ${apiKey.name}`}
+          >
+            <Trash2 aria-hidden />
+            Revoke
+          </Button>
+        </div>
       )}
     </li>
   );
@@ -159,10 +186,13 @@ export const AccountApiKeysSection = ({
   creating,
   revokingId,
   confirmingRevokeId,
+  rotatingId,
+  replacedKeyId,
   onChangeName,
   onChangeScope,
   onChangeExpiresInDays,
   onSubmit,
+  onRotate,
   onRequestRevoke,
   onConfirmRevoke,
   onCancelRevoke,
@@ -236,6 +266,16 @@ export const AccountApiKeysSection = ({
     <div className="mt-8 border-t border-border pt-6">
       <h3 className="text-sm font-semibold text-foreground">Your keys</h3>
 
+      {replacedKeyId ? (
+        <p
+          className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+          role="status"
+        >
+          A replacement key was created. Update your AI tool config with the new key first — the
+          old key keeps working until you revoke it.
+        </p>
+      ) : null}
+
       {loadError ? (
         <p className="mt-3 text-sm text-destructive" role="alert">
           {loadError}
@@ -258,6 +298,9 @@ export const AccountApiKeysSection = ({
               apiKey={apiKey}
               revoking={revokingId === apiKey.id}
               confirming={confirmingRevokeId === apiKey.id}
+              rotating={rotatingId === apiKey.id}
+              replaced={replacedKeyId === apiKey.id}
+              onRotate={onRotate}
               onRequestRevoke={onRequestRevoke}
               onConfirmRevoke={onConfirmRevoke}
               onCancelRevoke={onCancelRevoke}

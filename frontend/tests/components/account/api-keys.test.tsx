@@ -30,10 +30,13 @@ const BASE = {
   creating: false,
   revokingId: null,
   confirmingRevokeId: null,
+  rotatingId: null,
+  replacedKeyId: null,
   onChangeName: vi.fn(),
   onChangeScope: vi.fn(),
   onChangeExpiresInDays: vi.fn(),
   onSubmit: vi.fn((e) => e.preventDefault()),
+  onRotate: vi.fn(),
   onRequestRevoke: vi.fn(),
   onConfirmRevoke: vi.fn(),
   onCancelRevoke: vi.fn(),
@@ -112,6 +115,40 @@ describe("AccountApiKeysSection", () => {
       );
       fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
       expect(onCancelRevoke).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("rotate", () => {
+    it("offers rotation on an active key", () => {
+      const onRotate = vi.fn();
+      render(<AccountApiKeysSection {...BASE} keys={[key()]} onRotate={onRotate} />);
+      fireEvent.click(screen.getByRole("button", { name: /rotate cursor/i }));
+      expect(onRotate).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not offer rotation on a revoked key", () => {
+      render(
+        <AccountApiKeysSection {...BASE} keys={[key({ revoked_at: "2026-02-01T00:00:00Z" })]} />,
+      );
+      expect(screen.queryByRole("button", { name: /rotate cursor/i })).not.toBeInTheDocument();
+    });
+
+    it("keeps the replaced key revocable rather than revoking it automatically", () => {
+      render(<AccountApiKeysSection {...BASE} keys={[key()]} replacedKeyId="key-1" />);
+      expect(screen.getByText(/replaced — still active/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /^revoke cursor$/i })).toBeInTheDocument();
+    });
+
+    it("explains the swap order after a rotation", () => {
+      render(<AccountApiKeysSection {...BASE} keys={[key()]} replacedKeyId="key-1" />);
+      expect(screen.getByRole("status")).toHaveTextContent(
+        /old key keeps working until you revoke it/i,
+      );
+    });
+
+    it("shows no rotation banner when nothing has been replaced", () => {
+      render(<AccountApiKeysSection {...BASE} keys={[key()]} />);
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
     });
   });
 

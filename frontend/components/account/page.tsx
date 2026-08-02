@@ -9,6 +9,7 @@ import { useAuth } from "@contexts/auth";
 import { getApiErrorMessage } from "@utils/common";
 import { readSession, saveSession } from "@lib/auth-session";
 import {
+  API_KEY_NAME_MAX,
   type ProfileFieldKey,
   type ProfileFormValues,
   validateApiKeyForm,
@@ -80,6 +81,8 @@ export const AccountPage = () => {
   const [createdKey, setCreatedKey] = useState<McpApiKeyCreated | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [confirmingRevokeId, setConfirmingRevokeId] = useState<string | null>(null);
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
+  const [replacedKeyId, setReplacedKeyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ready || session) return;
@@ -349,6 +352,30 @@ export const AccountPage = () => {
     [keyName, keyScope, keyExpiresInDays],
   );
 
+  /**
+   * Rotation = mint a replacement with the same scopes, leaving the old key
+   * live so hosts keep working until the user has swapped their config over.
+   * The old key is revoked separately, on their schedule.
+   */
+  const rotateApiKey = useCallback(async (key: McpApiKey) => {
+    setRotatingId(key.id);
+    setKeyErrors({});
+    try {
+      const created = await accountService.createApiKey({
+        name: `${key.name} (rotated)`.slice(0, API_KEY_NAME_MAX),
+        scopes: key.scopes,
+      });
+      setCreatedKey(created);
+      setReplacedKeyId(key.id);
+      const keys = await accountService.listApiKeys();
+      setApiKeys(keys);
+    } catch (err) {
+      setKeyErrors({ form: getApiErrorMessage(err) });
+    } finally {
+      setRotatingId(null);
+    }
+  }, []);
+
   const confirmRevokeApiKey = useCallback(async (key: McpApiKey) => {
     setRevokingId(key.id);
     setKeyErrors({});
@@ -357,6 +384,8 @@ export const AccountPage = () => {
       const keys = await accountService.listApiKeys();
       setApiKeys(keys);
       setConfirmingRevokeId(null);
+      // Rotation is finished once the key it replaced is gone.
+      setReplacedKeyId((id) => (id === key.id ? null : id));
     } catch (err) {
       setKeyErrors({ form: getApiErrorMessage(err) });
     } finally {
@@ -473,10 +502,13 @@ export const AccountPage = () => {
                 creating={keyCreating}
                 revokingId={revokingId}
                 confirmingRevokeId={confirmingRevokeId}
+                rotatingId={rotatingId}
+                replacedKeyId={replacedKeyId}
                 onChangeName={onChangeKeyName}
                 onChangeScope={setKeyScope}
                 onChangeExpiresInDays={onChangeKeyExpiresInDays}
                 onSubmit={submitCreateApiKey}
+                onRotate={rotateApiKey}
                 onRequestRevoke={(key) => setConfirmingRevokeId(key.id)}
                 onConfirmRevoke={confirmRevokeApiKey}
                 onCancelRevoke={() => setConfirmingRevokeId(null)}
