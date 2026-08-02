@@ -76,6 +76,9 @@ def test_create_server_registers_core_tools_only() -> None:
         "get_agent",
         "explain_fit",
         "start_intake_session",
+        "get_intake_session",
+        "answer_intake",
+        "complete_intake",
         "enqueue_ingest",
         "list_listing_submissions",
     ):

@@ -290,6 +290,7 @@ Local stdio (`run-mcp.cmd` / `pnpm run dev:mcp`) remains the default for contrib
 
 Resources: `listing://`, `search://`.  
 Prompts: `cre_property_search` (quick_search flow), `draft_broker_outreach`.
+
 ## Tests
 
 ```powershell
