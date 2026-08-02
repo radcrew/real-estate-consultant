@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@contexts/auth";
 
-import { getApiErrorMessage } from "@utils/common";
+import { cn, getApiErrorMessage } from "@utils/common";
 import { readSession, saveSession } from "@lib/auth-session";
 import {
   API_KEY_EXPIRY_DEFAULT_DAYS,
@@ -448,12 +448,17 @@ export const AccountPage = () => {
 
   const profileValues = editingProfile ? draftProfile : mergedSavedProfile;
 
+  // API keys need the extra room: key rows carry four metadata columns plus
+  // action buttons, and the host config snippets are wide code blocks. The
+  // form-only tabs read better kept narrow.
+  const contentWidth = activeTab === "api-keys" ? "max-w-5xl" : "max-w-3xl";
+
   return (
     <div className="flex flex-col lg:flex-row">
       <AccountSidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 
       <main className="min-w-0 flex-1 px-4 py-10 sm:px-6 lg:px-10">
-        <div className="mx-auto w-full max-w-3xl">
+        <div className={cn("mx-auto w-full", contentWidth)}>
           <header className="border-b border-border pb-8">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               {brand.account.workspaceLabel}
