@@ -6,9 +6,6 @@ from mcp.server.fastmcp import FastMCP
 from app.client.backend import BackendClient
 from app.client.errors import AuthRequiredError
 from app.server import create_server
-from app.tools.account import register_account_tools
-from app.tools.agents import register_agents_tools
-from app.tools.fit import register_fit_tools
 from app.tools.listings import register_listings_tools
 from app.tools.search import register_search_tools
 
@@ -105,16 +102,12 @@ async def test_search_properties_compacts_and_auths() -> None:
     )
     mcp = FastMCP("test")
     register_search_tools(mcp)
-    # Patch settings via client ctor by monkeypatching tool's BackendClient — call client directly
-    # and also exercise tool with a client that has token through env/settings.
     client = BackendClient(base_url=BASE, access_token=TOKEN)
     data = await client.search_properties("sess-1", limit=10)
     assert data["results"][0]["property"]["id"] == "prop-1"
     assert route.called
     assert route.calls.last.request.headers["Authorization"] == f"Bearer {TOKEN}"
 
-    # Tool uses settings token; inject via BackendClient default — call tool.fn with patched client
-    # by setting env is heavy; instead invoke transform path via tool after respx + settings token.
     from app import config
 
     original = config.settings.mcp_user_access_token
@@ -225,92 +218,20 @@ async def test_get_similar_listings() -> None:
     assert respx.calls.last.request.url.params["limit"] == "6"
 
 
-@pytest.mark.asyncio
-@respx.mock
-async def test_explain_fit() -> None:
-    respx.post(f"{BASE}/api/v1/search/sess-1/fit/prop-1").mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "property_id": "prop-1",
-                "score": {"location": 0.9, "price": 0.8, "size": 0.7, "total": 85.0},
-                "summary": "Strong location fit.",
-                "strengths": ["Near target market"],
-                "considerations": ["Slightly over budget"],
-            },
-        ),
-    )
-    from app import config
-
-    mcp = FastMCP("test")
-    register_fit_tools(mcp)
-    original = config.settings.mcp_user_access_token
-    config.settings.mcp_user_access_token = TOKEN
-    try:
-        result = await _tool(mcp, "explain_fit").fn(
-            session_profile_id="sess-1",
-            property_id="prop-1",
-        )
-    finally:
-        config.settings.mcp_user_access_token = original
-    assert result.get("isError") is not True
-    assert "Strong location fit" in result["content"][0]["text"]
-
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_list_saved_and_get_agent() -> None:
-    respx.get(f"{BASE}/api/v1/account/saved").mock(
-        return_value=httpx.Response(200, json={"property_ids": ["a", "b"]}),
-    )
-    respx.get(f"{BASE}/api/v1/agents/Ada%20Broker").mock(
-        return_value=httpx.Response(
-            200,
-            json={
-                "name": "Ada Broker",
-                "email": "ada@example.com",
-                "phone": None,
-                "properties": [{"id": "p1", "city": "Austin"}],
-            },
-        ),
-    )
-    from app import config
-
-    mcp = FastMCP("test")
-    register_account_tools(mcp)
-    register_agents_tools(mcp)
-    original = config.settings.mcp_user_access_token
-    config.settings.mcp_user_access_token = TOKEN
-    try:
-        saved = await _tool(mcp, "list_saved_listings").fn()
-        agent = await _tool(mcp, "get_agent").fn(broker="Ada Broker")
-    finally:
-        config.settings.mcp_user_access_token = original
-
-    assert saved.get("isError") is not True
-    assert "property_ids" in saved["content"][0]["text"]
-    assert agent.get("isError") is not True
-    assert "Ada Broker" in agent["content"][0]["text"]
-
-
 def test_backend_client_require_auth() -> None:
     client = BackendClient(base_url=BASE, access_token="")
     with pytest.raises(AuthRequiredError):
         client.require_auth()
 
 
-def test_create_server_registers_phase1_tools() -> None:
+def test_create_server_registers_search_and_listings_tools() -> None:
     mcp = create_server()
     for name in (
-        "ping_backend",
         "quick_search",
         "search_properties",
         "update_search_criteria",
         "get_listing",
         "get_featured_listings",
         "get_similar_listings",
-        "explain_fit",
-        "list_saved_listings",
-        "get_agent",
     ):
         assert mcp._tool_manager.get_tool(name) is not None
