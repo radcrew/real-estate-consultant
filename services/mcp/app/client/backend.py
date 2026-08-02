@@ -103,13 +103,11 @@ class BackendClient:
         body: dict[str, Any] | None = None,
         *,
         auth: bool = True,
-        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         data = await self._request_json(
             "POST",
             path,
             auth=auth,
-            params=params,
             json_body=body,
         )
         if not isinstance(data, dict):
@@ -123,13 +121,11 @@ class BackendClient:
         body: dict[str, Any],
         *,
         auth: bool = True,
-        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         data = await self._request_json(
             "PATCH",
             path,
             auth=auth,
-            params=params,
             json_body=body,
         )
         if not isinstance(data, dict):
