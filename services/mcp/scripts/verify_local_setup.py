@@ -17,12 +17,6 @@ async def main() -> int:
     client = BackendClient()
 
     try:
-        featured = await client.get_featured_listings()
-        print("featured_count", len(featured.get("listings") or []))
-    except Exception as exc:  # noqa: BLE001
-        print("featured_skip", exc)
-
-    try:
         created = await client.quick_search(location="Austin, TX")
         profile_id = created.get("search_profile_id")
         print("quick_search_profile", profile_id)

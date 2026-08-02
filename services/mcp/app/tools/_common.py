@@ -131,16 +131,6 @@ def compact_search_response(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def compact_featured_response(data: dict[str, Any]) -> dict[str, Any]:
-    listings = []
-    for item in data.get("listings") or []:
-        if not isinstance(item, dict):
-            continue
-        prop = item.get("property") if isinstance(item.get("property"), dict) else {}
-        listings.append(compact_property(prop))
-    return {"listings": listings, "count": len(listings)}
-
-
 def compact_similar_response(data: dict[str, Any]) -> dict[str, Any]:
     results = []
     for item in data.get("results") or []:

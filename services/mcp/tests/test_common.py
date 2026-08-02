@@ -1,5 +1,4 @@
 from app.tools._common import (
-    compact_featured_response,
     compact_property,
     compact_search_response,
     error_text,
@@ -54,15 +53,10 @@ def test_compact_search_response() -> None:
     assert "description" not in out["results"][0]
 
 
-def test_compact_property_and_featured() -> None:
+def test_compact_property() -> None:
     prop = compact_property({"id": "x", "city": "Dallas", "extra": "drop-me"})
     assert prop["property_id"] == "x"
     assert "extra" not in prop
-    featured = compact_featured_response(
-        {"listings": [{"property": {"id": "a", "city": "Houston"}}]},
-    )
-    assert featured["count"] == 1
-    assert featured["listings"][0]["city"] == "Houston"
 
 
 def test_compact_similar_response() -> None:

@@ -84,19 +84,6 @@ class BackendClient:
             raise TypeError(msg)
         return data
 
-    async def put_json(
-        self,
-        path: str,
-        body: dict[str, Any],
-        *,
-        auth: bool = True,
-    ) -> dict[str, Any]:
-        data = await self._request_json("PUT", path, auth=auth, json_body=body)
-        if not isinstance(data, dict):
-            msg = f"Expected JSON object from {path}, got {type(data).__name__}"
-            raise TypeError(msg)
-        return data
-
     async def post_json(
         self,
         path: str,
@@ -106,24 +93,6 @@ class BackendClient:
     ) -> dict[str, Any]:
         data = await self._request_json(
             "POST",
-            path,
-            auth=auth,
-            json_body=body,
-        )
-        if not isinstance(data, dict):
-            msg = f"Expected JSON object from {path}, got {type(data).__name__}"
-            raise TypeError(msg)
-        return data
-
-    async def patch_json(
-        self,
-        path: str,
-        body: dict[str, Any],
-        *,
-        auth: bool = True,
-    ) -> dict[str, Any]:
-        data = await self._request_json(
-            "PATCH",
             path,
             auth=auth,
             json_body=body,
@@ -167,21 +136,9 @@ class BackendClient:
             params={"limit": limit, "offset": offset},
         )
 
-    async def update_search_criteria(
-        self,
-        session_profile_id: str,
-        criteria: dict[str, Any],
-    ) -> dict[str, Any]:
-        """PUT /api/v1/search/{session_profile_id} — replaces search criteria."""
-        return await self.put_json(f"/api/v1/search/{session_profile_id}", criteria, auth=True)
-
     async def get_listing(self, property_id: str) -> dict[str, Any]:
         """GET /api/v1/listings/{property_id}"""
         return await self.get_json(f"/api/v1/listings/{property_id}")
-
-    async def get_featured_listings(self) -> dict[str, Any]:
-        """GET /api/v1/listings/featured"""
-        return await self.get_json("/api/v1/listings/featured")
 
     async def get_similar_listings(
         self,
@@ -213,12 +170,4 @@ class BackendClient:
             "/api/v1/outreach/drafts/latest",
             auth=True,
             params={"property_id": property_id},
-        )
-
-    async def update_outreach_draft(self, draft_id: str, draft_email: str) -> dict[str, Any]:
-        """PATCH /api/v1/outreach/drafts/{draft_id}"""
-        return await self.patch_json(
-            f"/api/v1/outreach/drafts/{draft_id}",
-            {"draft_email": draft_email},
-            auth=True,
         )

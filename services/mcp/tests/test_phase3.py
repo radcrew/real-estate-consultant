@@ -61,16 +61,16 @@ def test_create_server_registers_core_tools_only() -> None:
     for name in (
         "quick_search",
         "search_properties",
-        "update_search_criteria",
         "get_listing",
-        "get_featured_listings",
         "get_similar_listings",
         "generate_outreach_draft",
         "get_outreach_draft",
-        "update_outreach_draft",
     ):
         assert mcp._tool_manager.get_tool(name) is not None
     for name in (
+        "update_search_criteria",
+        "get_featured_listings",
+        "update_outreach_draft",
         "ping_backend",
         "list_saved_listings",
         "get_agent",
