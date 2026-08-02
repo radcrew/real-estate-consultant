@@ -7,6 +7,8 @@ import { useState } from "react";
 import { Button } from "@components/ui/button-variants";
 import type { McpApiKeyCreated } from "@services/account";
 
+import { McpConfigTabs } from "./config-tabs";
+
 export type ApiKeyCreatedDialogProps = {
   apiKey: McpApiKeyCreated | null;
   onDismiss: () => void;
@@ -88,6 +90,11 @@ export const ApiKeyCreatedDialog = ({ apiKey, onDismiss }: ApiKeyCreatedDialogPr
             <p className="mt-3 text-xs text-muted-foreground">
               {apiKey?.name} · {apiKey?.scopes.join(", ")}
             </p>
+
+            <div className="mt-5 border-t border-neutral-200 pt-5 dark:border-neutral-700">
+              <h4 className="text-sm font-medium">Add it to your AI tool</h4>
+              {apiKey ? <McpConfigTabs apiKey={apiKey.api_key} /> : null}
+            </div>
 
             <label className="mt-5 flex items-start gap-2 text-sm">
               <input

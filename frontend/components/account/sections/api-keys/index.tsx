@@ -4,9 +4,11 @@ import { Plug, Trash2 } from "lucide-react";
 
 import { Button } from "@components/ui/button-variants";
 import type { McpApiKey } from "@services/account";
+import { API_KEY_PLACEHOLDER } from "@utils/account/mcp-config";
 
 import { AccountField } from "../../field";
 import { ACCOUNT_SECTION_CARD_CLASS } from "../../styles";
+import { McpConfigTabs } from "./config-tabs";
 
 /**
  * Scopes offered in the UI. `mcp:admin` is deliberately omitted — the MCP
@@ -264,5 +266,17 @@ export const AccountApiKeysSection = ({
         </ul>
       ) : null}
     </div>
+
+    {keys.length > 0 ? (
+      <div className="mt-8 border-t border-border pt-6">
+        <h3 className="text-sm font-semibold text-foreground">Connect an AI tool</h3>
+        <p className="mt-1 mb-3 text-sm text-muted-foreground">
+          Paste this into your host config, replacing{" "}
+          <code className="font-mono text-xs">{API_KEY_PLACEHOLDER}</code> with a key you saved
+          when you created it. Keys cannot be shown again.
+        </p>
+        <McpConfigTabs apiKey={API_KEY_PLACEHOLDER} />
+      </div>
+    ) : null}
   </section>
 );

@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AccountApiKeysSection } from "@components/account/sections/api-keys";
 import { ApiKeyCreatedDialog } from "@components/account/sections/api-keys/created-dialog";
+import { McpConfigTabs } from "@components/account/sections/api-keys/config-tabs";
+import { API_KEY_PLACEHOLDER } from "@utils/account/mcp-config";
 import type { McpApiKey, McpApiKeyCreated } from "@services/account";
 
 const key = (over: Partial<McpApiKey> = {}): McpApiKey => ({
@@ -193,6 +195,51 @@ describe("ApiKeyCreatedDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: /copy api key/i }));
 
     expect(writeText).toHaveBeenCalledWith(created.api_key);
-    expect(await screen.findByRole("button", { name: /copied/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /api key copied/i })).toBeInTheDocument();
+  });
+
+  it("embeds the real key in the setup snippet", () => {
+    render(<ApiKeyCreatedDialog apiKey={created} onDismiss={vi.fn()} />);
+    expect(screen.getByTestId("mcp-config-snippet")).toHaveTextContent(created.api_key);
+  });
+});
+
+describe("McpConfigTabs", () => {
+  it("defaults to Cursor and emits its mcpServers shape", () => {
+    render(<McpConfigTabs apiKey={created.api_key} url="https://mcp.example.com/mcp" />);
+    expect(screen.getByRole("tab", { name: "Cursor" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("mcp-config-snippet")).toHaveTextContent(/mcpServers/);
+  });
+
+  it("switches the snippet when another host is selected", () => {
+    render(<McpConfigTabs apiKey={created.api_key} url="https://mcp.example.com/mcp" />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "VS Code" }));
+    const snippet = screen.getByTestId("mcp-config-snippet");
+    expect(snippet).toHaveTextContent(/servers/);
+    expect(snippet).not.toHaveTextContent(/mcpServers/);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Claude Code" }));
+    expect(screen.getByTestId("mcp-config-snippet")).toHaveTextContent(/claude mcp add/);
+  });
+
+  it("renders the placeholder when no plaintext key is available", () => {
+    render(<McpConfigTabs apiKey={API_KEY_PLACEHOLDER} url="https://mcp.example.com/mcp" />);
+    expect(screen.getByTestId("mcp-config-snippet")).toHaveTextContent(API_KEY_PLACEHOLDER);
+  });
+
+  it("copies the snippet, and resets the copied state on host switch", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+
+    render(<McpConfigTabs apiKey={created.api_key} url="https://mcp.example.com/mcp" />);
+    fireEvent.click(screen.getByRole("button", { name: /copy config/i }));
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining(created.api_key));
+    expect(await screen.findByRole("button", { name: /config copied/i })).toBeInTheDocument();
+
+    // Switching hosts changes the snippet, so the "Copied" state must not persist.
+    fireEvent.click(screen.getByRole("tab", { name: "VS Code" }));
+    expect(screen.getByRole("button", { name: /copy config/i })).toBeInTheDocument();
   });
 });
