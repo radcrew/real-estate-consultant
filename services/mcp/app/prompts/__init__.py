@@ -8,18 +8,18 @@ from mcp.server.fastmcp import FastMCP
 def register_prompts(mcp: FastMCP) -> None:
     @mcp.prompt()
     def cre_property_search() -> str:
-        """Guided workflow: intake → complete → search → explain top fits."""
+        """Guided workflow: quick_search → listing detail → optional similar."""
         return (
             "You are helping a user find commercial real estate with radestate tools.\n"
-            "1. Call start_intake_session(mode=\"llm\" or \"guided\").\n"
-            "2. Use answer_intake until the session is ready "
-            "(guided: key+answers; llm: text), then complete_intake.\n"
-            "3. Take search_profile_id from complete_intake and call search_properties.\n"
-            "4. For the top 2–3 matches, call get_listing and explain_fit.\n"
-            "5. Optionally call get_similar_listings on a favorite to explore neighbors.\n"
-            "6. Summarize tradeoffs; do not invent listing facts.\n"
-            "WRITE tools: start_intake_session, answer_intake, complete_intake, "
-            "update_search_criteria. Prefer asking before writes when unsure."
+            "1. Prefer quick_search with location, optional property_types, "
+            "and price_min/price_max.\n"
+            "2. If a search_profile_id already exists, call search_properties "
+            "(and update_search_criteria only when the user wants changes).\n"
+            "3. For the top 2–3 matches, call get_listing for full detail.\n"
+            "4. Optionally call get_similar_listings on a favorite to explore neighbors.\n"
+            "5. Summarize tradeoffs; do not invent listing facts.\n"
+            "WRITE tools: quick_search, update_search_criteria. "
+            "Prefer asking before writes when unsure."
         )
 
     @mcp.prompt()

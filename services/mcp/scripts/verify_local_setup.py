@@ -12,11 +12,9 @@ from app.config import settings
 
 
 async def main() -> int:
-    print("token_set", bool(settings.mcp_user_access_token.strip()))
+    print("token_set", bool((settings.mcp_api_key or settings.mcp_user_access_token).strip()))
     print("backend", settings.backend_api_url)
     client = BackendClient()
-    ping = await client.ping()
-    print("ping", ping)
 
     try:
         featured = await client.get_featured_listings()
@@ -25,14 +23,18 @@ async def main() -> int:
         print("featured_skip", exc)
 
     try:
-        intake = await client.start_intake_session("guided")
-        print("intake_session", intake.get("session_id") or intake.get("mode") or intake)
+        created = await client.quick_search(location="Austin, TX")
+        profile_id = created.get("search_profile_id")
+        print("quick_search_profile", profile_id)
+        if profile_id:
+            results = await client.search_properties(str(profile_id), limit=3)
+            print("search_total", results.get("total"))
     except httpx.HTTPStatusError as exc:
-        print("intake_http", exc.response.status_code, exc.response.text[:200])
+        print("search_http", exc.response.status_code, exc.response.text[:200])
         if exc.response.status_code in (401, 403):
             return 1
     except Exception as exc:  # noqa: BLE001
-        print("intake_skip", exc)
+        print("search_skip", exc)
 
     print("OK local MCP auth is ready — reload radestate in Cursor")
     return 0

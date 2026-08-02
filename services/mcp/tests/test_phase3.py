@@ -56,10 +56,33 @@ def test_rate_limiter_blocks() -> None:
     assert raised is True
 
 
-def test_create_server_registers_admin_tools() -> None:
+def test_create_server_registers_core_tools_only() -> None:
     mcp = create_server()
-    assert mcp._tool_manager.get_tool("enqueue_ingest") is not None
-    assert mcp._tool_manager.get_tool("list_listing_submissions") is not None
+    for name in (
+        "quick_search",
+        "search_properties",
+        "update_search_criteria",
+        "get_listing",
+        "get_featured_listings",
+        "get_similar_listings",
+        "generate_outreach_draft",
+        "get_outreach_draft",
+        "update_outreach_draft",
+    ):
+        assert mcp._tool_manager.get_tool(name) is not None
+    for name in (
+        "ping_backend",
+        "list_saved_listings",
+        "get_agent",
+        "explain_fit",
+        "start_intake_session",
+        "get_intake_session",
+        "answer_intake",
+        "complete_intake",
+        "enqueue_ingest",
+        "list_listing_submissions",
+    ):
+        assert mcp._tool_manager.get_tool(name) is None
 
 
 def test_transport_rejects_unknown() -> None:

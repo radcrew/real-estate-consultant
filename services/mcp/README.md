@@ -1,7 +1,8 @@
 # MCP adapter for the radestate commercial real-estate platform.
 
-Thin FastMCP process over the FastAPI backend (`/api/v1`). Domain logic stays in
-`backend/`. Setup, auth, tools, and deploy notes are documented in this README.
+Thin FastMCP process over the FastAPI backend (`/api/v1`) for **search**,
+**listings**, and **draft outreach**. Domain logic stays in `backend/`. Setup,
+auth, tools, and deploy notes are documented in this README.
 
 ## Requirements
 
@@ -49,8 +50,8 @@ Never commit keys or paste them into `mcp.json`. Set `MCP_API_KEY_PEPPER` in
 
 Optional create body fields: `scopes` (`*`, `mcp:read`, `mcp:write`, `mcp:admin`)
 and `expires_in_days`. Default scope is `["*"]`. Backend maps GET→`mcp:read`,
-mutating methods→`mcp:write`; admin routes also need `mcp:admin` plus
-`profiles.is_admin`.
+mutating methods→`mcp:write`. This MCP server only exposes search, listings, and
+outreach tools — `mcp:read` / `mcp:write` (or `*`) is enough.
 
 ### Rotate a key
 
@@ -264,8 +265,6 @@ for the current remote-auth field names.
 - MCP per-process rate limit (`RATE_LIMIT_PER_MINUTE`)
 - Tool call timeout (`HTTP_TIMEOUT_SECONDS`, keep ≤ Vercel `maxDuration`)
 - Output + log sanitization (JWT / `rad_…` / HF key redaction, injection filter, truncation)
-- Admin tools (`enqueue_ingest`, `list_listing_submissions`) — backend enforces
-  `mcp:admin` (API key) and `profiles.is_admin`
 
 ## Runbook (remote MCP)
 
@@ -273,7 +272,7 @@ for the current remote-auth field names.
 |---------|----------------|------------|
 | First tool call slow / timeout | Vercel cold start (MCP and/or backend) | Retry once; raise `maxDuration` / Fluid Compute if persistent |
 | `401` / invalid token | Missing/wrong `rad_…`, revoked key, or pepper mismatch on backend | Recreate key against **prod** backend; confirm `MCP_API_KEY_PEPPER` on BE |
-| `403` Forbidden | User lacks access or API key lacks `mcp:admin` for admin tools | Use a key with the right scopes; confirm `profiles.is_admin` |
+| `403` Forbidden | User lacks access to that resource or key lacks `mcp:read` / `mcp:write` | Use a key with the right scopes |
 | `429` rate limited | Backend per-key limit or MCP process limiter | Back off; raise limits only if needed |
 | `502` / `503` / unavailable | Backend cold start, RLS, or upstream error | Check BE `/health` and Vercel BE logs; retry |
 | HTML instead of JSON from `/mcp` | Vercel Deployment Protection | Disable protection or use bypass secret for automation |
@@ -285,15 +284,12 @@ Local stdio (`run-mcp.cmd` / `pnpm run dev:mcp`) remains the default for contrib
 
 | Area | Tools |
 |------|-------|
-| Health | `ping_backend` |
-| Search | `quick_search` (location/budget/type one-shot), `search_properties`, `update_search_criteria`, `explain_fit` |
-| Listings | `get_listing`, `get_featured_listings`, `get_similar_listings`, `get_agent`, `list_saved_listings` |
-| Intake | `start_intake_session`, `answer_intake`, `complete_intake`, `get_intake_session` |
+| Search | `quick_search` (location/budget/type one-shot), `search_properties`, `update_search_criteria` |
+| Listings | `get_listing`, `get_featured_listings`, `get_similar_listings` |
 | Outreach | `generate_outreach_draft`, `get_outreach_draft`, `update_outreach_draft` (draft only) |
-| Admin | `enqueue_ingest`, `list_listing_submissions` |
 
-Resources: `listing://`, `search://`, `intake://`.  
-Prompts: `cre_property_search`, `draft_broker_outreach`.
+Resources: `listing://`, `search://`.  
+Prompts: `cre_property_search` (quick_search flow), `draft_broker_outreach`.
 
 ## Tests
 
