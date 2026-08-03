@@ -452,8 +452,11 @@ export const AccountPage = () => {
       <AccountSidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 
       <main className="min-w-0 flex-1 px-3 py-8 lg:px-6">
-        {/* One width for every tab: a per-tab cap made the card jump on switch. */}
-        <div className="mx-auto w-full max-w-4xl">
+        {/* One width for every tab: a per-tab cap made the card jump on switch.
+            5xl is the widest tab's requirement — API key rows carry four
+            metadata columns plus actions, and the host config snippets are wide
+            code blocks — so the forms follow it rather than the reverse. */}
+        <div className="mx-auto w-full max-w-5xl">
           {activeTab === "profile" ? (
             <AccountPersonalInfoSection
               editing={editingProfile}
