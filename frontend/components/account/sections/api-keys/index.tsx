@@ -215,18 +215,8 @@ export const AccountApiKeysSection = ({
   const visibleKeys = keys.filter((apiKey) => !isRevoked(apiKey));
 
   return (
-    <section className={ACCOUNT_SECTION_CARD_CLASS} aria-labelledby="api-keys-heading">
-      <div className="border-b border-border pb-5">
-        <h2 id="api-keys-heading" className="text-lg font-semibold text-foreground">
-          MCP API keys
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Connect AI tools like Cursor or Claude to your RadEstate account. Each key acts as you —
-          treat it like a password.
-        </p>
-      </div>
-
-      <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-5">
+    <section className={ACCOUNT_SECTION_CARD_CLASS} aria-label="MCP API keys">
+      <form onSubmit={onSubmit} className="flex flex-col gap-5">
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <AccountField
             id="api-key-name"

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAuth } from "@contexts/auth";
 
-import { cn, getApiErrorMessage } from "@utils/common";
+import { getApiErrorMessage } from "@utils/common";
 import { readSession, saveSession } from "@lib/auth-session";
 import {
   API_KEY_EXPIRY_DEFAULT_DAYS,
@@ -24,7 +24,6 @@ import {
   type McpApiKey,
   type McpApiKeyCreated,
 } from "@services/account";
-import { brand } from "@config/brand";
 
 import { AccountSidebar, type AccountTab } from "./sidebar";
 import { AccountApiKeysSection } from "./sections/api-keys";
@@ -448,83 +447,67 @@ export const AccountPage = () => {
 
   const profileValues = editingProfile ? draftProfile : mergedSavedProfile;
 
-  // API keys need the extra room: key rows carry four metadata columns plus
-  // action buttons, and the host config snippets are wide code blocks. The
-  // form-only tabs read better kept narrow.
-  const contentWidth = activeTab === "api-keys" ? "max-w-5xl" : "max-w-3xl";
-
   return (
     <div className="flex flex-col lg:flex-row">
       <AccountSidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      <main className="min-w-0 flex-1 px-4 py-10 sm:px-6 lg:px-10">
-        <div className={cn("mx-auto w-full", contentWidth)}>
-          <header className="border-b border-border pb-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              {brand.account.workspaceLabel}
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              {brand.account.title}
-            </h1>
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground">{brand.account.subtitle}</p>
-          </header>
-
-          <div className="mt-10">
-            {activeTab === "profile" ? (
-              <AccountPersonalInfoSection
-                editing={editingProfile}
-                values={profileValues}
-                errors={profileErrors}
-                notice={profileNotice}
-                noticeVariant={profileNoticeVariant}
-                saving={profileSaving}
-                profileLoading={profileLoading}
-                avatarUrl={avatarUrl}
-                avatarUploading={avatarUploading}
-                onUploadAvatar={uploadAvatar}
-                onEdit={startEditProfile}
-                onCancel={cancelEditProfile}
-                onSave={saveProfile}
-                onChangeField={updateDraft}
-              />
-            ) : activeTab === "security" ? (
-              <AccountPasswordSection
-                currentPassword={currentPassword}
-                newPassword={newPassword}
-                confirmPassword={confirmPassword}
-                errors={passwordErrors}
-                submitting={passwordSubmitting}
-                success={passwordSuccess}
-                onChangeCurrent={onChangeCurrentPassword}
-                onChangeNew={onChangeNewPassword}
-                onChangeConfirm={onChangeConfirmPassword}
-                onSubmit={submitPasswordChange}
-              />
-            ) : (
-              <AccountApiKeysSection
-                keys={apiKeys}
-                loading={apiKeysLoading}
-                loadError={apiKeysLoadError}
-                name={keyName}
-                scope={keyScope}
-                expiresInDays={keyExpiresInDays}
-                errors={keyErrors}
-                creating={keyCreating}
-                revokingId={revokingId}
-                confirmingRevokeId={confirmingRevokeId}
-                rotatingId={rotatingId}
-                replacedKeyId={replacedKeyId}
-                onChangeName={onChangeKeyName}
-                onChangeScope={setKeyScope}
-                onChangeExpiresInDays={onChangeKeyExpiresInDays}
-                onSubmit={submitCreateApiKey}
-                onRotate={rotateApiKey}
-                onRequestRevoke={(key) => setConfirmingRevokeId(key.id)}
-                onConfirmRevoke={confirmRevokeApiKey}
-                onCancelRevoke={() => setConfirmingRevokeId(null)}
-              />
-            )}
-          </div>
+      <main className="min-w-0 flex-1 px-3 py-8 lg:px-6">
+        {/* One width for every tab: a per-tab cap made the card jump on switch. */}
+        <div className="mx-auto w-full max-w-4xl">
+          {activeTab === "profile" ? (
+            <AccountPersonalInfoSection
+              editing={editingProfile}
+              values={profileValues}
+              errors={profileErrors}
+              notice={profileNotice}
+              noticeVariant={profileNoticeVariant}
+              saving={profileSaving}
+              profileLoading={profileLoading}
+              avatarUrl={avatarUrl}
+              avatarUploading={avatarUploading}
+              onUploadAvatar={uploadAvatar}
+              onEdit={startEditProfile}
+              onCancel={cancelEditProfile}
+              onSave={saveProfile}
+              onChangeField={updateDraft}
+            />
+          ) : activeTab === "security" ? (
+            <AccountPasswordSection
+              currentPassword={currentPassword}
+              newPassword={newPassword}
+              confirmPassword={confirmPassword}
+              errors={passwordErrors}
+              submitting={passwordSubmitting}
+              success={passwordSuccess}
+              onChangeCurrent={onChangeCurrentPassword}
+              onChangeNew={onChangeNewPassword}
+              onChangeConfirm={onChangeConfirmPassword}
+              onSubmit={submitPasswordChange}
+            />
+          ) : (
+            <AccountApiKeysSection
+              keys={apiKeys}
+              loading={apiKeysLoading}
+              loadError={apiKeysLoadError}
+              name={keyName}
+              scope={keyScope}
+              expiresInDays={keyExpiresInDays}
+              errors={keyErrors}
+              creating={keyCreating}
+              revokingId={revokingId}
+              confirmingRevokeId={confirmingRevokeId}
+              rotatingId={rotatingId}
+              replacedKeyId={replacedKeyId}
+              onChangeName={onChangeKeyName}
+              onChangeScope={setKeyScope}
+              onChangeExpiresInDays={onChangeKeyExpiresInDays}
+              onSubmit={submitCreateApiKey}
+              onRotate={rotateApiKey}
+              onRequestRevoke={(key) => setConfirmingRevokeId(key.id)}
+              onConfirmRevoke={confirmRevokeApiKey}
+              onCancelRevoke={() => setConfirmingRevokeId(null)}
+            />
+          )}
         </div>
       </main>
 

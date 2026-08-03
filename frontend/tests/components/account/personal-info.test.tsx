@@ -28,9 +28,9 @@ const BASE = {
 };
 
 describe("AccountPersonalInfoSection", () => {
-  it("renders the section heading", () => {
+  it("names the section for assistive tech", () => {
     render(<AccountPersonalInfoSection {...BASE} />);
-    expect(screen.getByRole("heading", { name: /personal information/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /personal information/i })).toBeInTheDocument();
   });
 
   it("shows Edit button when not editing", () => {

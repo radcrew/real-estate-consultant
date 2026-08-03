@@ -63,7 +63,7 @@ export const AccountPersonalInfoSection = ({
   return (
   <section
     className={ACCOUNT_SECTION_CARD_CLASS}
-    aria-labelledby="personal-heading"
+    aria-label="Personal information"
     aria-busy={profileLoading}
   >
     {notice ? (
@@ -78,13 +78,7 @@ export const AccountPersonalInfoSection = ({
         {notice}
       </p>
     ) : null}
-    <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h2 id="personal-heading" className="text-lg font-semibold text-foreground">
-          Personal information
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">Your name, contact details, and address.</p>
-      </div>
+    <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-end">
       <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
         {!editing ? (
           <Button
