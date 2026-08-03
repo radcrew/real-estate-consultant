@@ -9,6 +9,8 @@ import { BlogAuthorBox } from "@components/blog/author-box";
 import { BlogPostCard } from "@components/blog/post-card";
 import { Avatar } from "@components/ui/avatar";
 import { Badge } from "@components/ui/badge";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn } from "@utils/common";
 
 type BlogPostPageProps = {
   params: Promise<{ slug: string }>;
@@ -88,7 +90,7 @@ const BlogPostPage = async ({ params }: BlogPostPageProps) => {
       </div>
 
       {related.length > 0 && (
-        <section className="mx-auto mt-20 max-w-screen-xl px-4">
+        <section className={cn(PAGE_CONTAINER, "mt-20")}>
           <h2 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">
             More insights
           </h2>

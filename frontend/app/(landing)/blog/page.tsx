@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { BLOG_POSTS } from "@components/blog/data";
 import { BlogFeaturedCard } from "@components/blog/featured-card";
 import { BlogPostCard } from "@components/blog/post-card";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn } from "@utils/common";
 
 export const metadata: Metadata = {
   title: "Insights",
@@ -12,7 +14,7 @@ export const metadata: Metadata = {
 const [featured, ...rest] = BLOG_POSTS;
 
 const BlogPage = () => (
-  <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
+  <div className={cn(PAGE_CONTAINER, "py-16 lg:py-20")}>
     <div className="max-w-2xl">
       <h1 className="text-3xl font-semibold text-neutral-900 md:text-4xl dark:text-neutral-100">
         Insights

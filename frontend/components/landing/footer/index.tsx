@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Logo } from "@components/ui/logo";
+import { PAGE_CONTAINER } from "@components/ui/styles";
 import { SocialsList } from "@components/ui/socials-list";
 import { brand } from "@config/brand";
 
@@ -46,7 +47,7 @@ export const Footer = () => {
 
   return (
     <footer className="relative border-t border-neutral-200 pt-20 lg:pt-24 dark:border-neutral-700">
-      <div className="mx-auto max-w-screen-xl px-4">
+      <div className={PAGE_CONTAINER}>
         <div className="grid grid-cols-2 gap-x-5 gap-y-10 sm:gap-x-8 md:grid-cols-4 lg:gap-x-10">
           <div className="col-span-2 flex flex-col gap-5 md:col-span-4 lg:col-span-1">
             <Logo />

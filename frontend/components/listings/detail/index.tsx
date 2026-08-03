@@ -4,6 +4,8 @@ import { HistoryBackButton } from "@components/ui/button-back";
 import { ButtonThird } from "@components/ui/button-third";
 import { detailToModel } from "@components/property/listing-model";
 import { PropertyGallery } from "@components/property/gallery";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn } from "@utils/common";
 
 import { useListingDetail } from "../../../hooks/use-listing-detail";
 import { ListingActions } from "./actions";
@@ -22,7 +24,7 @@ export const ListingDetailView = () => {
 
   return (
     <div className="min-h-[60vh]">
-      <div className="mx-auto max-w-screen-xl px-4 py-8 lg:py-10">
+      <div className={cn(PAGE_CONTAINER, "py-8 lg:py-10")}>
         <HistoryBackButton />
 
         <div className="mt-6">

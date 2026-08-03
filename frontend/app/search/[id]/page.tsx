@@ -1,9 +1,11 @@
 import { Suspense } from "react";
 
 import { SearchResults } from "@components/search/result";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn } from "@utils/common";
 
 const ResultsFallback = () => (
-  <div className="mx-auto max-w-screen-xl px-4 py-16 text-center text-muted-foreground">
+  <div className={cn(PAGE_CONTAINER, "py-16 text-center text-muted-foreground")}>
     Loading results…
   </div>
 );

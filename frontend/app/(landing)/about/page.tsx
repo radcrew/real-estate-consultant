@@ -4,6 +4,8 @@ import Image from "next/image";
 import { SectionHeading } from "@components/landing/section-heading";
 import { Testimonials } from "@components/landing/testimonials";
 import { BgGlassmorphism } from "@components/ui/bg-glassmorphism";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn } from "@utils/common";
 
 export const metadata: Metadata = {
   title: "About",
@@ -40,7 +42,7 @@ const TEAM = [
 const AboutPage = () => (
   <div className="relative overflow-hidden">
     <BgGlassmorphism />
-    <div className="relative z-10 mx-auto max-w-screen-xl space-y-16 px-4 py-16 lg:space-y-28 lg:py-28">
+    <div className={cn(PAGE_CONTAINER, "relative z-10 space-y-16 py-16 lg:space-y-28 lg:py-28")}>
       {/* Hero */}
       <div className="flex flex-col items-center space-y-14 text-center lg:flex-row lg:space-x-10 lg:space-y-0 lg:text-left">
         <div className="w-screen max-w-full space-y-5 lg:max-w-lg lg:space-y-7">

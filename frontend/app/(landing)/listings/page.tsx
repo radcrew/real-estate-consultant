@@ -10,6 +10,8 @@ import { PropertyCard, PropertyCardSkeleton, PROPERTY_GRID } from "@components/p
 import { Heading2 } from "@components/ui/heading2";
 import { brand } from "@config/brand";
 import { listingsService } from "@services/listings";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn } from "@utils/common";
 
 const isCancellation = (err: unknown) =>
   (err instanceof DOMException && err.name === "AbortError") ||
@@ -32,7 +34,7 @@ const ListingsIndexPage = () => {
   const loading = models === null;
 
   return (
-    <div className="mx-auto w-full max-w-screen-xl px-4 py-16 lg:py-20 2xl:max-w-screen-2xl 2xl:px-32">
+    <div className={cn(PAGE_CONTAINER, "py-16 lg:py-20")}>
       <div className="flex flex-col items-start gap-6 border-b border-neutral-200 pb-12 lg:flex-row lg:items-end lg:justify-between dark:border-neutral-700">
         <div className="max-w-2xl">
           <h1 className="text-3xl font-semibold text-neutral-900 md:text-4xl dark:text-neutral-100">
