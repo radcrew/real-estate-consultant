@@ -52,7 +52,7 @@ pnpm dev:be                  # node backend/scripts/setup.mjs
 pnpm dev:mcp                 # node services/mcp/scripts/setup.mjs
 ```
 
-`dev:be` and `dev:mcp` shell out to a `setup.mjs` that provisions the Python venv before starting the server. They are not bare uvicorn invocations, so a missing venv is handled for you but a broken one is not.
+`dev:be` and `dev:mcp` shell out to a `setup.mjs` that **checks** the Python venv, then starts uvicorn (backend on port 8888). It does not create anything: a missing venv or a missing `uvicorn` import exits 1 with the `python -m venv .venv` / `pip install -e ".[dev]"` commands to run yourself. Provision each package's venv first, per the block below.
 
 `dev:fe` and `build` both pass `--webpack`, so the repo deliberately opts out of Turbopack. `pnpm --filter radestate dev:turbo` is the opt-in if you want to test under it.
 
@@ -83,7 +83,7 @@ Current baselines, measured on merge commit `409b0ebc`:
 | `frontend` | 886 across 114 files | ~50s |
 | `backend` | 612 | ~3 min |
 | `services/ingestion` | 155 | ~2s |
-| `services/mcp` | not measured; needs its own venv | — |
+| `services/mcp` | 37 | ~1s |
 
 ESLint on `main` reports **5 errors and 32 warnings**, all pre-existing: 3 × `react-hooks/set-state-in-effect`, 1 × `@next/next/no-html-link-for-pages`, 1 × `react/no-unescaped-entities`, and warnings dominated by `@next/next/no-img-element` in test mocks. No workflow runs ESLint, so these do not fail anything. Do not treat clearing them as part of an unrelated task, and do not read your own clean run as a clean repo.
 
@@ -161,7 +161,7 @@ Reading one resolver and assuming the other matches is the trap. Neither degrade
 
 Four Vercel projects. See AGENTS.md for what each workflow does and does not check.
 
-- **Frontend** (`frontend.yml`): build only on PR; build and `vercel deploy --prebuilt --prod` on push to `main`. Vercel Root Directory is `frontend`, but `frontend/vercel.json` runs `cd .. && pnpm install --frozen-lockfile` and `cd .. && pnpm --filter radestate build`, because the lockfile lives at the repo root.
+- **Frontend** (`frontend.yml`): build, then a **preview deploy on every PR** (`vercel deploy`) and a production deploy on push to `main` (`vercel deploy --prod`). No lint, no tests, and no smoke test on either deploy. Vercel Root Directory is `frontend`, but `frontend/vercel.json` runs `cd .. && pnpm install --frozen-lockfile` and `cd .. && pnpm --filter radestate build`, because the lockfile lives at the repo root.
 - **Backend** (`backend.yml`): Ruff and the ingestion contract check, then a **preview deploy on every PR** and a production deploy on `main`, each followed by a smoke test. Root Directory is `backend`, and the repo-root `.vercelignore` contains `backend/` so the frontend project does not pull it in.
 - **MCP** (`mcp.yml`): Ruff and pytest only. Deploys come from the Vercel Git integration under a **different Vercel team**; `secrets.VERCEL_TOKEN` cannot see that project.
 - **Ingestion**: no workflow of its own beyond `coverage.yml` and the dataset trigger.
@@ -172,7 +172,8 @@ The backend runs as a **single Vercel Python function**: `backend/vercel.json` r
 
 ## Docs
 
-- [README.md](./README.md) is current on stack, local setup, deploy steps and env vars, and is explicit that frontend PRs run build only. Trust it.
+- [README.md](./README.md) is current on stack, local setup, deploy steps and env vars.
 - [CONTRIBUTING.md](./CONTRIBUTING.md) is **stale on tooling**: it prescribes `npm` in a pnpm repo and claims parity between local checks and CI that does not exist. Do not cite it; fixing it is welcome.
+- [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md) carries the same `npm` staleness in its checklist, and its `ruff check .` is wider than the `ruff check app` that CI actually runs. Follow the commands in this file, not the ones in the checkbox labels.
 - `backend/app/core/config.py` is the source of truth for backend configuration. When you change a setting's name, default or meaning, update `backend/.env.example` in the same commit.
 - `services/mcp/README.md` covers the adapter and host config.
