@@ -47,4 +47,27 @@ describe("AccountSidebar", () => {
     render(<AccountSidebar activeTab="profile" onSelectTab={vi.fn()} />);
     expect(screen.getByText("user@test.com")).toBeInTheDocument();
   });
+
+  // The rail used to hardcode its dark palette, so the header's theme toggle
+  // flipped every surface around it and left the sidebar dark.
+  it("pairs every rail surface color with a dark: variant", () => {
+    const { container } = render(<AccountSidebar activeTab="profile" onSelectTab={vi.fn()} />);
+    const surfaces = [
+      container.querySelector("aside"),
+      ...container.querySelectorAll("nav button"),
+    ];
+
+    for (const el of surfaces) {
+      const classes = (el?.className ?? "").split(/\s+/);
+      // Every base surface property the rail paints must have a dark override,
+      // whatever shade that override picks.
+      const properties = new Set(
+        classes.flatMap((c) => (/^(bg|text)-/.test(c) ? [c.split("-")[0]] : [])),
+      );
+      expect(properties.size).toBeGreaterThan(0);
+      for (const property of properties) {
+        expect(classes.some((c) => c.startsWith(`dark:${property}-`))).toBe(true);
+      }
+    }
+  });
 });
