@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Heart, KeyRound, Plug, UserCircle } from "lucide-react";
 
 import { Avatar } from "@components/ui/avatar";
@@ -11,11 +10,11 @@ import { cn } from "@utils/common";
 /**
  * Voyager `AccountSidebar` adapted to this app: dark workspace rail with the
  * signed-in user's avatar and a tabbed nav for the account sections. Branding
- * is left to the site header above it. Profile + Security + API keys are
- * in-page tabs (switch the visible panel); Saved is a real route since it
- * lives on its own page.
+ * is left to the site header above it. Every entry is an in-page tab that
+ * swaps the visible panel — Saved included, so the rail survives the click.
+ * The standalone `/saved` route still serves the links in the site header.
  */
-export type AccountTab = "profile" | "security" | "api-keys";
+export type AccountTab = "profile" | "security" | "api-keys" | "saved";
 
 const TAB_ITEMS: {
   tab: AccountTab;
@@ -40,6 +39,12 @@ const TAB_ITEMS: {
     label: "API keys",
     description: "Connect AI tools to your account",
     icon: Plug,
+  },
+  {
+    tab: "saved",
+    label: "Saved",
+    description: "Properties you’ve saved",
+    icon: Heart,
   },
 ];
 
@@ -111,22 +116,6 @@ export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) 
             </button>
           );
         })}
-
-        <Link
-          href="/saved"
-          className={cn(ITEM_CLASS, "border-transparent text-neutral-400 hover:bg-neutral-900 hover:text-neutral-100")}
-        >
-          <Heart
-            className="size-5 flex-shrink-0 text-neutral-500 group-hover:text-primary-400"
-            aria-hidden
-          />
-          <span className="min-w-0">
-            <span className="block text-sm font-medium">Saved</span>
-            <span className={DESCRIPTION}>
-              Properties you&rsquo;ve saved
-            </span>
-          </span>
-        </Link>
       </nav>
     </aside>
   );

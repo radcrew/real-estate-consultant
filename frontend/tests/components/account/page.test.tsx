@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { AccountPage } from "@components/account/page";
 
@@ -25,6 +25,12 @@ vi.mock("@services/account", () => ({
 vi.mock("@lib/auth-session", () => ({
   readSession: () => null,
   saveSession: vi.fn(),
+}));
+vi.mock("@components/saved/provider", () => ({
+  useSavedListings: () => ({ savedIds: [], isSaved: () => false, ready: true, signedIn: true }),
+}));
+vi.mock("@services/listings", () => ({
+  listingsService: { getListing: vi.fn() },
 }));
 
 beforeEach(() => {
@@ -55,5 +61,16 @@ describe("AccountPage", () => {
     mockUseAuth.mockReturnValue({ session: { user: { email: "jane@test.com", avatarUrl: null } }, ready: true, refresh: vi.fn() });
     render(<AccountPage />);
     await waitFor(() => expect(screen.getByRole("navigation", { name: /account navigation/i })).toBeInTheDocument());
+  });
+
+  it("shows saved properties in-panel and keeps the sidebar", async () => {
+    mockUseAuth.mockReturnValue({ session: { user: { email: "jane@test.com", avatarUrl: null } }, ready: true, refresh: vi.fn() });
+    render(<AccountPage />);
+    const nav = await screen.findByRole("navigation", { name: /account navigation/i });
+
+    fireEvent.click(screen.getByRole("button", { name: /saved/i }));
+
+    expect(await screen.findByRole("heading", { name: /saved properties/i })).toBeInTheDocument();
+    expect(nav).toBeInTheDocument();
   });
 });

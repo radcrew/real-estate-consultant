@@ -25,6 +25,8 @@ import {
   type McpApiKeyCreated,
 } from "@services/account";
 
+import { SavedView } from "@components/saved/view";
+
 import { AccountSidebar, type AccountTab } from "./sidebar";
 import { AccountApiKeysSection } from "./sections/api-keys";
 import { ApiKeyCreatedDialog } from "./sections/api-keys/created-dialog";
@@ -474,7 +476,9 @@ export const AccountPage = () => {
               onSave={saveProfile}
               onChangeField={updateDraft}
             />
-          ) : activeTab === "security" ? (
+          ) : null}
+
+          {activeTab === "security" ? (
             <AccountPasswordSection
               currentPassword={currentPassword}
               newPassword={newPassword}
@@ -487,7 +491,9 @@ export const AccountPage = () => {
               onChangeConfirm={onChangeConfirmPassword}
               onSubmit={submitPasswordChange}
             />
-          ) : (
+          ) : null}
+
+          {activeTab === "api-keys" ? (
             <AccountApiKeysSection
               keys={apiKeys}
               loading={apiKeysLoading}
@@ -510,7 +516,9 @@ export const AccountPage = () => {
               onConfirmRevoke={confirmRevokeApiKey}
               onCancelRevoke={() => setConfirmingRevokeId(null)}
             />
-          )}
+          ) : null}
+
+          {activeTab === "saved" ? <SavedView embedded /> : null}
         </div>
       </main>
 
