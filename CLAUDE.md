@@ -37,7 +37,14 @@ Only `frontend/` is a pnpm workspace member; the three Python packages each carr
 
 **Commit messages.** After *every* response in which you change one or more files, not just at the end of a multi-step task and not just when asked, automatically draft and show a Conventional Commits message in a copyable code block. Match this repo's history: lowercase `feat:` / `fix:` / `refactor:` / `ui:` / `test:` / `docs:` / `cleanup:` prefix, imperative mood, usually no scope. This applies to small incremental edits too. Scope it to the actual uncommitted change set (check `git status`) and call out any unrelated modified files so they can be excluded. Do not run `git commit` yourself; the user commits manually unless they explicitly ask you to.
 
-**Pull requests.** Follow [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md). Do not tick a test checkbox unless you ran the suite and saw it pass. Remember that opening the PR deploys a backend preview.
+**Pull requests.** Follow [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md). Do not tick a test checkbox unless you ran the suite and saw it pass. Remember that opening the PR deploys a preview, backend or frontend depending on which paths the branch touches.
+
+The recurring request is some form of *"I am gonna create a PR for `<branch>` branch. give me PR title and description as md format."* Treat any phrasing of it as the same standing ask:
+
+1. Read the actual change first: `git diff main...<branch>` and `git log main..<branch>`. Describe what the diff does, not what the branch name suggests.
+2. Answer with **one copyable markdown code block** holding the title on the first line and the template-shaped description below it. The user pastes it into GitHub by hand.
+3. Fill in every template section. Tick an Area box only if that area really changed, and a Checklist box only for a command you ran and watched pass in this session; leave the rest unticked rather than guessing.
+4. Do not run `gh pr create` or push. Opening the PR is the user's action, and it deploys a preview.
 
 ## Commands
 
