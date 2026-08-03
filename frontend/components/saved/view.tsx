@@ -23,9 +23,15 @@ export type SavedViewProps = {
    * so the standalone spacing would stack on top of it.
    */
   embedded?: boolean;
+  /**
+   * Handles the empty state's "Browse properties" CTA in place of navigating
+   * to `/listings`. The account shell passes one so browsing stays in-panel
+   * and keeps its sidebar; the standalone page leaves it unset and links out.
+   */
+  onBrowse?: () => void;
 };
 
-export const SavedView = ({ embedded = false }: SavedViewProps) => {
+export const SavedView = ({ embedded = false, onBrowse }: SavedViewProps) => {
   const { savedIds, isSaved, ready, signedIn } = useSavedListings();
   const [models, setModels] = useState<PropertyModel[] | null>(null);
 
@@ -110,7 +116,11 @@ export const SavedView = ({ embedded = false }: SavedViewProps) => {
             to save it here.
           </p>
           <div className="mt-6 flex justify-center">
-            <ButtonPrimary href="/listings">Browse properties</ButtonPrimary>
+            {onBrowse ? (
+              <ButtonPrimary onClick={onBrowse}>Browse properties</ButtonPrimary>
+            ) : (
+              <ButtonPrimary href="/listings">Browse properties</ButtonPrimary>
+            )}
           </div>
         </NoticeCard>
       ) : null}
