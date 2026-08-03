@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Heart, KeyRound, UserCircle } from "lucide-react";
+import { Heart, KeyRound, Plug, UserCircle } from "lucide-react";
 
 import { Avatar } from "@components/ui/avatar";
 import { brand } from "@config/brand";
@@ -10,11 +10,12 @@ import { cn } from "@utils/common";
 
 /**
  * Voyager `AccountSidebar` adapted to this app: dark workspace rail with the
- * brand block, the signed-in user's avatar, and a tabbed nav for the account
- * sections. Profile + Security are in-page tabs (switch the visible panel);
- * Saved is a real route since it lives on its own page.
+ * signed-in user's avatar and a tabbed nav for the account sections. Branding
+ * is left to the site header above it. Profile + Security + API keys are
+ * in-page tabs (switch the visible panel); Saved is a real route since it
+ * lives on its own page.
  */
-export type AccountTab = "profile" | "security";
+export type AccountTab = "profile" | "security" | "api-keys";
 
 const TAB_ITEMS: {
   tab: AccountTab;
@@ -34,6 +35,12 @@ const TAB_ITEMS: {
     description: "Change your password",
     icon: KeyRound,
   },
+  {
+    tab: "api-keys",
+    label: "API keys",
+    description: "Connect AI tools to your account",
+    icon: Plug,
+  },
 ];
 
 const ITEM_CLASS =
@@ -52,16 +59,6 @@ export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) 
 
   return (
     <aside className="flex-shrink-0 bg-neutral-950 text-neutral-200 lg:min-h-[calc(100vh-5rem)] lg:w-72">
-      <div className="border-b border-neutral-800 px-6 pb-6 pt-8">
-        <Link href="/" className="inline-flex items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary-600 text-white">
-            <Building2 className="size-5" aria-hidden />
-          </span>
-          <span className="text-lg font-semibold text-white">{brand.name}</span>
-        </Link>
-        <p className="mt-2 text-xs text-neutral-500">{brand.tagline}</p>
-      </div>
-
       <div className="hidden border-b border-neutral-800 px-6 py-6 lg:block">
         <div className="flex items-center gap-3">
           <Avatar

@@ -48,7 +48,7 @@ describe("AccountPage", () => {
   it("renders account page when signed in", async () => {
     mockUseAuth.mockReturnValue({ session: { user: { email: "jane@test.com", avatarUrl: null } }, ready: true, refresh: vi.fn() });
     render(<AccountPage />);
-    await waitFor(() => expect(screen.getByRole("heading", { name: /personal information/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("region", { name: /personal information/i })).toBeInTheDocument());
   });
 
   it("renders account sidebar navigation", async () => {

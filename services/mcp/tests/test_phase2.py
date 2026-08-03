@@ -55,12 +55,6 @@ async def test_outreach_draft_tools() -> None:
             json={"id": "d1", "property_id": "p1", "draft_email": "Hello broker..."},
         ),
     )
-    respx.patch(f"{BASE}/api/v1/outreach/drafts/d1").mock(
-        return_value=httpx.Response(
-            200,
-            json={"id": "d1", "property_id": "p1", "draft_email": "Edited draft"},
-        ),
-    )
     mcp = FastMCP("test")
     register_outreach_tools(mcp)
     original = _with_token()
@@ -69,10 +63,6 @@ async def test_outreach_draft_tools() -> None:
         by_id = await _tool(mcp, "get_outreach_draft").fn(draft_id="d1")
         by_prop = await _tool(mcp, "get_outreach_draft").fn(property_id="p1")
         missing = await _tool(mcp, "get_outreach_draft").fn()
-        updated = await _tool(mcp, "update_outreach_draft").fn(
-            draft_id="d1",
-            draft_email="Edited draft",
-        )
     finally:
         _restore_token(original)
 
@@ -81,8 +71,6 @@ async def test_outreach_draft_tools() -> None:
     assert by_id.get("isError") is not True
     assert by_prop.get("isError") is not True
     assert missing["isError"] is True
-    assert updated.get("isError") is not True
-    assert "Edited draft" in updated["content"][0]["text"]
 
 
 def test_create_server_registers_outreach_tools() -> None:
@@ -90,7 +78,6 @@ def test_create_server_registers_outreach_tools() -> None:
     for name in (
         "generate_outreach_draft",
         "get_outreach_draft",
-        "update_outreach_draft",
     ):
         assert mcp._tool_manager.get_tool(name) is not None
 

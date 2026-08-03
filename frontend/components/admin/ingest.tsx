@@ -4,6 +4,8 @@ import { NoticeCard } from "@components/ui/notice-card";
 import { Badge, type BadgeColor } from "@components/ui/badge";
 import { ButtonPrimary } from "@components/ui/button-primary";
 import { useIngestJob, type JobStatus } from "@hooks/use-ingest-job";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn } from "@utils/common";
 
 const STATUS_COLOR: Record<JobStatus, BadgeColor> = {
   pending: "yellow",
@@ -16,7 +18,7 @@ export const AdminIngestView = () => {
   const { job, error, triggering, isBusy, triggerIngest } = useIngestJob();
 
   return (
-    <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
+    <div className={cn(PAGE_CONTAINER, "py-16 lg:py-20")}>
       <h1 className="text-3xl font-semibold text-neutral-900 md:text-4xl dark:text-neutral-100">
         Ingestion
       </h1>

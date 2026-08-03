@@ -11,7 +11,8 @@ import {
   type ListingSubmissionItem,
   type ListingSubmissionStatus,
 } from "@services/listings";
-import { getApiErrorMessage } from "@utils/common";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn, getApiErrorMessage } from "@utils/common";
 
 const STATUS_COLOR: Record<ListingSubmissionStatus, "yellow" | "green" | "red"> = {
   pending: "yellow",
@@ -54,7 +55,7 @@ export const AdminSubmissionsView = () => {
   const loading = items === null && !error;
 
   return (
-    <div className="mx-auto max-w-screen-xl px-4 py-16 lg:py-20">
+    <div className={cn(PAGE_CONTAINER, "py-16 lg:py-20")}>
       <h1 className="text-3xl font-semibold text-neutral-900 md:text-4xl dark:text-neutral-100">
         Listing submissions
       </h1>

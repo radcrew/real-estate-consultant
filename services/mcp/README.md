@@ -284,9 +284,9 @@ Local stdio (`run-mcp.cmd` / `pnpm run dev:mcp`) remains the default for contrib
 
 | Area | Tools |
 |------|-------|
-| Search | `quick_search` (location/budget/type one-shot), `search_properties`, `update_search_criteria` |
-| Listings | `get_listing`, `get_featured_listings`, `get_similar_listings` |
-| Outreach | `generate_outreach_draft`, `get_outreach_draft`, `update_outreach_draft` (draft only) |
+| Search | `quick_search` (location/budget/type one-shot), `search_properties` |
+| Listings | `get_listing`, `get_similar_listings` |
+| Outreach | `generate_outreach_draft`, `get_outreach_draft` (draft only) |
 
 Resources: `listing://`, `search://`.  
 Prompts: `cre_property_search` (quick_search flow), `draft_broker_outreach`.

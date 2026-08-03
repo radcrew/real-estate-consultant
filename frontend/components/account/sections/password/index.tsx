@@ -31,17 +31,8 @@ export const AccountPasswordSection = ({
   onChangeConfirm,
   onSubmit,
 }: AccountPasswordSectionProps) => (
-  <section className={ACCOUNT_SECTION_CARD_CLASS} aria-labelledby="security-heading">
-    <div className="border-b border-border pb-5">
-      <h2 id="security-heading" className="text-lg font-semibold text-foreground">
-        Security
-      </h2>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Change your password. You must enter your current password.
-      </p>
-    </div>
-
-    <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-5">
+  <section className={ACCOUNT_SECTION_CARD_CLASS} aria-label="Security">
+    <form onSubmit={onSubmit} className="flex flex-col gap-5">
       <AccountField
         id="account-current-password"
         label="Current password"

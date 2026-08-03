@@ -3,6 +3,15 @@ export const BACKEND_BASE_URL = (
   process.env.NEXT_PUBLIC_BACKEND_API_URL?.trim() || "http://localhost:8888"
 ).replace(/\/+$/, "");
 
+/**
+ * Streamable-HTTP endpoint of the MCP adapter, used to build client config
+ * snippets. Defaults to the local `pnpm run dev:mcp` bind; set this to the
+ * deployed URL in preview/production.
+ */
+export const MCP_SERVER_URL = (
+  process.env.NEXT_PUBLIC_MCP_URL?.trim() || "http://127.0.0.1:8900/mcp"
+).replace(/\/+$/, "");
+
 export const SUPABASE_URL =
   process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
 

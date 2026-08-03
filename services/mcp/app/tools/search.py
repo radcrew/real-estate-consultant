@@ -87,24 +87,3 @@ def register_search_tools(mcp: FastMCP) -> None:
             _call,
             transform=compact_search_response,
         )
-
-    @mcp.tool()
-    async def update_search_criteria(
-        session_profile_id: str,
-        criteria: dict[str, Any],
-    ) -> dict:
-        """Replace search criteria on an existing search profile (WRITE).
-
-        Overwrites prior criteria. Requires MCP_USER_ACCESS_TOKEN. Prefer asking
-        the user before calling when criteria changes are consequential.
-
-        Args:
-            session_profile_id: Search profile UUID.
-            criteria: Full criteria object to store (not a partial patch).
-        """
-        client = BackendClient()
-
-        async def _call() -> dict[str, Any]:
-            return await client.update_search_criteria(session_profile_id, criteria)
-
-        return await run_backend("update_search_criteria", _call)

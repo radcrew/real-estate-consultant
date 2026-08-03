@@ -8,9 +8,10 @@ import { NoticeCard } from "@components/ui/notice-card";
 import { propertyToModel } from "@components/property/listing-model";
 import { PropertyCard, PROPERTY_GRID } from "@components/property/card";
 import { listingsService, type AgentProfileResponse } from "@services/listings";
-import { getApiErrorMessage } from "@utils/common";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn, getApiErrorMessage } from "@utils/common";
 
-const PAGE_SHELL = "mx-auto max-w-screen-xl px-4 py-16 lg:py-20";
+const PAGE_SHELL = cn(PAGE_CONTAINER, "py-16 lg:py-20");
 const SECTION_HEADING = "text-2xl font-semibold text-neutral-900 dark:text-neutral-100";
 const CONTACT_LINK = "flex items-center gap-3 text-sm text-neutral-600 hover:text-primary-600 dark:text-neutral-300";
 
@@ -63,7 +64,7 @@ export const AgentView = ({ broker }: AgentViewProps) => {
   const count = data.properties.length;
 
   return (
-    <div className="mx-auto max-w-screen-xl px-4 py-16 lg:flex lg:gap-10 lg:py-20 xl:gap-14">
+    <div className={cn(PAGE_CONTAINER, "py-16 lg:flex lg:gap-10 lg:py-20 xl:gap-14")}>
       <div className="lg:w-80 lg:shrink-0">
         <div className="flex flex-col items-center space-y-6 rounded-2xl border border-neutral-200 p-6 text-center sm:p-8 lg:sticky lg:top-24 dark:border-neutral-700">
           <Avatar userName={data.name} sizeClass="h-28 w-28 text-3xl" radius="rounded-full" />

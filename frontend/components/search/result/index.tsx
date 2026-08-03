@@ -15,6 +15,7 @@ import { Pagination } from "@components/ui/pagination";
 import { SectionGridHasMap } from "@components/property/grid-with-map";
 import { useSearchResults } from "@hooks/use-search-results";
 import { useFitExplanation } from "@hooks/use-fit-explanation";
+import { PAGE_CONTAINER } from "@components/ui/styles";
 import { cn } from "@utils/common";
 
 import { SearchFilter } from "./filter-bar";
@@ -69,7 +70,7 @@ export const SearchResults = () => {
     <div className="min-h-[60vh]">
       {showFilterDock && (
         <div className="fixed top-20 right-0 left-0 z-30 border-b border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="mx-auto max-w-screen-xl px-4 py-2">
+          <div className={cn(PAGE_CONTAINER, "py-2")}>
             <SearchFilter
               criteria={criteria}
               disabled={loading}
@@ -81,8 +82,10 @@ export const SearchResults = () => {
 
       <div
         className={cn(
-          "mx-auto px-4 pb-12",
-          view === "map" ? "max-w-[1600px]" : "max-w-screen-xl",
+          PAGE_CONTAINER,
+          "pb-12",
+          // Map view keeps its own wider cap so the split panel has room.
+          view === "map" && "max-w-[1600px]",
           showFilterDock ? "pt-16" : "pt-10",
         )}
       >

@@ -73,13 +73,16 @@ if (check.status !== 0) {
 
 const host = process.env.MCP_HTTP_HOST || "127.0.0.1";
 const port = process.env.MCP_HTTP_PORT || "8900";
-const childEnv = loadDotEnv({
-  ...process.env,
+// .env supplies credentials, but this launcher is the HTTP entry point — its
+// transport/bind settings must win. Loading .env last would let the stdio
+// default shipped in .env.example silently start a server that binds no port.
+const childEnv = {
+  ...loadDotEnv({ ...process.env }),
   PYTHONPATH: mcpRoot,
   MCP_TRANSPORT: "streamable-http",
   MCP_HTTP_HOST: host,
   MCP_HTTP_PORT: String(port),
-});
+};
 
 const child = spawn(venvPython, ["-m", "app.main"], {
   cwd: mcpRoot,

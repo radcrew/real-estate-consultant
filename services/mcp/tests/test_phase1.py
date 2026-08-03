@@ -148,30 +148,11 @@ async def test_search_requires_auth() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_update_search_criteria() -> None:
-    route = respx.put(f"{BASE}/api/v1/search/sess-1").mock(
-        return_value=httpx.Response(200, json={"status": "in_progress", "criteria": {}}),
-    )
-    client = BackendClient(base_url=BASE, access_token=TOKEN)
-    data = await client.update_search_criteria("sess-1", {"location": "Austin, TX"})
-    assert data["status"] == "in_progress"
-    assert route.called
-    assert route.calls.last.request.content  # body present
-
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_get_listing_and_featured() -> None:
+async def test_get_listing() -> None:
     respx.get(f"{BASE}/api/v1/listings/prop-1").mock(
         return_value=httpx.Response(
             200,
             json={"property": {"id": "prop-1", "city": "Austin"}, "images": ["https://x"]},
-        ),
-    )
-    respx.get(f"{BASE}/api/v1/listings/featured").mock(
-        return_value=httpx.Response(
-            200,
-            json={"listings": [{"property": {"id": "f1", "city": "Dallas"}, "images": []}]},
         ),
     )
     mcp = FastMCP("test")
@@ -180,10 +161,6 @@ async def test_get_listing_and_featured() -> None:
     listing = await _tool(mcp, "get_listing").fn(property_id="prop-1")
     assert listing.get("isError") is not True
     assert "prop-1" in listing["content"][0]["text"]
-
-    featured = await _tool(mcp, "get_featured_listings").fn()
-    assert featured.get("isError") is not True
-    assert "Dallas" in featured["content"][0]["text"]
 
 
 @pytest.mark.asyncio
@@ -229,9 +206,7 @@ def test_create_server_registers_search_and_listings_tools() -> None:
     for name in (
         "quick_search",
         "search_properties",
-        "update_search_criteria",
         "get_listing",
-        "get_featured_listings",
         "get_similar_listings",
     ):
         assert mcp._tool_manager.get_tool(name) is not None

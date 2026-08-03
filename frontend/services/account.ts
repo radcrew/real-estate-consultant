@@ -34,6 +34,28 @@ export type AccountPasswordChangeBody = {
   new_password: string;
 };
 
+export type McpApiKey = {
+  id: string;
+  name: string;
+  key_prefix: string;
+  scopes: string[];
+  created_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  expires_at: string | null;
+};
+
+/** Create-only shape — `api_key` is the plaintext `rad_…`, returned exactly once. */
+export type McpApiKeyCreated = Omit<McpApiKey, "last_used_at" | "revoked_at"> & {
+  api_key: string;
+};
+
+export type McpApiKeyCreateBody = {
+  name?: string;
+  scopes?: string[];
+  expires_in_days?: number;
+};
+
 const FORM_TO_API: { key: keyof ProfileFormValues; api: keyof AccountProfileUpdateBody }[] = [
   { key: "firstName", api: "first_name" },
   { key: "lastName", api: "last_name" },
@@ -129,6 +151,30 @@ export class AccountService {
       headers: { "Content-Type": null },
     });
     return data;
+  }
+
+  async listApiKeys(options?: { signal?: AbortSignal }): Promise<McpApiKey[]> {
+    const { data } = await this.http.get<{ keys: McpApiKey[] }>("/account/api-keys", {
+      signal: options?.signal,
+    });
+    return data.keys;
+  }
+
+  /** The resolved `api_key` is the only time the plaintext key exists — it cannot be re-read. */
+  async createApiKey(
+    body: McpApiKeyCreateBody,
+    options?: { signal?: AbortSignal },
+  ): Promise<McpApiKeyCreated> {
+    const { data } = await this.http.post<McpApiKeyCreated>("/account/api-keys", body, {
+      signal: options?.signal,
+    });
+    return data;
+  }
+
+  async revokeApiKey(keyId: string, options?: { signal?: AbortSignal }): Promise<void> {
+    await this.http.delete(`/account/api-keys/${encodeURIComponent(keyId)}`, {
+      signal: options?.signal,
+    });
   }
 }
 

@@ -49,21 +49,3 @@ def register_outreach_tools(mcp: FastMCP) -> None:
                 lambda: client.get_latest_outreach_draft(property_id),
             )
         return error_text("Provide draft_id or property_id.")
-
-    @mcp.tool()
-    async def update_outreach_draft(draft_id: str, draft_email: str) -> dict:
-        """Update outreach draft email text (WRITE — edits draft only, never sends).
-
-        Requires MCP_USER_ACCESS_TOKEN.
-
-        Args:
-            draft_id: Outreach draft UUID.
-            draft_email: Full replacement email body.
-        """
-        if not draft_email.strip():
-            return error_text("draft_email must be non-empty.")
-        client = BackendClient()
-        return await run_backend(
-            "update_outreach_draft",
-            lambda: client.update_outreach_draft(draft_id, draft_email),
-        )

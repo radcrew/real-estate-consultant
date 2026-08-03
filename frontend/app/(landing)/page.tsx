@@ -14,11 +14,13 @@ import { Subscribe } from "@components/landing/subscribe";
 import { Testimonials } from "@components/landing/testimonials";
 import { BackgroundSection } from "@components/ui/background-section";
 import { BgGlassmorphism } from "@components/ui/bg-glassmorphism";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn } from "@utils/common";
 
 const HomePage = () => (
   <main className="relative flex flex-1 flex-col overflow-hidden bg-background">
     <BgGlassmorphism />
-    <div className="relative z-10 mx-auto w-full max-w-screen-xl space-y-24 px-4 pb-24 lg:space-y-28 lg:pb-28 2xl:max-w-screen-2xl 2xl:px-32">
+    <div className={cn(PAGE_CONTAINER, "relative z-10 space-y-24 pb-24 lg:space-y-28 lg:pb-28")}>
       <SectionHero className="pt-10 lg:pt-16" />
       <HowItWorks />
 

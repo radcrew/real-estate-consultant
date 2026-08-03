@@ -1,13 +1,15 @@
 import Image from "next/image";
 
 import { ButtonPrimary } from "@components/ui/button-primary";
+import { PAGE_CONTAINER } from "@components/ui/styles";
+import { cn } from "@utils/common";
 
 /**
  * 404 page, ported from Voyager's `not-found.tsx`: centered 404 art, a message,
  * and a "Return home" CTA.
  */
 const NotFound = () => (
-  <div className="relative mx-auto max-w-screen-xl px-4 pb-16 pt-5 lg:pb-20">
+  <div className={cn(PAGE_CONTAINER, "relative pb-16 pt-5 lg:pb-20")}>
     <header className="mx-auto max-w-2xl space-y-2 text-center">
       <Image
         src="/images/404.png"

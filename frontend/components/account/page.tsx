@@ -9,8 +9,11 @@ import { useAuth } from "@contexts/auth";
 import { getApiErrorMessage } from "@utils/common";
 import { readSession, saveSession } from "@lib/auth-session";
 import {
+  API_KEY_EXPIRY_DEFAULT_DAYS,
+  API_KEY_NAME_MAX,
   type ProfileFieldKey,
   type ProfileFormValues,
+  validateApiKeyForm,
   validatePasswordChange,
   validateProfileForm,
 } from "@utils/account/validation";
@@ -18,10 +21,13 @@ import {
   accountService,
   buildProfileUpdateBody,
   mapProfileResponseToForm,
+  type McpApiKey,
+  type McpApiKeyCreated,
 } from "@services/account";
-import { brand } from "@config/brand";
 
 import { AccountSidebar, type AccountTab } from "./sidebar";
+import { AccountApiKeysSection } from "./sections/api-keys";
+import { ApiKeyCreatedDialog } from "./sections/api-keys/created-dialog";
 import { AccountPasswordSection } from "./sections/password";
 import { AccountPersonalInfoSection } from "./sections/personal-info";
 
@@ -62,6 +68,21 @@ export const AccountPage = () => {
   const [passwordErrors, setPasswordErrors] = useState<Partial<Record<string, string>>>({});
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  const [apiKeys, setApiKeys] = useState<McpApiKey[]>([]);
+  const [apiKeysLoading, setApiKeysLoading] = useState(false);
+  const [apiKeysLoaded, setApiKeysLoaded] = useState(false);
+  const [apiKeysLoadError, setApiKeysLoadError] = useState<string | null>(null);
+  const [keyName, setKeyName] = useState("");
+  const [keyScope, setKeyScope] = useState("*");
+  const [keyExpiresInDays, setKeyExpiresInDays] = useState(String(API_KEY_EXPIRY_DEFAULT_DAYS));
+  const [keyErrors, setKeyErrors] = useState<Partial<Record<string, string>>>({});
+  const [keyCreating, setKeyCreating] = useState(false);
+  const [createdKey, setCreatedKey] = useState<McpApiKeyCreated | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [confirmingRevokeId, setConfirmingRevokeId] = useState<string | null>(null);
+  const [rotatingId, setRotatingId] = useState<string | null>(null);
+  const [replacedKeyId, setReplacedKeyId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ready || session) return;
@@ -268,6 +289,136 @@ export const AccountPage = () => {
     setPasswordSuccess(false);
   }, []);
 
+  // Keys are fetched on first visit to the tab — most sessions never open it.
+  useEffect(() => {
+    if (!ready || !session || activeTab !== "api-keys" || apiKeysLoaded) {
+      return;
+    }
+
+    const ac = new AbortController();
+    setApiKeysLoading(true);
+    setApiKeysLoadError(null);
+
+    (async () => {
+      try {
+        const keys = await accountService.listApiKeys({ signal: ac.signal });
+        if (ac.signal.aborted) return;
+        setApiKeys(keys);
+        setApiKeysLoaded(true);
+      } catch (e) {
+        if (ac.signal.aborted) return;
+        setApiKeysLoadError(getApiErrorMessage(e));
+      } finally {
+        if (!ac.signal.aborted) {
+          setApiKeysLoading(false);
+        }
+      }
+    })();
+
+    return () => ac.abort();
+  }, [ready, session, activeTab, apiKeysLoaded]);
+
+  const submitCreateApiKey = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      const errors = validateApiKeyForm({ name: keyName, expiresInDays: keyExpiresInDays });
+      if (Object.keys(errors).length > 0) {
+        setKeyErrors(errors);
+        return;
+      }
+      setKeyErrors({});
+      setKeyCreating(true);
+      try {
+        const expiry = keyExpiresInDays.trim();
+        const created = await accountService.createApiKey({
+          name: keyName.trim(),
+          scopes: [keyScope],
+          ...(expiry ? { expires_in_days: Number(expiry) } : {}),
+        });
+        // Show the plaintext key before anything else can navigate away.
+        setCreatedKey(created);
+        setKeyName("");
+        setKeyExpiresInDays(String(API_KEY_EXPIRY_DEFAULT_DAYS));
+        setKeyScope("*");
+        // Refetch rather than appending — the list shape omits api_key.
+        const keys = await accountService.listApiKeys();
+        setApiKeys(keys);
+      } catch (err) {
+        setKeyErrors({ form: getApiErrorMessage(err) });
+      } finally {
+        setKeyCreating(false);
+      }
+    },
+    [keyName, keyScope, keyExpiresInDays],
+  );
+
+  /**
+   * Rotation = mint a replacement with the same scopes, leaving the old key
+   * live so hosts keep working until the user has swapped their config over.
+   * The old key is revoked separately, on their schedule.
+   */
+  const rotateApiKey = useCallback(async (key: McpApiKey) => {
+    setRotatingId(key.id);
+    setKeyErrors({});
+    try {
+      const created = await accountService.createApiKey({
+        name: `${key.name} (rotated)`.slice(0, API_KEY_NAME_MAX),
+        scopes: key.scopes,
+        // Carry the expiry policy across: a key that expired must not be
+        // replaced by one that never does. The original TTL is unknowable
+        // from expires_at alone, so fall back to the default window.
+        ...(key.expires_at ? { expires_in_days: API_KEY_EXPIRY_DEFAULT_DAYS } : {}),
+      });
+      setCreatedKey(created);
+      setReplacedKeyId(key.id);
+      const keys = await accountService.listApiKeys();
+      setApiKeys(keys);
+    } catch (err) {
+      setKeyErrors({ form: getApiErrorMessage(err) });
+    } finally {
+      setRotatingId(null);
+    }
+  }, []);
+
+  const confirmRevokeApiKey = useCallback(async (key: McpApiKey) => {
+    setRevokingId(key.id);
+    setKeyErrors({});
+    try {
+      await accountService.revokeApiKey(key.id);
+      const keys = await accountService.listApiKeys();
+      setApiKeys(keys);
+      setConfirmingRevokeId(null);
+      // Rotation is finished once the key it replaced is gone.
+      setReplacedKeyId((id) => (id === key.id ? null : id));
+    } catch (err) {
+      setKeyErrors({ form: getApiErrorMessage(err) });
+    } finally {
+      setRevokingId(null);
+    }
+  }, []);
+
+  const onChangeKeyName = useCallback((v: string) => {
+    setKeyName(v);
+    setKeyErrors((e) => {
+      if (!e.name && !e.form) return e;
+      const next = { ...e };
+      delete next.name;
+      delete next.form;
+      return next;
+    });
+  }, []);
+
+  const onChangeKeyExpiresInDays = useCallback((v: string) => {
+    setKeyExpiresInDays(v);
+    setKeyErrors((e) => {
+      if (!e.expiresInDays && !e.form) return e;
+      const next = { ...e };
+      delete next.expiresInDays;
+      delete next.form;
+      return next;
+    });
+  }, []);
+
   const onChangeConfirmPassword = useCallback((v: string) => {
     setConfirmPassword(v);
     setPasswordErrors((e) => {
@@ -300,53 +451,70 @@ export const AccountPage = () => {
     <div className="flex flex-col lg:flex-row">
       <AccountSidebar activeTab={activeTab} onSelectTab={setActiveTab} />
 
-      <main className="min-w-0 flex-1 px-4 py-10 sm:px-6 lg:px-10">
-        <div className="mx-auto w-full max-w-3xl">
-          <header className="border-b border-border pb-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              {brand.account.workspaceLabel}
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              {brand.account.title}
-            </h1>
-            <p className="mt-2 max-w-xl text-sm text-muted-foreground">{brand.account.subtitle}</p>
-          </header>
-
-          <div className="mt-10">
-            {activeTab === "profile" ? (
-              <AccountPersonalInfoSection
-                editing={editingProfile}
-                values={profileValues}
-                errors={profileErrors}
-                notice={profileNotice}
-                noticeVariant={profileNoticeVariant}
-                saving={profileSaving}
-                profileLoading={profileLoading}
-                avatarUrl={avatarUrl}
-                avatarUploading={avatarUploading}
-                onUploadAvatar={uploadAvatar}
-                onEdit={startEditProfile}
-                onCancel={cancelEditProfile}
-                onSave={saveProfile}
-                onChangeField={updateDraft}
-              />
-            ) : (
-              <AccountPasswordSection
-                currentPassword={currentPassword}
-                newPassword={newPassword}
-                confirmPassword={confirmPassword}
-                errors={passwordErrors}
-                submitting={passwordSubmitting}
-                success={passwordSuccess}
-                onChangeCurrent={onChangeCurrentPassword}
-                onChangeNew={onChangeNewPassword}
-                onChangeConfirm={onChangeConfirmPassword}
-                onSubmit={submitPasswordChange}
-              />
-            )}
-          </div>
+      <main className="min-w-0 flex-1 px-3 py-8 lg:px-6">
+        {/* One width for every tab: a per-tab cap made the card jump on switch.
+            5xl is the widest tab's requirement — API key rows carry four
+            metadata columns plus actions, and the host config snippets are wide
+            code blocks — so the forms follow it rather than the reverse. */}
+        <div className="mx-auto w-full max-w-5xl">
+          {activeTab === "profile" ? (
+            <AccountPersonalInfoSection
+              editing={editingProfile}
+              values={profileValues}
+              errors={profileErrors}
+              notice={profileNotice}
+              noticeVariant={profileNoticeVariant}
+              saving={profileSaving}
+              profileLoading={profileLoading}
+              avatarUrl={avatarUrl}
+              avatarUploading={avatarUploading}
+              onUploadAvatar={uploadAvatar}
+              onEdit={startEditProfile}
+              onCancel={cancelEditProfile}
+              onSave={saveProfile}
+              onChangeField={updateDraft}
+            />
+          ) : activeTab === "security" ? (
+            <AccountPasswordSection
+              currentPassword={currentPassword}
+              newPassword={newPassword}
+              confirmPassword={confirmPassword}
+              errors={passwordErrors}
+              submitting={passwordSubmitting}
+              success={passwordSuccess}
+              onChangeCurrent={onChangeCurrentPassword}
+              onChangeNew={onChangeNewPassword}
+              onChangeConfirm={onChangeConfirmPassword}
+              onSubmit={submitPasswordChange}
+            />
+          ) : (
+            <AccountApiKeysSection
+              keys={apiKeys}
+              loading={apiKeysLoading}
+              loadError={apiKeysLoadError}
+              name={keyName}
+              scope={keyScope}
+              expiresInDays={keyExpiresInDays}
+              errors={keyErrors}
+              creating={keyCreating}
+              revokingId={revokingId}
+              confirmingRevokeId={confirmingRevokeId}
+              rotatingId={rotatingId}
+              replacedKeyId={replacedKeyId}
+              onChangeName={onChangeKeyName}
+              onChangeScope={setKeyScope}
+              onChangeExpiresInDays={onChangeKeyExpiresInDays}
+              onSubmit={submitCreateApiKey}
+              onRotate={rotateApiKey}
+              onRequestRevoke={(key) => setConfirmingRevokeId(key.id)}
+              onConfirmRevoke={confirmRevokeApiKey}
+              onCancelRevoke={() => setConfirmingRevokeId(null)}
+            />
+          )}
         </div>
       </main>
+
+      <ApiKeyCreatedDialog apiKey={createdKey} onDismiss={() => setCreatedKey(null)} />
     </div>
   );
 };

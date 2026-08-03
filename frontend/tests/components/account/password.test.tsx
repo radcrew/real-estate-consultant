@@ -17,9 +17,9 @@ const BASE = {
 };
 
 describe("AccountPasswordSection", () => {
-  it("renders the security heading", () => {
+  it("names the section for assistive tech", () => {
     render(<AccountPasswordSection {...BASE} />);
-    expect(screen.getByRole("heading", { name: /security/i })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /security/i })).toBeInTheDocument();
   });
 
   it("renders update password submit button", () => {
