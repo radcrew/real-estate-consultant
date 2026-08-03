@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { SavedView } from "@components/saved/view";
 
@@ -41,6 +41,16 @@ describe("SavedView", () => {
     render(<SavedView />);
     expect(screen.getByText(/haven.*t saved any/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /browse properties/i })).toHaveAttribute("href", "/listings");
+  });
+
+  it("calls onBrowse instead of linking out when the account shell supplies one", () => {
+    const onBrowse = vi.fn();
+    mockUseSaved.mockReturnValue({ savedIds: [], isSaved: () => false, ready: true, signedIn: true });
+    render(<SavedView embedded onBrowse={onBrowse} />);
+
+    expect(screen.queryByRole("link", { name: /browse properties/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /browse properties/i }));
+    expect(onBrowse).toHaveBeenCalledOnce();
   });
 
   it("renders heading", () => {

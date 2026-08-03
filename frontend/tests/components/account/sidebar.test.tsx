@@ -3,12 +3,6 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { AccountSidebar } from "@components/account/sidebar";
 
-vi.mock("next/link", () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
-  ),
-}));
-
 vi.mock("next/image", () => ({
   default: ({ alt, src }: { alt: string; src: string }) => <img alt={alt} src={src} />,
 }));
@@ -41,13 +35,39 @@ describe("AccountSidebar", () => {
     expect(onSelectTab).toHaveBeenCalledWith("security");
   });
 
-  it("renders the saved properties link", () => {
-    render(<AccountSidebar activeTab="profile" onSelectTab={vi.fn()} />);
-    expect(screen.getByRole("link", { name: /saved/i })).toHaveAttribute("href", "/saved");
+  it("keeps saved properties in-page so the sidebar survives the click", () => {
+    const onSelectTab = vi.fn();
+    render(<AccountSidebar activeTab="profile" onSelectTab={onSelectTab} />);
+    expect(screen.queryByRole("link", { name: /saved/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /saved/i }));
+    expect(onSelectTab).toHaveBeenCalledWith("saved");
   });
 
   it("shows user email when signed in", () => {
     render(<AccountSidebar activeTab="profile" onSelectTab={vi.fn()} />);
     expect(screen.getByText("user@test.com")).toBeInTheDocument();
+  });
+
+  // The rail used to hardcode its dark palette, so the header's theme toggle
+  // flipped every surface around it and left the sidebar dark.
+  it("pairs every rail surface color with a dark: variant", () => {
+    const { container } = render(<AccountSidebar activeTab="profile" onSelectTab={vi.fn()} />);
+    const surfaces = [
+      container.querySelector("aside"),
+      ...container.querySelectorAll("nav button"),
+    ];
+
+    for (const el of surfaces) {
+      const classes = (el?.className ?? "").split(/\s+/);
+      // Every base surface property the rail paints must have a dark override,
+      // whatever shade that override picks.
+      const properties = new Set(
+        classes.flatMap((c) => (/^(bg|text)-/.test(c) ? [c.split("-")[0]] : [])),
+      );
+      expect(properties.size).toBeGreaterThan(0);
+      for (const property of properties) {
+        expect(classes.some((c) => c.startsWith(`dark:${property}-`))).toBe(true);
+      }
+    }
   });
 });

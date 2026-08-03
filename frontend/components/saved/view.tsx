@@ -16,7 +16,22 @@ import { listingsService } from "@services/listings";
 import { PAGE_CONTAINER } from "@components/ui/styles";
 import { cn } from "@utils/common";
 
-export const SavedView = () => {
+export type SavedViewProps = {
+  /**
+   * Rendered inside the account shell rather than as the `/saved` page. The
+   * shell already supplies the page container, width cap and vertical rhythm,
+   * so the standalone spacing would stack on top of it.
+   */
+  embedded?: boolean;
+  /**
+   * Handles the empty state's "Browse properties" CTA in place of navigating
+   * to `/listings`. The account shell passes one so browsing stays in-panel
+   * and keeps its sidebar; the standalone page leaves it unset and links out.
+   */
+  onBrowse?: () => void;
+};
+
+export const SavedView = ({ embedded = false, onBrowse }: SavedViewProps) => {
   const { savedIds, isSaved, ready, signedIn } = useSavedListings();
   const [models, setModels] = useState<PropertyModel[] | null>(null);
 
@@ -56,9 +71,14 @@ export const SavedView = () => {
   const visible = (models ?? []).filter((m) => isSaved(m.id));
 
   return (
-    <div className={cn(PAGE_CONTAINER, "py-16 lg:py-20")}>
+    <div className={embedded ? undefined : cn(PAGE_CONTAINER, "py-16 lg:py-20")}>
       <div className="max-w-2xl">
-        <h1 className="text-3xl font-semibold text-neutral-900 md:text-4xl dark:text-neutral-100">
+        <h1
+          className={cn(
+            "font-semibold text-neutral-900 dark:text-neutral-100",
+            embedded ? "text-2xl" : "text-3xl md:text-4xl",
+          )}
+        >
           Saved properties
         </h1>
         <p className="mt-3 text-neutral-500 dark:text-neutral-400">
@@ -96,7 +116,11 @@ export const SavedView = () => {
             to save it here.
           </p>
           <div className="mt-6 flex justify-center">
-            <ButtonPrimary href="/listings">Browse properties</ButtonPrimary>
+            {onBrowse ? (
+              <ButtonPrimary onClick={onBrowse}>Browse properties</ButtonPrimary>
+            ) : (
+              <ButtonPrimary href="/listings">Browse properties</ButtonPrimary>
+            )}
           </div>
         </NoticeCard>
       ) : null}

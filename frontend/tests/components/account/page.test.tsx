@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { AccountPage } from "@components/account/page";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
+  usePathname: () => "/account",
 }));
 vi.mock("next/link", () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -25,6 +26,15 @@ vi.mock("@services/account", () => ({
 vi.mock("@lib/auth-session", () => ({
   readSession: () => null,
   saveSession: vi.fn(),
+}));
+vi.mock("@components/saved/provider", () => ({
+  useSavedListings: () => ({ savedIds: [], isSaved: () => false, ready: true, signedIn: true }),
+}));
+vi.mock("@services/listings", () => ({
+  listingsService: {
+    getListing: vi.fn(),
+    getFeaturedListings: vi.fn().mockResolvedValue({ listings: [] }),
+  },
 }));
 
 beforeEach(() => {
@@ -55,5 +65,56 @@ describe("AccountPage", () => {
     mockUseAuth.mockReturnValue({ session: { user: { email: "jane@test.com", avatarUrl: null } }, ready: true, refresh: vi.fn() });
     render(<AccountPage />);
     await waitFor(() => expect(screen.getByRole("navigation", { name: /account navigation/i })).toBeInTheDocument());
+  });
+
+  it("shows saved properties in-panel and keeps the sidebar", async () => {
+    mockUseAuth.mockReturnValue({ session: { user: { email: "jane@test.com", avatarUrl: null } }, ready: true, refresh: vi.fn() });
+    render(<AccountPage />);
+    const nav = await screen.findByRole("navigation", { name: /account navigation/i });
+
+    fireEvent.click(screen.getByRole("button", { name: /saved/i }));
+
+    expect(await screen.findByRole("heading", { name: /saved properties/i })).toBeInTheDocument();
+    expect(nav).toBeInTheDocument();
+  });
+
+  it("keeps the sidebar when browsing properties from the empty Saved tab", async () => {
+    mockUseAuth.mockReturnValue({ session: { user: { email: "jane@test.com", avatarUrl: null } }, ready: true, refresh: vi.fn() });
+    render(<AccountPage />);
+    const nav = await screen.findByRole("navigation", { name: /account navigation/i });
+    fireEvent.click(screen.getByRole("button", { name: /saved/i }));
+
+    // The CTA must act in-panel, not navigate to /listings and drop the rail.
+    const browse = await screen.findByRole("button", { name: /browse properties/i });
+    fireEvent.click(browse);
+
+    expect(await screen.findByRole("button", { name: /back to saved properties/i })).toBeInTheDocument();
+    expect(nav).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /saved properties/i })).not.toBeInTheDocument();
+  });
+
+  it("returns to the saved list from the browse panel", async () => {
+    mockUseAuth.mockReturnValue({ session: { user: { email: "jane@test.com", avatarUrl: null } }, ready: true, refresh: vi.fn() });
+    render(<AccountPage />);
+    await screen.findByRole("navigation", { name: /account navigation/i });
+    fireEvent.click(screen.getByRole("button", { name: /saved/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /browse properties/i }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /back to saved properties/i }));
+
+    expect(await screen.findByRole("heading", { name: /saved properties/i })).toBeInTheDocument();
+  });
+
+  it("drops the browse panel when another tab is selected", async () => {
+    mockUseAuth.mockReturnValue({ session: { user: { email: "jane@test.com", avatarUrl: null } }, ready: true, refresh: vi.fn() });
+    render(<AccountPage />);
+    await screen.findByRole("navigation", { name: /account navigation/i });
+    fireEvent.click(screen.getByRole("button", { name: /saved/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /browse properties/i }));
+
+    fireEvent.click(screen.getByRole("button", { name: /security/i }));
+    fireEvent.click(screen.getByRole("button", { name: /saved/i }));
+
+    expect(await screen.findByRole("heading", { name: /saved properties/i })).toBeInTheDocument();
   });
 });

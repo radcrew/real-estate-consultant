@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Heart, KeyRound, Plug, UserCircle } from "lucide-react";
 
 import { Avatar } from "@components/ui/avatar";
@@ -9,13 +8,18 @@ import { useAuth } from "@contexts/auth";
 import { cn } from "@utils/common";
 
 /**
- * Voyager `AccountSidebar` adapted to this app: dark workspace rail with the
+ * Voyager `AccountSidebar` adapted to this app: a workspace rail with the
  * signed-in user's avatar and a tabbed nav for the account sections. Branding
- * is left to the site header above it. Profile + Security + API keys are
- * in-page tabs (switch the visible panel); Saved is a real route since it
- * lives on its own page.
+ * is left to the site header above it. Every entry is an in-page tab that
+ * swaps the visible panel — Saved included, so the rail survives the click.
+ * The standalone `/saved` route still serves the links in the site header.
+ *
+ * The rail follows the theme toggle rather than staying dark in both: it sits
+ * flush against the header, and a permanently-dark rail under a white header
+ * read as a rendering bug. Light mode lifts off the white canvas with a
+ * neutral-50 surface; the original dark values live on under `dark:`.
  */
-export type AccountTab = "profile" | "security" | "api-keys";
+export type AccountTab = "profile" | "security" | "api-keys" | "saved";
 
 const TAB_ITEMS: {
   tab: AccountTab;
@@ -41,11 +45,29 @@ const TAB_ITEMS: {
     description: "Connect AI tools to your account",
     icon: Plug,
   },
+  {
+    tab: "saved",
+    label: "Saved",
+    description: "Properties you’ve saved",
+    icon: Heart,
+  },
 ];
 
 const ITEM_CLASS =
   "group flex flex-shrink-0 items-center gap-3 rounded-lg border-l-2 px-3 py-3 text-left transition-colors";
-const DESCRIPTION = "hidden text-xs text-neutral-500 group-hover:text-neutral-400 lg:block";
+const DESCRIPTION = cn(
+  "hidden text-xs text-neutral-500 group-hover:text-neutral-600 lg:block",
+  "dark:group-hover:text-neutral-400",
+);
+
+const ITEM_ACTIVE = cn(
+  "border-primary-500 bg-neutral-100 text-neutral-900",
+  "dark:bg-neutral-900 dark:text-white",
+);
+const ITEM_INACTIVE = cn(
+  "border-transparent text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900",
+  "dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-neutral-100",
+);
 
 type AccountSidebarProps = {
   activeTab: AccountTab;
@@ -58,8 +80,13 @@ export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) 
   const avatarUrl = session?.user.avatarUrl?.trim() || undefined;
 
   return (
-    <aside className="flex-shrink-0 bg-neutral-950 text-neutral-200 lg:min-h-[calc(100vh-5rem)] lg:w-72">
-      <div className="hidden border-b border-neutral-800 px-6 py-6 lg:block">
+    <aside
+      className={cn(
+        "flex-shrink-0 border-neutral-200 bg-neutral-50 text-neutral-700 lg:min-h-[calc(100vh-5rem)] lg:w-72 lg:border-r",
+        "dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200",
+      )}
+    >
+      <div className="hidden border-b border-neutral-200 px-6 py-6 lg:block dark:border-neutral-800">
         <div className="flex items-center gap-3">
           <Avatar
             sizeClass="w-11 h-11"
@@ -70,7 +97,9 @@ export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) 
             unoptimized
           />
           <div className="min-w-0">
-            <p className="truncate font-medium text-white">{email || "Your account"}</p>
+            <p className="truncate font-medium text-neutral-900 dark:text-white">
+              {email || "Your account"}
+            </p>
             <p className="truncate text-xs text-neutral-500">{brand.account.workspaceLabel}</p>
           </div>
         </div>
@@ -88,17 +117,14 @@ export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) 
               type="button"
               onClick={() => onSelectTab(tab)}
               aria-current={active ? "page" : undefined}
-              className={cn(
-                ITEM_CLASS,
-                active
-                  ? "border-primary-500 bg-neutral-900 text-white"
-                  : "border-transparent text-neutral-400 hover:bg-neutral-900 hover:text-neutral-100",
-              )}
+              className={cn(ITEM_CLASS, active ? ITEM_ACTIVE : ITEM_INACTIVE)}
             >
               <Icon
                 className={cn(
                   "size-5 flex-shrink-0",
-                  active ? "text-primary-400" : "text-neutral-500 group-hover:text-primary-400",
+                  active
+                    ? "text-primary-600 dark:text-primary-400"
+                    : "text-neutral-400 group-hover:text-primary-600 dark:text-neutral-500 dark:group-hover:text-primary-400",
                 )}
                 aria-hidden
               />
@@ -111,22 +137,6 @@ export const AccountSidebar = ({ activeTab, onSelectTab }: AccountSidebarProps) 
             </button>
           );
         })}
-
-        <Link
-          href="/saved"
-          className={cn(ITEM_CLASS, "border-transparent text-neutral-400 hover:bg-neutral-900 hover:text-neutral-100")}
-        >
-          <Heart
-            className="size-5 flex-shrink-0 text-neutral-500 group-hover:text-primary-400"
-            aria-hidden
-          />
-          <span className="min-w-0">
-            <span className="block text-sm font-medium">Saved</span>
-            <span className={DESCRIPTION}>
-              Properties you&rsquo;ve saved
-            </span>
-          </span>
-        </Link>
       </nav>
     </aside>
   );

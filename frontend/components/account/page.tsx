@@ -25,6 +25,9 @@ import {
   type McpApiKeyCreated,
 } from "@services/account";
 
+import { ListingsIndexView } from "@components/listings/index-view";
+import { SavedView } from "@components/saved/view";
+
 import { AccountSidebar, type AccountTab } from "./sidebar";
 import { AccountApiKeysSection } from "./sections/api-keys";
 import { ApiKeyCreatedDialog } from "./sections/api-keys/created-dialog";
@@ -48,6 +51,14 @@ export const AccountPage = () => {
   const { session, ready, refresh } = useAuth();
 
   const [activeTab, setActiveTab] = useState<AccountTab>("profile");
+  // The Saved tab's empty state can swap its panel for the listings index, so
+  // "Browse properties" doesn't navigate the sidebar away mid-flow.
+  const [browsingListings, setBrowsingListings] = useState(false);
+
+  const selectTab = useCallback((tab: AccountTab) => {
+    setActiveTab(tab);
+    setBrowsingListings(false);
+  }, []);
 
   const [savedProfile, setSavedProfile] = useState<ProfileFormValues>(emptyProfile);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -449,7 +460,7 @@ export const AccountPage = () => {
 
   return (
     <div className="flex flex-col lg:flex-row">
-      <AccountSidebar activeTab={activeTab} onSelectTab={setActiveTab} />
+      <AccountSidebar activeTab={activeTab} onSelectTab={selectTab} />
 
       <main className="min-w-0 flex-1 px-3 py-8 lg:px-6">
         {/* One width for every tab: a per-tab cap made the card jump on switch.
@@ -474,7 +485,9 @@ export const AccountPage = () => {
               onSave={saveProfile}
               onChangeField={updateDraft}
             />
-          ) : activeTab === "security" ? (
+          ) : null}
+
+          {activeTab === "security" ? (
             <AccountPasswordSection
               currentPassword={currentPassword}
               newPassword={newPassword}
@@ -487,7 +500,9 @@ export const AccountPage = () => {
               onChangeConfirm={onChangeConfirmPassword}
               onSubmit={submitPasswordChange}
             />
-          ) : (
+          ) : null}
+
+          {activeTab === "api-keys" ? (
             <AccountApiKeysSection
               keys={apiKeys}
               loading={apiKeysLoading}
@@ -510,7 +525,15 @@ export const AccountPage = () => {
               onConfirmRevoke={confirmRevokeApiKey}
               onCancelRevoke={() => setConfirmingRevokeId(null)}
             />
-          )}
+          ) : null}
+
+          {activeTab === "saved" ? (
+            browsingListings ? (
+              <ListingsIndexView embedded onBack={() => setBrowsingListings(false)} />
+            ) : (
+              <SavedView embedded onBrowse={() => setBrowsingListings(true)} />
+            )
+          ) : null}
         </div>
       </main>
 
