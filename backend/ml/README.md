@@ -61,6 +61,26 @@ unattributable to either.
 At P6, add `--imatrix path/to/imatrix.dat`, which also protects the embedding and output
 tensors at Q8_0. It is off for the stock baseline so that row measures plain Q4_K_M.
 
+### Importance matrix
+
+```bash
+python -m ml.quantize.make_imatrix --gguf qwen2.5-0.5b-instruct-intake-f16.gguf
+python -m ml.quantize.build_gguf --model <merged-dir> --imatrix .local/models/imatrix.dat
+```
+
+`llama-quantize` has to decide which weights tolerate 4 bits. Unaided it uses a generic
+notion of importance; given an imatrix it uses activations measured on text you supply.
+Calibrating on intake prompts is exactly the case where that pays, because the model only
+ever sees this one prompt shape in production.
+
+Calibration is drawn from the **training** split. Using the eval split would launder eval
+information into the artifact you then score.
+
+One caveat measured at P2: on this model `llama-quantize` reported *144 of 290 tensors
+required fallback quantization*, because the 0.5B's 896-wide tensors do not divide evenly
+for every K-quant. "Q4_K_M" here is really ~6.35 bits per weight, so expect the imatrix to
+buy less than it would on a model whose shapes cooperate.
+
 ## Serving locally
 
 ```bash

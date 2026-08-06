@@ -169,6 +169,13 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=17)
     parser.add_argument("--threads", type=int, default=None)
     parser.add_argument(
+        "--max-examples",
+        type=int,
+        default=None,
+        help="Cap the training set. CPU runs cost ~24.5s/example, so this is the dial "
+             "between a 4-hour probe and a 24-hour full run",
+    )
+    parser.add_argument(
         "--smoke",
         action="store_true",
         help="Run a handful of steps on a slice, to verify the pipeline before the real run",
@@ -184,6 +191,8 @@ def main() -> int:
 
     train_set = IntakeDataset(Path(args.train), tokenizer, args.max_len)
     val_set = IntakeDataset(Path(args.val), tokenizer, args.max_len)
+    if args.max_examples:
+        train_set.rows = train_set.rows[: args.max_examples]
     print(f"train {len(train_set)} | val {len(val_set)}")
     if train_set.truncated or val_set.truncated:
         print(f"WARNING truncated {train_set.truncated + val_set.truncated} examples "
