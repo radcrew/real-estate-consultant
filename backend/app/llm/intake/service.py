@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.domain.intake_next_question import (
@@ -30,14 +31,35 @@ QuestionRow = dict[str, Any]
 # Reserved criteria key holding required fields the user explicitly declined to answer.
 SKIPPED_FIELDS_KEY = "_skipped_fields"
 
+# Decode settings for criteria extraction. Named so ``ml/eval`` scores the same decode
+# production runs; changing one here changes both.
+INTAKE_PARSE_TEMPERATURE = 0.1
+INTAKE_PARSE_MAX_TOKENS = 800
 
-async def parse_user_input(
+
+@dataclass(frozen=True)
+class IntakePrompt:
+    """The extraction request, plus the derived context needed to score its reply."""
+
+    messages: list[dict[str, Any]] = field(default_factory=list)
+    question_keys: list[str] = field(default_factory=list)
+    required_fields: list[str] = field(default_factory=list)
+    previously_skipped: list[str] = field(default_factory=list)
+    criteria_for_prompt: dict[str, Any] = field(default_factory=dict)
+
+
+def build_intake_messages(
     *,
     user_input: str,
     current_criteria: dict[str, Any],
     questions: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Parse free-form user intake input into structured criteria and next-step hints."""
+) -> IntakePrompt:
+    """Build the criteria-extraction request sent for one intake turn.
+
+    Shared with ``ml/eval`` so the harness cannot score a prompt production never sends.
+    Constant content (schema, rules) stays ahead of variable content (the turn payload)
+    so a served prefix cache keeps hitting.
+    """
     question_keys, required_fields = extract_question_keys(questions)
     previously_skipped = [
         key for key in current_criteria.get(SKIPPED_FIELDS_KEY, []) if isinstance(key, str)
@@ -59,21 +81,42 @@ async def parse_user_input(
         },
         ensure_ascii=True,
     )
-    parsed_output = await generate_structured_output(
+    return IntakePrompt(
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
+        question_keys=question_keys,
+        required_fields=required_fields,
+        previously_skipped=previously_skipped,
+        criteria_for_prompt=criteria_for_prompt,
+    )
+
+
+async def parse_user_input(
+    *,
+    user_input: str,
+    current_criteria: dict[str, Any],
+    questions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Parse free-form user intake input into structured criteria and next-step hints."""
+    prompt = build_intake_messages(
+        user_input=user_input,
+        current_criteria=current_criteria,
+        questions=questions,
+    )
+    parsed_output = await generate_structured_output(
+        messages=prompt.messages,
         response_format=LlmParseModelOutput,
-        temperature=0.1,
-        max_tokens=800,
+        temperature=INTAKE_PARSE_TEMPERATURE,
+        max_tokens=INTAKE_PARSE_MAX_TOKENS,
     )
     return _build_intake_parse_result(
         parsed_output=parsed_output,
-        question_keys=question_keys,
-        current_criteria=criteria_for_prompt,
-        required_fields=required_fields,
-        previously_skipped=previously_skipped,
+        question_keys=prompt.question_keys,
+        current_criteria=prompt.criteria_for_prompt,
+        required_fields=prompt.required_fields,
+        previously_skipped=prompt.previously_skipped,
     )
 
 

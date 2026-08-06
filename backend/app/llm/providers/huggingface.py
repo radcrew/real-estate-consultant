@@ -40,6 +40,25 @@ logger = logging.getLogger(__name__)
 StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
 
 
+def structured_output_messages(
+    *,
+    messages: list[dict[str, Any]],
+    response_format: type[BaseModel],
+) -> list[dict[str, Any]]:
+    """Prepend the schema instruction the provider sends with every structured request.
+
+    Module-level so ``ml/eval`` can reproduce the exact request without reaching into
+    the provider or restating the instruction.
+    """
+    schema = response_format.model_json_schema()
+    instruction = (
+        "Respond with a single JSON object that validates against this JSON Schema. "
+        "Do not wrap the JSON in markdown fences or add commentary.\n"
+        f"{json.dumps(schema, ensure_ascii=True)}"
+    )
+    return [{"role": "system", "content": instruction}, *messages]
+
+
 class HuggingFaceProvider:
     """Provider client for Hugging Face OpenAI-compatible chat completions."""
 
@@ -123,13 +142,10 @@ class HuggingFaceProvider:
         messages: list[dict[str, Any]],
         response_format: type[BaseModel],
     ) -> list[dict[str, Any]]:
-        schema = response_format.model_json_schema()
-        instruction = (
-            "Respond with a single JSON object that validates against this JSON Schema. "
-            "Do not wrap the JSON in markdown fences or add commentary.\n"
-            f"{json.dumps(schema, ensure_ascii=True)}"
+        return structured_output_messages(
+            messages=messages,
+            response_format=response_format,
         )
-        return [{"role": "system", "content": instruction}, *messages]
 
     async def generate_structured_output(
         self,
