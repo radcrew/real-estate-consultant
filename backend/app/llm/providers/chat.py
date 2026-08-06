@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Literal
+
+from fastapi import HTTPException
 
 from app.core.config import Settings
 from app.core.config import settings as app_settings
@@ -12,6 +15,12 @@ from app.llm.providers.huggingface import huggingface_provider
 from app.llm.providers.openrouter import openrouter_provider
 
 ChatProviderName = Literal["openrouter", "huggingface"]
+
+# Box-is-down signals: bad gateway, service unavailable, gateway timeout. Everything
+# else - auth, malformed request, a refusal - is a fault the fallback would repeat.
+_FALLBACK_STATUS = frozenset({502, 503, 504})
+
+logger = logging.getLogger(__name__)
 
 
 def resolve_chat_provider_name(*, config: Settings) -> ChatProviderName | None:
@@ -53,17 +62,39 @@ async def generate_structured_output(
     path uses ``beta.chat.completions.parse``, which assumes that vendor's structured
     output support rather than a generic ``/v1/chat/completions``.
     """
-    if (base_url or "").strip():
-        provider: ChatProvider = huggingface_provider
-    else:
-        provider = resolve_chat_provider(config=config)
-    return await provider.generate_structured_output(
+    pinned = bool((base_url or "").strip())
+    provider: ChatProvider = huggingface_provider if pinned else resolve_chat_provider(
+        config=config
+    )
+    try:
+        return await provider.generate_structured_output(
+            messages=messages,
+            response_format=response_format,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            include_schema_instruction=include_schema_instruction,
+            model=model,
+            base_url=base_url,
+            api_key=api_key,
+        )
+    except HTTPException as exc:
+        # A pinned endpoint is a single box we operate; the router is a managed service on
+        # the same protocol. When the box is unreachable, degrade to it rather than fail
+        # the turn. Only transport-level faults qualify: a 401 means the key is wrong and
+        # a 4xx means the request is wrong, and both should stay loud instead of being
+        # papered over by a silent, more expensive fallback.
+        if not pinned or exc.status_code not in _FALLBACK_STATUS:
+            raise
+        logger.warning(
+            "intake_endpoint_fallback",
+            extra={"status_code": exc.status_code, "pinned_model": model},
+        )
+
+    fallback = resolve_chat_provider(config=config)
+    return await fallback.generate_structured_output(
         messages=messages,
         response_format=response_format,
         temperature=temperature,
         max_tokens=max_tokens,
         include_schema_instruction=include_schema_instruction,
-        model=model,
-        base_url=base_url,
-        api_key=api_key,
     )

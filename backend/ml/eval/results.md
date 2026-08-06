@@ -53,7 +53,7 @@ Both local rows: full 52 turns (`--split all`), llama.cpp b10290, 6 threads, `--
 | **0.5b-lora-f16-local** | `qwen2.5-0.5b-instruct-intake-f16` | local llama.cpp | 52 | 1.000 | 0.955 | 0.894 | **0.923** | 0.857 | 0.882 | 0.714 | n/a | 1692 | 2598 |
 | **0.5b-lora-q4km-local** | `qwen2.5-0.5b-instruct-intake-q4_k_m` | local llama.cpp | 52 | 1.000 | 0.956 | 0.915 | **0.935** | 0.837 | 0.889 | 0.762 | n/a | **1262** | **1801** |
 | 0.5b-lora-q4km-imatrix | `…-q4_k_m-imatrix` | local llama.cpp | 52 | 1.000 | 0.932 | 0.872 | 0.901 | 0.805 | 0.889 | 0.762 | n/a | 1175 | 1555 |
-| `7b-router` | — | HF router | — | **blocked on credits** |||||||||
+| `7b-router` | — | HF router | — | **blocked on credits, see below** |||||||||
 
 **Next-question accuracy is not measured.** P1 removed `next_question.key` from the schema,
 so no model emits one and the runner scored only the 14 null-gold turns as correct — 0.269
@@ -178,6 +178,36 @@ is about Qwen2.5-0.5B's geometry, not about importance matrices in general.
 
 The pre-agreed `Q5_K_M` fallback is also unnecessary: there was no quantization regression
 to recover from in the first place.
+
+### The 7B row: attempted, still not measurable
+
+The router accepted **6 calls** and then returned 402 again. The key, the model id and the
+harness path are all fine — this is purely depleted credits, not a configuration problem.
+The runner aborted on the 402 rather than burning the remaining 47 turns, which is what
+`FATAL_STATUS` exists for.
+
+What came back, over 5 scored turns, **all of them `single-field`**:
+
+```
+| 7b-router (5 of 52, NOT a baseline) | 1.000 | prec 0.500 | rec 1.000 | F1 0.667 | val 0.800 | p50 1612 | p95 10985 |
+```
+
+**Do not put this in the table above and do not compare anything to it.** Five turns of the
+single easiest category says nothing about skip handling, corrections or unit ambiguity —
+and skip handling is where the tuned 0.5B is weakest, so the one comparison that matters is
+precisely the one this cannot make.
+
+Two things it does hint at, both to be confirmed rather than believed:
+
+- The 7B **also over-emits** — precision 0.500 on turns whose gold has one field. If that
+  holds across the full set, the tuned 0.5B's 0.956 is not merely competitive with the
+  incumbent, it is better at the specific thing this task needs.
+- The router has a **long latency tail**: p95 10985 ms against a p50 of 1612 ms, on five
+  requests. A warm local process does not do this. Worth quantifying properly, because a
+  rare eleven-second turn is a worse user experience than a slower median.
+
+Restoring credits or setting `OPENROUTER_API_KEY` is the only thing standing between here
+and a closed gate.
 
 ### What this does not settle
 

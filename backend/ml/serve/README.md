@@ -95,11 +95,14 @@ No code revert, which is why nothing about the URL or model id is hardcoded.
 
 ## Known gaps
 
-- **The box is a single point of failure.** `generate_structured_output` raises 503 rather
-  than degrading, so if it goes down intake goes down. The router is a cheap fallback —
-  same protocol, same client, one config value — but it is a deliberate build, not
-  something that happens automatically.
-- **Nothing monitors the box.** At minimum, alert on the systemd unit failing and on the
-  5xx rate from the reverse proxy.
+- **Nothing monitors the box.** Intake now degrades to the router on 502/503/504, so an
+  outage is survivable but **silent** — the only trace is a `intake_endpoint_fallback`
+  warning in the logs. Alert on that log line, on the systemd unit failing, and on the 5xx
+  rate from the reverse proxy. A box that has quietly been down for a week, with every
+  request going to the router at router prices, is the failure mode to watch for.
+- **The fallback is deliberately narrow.** Only transport faults trigger it. A 401 from a
+  wrong `--api-key`, or a 4xx from a malformed request, is raised rather than retried:
+  those would fail identically on the router, so retrying would double the cost and hide a
+  configuration error instead of surfacing it.
 - **Concurrency is untested under load.** `--parallel 1` is sized for an internal MVP.
   Measure two simultaneous requests before assuming a second user is free.
