@@ -71,6 +71,33 @@ Threads default to physical cores, `--parallel` to 1, and prefix caching is on. 
 choices decide what a latency number means, which is why they are in a script rather
 than in someone's shell history.
 
+## Generating training data
+
+```bash
+python -m ml.data.generate --count 2000
+```
+
+Writes `ml/data/train.jsonl` and `val.jsonl`, both gitignored. Labels are correct by
+construction: a criteria dict is chosen first, rendered into natural language, and kept
+as gold — there is no teacher to be wrong.
+
+**The set is built to teach precision, not recall.** The P2 baseline put the stock 0.5B
+at precision 0.15 with recall 1.0, so it already finds every field; what it cannot do is
+stop. About a third of examples therefore have empty `extracted` (noise, greetings, pure
+skips, confirmations), the average example names fewer than two fields, and no example
+ever lists a key in both `extracted` and `skipped_fields`.
+
+Every row is validated before it is written, and any row whose `(user_input,
+current_criteria)` matches the eval set is dropped, so training never contains a turn we
+score on. Prompts come from `build_intake_messages`, so the training text is what the
+model will see at serving time.
+
+Two limits worth knowing. Phrasings are templated, so the set is stylistically narrower
+than real user input — the eval set is hand-written prose precisely so it does not
+reward overfitting to these templates. And skip and noise inputs come from fixed phrase
+lists, so they deduplicate hard; raising `--count` past a few thousand mostly adds
+extraction examples rather than negative ones.
+
 ## Running the eval
 
 From `backend/`, with `.env` present (the settings module loads it at import):
