@@ -98,6 +98,40 @@ reward overfitting to these templates. And skip and noise inputs come from fixed
 lists, so they deduplicate hard; raising `--count` past a few thousand mostly adds
 extraction examples rather than negative ones.
 
+## Training the adapter
+
+```bash
+python -m ml.train.train_lora --smoke     # 6 steps, verifies the pipeline
+python -m ml.train.train_lora             # the real run
+python -m ml.train.merge                  # fold the adapter into the base weights
+```
+
+Loss is on completion tokens only — the prompt is masked to `-100`. On the current set
+that means **3.7% of tokens are supervised**; training on the rest would spend the
+gradient teaching the model to recite a schema it is handed at inference time anyway.
+
+The chat template comes from the tokenizer. The encoder asserts the prompt is a strict
+prefix of the full sequence and drops any example where it is not, because a mask in the
+wrong place trains on nothing useful and fails silently.
+
+### Cost on CPU, measured
+
+On an i7-10750H (6 physical cores) the smoke run came in at **~196 s per optimizer step**
+at batch 1 × grad-accum 8, so roughly 24.5 s per example. A full 2-epoch run over 1800
+examples is about **24 hours**.
+
+That is the number open decision 2 needs. The options, in order of how much they cost you:
+
+| Path | Time | Note |
+|---|---|---|
+| Free hosted GPU notebook | minutes | A GPU you do not own, provision or pay for, used once, offline |
+| CPU, full set, 2 epochs | ~24 h | Run it overnight; nothing else needs the machine |
+| CPU, 600 examples, 1 epoch | ~4 h | Enough to see whether the adapter moves the metrics at all |
+
+`bf16` is used on CUDA and `fp32` on CPU. The plan specifies bf16, which is right on a
+GPU; this CPU has neither AVX512-BF16 nor AMX, so bf16 would be emulated and cost speed
+rather than save it.
+
 ## Running the eval
 
 From `backend/`, with `.env` present (the settings module loads it at import):
