@@ -399,3 +399,51 @@ class TestIntakeOverrideWiring:
                 welcome_message="Welcome", key="location", type="location"
             )
         assert "base_url" not in mock_gen.call_args.kwargs
+
+
+class TestSkipClearedWhenAnswered:
+    """A required field is answered, skipped, or missing - never two at once."""
+
+    def _call(self, parsed, **kw):
+        return _build_intake_parse_result(
+            parsed_output=parsed,
+            question_keys=kw.get("question_keys", ["location", "budget"]),
+            current_criteria=kw.get("current_criteria", {}),
+            required_fields=kw.get("required_fields", ["location", "budget"]),
+            previously_skipped=kw.get("previously_skipped", []),
+        )
+
+    def test_answering_a_skipped_field_clears_the_skip(self):
+        # Previously this stayed skipped forever: the union carried it across every
+        # later turn, so the answer the user gave was ignored by the progress state.
+        parsed = _parsed_output(extracted={"location": "Austin"})
+        result = self._call(parsed, previously_skipped=["location"])
+        assert result["skipped_fields"] == []
+        assert result["merged_criteria"]["location"] == "Austin"
+        assert SKIPPED_FIELDS_KEY not in result["merged_criteria"]
+
+    def test_a_field_answered_in_an_earlier_turn_is_not_skipped(self):
+        parsed = _parsed_output(skipped=["location"])
+        result = self._call(parsed, current_criteria={"location": "Austin"})
+        assert "location" not in result["skipped_fields"]
+
+    def test_unanswered_skips_still_carry_forward(self):
+        parsed = _parsed_output(extracted={"location": "Austin"})
+        result = self._call(parsed, previously_skipped=["location", "budget"])
+        assert result["skipped_fields"] == ["budget"]
+
+    def test_a_key_never_appears_in_both_skipped_and_missing(self):
+        parsed = _parsed_output(extracted={"location": "Austin"})
+        result = self._call(parsed, previously_skipped=["location"])
+        assert not set(result["skipped_fields"]) & set(result["missing_fields"])
+
+    def test_answering_a_skipped_field_makes_the_session_completable(self):
+        parsed = _parsed_output(extracted={"budget": {"max": 100}})
+        result = self._call(
+            parsed,
+            current_criteria={"location": "Austin"},
+            previously_skipped=["budget"],
+        )
+        assert result["skipped_fields"] == []
+        assert result["missing_fields"] == []
+        assert result["is_complete"] is True

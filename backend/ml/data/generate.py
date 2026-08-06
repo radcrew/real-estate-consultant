@@ -65,16 +65,46 @@ LISTING_TEMPLATES = {
     "Sale": ["we want to buy", "looking to purchase", "buying, not leasing", "for sale"],
     "Lease": ["we want to lease", "looking to rent", "leasing", "for lease"],
 }
+# A refusal and a piece of noise both produce empty ``extracted``; the only signal
+# separating them is phrasing. The first pass used 14 refusal strings and the model
+# learned the strings, not the concept - it answered four of ten eval refusals by
+# re-asking the very field being refused. Breadth here is the fix, so these are
+# deliberately long and varied in register.
 SKIP_PHRASES = [
-    "skip", "pass", "no preference", "doesn't matter", "let's move on", "next question",
-    "I don't care", "not important", "skip that one", "I'd rather not say",
-    "move on please", "no strong feelings there", "whatever works", "not fussed",
+    "skip", "skip it", "skip this", "skip that one", "skip this one", "just skip it",
+    "pass", "pass on that", "I'll pass", "next", "next question", "next one please",
+    "move on", "let's move on", "move on please", "can we move on", "moving on",
+    "no preference", "no strong preference", "no strong feelings there", "no opinion",
+    "doesn't matter", "does not matter", "doesn't really matter", "it doesn't matter to me",
+    "I don't care", "don't care", "I really don't mind", "I don't mind", "not fussed",
+    "not important", "that's not important", "not important right now", "unimportant",
+    "whatever works", "anything works", "any is fine", "either is fine", "open to anything",
+    "I'd rather not say", "prefer not to answer", "rather not answer that",
+    "I don't want to answer that", "not answering that", "leave that one",
+    "leave it blank", "leave that empty", "no answer", "n/a", "not applicable",
+    "flexible on that", "we're flexible there", "we're open on that", "undecided",
+    "haven't decided", "not sure yet", "no idea yet", "TBD", "come back to that",
+    "ask me later", "later", "I'll figure that out later", "no requirement there",
 ]
 NOISE_INPUTS = [
-    "", "   ", "hi", "hello there", "hey", "what can you help me with?",
-    "how does this work?", "asdkjfh", "???", "thanks", "ok", "sounds good",
-    "got it", "cool", "sure", "yes", "that's everything", "nothing else",
+    "", "   ", "\n", "hi", "hello there", "hey", "hey there", "good morning",
+    "what can you help me with?", "how does this work?", "what do you need from me?",
+    "who are you?", "are you a bot?", "can you explain?", "what happens next?",
+    "asdkjfh", "???", "...", "test", "aaa", "qwerty",
+    "thanks", "thank you", "ok", "okay", "alright", "sounds good", "got it",
+    "cool", "nice", "sure", "yes", "yep", "yeah", "no worries", "perfect",
+    "that's everything", "nothing else", "that's all", "done", "all set",
 ]
+
+# Labels a user would plausibly use when naming a field they want to skip.
+FIELD_LABELS = {
+    "location": ["location", "city", "area"],
+    "property_type": ["property type", "space type", "building type"],
+    "listing_type": ["buy or lease", "sale or lease", "listing type"],
+    "price": ["budget", "price", "price range"],
+    "size_sqft": ["size", "square footage", "size question"],
+    "loading_docks": ["loading docks", "docks"],
+}
 
 
 def _fmt_money(value: int) -> str:
@@ -168,10 +198,12 @@ def make_example(
     ordered_required: list[str],
 ) -> dict[str, Any]:
     """One training example. Shape is chosen first, so sparsity is controlled, not incidental."""
-    # Weighted so nearly half of the set teaches restraint rather than extraction.
+    # Weighted so over half the set teaches restraint rather than extraction. `skip` is
+    # over-weighted against its target share because refusal phrasings collapse under
+    # deduplication far harder than extraction phrasings do.
     shape = random.choices(
-        ["single", "multi", "skip", "noise", "carried-skip", "complete"],
-        weights=[30, 22, 20, 14, 8, 6],
+        ["single", "multi", "skip", "noise", "carried-skip", "complete", "answer-and-skip"],
+        weights=[22, 18, 28, 14, 7, 4, 7],
     )[0]
 
     prior: dict[str, Any] = {}
@@ -197,6 +229,29 @@ def make_example(
             target = random.choice(required)
         skipped = [target]
         user_input = random.choice(SKIP_PHRASES)
+    elif shape == "answer-and-skip":
+        # One message that answers one field and refuses another. The first pass had no
+        # example of this, and the eval turn that needs it failed: every skip example
+        # had empty `extracted`, so answering and skipping looked mutually exclusive.
+        answerable = [k for k in remaining if k in required] or remaining
+        answer_key = random.choice(answerable)
+        extracted[answer_key], fragment = _field_fragment(answer_key)
+        candidates = [
+            k for k in required if k not in prior and k != answer_key
+        ]
+        if candidates:
+            skip_key = random.choice(candidates)
+            skipped = [skip_key]
+            label = random.choice(FIELD_LABELS[skip_key])
+            refusal = random.choice([
+                f"but skip the {label}", f"but let's skip {label}",
+                f"no preference on {label} though", f"{label} doesn't matter",
+                f"and I'd rather not answer the {label} question",
+                f"leave {label} blank", f"flexible on {label}",
+            ])
+            user_input = f"{fragment}, {refusal}"
+        else:
+            user_input = fragment
     elif shape == "carried-skip":
         carried = random.sample(required, random.randint(1, 2))
         skipped = list(carried)

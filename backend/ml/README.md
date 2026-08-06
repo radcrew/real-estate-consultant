@@ -112,11 +112,28 @@ current_criteria)` matches the eval set is dropped, so training never contains a
 score on. Prompts come from `build_intake_messages`, so the training text is what the
 model will see at serving time.
 
+### Why the refusal phrasings are so varied
+
+A refusal and a piece of noise both produce empty `extracted`. The only thing separating
+them is how the message is worded, so that vocabulary is the entire training signal for
+skip detection.
+
+The first pass used 14 refusal strings and the model learned the strings rather than the
+concept: it missed four of ten eval refusals, and in each case returned empty `extracted`
+and then **re-asked the very field being refused** — it had classified the refusal as
+noise. The list is now ~60 phrasings across registers (blunt, polite, deferring,
+indifferent), and `skip` is over-weighted because refusal phrasings collapse under
+deduplication far harder than extraction phrasings do.
+
+The `answer-and-skip` shape exists for the same reason. Every skip example previously had
+empty `extracted`, which made answering and refusing look mutually exclusive; a message
+like *"industrial, but skip the budget question"* had no analogue in training and failed.
+
 Two limits worth knowing. Phrasings are templated, so the set is stylistically narrower
 than real user input — the eval set is hand-written prose precisely so it does not
-reward overfitting to these templates. And skip and noise inputs come from fixed phrase
-lists, so they deduplicate hard; raising `--count` past a few thousand mostly adds
-extraction examples rather than negative ones.
+reward overfitting to these templates. And the fixed phrase lists still deduplicate, so
+raising `--count` past a few thousand mostly adds extraction examples rather than
+negative ones.
 
 ## Training the adapter
 

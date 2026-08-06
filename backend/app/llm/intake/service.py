@@ -221,8 +221,13 @@ def _build_intake_parse_result(
     }
     merged_criteria = {**current_criteria, **extracted}
 
+    # Union carries a skip forward across turns, so the user is never re-asked. Then
+    # subtract what is answered: a field the user has since filled in is no longer
+    # skipped, and without this it stays marked skipped for the life of the session.
+    # A required field is answered, skipped, or missing - never two of those at once.
     skipped_fields = sorted(
-        {*previously_skipped, *parsed_output.skipped_fields} & set(required_fields),
+        ({*previously_skipped, *parsed_output.skipped_fields} & set(required_fields))
+        - set(merged_criteria),
     )
 
     missing_fields = merge_missing_fields(
