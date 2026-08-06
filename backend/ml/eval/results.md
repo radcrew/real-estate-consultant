@@ -98,6 +98,29 @@ than recall of a memorised set.
 Field metrics improved alongside: F1 0.904 → 0.926, precision 0.899 → 0.931, raw JSON
 validity 0.990 → 1.000, and `unit-ambiguity` F1 0.917 → 1.000. Latency is unchanged.
 
+### Dev vs holdout: field metrics generalise, skip is underpowered
+
+v2's data design was derived by inspecting **dev** failures, so scoring the splits apart
+asks whether that design was fitted to the turns inspected.
+
+| Split | Turns | Field F1 | Value acc | Skip prec | Skip recall |
+|---|---|---|---|---|---|
+| dev | 76 | 0.938 | 0.774 | 0.833 | 0.833 |
+| holdout | 26 | 0.903 | **0.964** | 0.636 | 0.636 |
+
+Field extraction generalises: F1 0.938 against 0.903, and value accuracy is *higher* on
+holdout, which is the opposite of what fitting to dev would produce.
+
+**Skip recall drops 0.833 to 0.636, and the honest reading is "cannot tell".** The holdout
+contains 9 skip-bearing turns, about 11 gold skips. 7 of 11 has a 95% interval of roughly
+0.35–0.87, which covers the dev rate — so this is not evidence of a real gap, and equally
+not evidence against one. **The holdout is too small to resolve skip at all**, which is the
+same measurement problem r2 was created to fix, one level down.
+
+Do not act on the point estimate. Either grow the holdout's skip share before trusting a
+split comparison for this metric, or judge skip on the full set and accept that no
+held-out check of it exists yet.
+
 ### The remaining weakness is compound refusals
 
 `answer-and-skip` — one message that answers one field and refuses another, e.g.
