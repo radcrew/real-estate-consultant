@@ -268,6 +268,39 @@ class TestParseUserInput:
         assert "budget" in result["missing_fields"]
         assert result["is_complete"] is False
 
+    async def test_does_not_ask_the_provider_for_a_second_schema_copy(self):
+        mock_output = _parsed_output()
+        with patch(
+            "app.llm.intake.service.generate_structured_output",
+            new_callable=AsyncMock,
+            return_value=mock_output,
+        ) as mock_gen:
+            await parse_user_input(
+                user_input="I want to live in Austin",
+                current_criteria={},
+                questions=self._QUESTIONS,
+            )
+        assert mock_gen.call_args.kwargs["include_schema_instruction"] is False
+
+    async def test_constant_content_precedes_the_variable_turn_payload(self):
+        # A served prefix cache only hits while the schema and rules stay ahead of the
+        # per-turn payload. Reordering these silently costs prompt-processing time.
+        mock_output = _parsed_output()
+        with patch(
+            "app.llm.intake.service.generate_structured_output",
+            new_callable=AsyncMock,
+            return_value=mock_output,
+        ) as mock_gen:
+            await parse_user_input(
+                user_input="I want to live in Austin",
+                current_criteria={},
+                questions=self._QUESTIONS,
+            )
+        messages = mock_gen.call_args.kwargs["messages"]
+        assert [m["role"] for m in messages] == ["system", "user"]
+        assert "JSON Schema" in messages[0]["content"]
+        assert "I want to live in Austin" in messages[1]["content"]
+
     async def test_previously_skipped_excluded_from_criteria_for_prompt(self):
         mock_output = _parsed_output()
         with patch(

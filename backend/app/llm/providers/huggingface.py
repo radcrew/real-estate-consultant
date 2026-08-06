@@ -154,6 +154,7 @@ class HuggingFaceProvider:
         response_format: type[StructuredOutputT],
         temperature: float,
         max_tokens: int,
+        include_schema_instruction: bool = True,
     ) -> StructuredOutputT:
         """Request typed JSON from Hugging Face and validate with Pydantic.
 
@@ -161,13 +162,17 @@ class HuggingFaceProvider:
         outputs: HF Inference Providers often return 422
         ``grammar is not valid: failed to compile grammar`` depending on which
         upstream provider the router selects for the same model id.
+
+        ``include_schema_instruction`` False leaves ``messages`` untouched, for callers
+        whose system prompt already carries the schema.
         """
         if not self.settings.hf_token.strip():
             raise_hf_api_key_not_configured()
 
-        request_messages = self._structured_messages(
-            messages=messages,
-            response_format=response_format,
+        request_messages = (
+            self._structured_messages(messages=messages, response_format=response_format)
+            if include_schema_instruction
+            else messages
         )
         start = time.perf_counter()
         try:

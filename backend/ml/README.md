@@ -55,7 +55,7 @@ Useful flags:
 | `--split holdout` | Score the slice reserved from training |
 | `--category skip` | Isolate one behaviour while iterating |
 | `--concurrency N` | Leave at 1 for CPU serving; parallel requests contend for cores |
-| `--no-duplicate-schema` | Drop the provider's second schema copy (measures P1) |
+| `--duplicate-schema` | Re-add the provider's schema copy, as intake sent before P1 |
 | `--no-json-mode` | For endpoints that reject `response_format` |
 | `--no-next-question` | Score next-question accuracy as n/a once the key leaves the schema |
 

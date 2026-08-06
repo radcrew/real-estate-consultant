@@ -87,7 +87,8 @@ async def run_turn(
     )
     messages = prompt.messages
     if duplicate_schema:
-        # What production sends today: the provider prepends a second schema copy.
+        # Pre-P1 behaviour: the provider prepended a second schema copy. Intake now
+        # passes include_schema_instruction=False, so this is off by default.
         messages = structured_output_messages(
             messages=messages,
             response_format=LlmParseModelOutput,
@@ -227,9 +228,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument(
-        "--no-duplicate-schema",
+        "--duplicate-schema",
         action="store_true",
-        help="Skip the provider's second schema copy (measures the P1 prompt slimming)",
+        help="Also prepend the provider's schema copy, as intake did before P1",
     )
     parser.add_argument(
         "--no-json-mode",
@@ -272,7 +273,7 @@ async def main_async(argv: list[str] | None = None) -> int:
         questions=questions,
         model=args.model,
         concurrency=args.concurrency,
-        duplicate_schema=not args.no_duplicate_schema,
+        duplicate_schema=args.duplicate_schema,
         json_mode=not args.no_json_mode,
         score_next_question=not args.no_next_question,
     )
@@ -292,7 +293,7 @@ async def main_async(argv: list[str] | None = None) -> int:
                 "model": args.model,
                 "base_url": args.base_url,
                 "split": args.split,
-                "duplicate_schema": not args.no_duplicate_schema,
+                "duplicate_schema": args.duplicate_schema,
                 "json_mode": not args.no_json_mode,
                 "temperature": INTAKE_PARSE_TEMPERATURE,
                 "max_tokens": INTAKE_PARSE_MAX_TOKENS,

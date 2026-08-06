@@ -80,6 +80,26 @@ class TestHuggingFaceProvider:
         assert kwargs["messages"][0]["role"] == "system"
         assert "JSON Schema" in kwargs["messages"][0]["content"]
 
+    async def test_schema_instruction_can_be_suppressed(self):
+        # Intake's system prompt already carries the schema; a second copy is ~1k
+        # characters of duplicate prompt on every turn.
+        provider = _make_provider()
+        completion = MagicMock()
+        completion.usage = MagicMock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
+        completion.choices = [
+            MagicMock(message=MagicMock(content='{"text":"hello"}', refusal=None))
+        ]
+        provider.client.chat.completions.create = AsyncMock(return_value=completion)
+        await provider.generate_structured_output(
+            messages=_MESSAGES,
+            response_format=_Schema,
+            temperature=0.5,
+            max_tokens=100,
+            include_schema_instruction=False,
+        )
+        kwargs = provider.client.chat.completions.create.await_args.kwargs
+        assert kwargs["messages"] == _MESSAGES
+
     async def test_retries_without_json_object_when_unsupported(self):
         provider = _make_provider()
         completion = MagicMock()

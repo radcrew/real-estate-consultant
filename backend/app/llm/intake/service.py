@@ -110,6 +110,9 @@ async def parse_user_input(
         response_format=LlmParseModelOutput,
         temperature=INTAKE_PARSE_TEMPERATURE,
         max_tokens=INTAKE_PARSE_MAX_TOKENS,
+        # The system prompt already carries the intake schema; a second copy of the
+        # Pydantic schema would be ~1k characters of duplicate prompt per turn.
+        include_schema_instruction=False,
     )
     return _build_intake_parse_result(
         parsed_output=parsed_output,

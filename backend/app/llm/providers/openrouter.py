@@ -107,8 +107,14 @@ class OpenRouterProvider:
         response_format: type[StructuredOutputT],
         temperature: float,
         max_tokens: int,
+        include_schema_instruction: bool = True,
     ) -> StructuredOutputT:
-        """Request a typed structured output from OpenRouter."""
+        """Request a typed structured output from OpenRouter.
+
+        ``include_schema_instruction`` is accepted for protocol parity and unused:
+        ``beta.chat.completions.parse`` sends the schema natively, so this provider
+        never prepends a copy to ``messages``.
+        """
         if not self.settings.openrouter_api_key.strip():
             raise_openrouter_api_key_not_configured()
 

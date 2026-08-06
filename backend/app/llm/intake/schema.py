@@ -5,10 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pydantic import TypeAdapter
-
 from app.repositories.questions import sorted_intake_questions
-from app.schemas.llm_intake_parse import LlmParseNextQuestion
 
 QuestionRow = dict[str, Any]
 
@@ -115,6 +112,10 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
         if (key := _question_key(row))
     }
 
+    # Only these three survive the backend. ``missing_fields`` is recomputed by
+    # ``merge_missing_fields``, ``is_complete`` is derived from it, and
+    # ``next_question.key`` is re-anchored by ``resolve_next_intake_question`` — so
+    # asking the model for any of them buys prompt tokens and nothing else.
     return {
         "type": "object",
         "additionalProperties": False,
@@ -128,26 +129,29 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
                 ),
                 "properties": extracted_properties,
             },
-            "missing_fields": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Required criteria keys still missing and worth asking about.",
-            },
             "skipped_fields": {
                 "type": "array",
                 "items": {"type": "string"},
                 "description": (
-                    "Required criteria keys the user explicitly declined to answer "
-                    "(e.g. 'no preference', 'doesn't matter', 'skip that'). "
+                    "Criteria keys the user explicitly declined to answer. "
                     "Never ask about these again."
                 ),
             },
-            "next_question": TypeAdapter(LlmParseNextQuestion).json_schema(),
-            "is_complete": {"type": "boolean"},
+            "next_question": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "text": {
+                        "type": ["string", "null"],
+                        "description": (
+                            "Conversational question for the first unanswered, "
+                            "non-skipped field. Null when none remain."
+                        ),
+                    },
+                },
+            },
         },
-        "required": [
-            "extracted", "missing_fields", "skipped_fields", "next_question", "is_complete",
-        ],
+        "required": ["extracted", "skipped_fields", "next_question"],
     }
 
 

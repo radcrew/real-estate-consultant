@@ -22,6 +22,25 @@ disagreeing with them in prose, only for extracting different values.
 - `next_question_key` is the first required key that is neither answered nor skipped, by
   `order_index`, and `null` once none remain.
 
+## Prompt size (P1)
+
+Measured with `ml/eval/questions.json` (6 questions) on a turn with empty criteria.
+Characters, not tokens — no tokenizer is installed, and P2's runs report exact
+`prompt_tokens` from the endpoint.
+
+| Prompt | Chars |
+|---|---|
+| Before: intake system + user | 4975 |
+| Before: **what production sent**, incl. the provider's duplicate schema | **6022** |
+| After P1 | **3983** |
+
+A 33.9% reduction against what production actually sent. Three changes, roughly equal
+thirds: dropping `missing_fields` and `is_complete` from the schema, reducing
+`next_question` to `text` alone, and suppressing the provider's second schema copy.
+
+Every baseline below is measured on the post-P1 prompt, since P1 landed before any row
+was recorded. Use `--duplicate-schema` to reproduce the pre-P1 request.
+
 ## Baselines
 
 No rows yet. P2 fills these in.
@@ -41,7 +60,6 @@ Later phases add rows rather than editing existing ones:
 
 | Label | What it establishes |
 |---|---|
-| `7b-router-slimmed` | What P1's prompt slimming changed for the incumbent |
 | `0.5b-q4km-grammar` | What constrained decoding recovers |
 | `0.5b-lora-bf16` | Whether fine-tuning beat the stock model |
 | `0.5b-lora-q4km-imatrix` | The artifact that would actually ship |

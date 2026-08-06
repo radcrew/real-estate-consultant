@@ -41,6 +41,7 @@ async def generate_structured_output(
     temperature: float,
     max_tokens: int,
     config: Settings | None = None,
+    include_schema_instruction: bool = True,
 ) -> StructuredOutputT:
     """Structured chat completion via the configured provider (OpenRouter preferred)."""
     provider = resolve_chat_provider(config=config)
@@ -49,4 +50,5 @@ async def generate_structured_output(
         response_format=response_format,
         temperature=temperature,
         max_tokens=max_tokens,
+        include_schema_instruction=include_schema_instruction,
     )

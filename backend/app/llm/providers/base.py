@@ -19,8 +19,13 @@ class ChatProvider(Protocol):
         response_format: type[StructuredOutputT],
         temperature: float,
         max_tokens: int,
+        include_schema_instruction: bool = True,
     ) -> StructuredOutputT:
-        """Return a typed structured completion for the given messages."""
+        """Return a typed structured completion for the given messages.
+
+        Set ``include_schema_instruction`` False when ``messages`` already carries the
+        schema, so the provider does not prepend a second copy of it.
+        """
         ...
 
 
