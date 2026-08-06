@@ -10,12 +10,15 @@ that decides whether it ships.
 
 ```
 ml/
-  eval/       # dataset, questions, metrics, runner, results table   ← P0 (this)
+  eval/       # dataset, questions, metrics, runner, results table   ← P0
+  quantize/   # fetch, convert and quantize into GGUFs               ← P2, P6
+  serve/      # llama-server flags                                   ← P2, P8
   data/       # training-set generation; generated JSONL gitignored  ← P4
   train/      # LoRA config and entry point                          ← P5
-  quantize/   # imatrix + llama-quantize recipe                      ← P6
-  serve/      # llama-server flags, systemd unit, grammar files      ← P8
 ```
+
+Binaries, weights and GGUFs live in `<repo>/.local/`, which is gitignored. Nothing
+multi-gigabyte belongs in this tree — `ml/quantize` rebuilds all of it.
 
 `ml/` is listed in `.vercelignore`, so none of it is uploaded to the serverless
 function. It lives under `backend/` anyway so the harness can
@@ -26,6 +29,47 @@ Tests live in `backend/tests/ml/`, because `testpaths = ["tests"]` means pytest 
 collects anything under `ml/`.
 
 Weights, GGUFs and generated datasets go to the Hub or object storage, never into git.
+
+## Local setup
+
+Two things live outside the venv, both in `<repo>/.local/`:
+
+1. **llama.cpp binaries** — download the release zip for your platform from
+   `ggml-org/llama.cpp` and unzip into `.local/bin/`. On an AVX2 CPU with no AVX-512,
+   the plain `bin-win-cpu-x64` build is correct; it dispatches at runtime.
+2. **Model artifacts** — `.local/models/`, produced by the script below.
+
+The conversion and training dependencies are an optional extra, never in
+`requirements.txt`, because Vercel installs from that file and anything in it ships:
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU build, not CUDA
+pip install -e ".[ml]"
+```
+
+## Building the GGUFs
+
+```bash
+python -m ml.quantize.build_gguf --model Qwen/Qwen2.5-0.5B-Instruct
+```
+
+Downloads the snapshot, converts to F16, and quantizes to Q4_K_M. Both artifacts are
+kept on purpose: F16 against Q4_K_M isolates what quantization alone costs, before
+fine-tuning is in the picture. Measuring the two together makes a regression
+unattributable to either.
+
+At P6, add `--imatrix path/to/imatrix.dat`, which also protects the embedding and output
+tensors at Q8_0. It is off for the stock baseline so that row measures plain Q4_K_M.
+
+## Serving locally
+
+```bash
+python -m ml.serve.serve_local --model qwen2.5-0.5b-instruct-q4_k_m.gguf
+```
+
+Threads default to physical cores, `--parallel` to 1, and prefix caching is on. Those
+choices decide what a latency number means, which is why they are in a script rather
+than in someone's shell history.
 
 ## Running the eval
 

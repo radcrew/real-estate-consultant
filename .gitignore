@@ -24,3 +24,7 @@ Thumbs.db
 
 # Claude Code local overrides (permissions, hooks) — not shared across clones
 .claude/settings.local.json
+
+# Local model tooling: llama.cpp binaries, weights, GGUFs. Multi-GB and rebuildable
+# from backend/ml/quantize — never committed.
+.local/
