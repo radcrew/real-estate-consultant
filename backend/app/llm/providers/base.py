@@ -20,11 +20,17 @@ class ChatProvider(Protocol):
         temperature: float,
         max_tokens: int,
         include_schema_instruction: bool = True,
+        model: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
     ) -> StructuredOutputT:
         """Return a typed structured completion for the given messages.
 
         Set ``include_schema_instruction`` False when ``messages`` already carries the
         schema, so the provider does not prepend a second copy of it.
+
+        ``model`` / ``base_url`` / ``api_key`` pin one task to another OpenAI-compatible
+        endpoint. All three unset means the provider's configured defaults.
         """
         ...
 

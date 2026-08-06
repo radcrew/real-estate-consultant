@@ -42,13 +42,28 @@ async def generate_structured_output(
     max_tokens: int,
     config: Settings | None = None,
     include_schema_instruction: bool = True,
+    model: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
 ) -> StructuredOutputT:
-    """Structured chat completion via the configured provider (OpenRouter preferred)."""
-    provider = resolve_chat_provider(config=config)
+    """Structured chat completion via the configured provider (OpenRouter preferred).
+
+    When ``base_url`` is supplied the call is pinned to that endpoint and routed through
+    the Hugging Face provider, which is the plain OpenAI-compatible client. OpenRouter's
+    path uses ``beta.chat.completions.parse``, which assumes that vendor's structured
+    output support rather than a generic ``/v1/chat/completions``.
+    """
+    if (base_url or "").strip():
+        provider: ChatProvider = huggingface_provider
+    else:
+        provider = resolve_chat_provider(config=config)
     return await provider.generate_structured_output(
         messages=messages,
         response_format=response_format,
         temperature=temperature,
         max_tokens=max_tokens,
         include_schema_instruction=include_schema_instruction,
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
     )

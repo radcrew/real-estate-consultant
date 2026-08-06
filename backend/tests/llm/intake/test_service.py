@@ -337,3 +337,65 @@ class TestParseUserInput:
             )
         # both required fields now filled
         assert result["is_complete"] is True
+
+
+class TestIntakeOverrideWiring:
+    """Only parse_user_input takes the pinned endpoint."""
+
+    _QUESTIONS = [
+        _q("location", "location", order=1, required=True),
+        _q("budget", "range", order=2, required=True),
+    ]
+
+    async def test_parse_passes_the_configured_override(self):
+        with patch(
+            "app.llm.intake.service.generate_structured_output",
+            new_callable=AsyncMock,
+            return_value=_parsed_output(),
+        ) as mock_gen, patch(
+            "app.llm.intake.service.settings"
+        ) as mock_settings:
+            mock_settings.intake_chat_override = ("qwen-intake", "http://box:8080/v1", "k")
+            await parse_user_input(
+                user_input="Austin",
+                current_criteria={},
+                questions=self._QUESTIONS,
+            )
+        kwargs = mock_gen.call_args.kwargs
+        assert kwargs["model"] == "qwen-intake"
+        assert kwargs["base_url"] == "http://box:8080/v1"
+        assert kwargs["api_key"] == "k"
+
+    async def test_parse_sends_no_override_when_unset(self):
+        with patch(
+            "app.llm.intake.service.generate_structured_output",
+            new_callable=AsyncMock,
+            return_value=_parsed_output(),
+        ) as mock_gen, patch(
+            "app.llm.intake.service.settings"
+        ) as mock_settings:
+            mock_settings.intake_chat_override = None
+            await parse_user_input(
+                user_input="Austin",
+                current_criteria={},
+                questions=self._QUESTIONS,
+            )
+        kwargs = mock_gen.call_args.kwargs
+        assert kwargs["model"] is None
+        assert kwargs["base_url"] is None
+        assert kwargs["api_key"] is None
+
+    async def test_opening_question_never_takes_the_override(self):
+        # A 0.5B pinned for extraction must never be asked to write prose.
+        with patch(
+            "app.llm.intake.service.generate_structured_output",
+            new_callable=AsyncMock,
+            return_value=LlmOpeningQuestionOutput(text="What are you looking for?"),
+        ) as mock_gen, patch(
+            "app.llm.intake.service.settings"
+        ) as mock_settings:
+            mock_settings.intake_chat_override = ("qwen-intake", "http://box:8080/v1", "k")
+            await generate_opening_question(
+                welcome_message="Welcome", key="location", type="location"
+            )
+        assert "base_url" not in mock_gen.call_args.kwargs

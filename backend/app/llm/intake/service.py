@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.core.config import settings
 from app.domain.intake_next_question import (
     find_question_row_by_key,
     first_question_row_in_missing,
@@ -105,6 +106,11 @@ async def parse_user_input(
         current_criteria=current_criteria,
         questions=questions,
     )
+    # Only this call site takes the override. generate_opening_question, fit and
+    # outreach stay on the configured default, so a small pinned model never writes prose.
+    override = settings.intake_chat_override
+    model, base_url, api_key = override if override else (None, None, None)
+
     parsed_output = await generate_structured_output(
         messages=prompt.messages,
         response_format=LlmParseModelOutput,
@@ -113,6 +119,9 @@ async def parse_user_input(
         # The system prompt already carries the intake schema; a second copy of the
         # Pydantic schema would be ~1k characters of duplicate prompt per turn.
         include_schema_instruction=False,
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
     )
     return _build_intake_parse_result(
         parsed_output=parsed_output,

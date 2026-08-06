@@ -23,6 +23,7 @@ def _make_provider(hf_token: str = "tok") -> HuggingFaceProvider:
     mock_settings.hf_model = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     mock_settings.hf_embedding_model = "sentence-transformers/all-MiniLM-L6-v2"
     mock_settings.hf_base_url = "https://router.huggingface.co/v1"
+    mock_settings.hf_embedding_base_url = "https://router.huggingface.co/v1"
     mock_settings.hf_input_cost_per_1m = 0.2
     mock_settings.hf_output_cost_per_1m = 0.2
     mock_client = AsyncMock()
@@ -79,6 +80,100 @@ class TestHuggingFaceProvider:
         assert kwargs["response_format"] == {"type": "json_object"}
         assert kwargs["messages"][0]["role"] == "system"
         assert "JSON Schema" in kwargs["messages"][0]["content"]
+
+    async def test_endpoint_override_uses_a_per_call_client(self):
+        provider = _make_provider()
+        completion = MagicMock()
+        completion.usage = MagicMock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
+        completion.choices = [
+            MagicMock(message=MagicMock(content='{"text":"hello"}', refusal=None))
+        ]
+        shared_create = AsyncMock(return_value=completion)
+        provider.client.chat.completions.create = shared_create
+
+        with patch("app.llm.providers.huggingface.AsyncOpenAI") as mock_openai:
+            mock_openai.return_value.chat.completions.create = AsyncMock(
+                return_value=completion
+            )
+            await provider.generate_structured_output(
+                messages=_MESSAGES,
+                response_format=_Schema,
+                temperature=0.5,
+                max_tokens=100,
+                model="qwen-intake",
+                base_url="http://box:8080/v1",
+                api_key="box-key",
+            )
+
+        # The shared client is bound to hf_base_url; the override must not leak into it.
+        shared_create.assert_not_awaited()
+        kwargs = mock_openai.call_args.kwargs
+        assert kwargs["base_url"] == "http://box:8080/v1"
+        assert kwargs["api_key"] == "box-key"
+
+    async def test_override_does_not_send_the_hf_token(self):
+        # The box gets its own credential; HF_TOKEN must never reach it.
+        provider = _make_provider(hf_token="secret-hf-token")
+        completion = MagicMock()
+        completion.usage = MagicMock(prompt_tokens=1, completion_tokens=1, total_tokens=2)
+        completion.choices = [
+            MagicMock(message=MagicMock(content='{"text":"hi"}', refusal=None))
+        ]
+        with patch("app.llm.providers.huggingface.AsyncOpenAI") as mock_openai:
+            mock_openai.return_value.chat.completions.create = AsyncMock(
+                return_value=completion
+            )
+            await provider.generate_structured_output(
+                messages=_MESSAGES,
+                response_format=_Schema,
+                temperature=0.5,
+                max_tokens=100,
+                model="qwen-intake",
+                base_url="http://box:8080/v1",
+                api_key="box-key",
+            )
+        assert mock_openai.call_args.kwargs["api_key"] != "secret-hf-token"
+
+    async def test_override_without_a_key_still_does_not_require_hf_token(self):
+        # A local llama-server may run without auth; that must not 503 on a missing HF key.
+        provider = _make_provider(hf_token="   ")
+        completion = MagicMock()
+        completion.usage = MagicMock(prompt_tokens=1, completion_tokens=1, total_tokens=2)
+        completion.choices = [
+            MagicMock(message=MagicMock(content='{"text":"hi"}', refusal=None))
+        ]
+        with patch("app.llm.providers.huggingface.AsyncOpenAI") as mock_openai:
+            mock_openai.return_value.chat.completions.create = AsyncMock(
+                return_value=completion
+            )
+            result = await provider.generate_structured_output(
+                messages=_MESSAGES,
+                response_format=_Schema,
+                temperature=0.5,
+                max_tokens=100,
+                model="qwen-intake",
+                base_url="http://127.0.0.1:8080/v1",
+            )
+        assert result.text == "hi"
+
+    async def test_no_override_uses_the_shared_client_and_configured_model(self):
+        provider = _make_provider()
+        completion = MagicMock()
+        completion.usage = MagicMock(prompt_tokens=10, completion_tokens=20, total_tokens=30)
+        completion.choices = [
+            MagicMock(message=MagicMock(content='{"text":"hello"}', refusal=None))
+        ]
+        provider.client.chat.completions.create = AsyncMock(return_value=completion)
+        with patch("app.llm.providers.huggingface.AsyncOpenAI") as mock_openai:
+            await provider.generate_structured_output(
+                messages=_MESSAGES,
+                response_format=_Schema,
+                temperature=0.5,
+                max_tokens=100,
+            )
+        mock_openai.assert_not_called()
+        kwargs = provider.client.chat.completions.create.await_args.kwargs
+        assert kwargs["model"] == "meta-llama/Meta-Llama-3.1-8B-Instruct"
 
     async def test_schema_instruction_can_be_suppressed(self):
         # Intake's system prompt already carries the schema; a second copy is ~1k
@@ -218,6 +313,13 @@ class TestHuggingFaceEmbed:
             "https://router.huggingface.co/hf-inference/models/"
             "sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction"
         )
+
+    async def test_embeddings_ignore_the_chat_base_url(self):
+        # Pointing chat at llama.cpp used to break embeddings: the URL was derived from
+        # hf_base_url, and llama.cpp does not implement feature-extraction.
+        provider = _make_provider()
+        provider.settings.hf_base_url = "http://box:8080/v1"
+        assert provider._feature_extraction_url().startswith("https://router.huggingface.co")
 
     async def test_success_returns_batch_vectors(self):
         provider = _make_provider()

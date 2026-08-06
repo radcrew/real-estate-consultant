@@ -48,9 +48,17 @@ Both local rows: full 52 turns (`--split all`), llama.cpp b10290, 6 threads, `--
 
 | Label | Model | Endpoint | Turns | Raw JSON valid | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | Next-q acc | p50 ms | p95 ms |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0.5b-f16-local | `qwen2.5-0.5b-instruct-f16` | local llama.cpp | 52 | 1.000 | 0.152 | 1.000 | 0.264 | 0.362 | 0.106 | 0.810 | 0.269 | 5102 | 6647 |
-| 0.5b-q4km-local | `qwen2.5-0.5b-instruct-q4_k_m` | local llama.cpp | 52 | 1.000 | 0.154 | 0.809 | 0.259 | 0.421 | 0.094 | 0.762 | 0.269 | 2843 | 4713 |
+| 0.5b-f16-local | `qwen2.5-0.5b-instruct-f16` | local llama.cpp | 52 | 1.000 | 0.152 | 1.000 | 0.264 | 0.362 | 0.106 | 0.810 | n/a | 5102 | 6647 |
+| 0.5b-q4km-local | `qwen2.5-0.5b-instruct-q4_k_m` | local llama.cpp | 52 | 1.000 | 0.154 | 0.809 | 0.259 | 0.421 | 0.094 | 0.762 | n/a | 2843 | 4713 |
+| **0.5b-lora-f16-local** | `qwen2.5-0.5b-instruct-intake-f16` | local llama.cpp | 52 | 1.000 | 0.955 | 0.894 | **0.923** | 0.857 | 0.882 | 0.714 | n/a | 1692 | 2598 |
+| **0.5b-lora-q4km-local** | `qwen2.5-0.5b-instruct-intake-q4_k_m` | local llama.cpp | 52 | 1.000 | 0.956 | 0.915 | **0.935** | 0.837 | 0.889 | 0.762 | n/a | **1262** | **1801** |
+| 0.5b-lora-q4km-imatrix | `…-q4_k_m-imatrix` | local llama.cpp | 52 | 1.000 | 0.932 | 0.872 | 0.901 | 0.805 | 0.889 | 0.762 | n/a | 1175 | 1555 |
 | `7b-router` | — | HF router | — | **blocked on credits** |||||||||
+
+**Next-question accuracy is not measured.** P1 removed `next_question.key` from the schema,
+so no model emits one and the runner scored only the 14 null-gold turns as correct — 0.269
+on every row, an artifact rather than a signal. Pass `--no-next-question` from here on;
+scoring the question *text* would need a different metric than exact match.
 
 ```
 python -m ml.quantize.build_gguf --model Qwen/Qwen2.5-0.5B-Instruct
@@ -108,6 +116,68 @@ Mean completion is 107 tokens against a 929-token prompt. A model that emitted o
 fields actually present would produce perhaps 30 tokens, which on the same hardware lands
 near 1 s. Precision and latency therefore share one root cause. Both are behavioural, which
 is what a LoRA is for, so P5 should improve accuracy and speed together.
+
+### The fine-tune fixes the over-emission, and the speed comes with it
+
+600 examples, 1 epoch, ~2.8 h on 6 CPU cores. Against the stock Q4 row:
+
+| | stock Q4 | LoRA Q4 |
+|---|---|---|
+| Field precision | 0.154 | **0.956** |
+| Field F1 | 0.259 | **0.935** |
+| Value accuracy | 0.421 | **0.837** |
+| Skip precision | 0.094 | **0.889** |
+| p50 | 2843 ms | **1262 ms** |
+
+Precision moved 0.15 → 0.96 while recall held, which is the whole thesis: the stock model
+found every field and could not stop, and the training set was built almost entirely to
+teach restraint. The **latency followed for free** — 2.3× faster than stock Q4 and 4× faster
+than stock F16, because a model that emits only the fields present writes far fewer tokens.
+Nothing about the serving configuration changed between those rows.
+
+Per category, the LoRA Q4 scores 1.000 on `single-field`, `correction`, `complete` and
+`previously-skipped`, and 0.895 on `multi-field`.
+
+**The weak spot is skip detection**: category F1 0.667, skip recall 0.600. The model
+usually gets the skip right when it acts, but misses four of ten refusals outright. That is
+the obvious target for the next data pass — `skip` was 13% of the training set after
+deduplication, against a design intent of 20%, because refusal phrasings come from a fixed
+list and collapse under dedup.
+
+### Quantization is still free after fine-tuning
+
+F1 0.923 at F16 against 0.935 at Q4_K_M — the quantized model scores marginally *higher*,
+which on 52 turns means the gap is noise. The pre-agreed fallback to `Q5_K_M` is not needed:
+there is no regression to recover. Q4_K_M is also 1.3× faster and 398 MB against 994 MB.
+
+### The importance matrix does not pay on this model
+
+Calibrated on 400 training examples (1.7 MB), ~50 min of `llama-imatrix` on 6 cores.
+Result: F1 **0.901 against 0.935** for the plain quant, value accuracy 0.805 against 0.837.
+Not an improvement, and if anything slightly worse.
+
+The reason is visible in the quantizer output. `llama-quantize` reports the same
+`quant size = 373.71 MiB (6.35 BPW)` with and without the imatrix, because bit allocation
+did not change — and it did not change because **144 of 290 tensors never reach `q4_K` at
+all**:
+
+```
+warning: blk.0.attn_output.weight - ncols 896 not divisible by 256
+         (required for type q4_K) -> falling back to q5_0
+```
+
+The 0.5B's 896-wide tensors are not divisible by the 256-element `q4_K` superblock, so half
+the model already sits at `q5_0`/`q6_K`. An imatrix steers value placement inside `q4_K`
+blocks; where there are no `q4_K` blocks, it has nothing to steer. `--token-embedding-type`
+and `--output-tensor-type` at `q8_0` likewise changed nothing, because the fallback had
+already promoted those tensors.
+
+**Ship the plain `Q4_K_M`.** The imatrix step costs an hour per build and buys nothing here.
+It is worth revisiting only on a model whose tensor shapes divide evenly — this conclusion
+is about Qwen2.5-0.5B's geometry, not about importance matrices in general.
+
+The pre-agreed `Q5_K_M` fallback is also unnecessary: there was no quantization regression
+to recover from in the first place.
 
 ### What this does not settle
 

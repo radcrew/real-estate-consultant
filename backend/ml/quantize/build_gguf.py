@@ -143,8 +143,12 @@ def main() -> int:
         return 1
 
     imatrix = Path(args.imatrix) if args.imatrix else None
+    # The suffix keeps the two rungs as separate artifacts. Without it an imatrix build
+    # silently overwrites the plain one, and a results row can no longer be traced to
+    # the file it was measured on.
+    suffix = "-imatrix" if imatrix is not None else ""
     for kind in quant_kinds:
-        target = out_dir / f"{stem}-{kind.lower()}.gguf"
+        target = out_dir / f"{stem}-{kind.lower()}{suffix}.gguf"
         run([str(quantize_exe), *quantize_flags(kind, imatrix), str(f16_path), str(target), kind])
 
     print("\nArtifacts:")
