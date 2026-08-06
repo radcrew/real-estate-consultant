@@ -4,13 +4,20 @@ Every row is one `ml/eval/run.py` invocation. **Record the command**, because a 
 only meaningful alongside the dataset revision, the split, and whether the duplicate
 schema copy and JSON mode were on.
 
-**Do not compare rows produced from different `questions.json` or `dataset.jsonl`
-revisions.** If either changes, previous rows are historical and a new table starts.
+**Rows from different `dataset.jsonl` revisions are not comparable and must not share a
+table.** When the dataset changes, previous rows become historical and a new table starts.
+
+## Dataset revisions
+
+| Rev | Turns | Notes |
+|---|---|---|
+| **r2 (current)** | 102 | skip 10 → 25, new `answer-and-skip` category, 26 holdout |
+| r1 | 52 | Original set. Rows below, kept for the conclusions they still support |
+
+r1's 10 skip turns meant skip recall could not resolve anything finer than 0.1, which was
+useless for judging a change aimed squarely at skip detection. That is why r2 exists.
 
 ## Conventions the gold labels assume
-
-The dataset encodes these so scoring is deterministic. A model is not penalised for
-disagreeing with them in prose, only for extracting different values.
 
 - A bare budget figure is an upper bound: "half a million" → `price.max = 500000`.
 - "at least N" sets `min`, "no more than N" / "under N" / "or less" sets `max`,
@@ -18,209 +25,167 @@ disagreeing with them in prose, only for extracting different values.
 - An exact size with no qualifier sets `min` and `max` to the same value.
 - `property_type` is a list even when one type is named.
 - "buy" → `listing_type: "Sale"`, "lease"/"rent" → `"Lease"`.
-- Answering a previously skipped field **clears** the skip rather than carrying it.
+- Answering a previously skipped field **clears** the skip.
 - `next_question_key` is the first required key that is neither answered nor skipped, by
   `order_index`, and `null` once none remain.
-
-## Prompt size (P1)
-
-Measured with `ml/eval/questions.json` (6 questions) on a turn with empty criteria.
-Characters, not tokens — no tokenizer is installed, and P2's runs report exact
-`prompt_tokens` from the endpoint.
-
-| Prompt | Chars |
-|---|---|
-| Before: intake system + user | 4975 |
-| Before: **what production sent**, incl. the provider's duplicate schema | **6022** |
-| After P1 | **3983** |
-
-A 33.9% reduction against what production actually sent. Three changes, roughly equal
-thirds: dropping `missing_fields` and `is_complete` from the schema, reducing
-`next_question` to `text` alone, and suppressing the provider's second schema copy.
-
-Every baseline below is measured on the post-P1 prompt, since P1 landed before any row
-was recorded. Use `--duplicate-schema` to reproduce the pre-P1 request.
-
-## Baselines
-
-Both local rows: full 52 turns (`--split all`), llama.cpp b10290, 6 threads, `--parallel 1`,
-`--cache-reuse 256`, on an i7-10750H (6 physical cores, AVX2, no AVX-512).
-
-| Label | Model | Endpoint | Turns | Raw JSON valid | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | Next-q acc | p50 ms | p95 ms |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0.5b-f16-local | `qwen2.5-0.5b-instruct-f16` | local llama.cpp | 52 | 1.000 | 0.152 | 1.000 | 0.264 | 0.362 | 0.106 | 0.810 | n/a | 5102 | 6647 |
-| 0.5b-q4km-local | `qwen2.5-0.5b-instruct-q4_k_m` | local llama.cpp | 52 | 1.000 | 0.154 | 0.809 | 0.259 | 0.421 | 0.094 | 0.762 | n/a | 2843 | 4713 |
-| **0.5b-lora-f16-local** | `qwen2.5-0.5b-instruct-intake-f16` | local llama.cpp | 52 | 1.000 | 0.955 | 0.894 | **0.923** | 0.857 | 0.882 | 0.714 | n/a | 1692 | 2598 |
-| **0.5b-lora-q4km-local** | `qwen2.5-0.5b-instruct-intake-q4_k_m` | local llama.cpp | 52 | 1.000 | 0.956 | 0.915 | **0.935** | 0.837 | 0.889 | 0.762 | n/a | **1262** | **1801** |
-| 0.5b-lora-q4km-imatrix | `…-q4_k_m-imatrix` | local llama.cpp | 52 | 1.000 | 0.932 | 0.872 | 0.901 | 0.805 | 0.889 | 0.762 | n/a | 1175 | 1555 |
-| `7b-router` | — | HF router | — | **blocked on credits, see below** |||||||||
+- Location gold contains exactly what the message states — a message naming only a city is
+  never labelled with a state.
 
 **Next-question accuracy is not measured.** P1 removed `next_question.key` from the schema,
-so no model emits one and the runner scored only the 14 null-gold turns as correct — 0.269
-on every row, an artifact rather than a signal. Pass `--no-next-question` from here on;
-scoring the question *text* would need a different metric than exact match.
+so no model emits one. Pass `--no-next-question`; scoring the question *text* would need a
+different metric than exact match.
 
-```
-python -m ml.quantize.build_gguf --model Qwen/Qwen2.5-0.5B-Instruct
-python -m ml.serve.serve_local --model qwen2.5-0.5b-instruct-{f16,q4_k_m}.gguf
-python -m ml.eval.run --label 0.5b-{f16,q4km}-local --split all \
-  --base-url http://127.0.0.1:8080/v1 --api-key local --model qwen2.5-0.5b-instruct-{f16,q4_k_m}
-```
+---
 
-Mean prompt tokens 929 on both rows, so the P1 slimming holds at the tokenizer level too.
-Artifact sizes, which run above the plan's estimates: F16 994 MB, Q4_K_M 398 MB.
-`llama-quantize` reported *144 of 290 tensors required fallback quantization* — the 0.5B's
-896-wide tensors do not divide evenly for every K-quant, so much of the model lands at
-q5_0/q6_K rather than q4_K. Q4_K_M on this model is closer to 6.35 bits per weight than to 4.
+## r2 — 102 turns
 
-### What quantization costs: nothing measurable
+llama.cpp b10290, 6 threads, `--parallel 1`, `--cache-reuse 256`, i7-10750H (6 physical
+cores, AVX2, no AVX-512). All rows `--split all --no-next-question`.
 
-Field F1 0.264 → 0.259 and skip recall 0.810 → 0.762 across 52 turns are well inside
-noise; value accuracy actually rose, 0.362 → 0.421, which is the same story from the other
-side. Raw JSON validity is 1.000 on both.
+| Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0.5b-stock-q4km | stock Q4_K_M | 102 | 1.000 | 0.143 | 0.841 | 0.244 | 0.392 | 0.110 | 0.830 | 2955 | 4085 |
+| 0.5b-lora-v1-q4km | LoRA v1 Q4_K_M | 102 | 0.990 | 0.899 | 0.909 | 0.904 | 0.825 | 0.848 | 0.596 | 1236 | 1716 |
+| **0.5b-lora-v2-q4km** | **LoRA v2 Q4_K_M** | 102 | **1.000** | **0.931** | **0.920** | **0.926** | **0.840** | 0.844 | **0.809** | 1271 | 1727 |
+| `7b-router` | the incumbent | — | **blocked on credits, see below** ||||||||
 
-**p50 halves, 5102 ms → 2843 ms**, for 398 MB of weights against 994 MB. That is the
-memory-bandwidth argument holding: generation reads the weights once per token, so
-throughput tracks bytes read. INT4 is the right call and costs nothing here.
-
-### The stock 0.5B is not usable for this task, at any precision
-
-Precision 0.15 against recall near 1.0 means it emits roughly six times more fields than it
-should. It is not extracting — it is echoing the schema. Every turn returns all six
-properties, nulls included, and stuffs `skipped_fields` with most of the required keys:
-
-```json
-// input: "I'm looking in Austin, Texas"   (gold: one field)
-{"extracted": {"location": "Austin, Texas", "property_type": ["Office","Retail"],
-               "listing_type": "Sale", "price": null, "size_sqft": null, "loading_docks": null},
- "skipped_fields": ["location","property_type","listing_type","price","size_sqft"],
- "next_question": null}
+```bash
+python -m ml.eval.run --label 0.5b-lora-v2-q4km --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v2-q4_k_m
 ```
 
-`skipped_fields` contains `location` while `extracted` answers it — self-contradictory in a
-single reply. On empty input it returns the *current criteria* as if freshly extracted, so
-it cannot tell "the user said nothing" from "the user repeated themselves". The `skip`
-category scores F1 0.036, the worst of the eight, which matters because skip handling is
-what the prompt spends most of its words on.
+### Skip recall cannot be read alone either
 
-### Grammar-constrained decoding would recover nothing here
+The stock model scores skip recall **0.830** — higher than tuned v1's 0.596. That is not
+skill. Its skip *precision* is **0.110**: it dumps most required keys into `skipped_fields`
+on every turn, so it "catches" refusals the way a stopped clock is right twice a day.
 
-Raw JSON validity is already **1.000** on both rows and no key fell outside the question set
-(`invented_keys_total` 0). A grammar enforces shape, and the shape is not what is broken —
-the model emits perfectly well-formed JSON that is semantically wrong. Worth adding as cheap
-insurance later, but it is not the fix, and any plan that leans on it is leaning on nothing.
+The pair is the story:
 
-### Latency is driven by over-emission, not by the prompt
-
-Mean completion is 107 tokens against a 929-token prompt. A model that emitted only the
-fields actually present would produce perhaps 30 tokens, which on the same hardware lands
-near 1 s. Precision and latency therefore share one root cause. Both are behavioural, which
-is what a LoRA is for, so P5 should improve accuracy and speed together.
-
-### The fine-tune fixes the over-emission, and the speed comes with it
-
-600 examples, 1 epoch, ~2.8 h on 6 CPU cores. Against the stock Q4 row:
-
-| | stock Q4 | LoRA Q4 |
+| | Skip precision | Skip recall |
 |---|---|---|
-| Field precision | 0.154 | **0.956** |
-| Field F1 | 0.259 | **0.935** |
-| Value accuracy | 0.421 | **0.837** |
-| Skip precision | 0.094 | **0.889** |
-| p50 | 2843 ms | **1262 ms** |
+| stock | 0.110 | 0.830 |
+| v1 | 0.848 | 0.596 |
+| **v2** | **0.844** | **0.809** |
 
-Precision moved 0.15 → 0.96 while recall held, which is the whole thesis: the stock model
-found every field and could not stop, and the training set was built almost entirely to
-teach restraint. The **latency followed for free** — 2.3× faster than stock Q4 and 4× faster
-than stock F16, because a model that emits only the fields present writes far fewer tokens.
-Nothing about the serving configuration changed between those rows.
+v2 reaches essentially the stock model's recall while keeping v1's precision — nearly 8×
+the precision at the same catch rate. This is the same lesson as field precision/recall:
+one number of a pair is never a verdict.
 
-Per category, the LoRA Q4 scores 1.000 on `single-field`, `correction`, `complete` and
-`previously-skipped`, and 0.895 on `multi-field`.
+### The v2 data pass worked, and why
 
-**The weak spot is skip detection**: category F1 0.667, skip recall 0.600. The model
-usually gets the skip right when it acts, but misses four of ten refusals outright. That is
-the obvious target for the next data pass — `skip` was 13% of the training set after
-deduplication, against a design intent of 20%, because refusal phrasings come from a fixed
-list and collapse under dedup.
+v1 missed four of ten r1 refusals, and on r2's 25 it recalled **0.520** in the `skip`
+category. The failure was legible: it returned empty `extracted` and then **re-asked the
+very field being refused**, i.e. it classified refusals as noise. Both shapes produce empty
+`extracted`, so wording is the only signal, and v1 trained on 14 fixed refusal strings —
+it learned the strings, not the category. `"skip"` worked; `"pass"` did not, from the same
+list.
 
-### Quantization is still free after fine-tuning
+v2 expanded the refusal vocabulary to ~60 phrasings across registers, over-weighted `skip`
+(12.6% → 18.9% of the set), and added an `answer-and-skip` shape. Result:
 
-F1 0.923 at F16 against 0.935 at Q4_K_M — the quantized model scores marginally *higher*,
-which on 52 turns means the gap is noise. The pre-agreed fallback to `Q5_K_M` is not needed:
-there is no regression to recover. Q4_K_M is also 1.3× faster and 398 MB against 994 MB.
+| Category | v1 skip recall | v2 skip recall |
+|---|---|---|
+| `skip` | 0.520 | **0.840** |
+| `previously-skipped` | 0.818 | **0.909** |
+| `answer-and-skip` | 0.000 | 0.200 |
+
+**The r2 eval turns deliberately use refusal phrasings absent from the training list**
+("surprise me", "meh", "we're negotiable on that"), so this measures generalisation rather
+than recall of a memorised set.
+
+Field metrics improved alongside: F1 0.904 → 0.926, precision 0.899 → 0.931, raw JSON
+validity 0.990 → 1.000, and `unit-ambiguity` F1 0.917 → 1.000. Latency is unchanged.
+
+### The remaining weakness is compound refusals
+
+`answer-and-skip` — one message that answers one field and refuses another, e.g.
+*"warehouse, and don't worry about the budget"* — sits at **0.200 skip recall**, 1 of 5.
+v1 scored 0.000, so the new shape helped, but it is far from solved at 9.5% of the training
+set. It is also only 5 eval turns, so the number is weak evidence either way; more turns
+and a larger share of that shape are the next pass.
+
+### The tuned model is 2.3× faster than stock
+
+p50 2955 ms → 1271 ms, with no serving change. A model that emits only the fields present
+writes far fewer tokens, and CPU generation is roughly linear in output length. Precision
+and latency are one problem, not two.
+
+---
+
+## r1 — 52 turns (historical)
+
+Superseded by r2. **Do not compare these rows to anything above.** They are retained
+because two conclusions were measured internally consistently within this revision and
+still hold.
+
+| Label | Turns | Field F1 | Value acc | p50 ms |
+|---|---|---|---|---|
+| 0.5b-f16-local | 52 | 0.264 | 0.362 | 5102 |
+| 0.5b-q4km-local | 52 | 0.259 | 0.421 | 2843 |
+| 0.5b-lora-f16-local | 52 | 0.923 | 0.857 | 1692 |
+| 0.5b-lora-q4km-local | 52 | 0.935 | 0.837 | 1262 |
+| 0.5b-lora-q4km-imatrix | 52 | 0.901 | 0.805 | 1175 |
+
+### INT4 costs nothing on this model
+
+Stock F16 0.264 against Q4_K_M 0.259, and tuned F16 0.923 against Q4_K_M 0.935 — both
+inside noise, in both directions. Meanwhile Q4 halves p50 for 398 MB of weights against
+994 MB, which is the memory-bandwidth argument holding. **Keep Q4_K_M.** The pre-agreed
+`Q5_K_M` fallback is unnecessary: there is no quantization regression to recover from.
 
 ### The importance matrix does not pay on this model
 
-Calibrated on 400 training examples (1.7 MB), ~50 min of `llama-imatrix` on 6 cores.
-Result: F1 **0.901 against 0.935** for the plain quant, value accuracy 0.805 against 0.837.
-Not an improvement, and if anything slightly worse.
+Calibrated on 400 training examples, ~50 min of `llama-imatrix`: F1 **0.901 against 0.935**
+for the plain quant. Not an improvement.
 
-The reason is visible in the quantizer output. `llama-quantize` reports the same
-`quant size = 373.71 MiB (6.35 BPW)` with and without the imatrix, because bit allocation
-did not change — and it did not change because **144 of 290 tensors never reach `q4_K` at
-all**:
+`llama-quantize` reports the same `quant size = 373.71 MiB (6.35 BPW)` with and without it,
+because bit allocation never changed — **144 of 290 tensors never reach `q4_K` at all**:
 
 ```
 warning: blk.0.attn_output.weight - ncols 896 not divisible by 256
          (required for type q4_K) -> falling back to q5_0
 ```
 
-The 0.5B's 896-wide tensors are not divisible by the 256-element `q4_K` superblock, so half
-the model already sits at `q5_0`/`q6_K`. An imatrix steers value placement inside `q4_K`
-blocks; where there are no `q4_K` blocks, it has nothing to steer. `--token-embedding-type`
-and `--output-tensor-type` at `q8_0` likewise changed nothing, because the fallback had
-already promoted those tensors.
+Qwen2.5-0.5B's 896-wide tensors are not divisible by the 256-element `q4_K` superblock, so
+half the model already sits at `q5_0`/`q6_K`. An imatrix steers value placement inside
+`q4_K` blocks; where there are none, it has nothing to steer. `--token-embedding-type` and
+`--output-tensor-type` at `q8_0` changed nothing for the same reason.
 
-**Ship the plain `Q4_K_M`.** The imatrix step costs an hour per build and buys nothing here.
-It is worth revisiting only on a model whose tensor shapes divide evenly — this conclusion
-is about Qwen2.5-0.5B's geometry, not about importance matrices in general.
+**Ship the plain `Q4_K_M`.** This conclusion is about this model's tensor geometry, not
+about importance matrices in general.
 
-The pre-agreed `Q5_K_M` fallback is also unnecessary: there was no quantization regression
-to recover from in the first place.
+### Grammar-constrained decoding would recover nothing
 
-### The 7B row: attempted, still not measurable
+Raw JSON validity was already 1.000, with zero keys outside the question set. A grammar
+enforces shape, and shape was never what was broken. Worth adding later as cheap insurance;
+it is not a fix, and no phase should depend on it.
 
-The router accepted **6 calls** and then returned 402 again. The key, the model id and the
-harness path are all fine — this is purely depleted credits, not a configuration problem.
-The runner aborted on the 402 rather than burning the remaining 47 turns, which is what
-`FATAL_STATUS` exists for.
+---
 
-What came back, over 5 scored turns, **all of them `single-field`**:
+## The 7B row: attempted, still not measurable
 
-```
-| 7b-router (5 of 52, NOT a baseline) | 1.000 | prec 0.500 | rec 1.000 | F1 0.667 | val 0.800 | p50 1612 | p95 10985 |
-```
+The router accepted **6 calls** and then returned 402 again. The key, model id and harness
+path are all fine — this is depleted credits, not configuration. The runner aborted on the
+402 rather than burning the remaining turns, which is what `FATAL_STATUS` exists for.
 
-**Do not put this in the table above and do not compare anything to it.** Five turns of the
-single easiest category says nothing about skip handling, corrections or unit ambiguity —
-and skip handling is where the tuned 0.5B is weakest, so the one comparison that matters is
-precisely the one this cannot make.
+The 5 scored turns were all `single-field`, the easiest category. **Not a baseline, not
+comparable to anything.** Two hints worth confirming, not believing: the 7B also over-emits
+(precision 0.500 on single-field gold), and the router showed p95 10985 ms against p50
+1612 ms on five requests — a tail a warm local process does not have.
 
-Two things it does hint at, both to be confirmed rather than believed:
+## What this does not settle
 
-- The 7B **also over-emits** — precision 0.500 on turns whose gold has one field. If that
-  holds across the full set, the tuned 0.5B's 0.956 is not merely competitive with the
-  incumbent, it is better at the specific thing this task needs.
-- The router has a **long latency tail**: p95 10985 ms against a p50 of 1612 ms, on five
-  requests. A warm local process does not do this. Worth quantifying properly, because a
-  rare eleven-second turn is a worse user experience than a slower median.
+**The gate cannot close.** Everything above compares the 0.5B against itself. There is
+still no measurement of the model this would replace, so "good enough" has no referent.
+Restoring credits or setting `OPENROUTER_API_KEY` is the only thing in the way, and it
+fixes the production outage at the same time.
 
-Restoring credits or setting `OPENROUTER_API_KEY` is the only thing standing between here
-and a closed gate.
-
-### What this does not settle
-
-The `7b-router` row is still missing, so **the gate cannot close**. Everything above compares
-the student against itself; none of it says whether the incumbent is too slow to keep. That
-row needs credits or an OpenRouter key and nothing else.
-
-Later phases add rows rather than editing existing ones:
+## Later rows
 
 | Label | What it establishes |
 |---|---|
-| `0.5b-q4km-grammar` | What constrained decoding recovers |
-| `0.5b-lora-bf16` | Whether fine-tuning beat the stock model |
-| `0.5b-lora-q4km-imatrix` | The artifact that would actually ship |
-
-Write the regression threshold for the last row **before** running it, not after.
+| `7b-router` | The incumbent, on r2. Everything else is measured against this |
+| `0.5b-lora-v2-q4km-holdout` | Whether r2's holdout split agrees with the dev split |
+| `0.5b-lora-v3-*` | Whether more `answer-and-skip` data fixes compound refusals |
