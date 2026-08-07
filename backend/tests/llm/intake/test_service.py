@@ -87,13 +87,23 @@ class TestBuildIntakeParseResult:
         assert result["extracted"]["price"] == {"max": 2000000}
         assert result["merged_criteria"]["price"] == {"max": 2000000}
 
-    def test_a_bound_is_left_alone_when_the_message_states_both_directions(self):
+    def test_each_figure_is_bound_by_its_own_comparator(self):
+        """"$2M" is governed by "lower than" even though the message also states a min."""
         parsed = _parsed_output(extracted={"price": {"min": 2000000}})
         result = self._call(
             parsed, ["price"], required_fields=["price"],
             user_input="lower than $2M but higher than $500K",
         )
-        assert result["extracted"]["price"] == {"min": 2000000}
+        assert result["extracted"]["price"] == {"max": 2000000}
+
+    def test_an_invented_bound_is_dropped(self):
+        """"less than $1M" states no minimum, so min: 0 came from nowhere."""
+        parsed = _parsed_output(extracted={"price": {"min": 0, "max": 1000000}})
+        result = self._call(
+            parsed, ["price"], required_fields=["price"],
+            user_input="costs less than $1M",
+        )
+        assert result["extracted"]["price"] == {"max": 1000000}
 
     def test_extracted_keys_filtered_to_allowed(self):
         parsed = _parsed_output(extracted={"location": "Austin", "unknown_key": "xyz"})

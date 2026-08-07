@@ -99,16 +99,34 @@ class TestCorrectBoundDirection:
         value = {"price": {"max": 2000000}}
         assert correct_bound_direction(value, "my budget range is less than $2M") == value
 
-    def test_leaves_a_two_sided_value_alone(self):
-        value = {"price": {"min": 500000, "max": 2000000}}
-        assert correct_bound_direction(value, "under $2M") == value
-
-    def test_leaves_an_ambiguous_message_alone(self):
-        """Both directions stated: the model's answer beats a coin flip."""
-        value = {"price": {"min": 2000000}}
+    def test_drops_a_bound_the_message_never_stated(self):
+        """500000 appears nowhere in "under $2M", so the model invented it."""
         assert correct_bound_direction(
-            value, "its cost is lower than $2M, its cost is higher than $500K"
-        ) == value
+            {"price": {"min": 500000, "max": 2000000}}, "under $2M"
+        ) == {"price": {"max": 2000000}}
+
+    def test_keeps_both_bounds_when_the_message_states_both(self):
+        value = {"price": {"min": 500000, "max": 2000000}}
+        assert correct_bound_direction(value, "between $500K and $2M") == value
+
+    def test_each_figure_takes_its_own_comparator(self):
+        """A whole-message reading sees both directions here and can say nothing."""
+        assert correct_bound_direction(
+            {"price": {"min": 0, "max": 1000000}, "size_sqft": {"min": 100, "max": 10000}},
+            "a building that costs less than $1M, size is bigger than 100sqft",
+        ) == {"price": {"max": 1000000}, "size_sqft": {"min": 100}}
+
+    def test_corrects_the_side_using_the_figures_own_comparator(self):
+        """"$2M" is governed by "lower than", so the bound belongs in max."""
+        assert correct_bound_direction(
+            {"price": {"min": 2000000}},
+            "its cost is lower than $2M, its cost is higher than $500K",
+        ) == {"price": {"max": 2000000}}
+
+    def test_an_exact_figure_with_no_comparator_keeps_both_bounds(self):
+        """The convention that a plain size sets min and max to the same value."""
+        value = {"size_sqft": {"min": 8000, "max": 8000}}
+        assert correct_bound_direction(value, "8,000 square feet") == value
 
     def test_leaves_a_message_with_no_comparator_alone(self):
         value = {"price": {"max": 500000}}
