@@ -26,38 +26,47 @@ from typing import Any
 # ``floor`` and ``ceiling`` are deliberately absent. They read as bounds in a budget
 # sentence but mean something else entirely in commercial real estate ("ground floor
 # retail", "24 ft clear ceiling height"), and the model already handles both correctly.
+# Comparative adjectives are matched as a class rather than one word at a time. Listing
+# them individually is how "larger than 32 sqft" slipped through: the list had "greater
+# than" and "higher than" but not the size-flavoured synonyms.
+_MORE = r"(?:more|larger|bigger|greater|higher|longer|wider|taller|deeper|heavier)"
+_LESS = r"(?:less|smaller|lower|shorter|narrower|slimmer|lighter)"
+
 _BOUND_WORDS: list[tuple[str, str]] = [
-    # negations
-    (r"no\s+less\s+than", "min"),
-    (r"no\s+lower\s+than", "min"),
-    (r"nothing\s+(?:below|under|less\s+than)", "min"),
-    (r"no\s+more\s+than", "max"),
-    (r"no\s+higher\s+than", "max"),
-    (r"not\s+over", "max"),
-    (r"nothing\s+(?:over|above|more\s+than)", "max"),
-    # multi-word
+    # Negations invert, so they must match before the comparative nested inside them.
+    (rf"no\s+{_LESS}\s+than", "min"),
+    (rf"not\s+{_LESS}\s+than", "min"),
+    (rf"nothing\s+(?:below|under|{_LESS}\s+than)", "min"),
+    (rf"no\s+{_MORE}\s+than", "max"),
+    (rf"not\s+{_MORE}\s+than", "max"),
+    (rf"nothing\s+(?:over|above|{_MORE}\s+than)", "max"),
+    (r"not\s+(?:over|above|exceeding)", "max"),
+    # Comparatives.
+    (rf"{_MORE}\s+than", "min"),
+    (rf"{_LESS}\s+than", "max"),
+    # Multi-word.
     (r"at\s+least", "min"),
-    (r"more\s+than", "min"),
-    (r"higher\s+than", "min"),
-    (r"greater\s+than", "min"),
     (r"starting\s+at", "min"),
     (r"upwards\s+of", "min"),
     (r"north\s+of", "min"),
-    (r"and\s+up\b", "min"),
-    (r"or\s+more", "min"),
+    (r"in\s+excess\s+of", "min"),
+    (r"and\s+(?:up|over|above)\b", "min"),
+    (r"or\s+(?:more|over|above)\b", "min"),
     (r"up\s+to", "max"),
-    (r"less\s+than", "max"),
-    (r"lower\s+than", "max"),
     (r"at\s+most", "max"),
     (r"shy\s+of", "max"),
-    (r"or\s+less", "max"),
-    # single words
+    (r"or\s+(?:less|under|below)\b", "max"),
+    # Single words.
     (r"\bminimum\b", "min"),
+    (r"\bexceeding\b", "min"),
     (r"\bover\b", "min"),
     (r"\babove\b", "min"),
+    (r"\bbeyond\b", "min"),
     (r"\bmaximum\b", "max"),
     (r"\bunder\b", "max"),
     (r"\bbelow\b", "max"),
+    (r"\bbeneath\b", "max"),
+    (r"\btops\b", "max"),
     (r"\bcap(?:ped)?\b", "max"),
 ]
 

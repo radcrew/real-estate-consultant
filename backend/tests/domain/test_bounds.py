@@ -25,19 +25,39 @@ class TestBoundSidesIn:
         "text",
         ["at least $500K", "more than $500K", "higher than $500K", "greater than $500K",
          "over $500K", "above $500K", "starting at $500K", "upwards of $750K",
-         "north of $500K", "$400k and up", "$500K or more", "minimum $500K"],
+         "north of $500K", "$400k and up", "$500K or more", "minimum $500K",
+         "in excess of $500K", "beyond $500K", "exceeding $500K"],
     )
     def test_lower_bounds(self, text):
         assert bound_sides_in(text) == {"min"}
 
     @pytest.mark.parametrize(
         "text,expected",
+        [("its size is larger than 32 sqft", {"min"}),
+         ("bigger than 5,000 sqft", {"min"}),
+         ("longer than 200 ft", {"min"}),
+         ("wider than 60 ft", {"min"}),
+         ("taller than 24 ft", {"min"}),
+         ("smaller than 3,000 sqft", {"max"}),
+         ("shorter than 100 ft", {"max"}),
+         ("narrower than 40 ft", {"max"})],
+    )
+    def test_size_comparatives(self, text, expected):
+        """Matched as a class: listing them one at a time is how 'larger than' leaked."""
+        assert bound_sides_in(text) == expected
+
+    @pytest.mark.parametrize(
+        "text,expected",
         [("no less than $500K", {"min"}),
          ("no lower than $500K", {"min"}),
+         ("no smaller than 5,000 sqft", {"min"}),
+         ("not smaller than 5,000 sqft", {"min"}),
          ("nothing below 5,000 sqft", {"min"}),
          ("nothing under 5,000 sqft", {"min"}),
          ("no more than $2M", {"max"}),
          ("no higher than $2M", {"max"}),
+         ("no larger than 8,000 sqft", {"max"}),
+         ("not exceeding $2M", {"max"}),
          ("nothing over $2M", {"max"}),
          ("nothing above $2M", {"max"})],
     )
