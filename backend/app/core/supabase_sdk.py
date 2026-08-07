@@ -16,7 +16,12 @@ async def _create_client(api_key: str) -> tuple[AsyncClient, httpx.AsyncClient]:
     http = httpx.AsyncClient(
         timeout=_SUPABASE_HTTP_TIMEOUT,
         follow_redirects=True,
-        http2=True,
+        # HTTP/1.1 on purpose. With http2 every request multiplexes onto one pooled
+        # connection, so a connection the remote drops poisons the pool: httpcore stores
+        # the write failure on the connection and re-raises it for each later request
+        # until the process restarts. HTTP/1.1 discards the dead connection instead, and
+        # multiplexing buys little at this call volume.
+        http2=False,
     )
     client = await acreate_client(
         settings.supabase_url,
