@@ -8,7 +8,7 @@ from typing import Any
 
 from app.core.config import settings
 from app.domain.bounds import correct_bound_direction
-from app.domain.intake_criteria import drop_unconfigured_choices
+from app.domain.intake_criteria import drop_placeholder_values, drop_unconfigured_choices
 from app.domain.intake_next_question import (
     find_question_row_by_key,
     first_question_row_in_missing,
@@ -243,9 +243,11 @@ def _build_intake_parse_result(
     extracted = {
         key: value for key, value in parsed_output.extracted.items() if key in allowed_keys
     }
-    # Keys are filtered above, values here. This runs before merge_missing_fields on
-    # purpose: a choice the questionnaire does not offer must leave the field *missing*,
-    # not answered, or the session completes on a value search cannot use.
+    # Keys are filtered above, values here. Both run before merge_missing_fields on
+    # purpose: a filler value, or a choice the questionnaire does not offer, must leave
+    # the field *missing* rather than answered, or the session completes on something
+    # search cannot use and the question is never asked.
+    extracted = drop_placeholder_values(extracted)
     extracted = drop_unconfigured_choices(extracted, questions)
     # The model reads the figure reliably and the comparator unreliably, so the side a
     # lone bound sits on is decided here from the message itself. No-op unless the

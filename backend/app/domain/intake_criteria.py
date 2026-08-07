@@ -72,6 +72,49 @@ def normalize_intake_value(question_type: str, value: Any) -> Any:
     return value
 
 
+# Stand-ins for "the user did not say". Matched exactly, never as substrings.
+_PLACEHOLDER_VALUES = frozenset({
+    "unknown", "unspecified", "not specified", "not provided", "not mentioned",
+    "not applicable", "n/a", "n.a.", "na", "none", "null", "nil", "nan",
+    "tbd", "to be determined", "any", "anything", "no preference",
+    "-", "--", "?", "???",
+})
+
+
+def _is_placeholder(value: object) -> bool:
+    return isinstance(value, str) and (
+        not value.strip() or value.strip().casefold() in _PLACEHOLDER_VALUES
+    )
+
+
+def drop_placeholder_values(extracted: dict[str, Any]) -> dict[str, Any]:
+    """Remove answers that stand in for "the user did not say".
+
+    Asked about a field the message never mentions, the model fills the slot rather than
+    omitting the key: ``location: "Unknown"`` was shown to a user as their chosen
+    location, and counted as answered so the question was never asked. A filler is not an
+    answer — dropping the key leaves the field missing.
+
+    Matching is exact after trimming and case folding, never a substring, so real values
+    that merely contain one of these words ("Unknown Street", "Nome") are untouched.
+    An all-null range (``{"min": null, "max": null}``) is treated the same way.
+    """
+    cleaned: dict[str, Any] = {}
+    for key, value in extracted.items():
+        if _is_placeholder(value):
+            continue
+        if isinstance(value, list):
+            if kept := [item for item in value if not _is_placeholder(item)]:
+                cleaned[key] = kept
+            continue
+        if isinstance(value, dict):
+            if any(inner is not None for inner in value.values()):
+                cleaned[key] = value
+            continue
+        cleaned[key] = value
+    return cleaned
+
+
 def _choice_aliases(row: dict[str, Any]) -> dict[str, str]:
     """Map every accepted spelling (casefolded) to the value that should be stored.
 
