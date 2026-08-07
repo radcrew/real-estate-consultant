@@ -144,6 +144,35 @@ class TestResolveNextIntakeQuestion:
         assert result.text == "Where would you like to live?"
         assert result.key == "location"
 
+    def test_nothing_missing_means_no_question(self):
+        """A completed session kept asking because the model still wrote question text."""
+        result = resolve_next_intake_question(
+            questions=self._QUESTIONS,
+            suggested_question={"key": None, "text": "What is your budget range?"},
+            missing_fields=[],
+        )
+        assert result is None
+
+    def test_text_about_an_answered_field_falls_back_to_canonical(self):
+        """The model may word a pending question, never introduce an answered one."""
+        result = resolve_next_intake_question(
+            questions=self._QUESTIONS,
+            suggested_question={"key": "location", "text": "What is your budget range?"},
+            missing_fields=["budget"],
+        )
+        assert isinstance(result, IntakeSessionFirstQuestion)
+        assert result.key == "budget"
+        assert result.text == "Budget?"
+
+    def test_key_suggestion_for_an_answered_field_is_ignored(self):
+        result = resolve_next_intake_question(
+            questions=self._QUESTIONS,
+            suggested_question={"key": "location", "text": None},
+            missing_fields=["budget"],
+        )
+        assert isinstance(result, IntakeSessionFirstQuestion)
+        assert result.key == "budget"
+
     def test_text_suggestion_without_matching_key_uses_missing_field(self):
         result = resolve_next_intake_question(
             questions=self._QUESTIONS,
