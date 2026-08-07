@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.config import settings
+from app.domain.bounds import correct_bound_direction
 from app.domain.intake_next_question import (
     find_question_row_by_key,
     first_question_row_in_missing,
@@ -125,6 +126,7 @@ async def parse_user_input(
     )
     return _build_intake_parse_result(
         parsed_output=parsed_output,
+        user_input=user_input,
         question_keys=prompt.question_keys,
         current_criteria=prompt.criteria_for_prompt,
         required_fields=prompt.required_fields,
@@ -210,6 +212,7 @@ def resolve_next_intake_question(
 def _build_intake_parse_result(
     *,
     parsed_output: LlmParseModelOutput,
+    user_input: str,
     question_keys: list[str],
     current_criteria: dict[str, Any],
     required_fields: list[str],
@@ -219,6 +222,10 @@ def _build_intake_parse_result(
     extracted = {
         key: value for key, value in parsed_output.extracted.items() if key in allowed_keys
     }
+    # The model reads the figure reliably and the comparator unreliably, so the side a
+    # lone bound sits on is decided here from the message itself. No-op unless the
+    # message states one direction and the model chose the other.
+    extracted = correct_bound_direction(extracted, user_input)
     merged_criteria = {**current_criteria, **extracted}
 
     # Union carries a skip forward across turns, so the user is never re-asked. Then

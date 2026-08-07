@@ -44,9 +44,14 @@ def _parsed_output(
 # ---------------------------------------------------------------------------
 
 class TestBuildIntakeParseResult:
-    def _call(self, parsed, question_keys, current_criteria=None, required_fields=None, previously_skipped=None):
+    def _call(self, parsed, question_keys, current_criteria=None, required_fields=None,
+              previously_skipped=None, user_input=""):
+        # user_input defaults to "" so bound-direction correction is a no-op here: a
+        # message with no comparator states no direction. Tests that want the correction
+        # pass a message explicitly.
         return _build_intake_parse_result(
             parsed_output=parsed,
+            user_input=user_input,
             question_keys=question_keys or [],
             current_criteria=current_criteria or {},
             required_fields=required_fields or [],
@@ -57,6 +62,24 @@ class TestBuildIntakeParseResult:
         parsed = _parsed_output(extracted={"location": "Austin"})
         result = self._call(parsed, ["location"], required_fields=["location"])
         assert result["merged_criteria"]["location"] == "Austin"
+
+    def test_an_inverted_bound_is_corrected_from_the_message(self):
+        """The model reads the figure reliably and the comparator unreliably."""
+        parsed = _parsed_output(extracted={"price": {"min": 2000000}})
+        result = self._call(
+            parsed, ["price"], required_fields=["price"],
+            user_input="cost should be lower than $2M",
+        )
+        assert result["extracted"]["price"] == {"max": 2000000}
+        assert result["merged_criteria"]["price"] == {"max": 2000000}
+
+    def test_a_bound_is_left_alone_when_the_message_states_both_directions(self):
+        parsed = _parsed_output(extracted={"price": {"min": 2000000}})
+        result = self._call(
+            parsed, ["price"], required_fields=["price"],
+            user_input="lower than $2M but higher than $500K",
+        )
+        assert result["extracted"]["price"] == {"min": 2000000}
 
     def test_extracted_keys_filtered_to_allowed(self):
         parsed = _parsed_output(extracted={"location": "Austin", "unknown_key": "xyz"})
@@ -407,6 +430,7 @@ class TestSkipClearedWhenAnswered:
     def _call(self, parsed, **kw):
         return _build_intake_parse_result(
             parsed_output=parsed,
+            user_input=kw.get("user_input", ""),
             question_keys=kw.get("question_keys", ["location", "budget"]),
             current_criteria=kw.get("current_criteria", {}),
             required_fields=kw.get("required_fields", ["location", "budget"]),
