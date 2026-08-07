@@ -49,6 +49,45 @@ class TestMultiSelect:
         assert len(result["property_type"]) == 5
 
 
+class TestDatabaseOptionShape:
+    """The live rows store options as {"label": ..., "value": ...}, not plain strings.
+
+    Reading only the string form made this filter a silent no-op in production: every DB
+    option is a dict, so nothing was recognised and every value passed through.
+    """
+
+    DB_QUESTIONS = [
+        {"key": "property_type", "type": "multi-select", "options": [
+            {"label": "Industrial", "value": "industrial"},
+            {"label": "Office", "value": "office"},
+            {"label": "Retail", "value": "retail"},
+        ]},
+    ]
+
+    def _clean_db(self, extracted):
+        return drop_unconfigured_choices(extracted, self.DB_QUESTIONS)
+
+    def test_drops_a_choice_that_is_not_offered(self):
+        assert self._clean_db({"property_type": ["Building"]}) == {}
+
+    def test_matches_on_the_label(self):
+        assert self._clean_db({"property_type": ["Industrial"]}) == {
+            "property_type": ["industrial"]
+        }
+
+    def test_matches_on_the_value(self):
+        assert self._clean_db({"property_type": ["industrial"]}) == {
+            "property_type": ["industrial"]
+        }
+
+    def test_stores_the_value_spelling(self):
+        """Search compares property_type with ilike, so casing does not affect matching."""
+        assert self._clean_db({"property_type": ["RETAIL"]}) == {"property_type": ["retail"]}
+
+    def test_still_catches_the_option_dump(self):
+        assert self._clean_db({"property_type": ["Industrial", "Office", "Retail"]}) == {}
+
+
 class TestSingleSelect:
     def test_keeps_a_configured_choice(self):
         assert _clean({"listing_type": "Lease"}) == {"listing_type": "Lease"}

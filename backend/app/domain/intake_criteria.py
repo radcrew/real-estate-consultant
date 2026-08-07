@@ -72,25 +72,51 @@ def normalize_intake_value(question_type: str, value: Any) -> Any:
     return value
 
 
-def _configured_options(row: dict[str, Any]) -> list[str]:
-    """Configured choices for a question, or [] when it does not have a fixed set.
+def _choice_aliases(row: dict[str, Any]) -> dict[str, str]:
+    """Map every accepted spelling (casefolded) to the value that should be stored.
+
+    Question rows come in two shapes and both occur in this codebase:
+    ``ml/eval/questions.json`` uses plain strings (``["Office", "Retail"]``) while the
+    database uses ``[{"label": "Industrial", "value": "industrial"}]``. Reading only the
+    string form made this filter a silent no-op against real data — every DB option is a
+    dict, so nothing was ever recognised and every value passed through.
+
+    Label and value are both accepted spellings; ``value`` is what gets stored. Search
+    compares ``property_type`` with ``ilike``, so the choice of canonical casing does not
+    affect matching.
 
     Range questions carry ``options`` as a dict (``{"unit": "USD"}``), so only a list is
     an enumeration.
     """
     options = row.get("options")
     if not isinstance(options, list):
-        return []
-    return [choice for choice in options if isinstance(choice, str) and choice.strip()]
+        return {}
+
+    aliases: dict[str, str] = {}
+    for choice in options:
+        if isinstance(choice, str) and choice.strip():
+            aliases[choice.strip().casefold()] = choice.strip()
+            continue
+        if not isinstance(choice, dict):
+            continue
+        spellings = [
+            text.strip()
+            for key in ("value", "label")
+            if isinstance(text := choice.get(key), str) and text.strip()
+        ]
+        if not spellings:
+            continue
+        for spelling in spellings:
+            aliases[spelling.casefold()] = spellings[0]
+    return aliases
 
 
-def _canonical_choice(value: str, options: list[str]) -> str | None:
-    """The configured spelling of ``value``, or None when it is not a configured choice."""
-    folded = value.strip().casefold()
-    return next((choice for choice in options if choice.casefold() == folded), None)
+def _canonical_choice(value: str, aliases: dict[str, str]) -> str | None:
+    """The stored spelling of ``value``, or None when it is not a configured choice."""
+    return aliases.get(value.strip().casefold())
 
 
-def _is_option_dump(chosen: list[str], options: list[str]) -> bool:
+def _is_option_dump(chosen: list[str], aliases: dict[str, str]) -> bool:
     """True when a multi-select answer is simply the whole option list.
 
     Free text never means "office, retail, industrial, warehouse, flex and land" — that
@@ -98,7 +124,8 @@ def _is_option_dump(chosen: list[str], options: list[str]) -> bool:
     already forbid and the stock model does constantly. Two-choice questions are excluded
     because "buy or lease" genuinely can be both.
     """
-    return len(options) > 2 and {c.casefold() for c in chosen} == {o.casefold() for o in options}
+    configured = set(aliases.values())
+    return len(configured) > 2 and set(chosen) == configured
 
 
 def drop_unconfigured_choices(
@@ -125,8 +152,8 @@ def drop_unconfigured_choices(
 
         qtype = row.get("type")
         qtype = qtype.strip().lower() if isinstance(qtype, str) else "text"
-        options = _configured_options(row)
-        if not options or qtype not in (_MULTI_SELECT_TYPES | _SINGLE_SELECT_TYPES):
+        aliases = _choice_aliases(row)
+        if not aliases or qtype not in (_MULTI_SELECT_TYPES | _SINGLE_SELECT_TYPES):
             cleaned[key] = value
             continue
 
@@ -134,13 +161,13 @@ def drop_unconfigured_choices(
             chosen = [
                 canonical
                 for item in _normalize_multi_select(value)
-                if (canonical := _canonical_choice(item, options)) is not None
+                if (canonical := _canonical_choice(item, aliases)) is not None
             ]
-            if chosen and not _is_option_dump(chosen, options):
+            if chosen and not _is_option_dump(chosen, aliases):
                 cleaned[key] = chosen
             continue
 
-        if isinstance(value, str) and (canonical := _canonical_choice(value, options)):
+        if isinstance(value, str) and (canonical := _canonical_choice(value, aliases)):
             cleaned[key] = canonical
 
     return cleaned
