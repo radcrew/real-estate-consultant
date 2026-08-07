@@ -96,6 +96,15 @@ NOISE_INPUTS = [
     "that's everything", "nothing else", "that's all", "done", "all set",
 ]
 
+# Confirmations that add no new criteria. Deliberately longer than the four this used to
+# hold: ``eval_input_keys`` now excludes any wording the eval scores on, and three of the
+# original four were eval turns, which would have collapsed this shape to one string.
+COMPLETE_PHRASES = [
+    "that's everything", "yes that's correct", "sounds good", "looks right",
+    "that covers it", "that's the lot", "correct, that's all of it",
+    "yep, we're good", "no changes needed", "confirmed", "that all looks right",
+]
+
 # Labels a user would plausibly use when naming a field they want to skip.
 FIELD_LABELS = {
     "location": ["location", "city", "area"],
@@ -294,8 +303,7 @@ def make_example(
         for key in required:
             if key not in prior:
                 prior[key], _ = _field_fragment(key)
-        user_input = random.choice(["that's everything", "yes that's correct",
-                                    "sounds good", "looks right"])
+        user_input = random.choice(COMPLETE_PHRASES)
     else:
         count = 1 if shape == "single" else random.randint(2, min(4, len(remaining)))
         for key in random.sample(remaining, count):
@@ -377,15 +385,24 @@ def to_chat_record(
 
 
 def eval_input_keys(path: Path) -> set[str]:
-    """Inputs from the eval set, so training never contains a turn we score on."""
+    """Wordings the eval scores on, so training never teaches one of them.
+
+    Keyed on ``user_input`` alone, **not** the (input, criteria) pair. For skip and
+    noise turns the wording *is* the whole signal, so the same phrase under different
+    conversation state is still the model recognising a string it trained on. Keying on
+    the pair let r2 ship with 9 of 25 skip turns reusing a ``SKIP_PHRASES`` entry, which
+    made roughly a third of skip recall memorisation.
+
+    Deduplication still keys on the pair — see ``main`` — because the same wording
+    against different state is legitimate variety *within* training.
+    """
     if not path.exists():
         return set()
-    keys = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            row = json.loads(line)
-            keys.add((row["user_input"], json.dumps(row["current_criteria"], sort_keys=True)))
-    return keys
+    return {
+        json.loads(line)["user_input"]
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
 
 
 def main() -> int:
@@ -425,13 +442,13 @@ def main() -> int:
         if reason:
             rejected[reason.split(":")[0]] += 1
             continue
+        if example["user_input"] in held_out:
+            rejected["collides with eval set"] += 1
+            continue
         identity = (
             example["user_input"],
             json.dumps(example["current_criteria"], sort_keys=True),
         )
-        if identity in held_out:
-            rejected["collides with eval set"] += 1
-            continue
         fingerprint = json.dumps([identity, example["target"]], sort_keys=True)
         if fingerprint in seen:
             rejected["duplicate"] += 1
