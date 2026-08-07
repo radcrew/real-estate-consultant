@@ -8,6 +8,7 @@ from typing import Any
 
 from app.core.config import settings
 from app.domain.bounds import correct_bound_direction
+from app.domain.intake_criteria import drop_unconfigured_choices
 from app.domain.intake_next_question import (
     find_question_row_by_key,
     first_question_row_in_missing,
@@ -127,6 +128,7 @@ async def parse_user_input(
     return _build_intake_parse_result(
         parsed_output=parsed_output,
         user_input=user_input,
+        questions=questions,
         question_keys=prompt.question_keys,
         current_criteria=prompt.criteria_for_prompt,
         required_fields=prompt.required_fields,
@@ -231,6 +233,7 @@ def _build_intake_parse_result(
     *,
     parsed_output: LlmParseModelOutput,
     user_input: str,
+    questions: list[QuestionRow],
     question_keys: list[str],
     current_criteria: dict[str, Any],
     required_fields: list[str],
@@ -240,6 +243,10 @@ def _build_intake_parse_result(
     extracted = {
         key: value for key, value in parsed_output.extracted.items() if key in allowed_keys
     }
+    # Keys are filtered above, values here. This runs before merge_missing_fields on
+    # purpose: a choice the questionnaire does not offer must leave the field *missing*,
+    # not answered, or the session completes on a value search cannot use.
+    extracted = drop_unconfigured_choices(extracted, questions)
     # The model reads the figure reliably and the comparator unreliably, so the side a
     # lone bound sits on is decided here from the message itself. No-op unless the
     # message states one direction and the model chose the other.

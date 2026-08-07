@@ -45,13 +45,14 @@ def _parsed_output(
 
 class TestBuildIntakeParseResult:
     def _call(self, parsed, question_keys, current_criteria=None, required_fields=None,
-              previously_skipped=None, user_input=""):
-        # user_input defaults to "" so bound-direction correction is a no-op here: a
-        # message with no comparator states no direction. Tests that want the correction
-        # pass a message explicitly.
+              previously_skipped=None, user_input="", questions=None):
+        # Both post-filters default to no-ops so unrelated cases stay focused:
+        # user_input "" states no bound direction, and questions [] gives the choice
+        # filter no configured options to check against. Tests that want either pass it.
         return _build_intake_parse_result(
             parsed_output=parsed,
             user_input=user_input,
+            questions=questions or [],
             question_keys=question_keys or [],
             current_criteria=current_criteria or {},
             required_fields=required_fields or [],
@@ -62,6 +63,19 @@ class TestBuildIntakeParseResult:
         parsed = _parsed_output(extracted={"location": "Austin"})
         result = self._call(parsed, ["location"], required_fields=["location"])
         assert result["merged_criteria"]["location"] == "Austin"
+
+    def test_an_unoffered_choice_leaves_the_field_missing(self):
+        """Dropping the value must happen before missing_fields, or the session
+        completes on a value the property search cannot use."""
+        rows = [_q("property_type", "multiselect", order=1, text="Type?", title="Type",
+                   options=["Office", "Warehouse"])]
+        parsed = _parsed_output(extracted={"property_type": ["house"]})
+        result = self._call(
+            parsed, ["property_type"], required_fields=["property_type"], questions=rows,
+        )
+        assert result["extracted"] == {}
+        assert result["missing_fields"] == ["property_type"]
+        assert result["is_complete"] is False
 
     def test_an_inverted_bound_is_corrected_from_the_message(self):
         """The model reads the figure reliably and the comparator unreliably."""
@@ -460,6 +474,7 @@ class TestSkipClearedWhenAnswered:
         return _build_intake_parse_result(
             parsed_output=parsed,
             user_input=kw.get("user_input", ""),
+            questions=kw.get("questions", []),
             question_keys=kw.get("question_keys", ["location", "budget"]),
             current_criteria=kw.get("current_criteria", {}),
             required_fields=kw.get("required_fields", ["location", "budget"]),
