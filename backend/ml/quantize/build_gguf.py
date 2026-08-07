@@ -43,8 +43,45 @@ def run(cmd: list[str], **kwargs) -> None:
     subprocess.run(cmd, check=True, **kwargs)
 
 
+def _is_local_path(model_id: str) -> bool:
+    """True when ``--model`` names a directory rather than a Hub repo id.
+
+    Hub ids are ``name`` or ``namespace/name``: at most one forward slash, never
+    absolute, no backslashes, no leading dot.
+    """
+    return (
+        Path(model_id).is_absolute()
+        or "\\" in model_id
+        or model_id.startswith(".")
+        or model_id.count("/") > 1
+    )
+
+
 def snapshot(model_id: str, out_dir: Path) -> Path:
-    """Download the HF snapshot, skipping the weights formats we do not read."""
+    """Resolve ``--model`` to a directory of full weights.
+
+    Accepts a Hub repo id or a local directory — ``ml.train.merge`` output is passed
+    this way at P6. A local-looking path that does not exist fails here rather than
+    falling through to the Hub, which would report it as an invalid repo id and send
+    you looking in the wrong place.
+    """
+    if _is_local_path(model_id):
+        local = Path(model_id).resolve()
+        if not local.is_dir():
+            raise SystemExit(
+                f"no model directory at {local}\n"
+                "Run ml.train.train_lora and then ml.train.merge first: "
+                "convert_hf_to_gguf.py reads full weights, not a LoRA adapter."
+            )
+        if not any(local.glob("*.safetensors")):
+            raise SystemExit(
+                f"{local} contains no *.safetensors.\n"
+                "That looks like an adapter directory, not a merged model. "
+                "Run ml.train.merge --adapter <that dir> --out <merged dir>."
+            )
+        print(f"using local model: {local}")
+        return local
+
     from huggingface_hub import snapshot_download
 
     target = out_dir / model_id.split("/")[-1]
@@ -129,7 +166,9 @@ def main() -> int:
             return 1
         quantize_exe = Path(found)
 
-    stem = args.model.split("/")[-1].lower()
+    # Path(...).name, not split("/"), so a Windows path with backslashes names the
+    # artifacts the same way a Hub id does.
+    stem = Path(args.model).name.lower()
     f16_path = out_dir / f"{stem}-f16.gguf"
 
     if not args.skip_convert:
