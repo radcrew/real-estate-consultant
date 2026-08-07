@@ -126,10 +126,16 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
         if (key := _question_key(row))
     }
 
-    # Only these three survive the backend. ``missing_fields`` is recomputed by
-    # ``merge_missing_fields``, ``is_complete`` is derived from it, and
-    # ``next_question.key`` is re-anchored by ``resolve_next_intake_question`` — so
-    # asking the model for any of them buys prompt tokens and nothing else.
+    # Only these two survive the backend. ``missing_fields`` is recomputed by
+    # ``merge_missing_fields`` and ``is_complete`` is derived from it, so asking the model
+    # for either buys prompt tokens and nothing else.
+    #
+    # ``next_question`` is gone for a stronger reason: the model wrote it from the turn
+    # alone, without knowing what the backend had recorded, and it caused four separate
+    # defects — schema prose shown to users verbatim, a question asked on an already
+    # completed session, the user's own sentence echoed back, and two questions in one.
+    # ``questions.json`` already holds the wording and
+    # ``resolve_next_intake_question`` already picks the row, so nothing was gained.
     return {
         "type": "object",
         "additionalProperties": False,
@@ -151,21 +157,8 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
                     "Never ask about these again."
                 ),
             },
-            "next_question": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "text": {
-                        "type": ["string", "null"],
-                        "description": (
-                            "Conversational question for the first unanswered, "
-                            "non-skipped field. Null when none remain."
-                        ),
-                    },
-                },
-            },
         },
-        "required": ["extracted", "skipped_fields", "next_question"],
+        "required": ["extracted", "skipped_fields"],
     }
 
 

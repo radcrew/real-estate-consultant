@@ -66,7 +66,7 @@ class TestBuildIntakeResponseSchema:
 
     def test_top_level_required_keys_present(self):
         schema = build_intake_response_schema(questions=[_q("loc", "location", 1)])
-        assert set(schema["required"]) == {"extracted", "skipped_fields", "next_question"}
+        assert set(schema["required"]) == {"extracted", "skipped_fields"}
 
     def test_recomputed_fields_are_not_requested(self):
         # merge_missing_fields recomputes one and derives the other, so asking the
@@ -75,10 +75,12 @@ class TestBuildIntakeResponseSchema:
         assert "missing_fields" not in schema["properties"]
         assert "is_complete" not in schema["properties"]
 
-    def test_next_question_asks_only_for_text(self):
-        # resolve_next_intake_question re-anchors the key against the question rows.
+    def test_next_question_is_not_requested(self):
+        # The model wrote it from the turn alone and caused four defects: schema prose
+        # shown verbatim, a question on a completed session, the user's own sentence
+        # echoed back, and two questions at once. questions.json holds the wording.
         schema = build_intake_response_schema(questions=[_q("loc", "location", 1)])
-        assert set(schema["properties"]["next_question"]["properties"]) == {"text"}
+        assert "next_question" not in schema["properties"]
 
     def test_skip_description_carries_no_example_phrases(self):
         # Example refusal phrasings in the schema get echoed back as if they were keys.
