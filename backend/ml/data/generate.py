@@ -135,24 +135,52 @@ def _sqft_value() -> int:
     return random.randrange(1_000, 60_000, 500)
 
 
-def _range_phrase(fmt, low_word: str, high_word: str) -> tuple[dict[str, int], str]:
-    """Return (gold bounds, phrasing). Bare figures are upper bounds by convention."""
-    style = random.choice(["max", "max", "min", "between"])
+# The model has to read DIRECTION off the wording, so both sides need comparable breadth.
+# v2 had 4 upper phrasings against 3 lower, and a 2:1 style weighting on top, producing
+# 445 upper-bound examples against 199 lower. It generalised unseen *upper* wordings fine
+# ("less than", "lower than") because the prior agreed, and inverted unseen *lower* ones:
+# "higher than $500K" came back as {"max": 500000}.
+MAX_PHRASES = [
+    "up to {v}", "no more than {v}", "under {v}", "less than {v}", "lower than {v}",
+    "below {v}", "at most {v}", "not over {v}", "{v} or less", "{v} max", "maximum {v}",
+]
+MIN_PHRASES = [
+    "at least {v}", "no less than {v}", "more than {v}", "higher than {v}", "over {v}",
+    "above {v}", "starting at {v}", "north of {v}", "{v} or more", "{v} and up",
+    "minimum {v}",
+]
+BETWEEN_PHRASES = [
+    "between {lo} and {hi}", "from {lo} to {hi}", "{lo} to {hi}",
+    "more than {lo} but under {hi}", "at least {lo} and no more than {hi}",
+]
+
+
+def _range_phrase(fmt) -> tuple[dict[str, int], str]:
+    """Return (gold bounds, phrasing).
+
+    Weights are set on the **gold** distribution, not the style names: ``bare`` also
+    yields a ``max`` bound, so explicit ``max`` is damped to compensate. The result is
+    roughly 40% max-only, 40% min-only, 20% two-sided — parity is the point, because the
+    imbalance is what let a learned prior override an explicit comparator.
+    """
+    style = random.choices(["max", "min", "between", "bare"], weights=[25, 40, 20, 15])[0]
     if style == "max":
         value = fmt[1]()
-        return {"max": value}, random.choice([
-            f"up to {fmt[0](value)}", f"no more than {fmt[0](value)}",
-            f"under {fmt[0](value)}", f"{fmt[0](value)} {high_word}",
-        ])
+        return {"max": value}, random.choice(MAX_PHRASES).format(v=fmt[0](value))
     if style == "min":
         value = fmt[1]()
-        return {"min": value}, random.choice([
-            f"at least {fmt[0](value)}", f"{fmt[0](value)} {low_word}",
-            f"minimum {fmt[0](value)}",
-        ])
+        return {"min": value}, random.choice(MIN_PHRASES).format(v=fmt[0](value))
+    if style == "bare":
+        # A figure with no comparator is an upper bound. The eval has always tested this
+        # ("half a million"), but v2 never generated it — every phrasing carried a
+        # comparator word, so the convention was scored and never taught.
+        value = fmt[1]()
+        return {"max": value}, fmt[0](value)
     low = fmt[1]()
     high = low + fmt[1]()
-    return {"min": low, "max": high}, f"between {fmt[0](low)} and {fmt[0](high)}"
+    return {"min": low, "max": high}, random.choice(BETWEEN_PHRASES).format(
+        lo=fmt[0](low), hi=fmt[0](high)
+    )
 
 
 PRICE_FMT = (_fmt_money, _price_value)
@@ -174,10 +202,10 @@ def _field_fragment(key: str) -> tuple[Any, str]:
         choice = random.choice(["Sale", "Lease"])
         return choice, random.choice(LISTING_TEMPLATES[choice])
     if key == "price":
-        bounds, phrase = _range_phrase(PRICE_FMT, "or more", "or less")
+        bounds, phrase = _range_phrase(PRICE_FMT)
         return bounds, random.choice([f"budget {phrase}", phrase, f"we can spend {phrase}"])
     if key == "size_sqft":
-        bounds, phrase = _range_phrase(SQFT_FMT, "or more", "or less")
+        bounds, phrase = _range_phrase(SQFT_FMT)
         return bounds, phrase
     if key == "loading_docks":
         count = random.randint(1, 8)
