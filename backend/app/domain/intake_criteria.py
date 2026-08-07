@@ -115,6 +115,90 @@ def drop_placeholder_values(extracted: dict[str, Any]) -> dict[str, Any]:
     return cleaned
 
 
+# Generic structure nouns. A place is never bare "Building" — that is the model naming
+# what the user is shopping for, in the slot for where they want it.
+_GENERIC_PLACE_NOUNS = frozenset({
+    "building", "buildings", "property", "properties", "space", "spaces",
+    "house", "home", "site", "unit", "premises", "real estate",
+    "commercial property", "commercial space", "commercial real estate",
+})
+# Trailing words stripped before comparing a location against the property types, so
+# "industrial space" is recognised as the property type it is.
+_PLACE_NOUN_SUFFIXES = (" space", " property", " building", " premises", " unit", " site")
+
+
+def _self_describing_aliases(row: dict[str, Any]) -> set[str]:
+    """Casefolded ways of naming the question itself, rather than answering it."""
+    names = {row.get("key"), row.get("title"), row.get("label")}
+    folded = {name.strip().casefold() for name in names if isinstance(name, str) and name.strip()}
+    key = row.get("key")
+    if isinstance(key, str):
+        folded.add(key.replace("_", " ").strip().casefold())
+    return folded
+
+
+def drop_self_describing_values(
+    extracted: dict[str, Any],
+    questions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Remove answers that describe the field instead of answering it.
+
+    With nothing in the message to put in a slot, the model reaches for the nearest
+    noun. ``location`` came back as ``"Building"`` for "I am finding a building…", as
+    ``"Location"`` (the field's own label), and as ``"industrial space"`` — the property
+    type, in the slot for where the property should be.
+
+    Three rules, all exact matches after trimming and case folding:
+
+    * any field: the value names the question (its key, title or label);
+    * a location: the value is a bare structure noun;
+    * a location: the value is one of the configured property types, with a trailing
+      generic noun ignored so "industrial space" is caught alongside "industrial".
+
+    Matching is never substring, so "Building Heights" and "Property Lane, Dallas"
+    survive. Bare "commercial" is deliberately not listed: unlike the others it is a
+    plausible place name, and a lone word that might be a real location is worth keeping
+    over catching one more echo.
+    """
+    rows_by_key = {row["key"]: row for row in questions if isinstance(row.get("key"), str)}
+    choice_names = {
+        alias
+        for row in questions
+        for alias in _choice_aliases(row)
+    } | {
+        canonical.casefold()
+        for row in questions
+        for canonical in _choice_aliases(row).values()
+    }
+
+    cleaned: dict[str, Any] = {}
+    for key, value in extracted.items():
+        row = rows_by_key.get(key)
+        if row is None or not isinstance(value, str) or not value.strip():
+            cleaned[key] = value
+            continue
+
+        folded = value.strip().casefold()
+        if folded in _self_describing_aliases(row):
+            continue
+
+        qtype = row.get("type")
+        qtype = qtype.strip().lower() if isinstance(qtype, str) else "text"
+        if qtype in _LOCATION_TYPES:
+            if folded in _GENERIC_PLACE_NOUNS:
+                continue
+            stem = folded
+            for suffix in _PLACE_NOUN_SUFFIXES:
+                if stem.endswith(suffix):
+                    stem = stem[: -len(suffix)].strip()
+                    break
+            if stem in choice_names:
+                continue
+
+        cleaned[key] = value
+    return cleaned
+
+
 def _choice_aliases(row: dict[str, Any]) -> dict[str, str]:
     """Map every accepted spelling (casefolded) to the value that should be stored.
 
