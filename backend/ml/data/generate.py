@@ -44,7 +44,6 @@ CITIES = [
     ("Atlanta", "GA"), ("Portland", "OR"), ("Nashville", "TN"), ("Charlotte", "NC"),
     ("Wailuku", "HI"), ("Boise", "ID"), ("Reno", "NV"), ("Tampa", "FL"),
 ]
-PROPERTY_TYPES = ["Office", "Retail", "Industrial", "Warehouse", "Flex", "Land"]
 
 # (template, whether the phrasing names the state). Gold must contain exactly what the
 # message states: labelling "Tampa area please" as "Tampa, FL" would teach the model to
@@ -196,7 +195,32 @@ PRICE_FMT = (_fmt_money, _price_value)
 SQFT_FMT = (_fmt_sqft, _sqft_value)
 
 
-def _field_fragment(key: str) -> tuple[Any, str]:
+def property_type_values(questions: list[dict[str, Any]]) -> list[str]:
+    """The property types this questionnaire actually offers.
+
+    Read from ``questions.json`` rather than hardcoded. The hardcoded list held six
+    title-case types including "Warehouse" — which no listing carries and the
+    questionnaire has never offered — so every generated example naming it taught a
+    value the model could not legally emit.
+    """
+    for row in questions:
+        if row.get("key") != "property_type":
+            continue
+        options = row.get("options")
+        if not isinstance(options, list):
+            break
+        return [
+            value
+            for option in options
+            if isinstance(
+                value := (option.get("value") if isinstance(option, dict) else option), str
+            )
+            and value.strip()
+        ]
+    raise SystemExit("questions.json has no property_type options; run ml.eval.dump_questions")
+
+
+def _field_fragment(key: str, property_types: list[str]) -> tuple[Any, str]:
     """Return (gold value, natural-language fragment) for one field."""
     if key == "location":
         city, state = random.choice(CITIES)
@@ -204,7 +228,7 @@ def _field_fragment(key: str) -> tuple[Any, str]:
         gold = f"{city}, {state}" if names_state else city
         return gold, template.format(city=city, state=state)
     if key == "property_type":
-        picked = random.sample(PROPERTY_TYPES, random.choice([1, 1, 1, 2]))
+        picked = random.sample(property_types, random.choice([1, 1, 1, 2]))
         words = " or ".join(t.lower() for t in picked)
         return picked, random.choice(TYPE_TEMPLATES).format(types=words)
     if key == "listing_type":
@@ -233,6 +257,7 @@ def make_example(
     question_keys: list[str],
     required: list[str],
     ordered_required: list[str],
+    property_types: list[str],
 ) -> dict[str, Any]:
     """One training example. Shape is chosen first, so sparsity is controlled, not incidental."""
     # Weighted so over half the set teaches restraint rather than extraction. `skip` is
@@ -249,7 +274,7 @@ def make_example(
     # is already in current_criteria.
     if random.random() < 0.45:
         for key in random.sample(required, random.randint(1, max(1, len(required) - 2))):
-            prior[key], _ = _field_fragment(key)
+            prior[key], _ = _field_fragment(key, property_types)
 
     remaining = [k for k in question_keys if k not in prior]
     if not remaining:
@@ -272,7 +297,7 @@ def make_example(
         # had empty `extracted`, so answering and skipping looked mutually exclusive.
         answerable = [k for k in remaining if k in required] or remaining
         answer_key = random.choice(answerable)
-        extracted[answer_key], fragment = _field_fragment(answer_key)
+        extracted[answer_key], fragment = _field_fragment(answer_key, property_types)
         candidates = [
             k for k in required if k not in prior and k != answer_key
         ]
@@ -296,18 +321,18 @@ def make_example(
         available = [k for k in remaining if k not in carried]
         if available:
             key = random.choice(available)
-            extracted[key], fragment = _field_fragment(key)
+            extracted[key], fragment = _field_fragment(key, property_types)
             fragments.append(fragment)
         user_input = ", ".join(fragments)
     elif shape == "complete":
         for key in required:
             if key not in prior:
-                prior[key], _ = _field_fragment(key)
+                prior[key], _ = _field_fragment(key, property_types)
         user_input = random.choice(COMPLETE_PHRASES)
     else:
         count = 1 if shape == "single" else random.randint(2, min(4, len(remaining)))
         for key in random.sample(remaining, count):
-            extracted[key], fragment = _field_fragment(key)
+            extracted[key], fragment = _field_fragment(key, property_types)
             fragments.append(fragment)
         user_input = ", ".join(fragments)
 
@@ -325,24 +350,10 @@ def make_example(
         "target": {
             "extracted": extracted,
             "skipped_fields": sorted(skipped),
-            "next_question": {"text": None} if next_key is None else {"text": _ask(next_key)},
         },
         "next_question_key": next_key,
     }
 
-
-_QUESTION_TEXT = {
-    "location": "Which city or area are you looking in?",
-    "property_type": "What kind of space do you need?",
-    "listing_type": "Are you looking to buy or lease?",
-    "price": "What budget range are you working with?",
-    "size_sqft": "How much space do you need?",
-    "loading_docks": "How many loading docks do you need?",
-}
-
-
-def _ask(key: str) -> str:
-    return _QUESTION_TEXT.get(key, "What else should I know?")
 
 
 def validate(example: dict[str, Any], question_keys: set[str], required: set[str]) -> str | None:
@@ -419,6 +430,7 @@ def main() -> int:
     random.seed(args.seed)
     questions = json.loads(Path(args.questions).read_text(encoding="utf-8"))
     question_keys = [q["key"] for q in questions]
+    property_types = property_type_values(questions)
     required = [q["key"] for q in questions if q.get("required")]
     ordered_required = [
         q["key"] for q in sorted(questions, key=lambda q: q["order_index"]) if q.get("required")
@@ -437,6 +449,7 @@ def main() -> int:
             question_keys=question_keys,
             required=required,
             ordered_required=ordered_required,
+            property_types=property_types,
         )
         reason = validate(example, set(question_keys), set(required))
         if reason:

@@ -8,31 +8,36 @@ from __future__ import annotations
 
 import json
 import random
+from pathlib import Path
 
 import pytest
 
 from ml.data.generate import (
     CITIES,
+    DEFAULT_QUESTIONS,
     _field_fragment,
     _next_question_key,
     make_example,
+    property_type_values,
     to_chat_record,
     validate,
 )
 
-QUESTION_KEYS = ["location", "property_type", "listing_type", "price", "size_sqft",
-                 "loading_docks"]
-REQUIRED = ["location", "property_type", "listing_type", "price", "size_sqft"]
+# Derived from the questionnaire, never restated. A hardcoded copy is what let the
+# generator and the eval spend the whole branch describing six questions the database
+# has never had.
+_QUESTIONS = json.loads(Path(DEFAULT_QUESTIONS).read_text(encoding="utf-8"))
+QUESTION_KEYS = [q["key"] for q in _QUESTIONS]
+REQUIRED = [q["key"] for q in _QUESTIONS if q.get("required")]
+ORDERED_REQUIRED = [
+    q["key"] for q in sorted(_QUESTIONS, key=lambda q: q["order_index"]) if q.get("required")
+]
+PROPERTY_TYPES = property_type_values(_QUESTIONS)
 
 
 @pytest.fixture
 def questions():
-    import json as _json
-    from pathlib import Path
-
-    from ml.data.generate import DEFAULT_QUESTIONS
-
-    return _json.loads(Path(DEFAULT_QUESTIONS).read_text(encoding="utf-8"))
+    return _QUESTIONS
 
 
 def _examples(n: int = 400, seed: int = 3):
@@ -41,7 +46,8 @@ def _examples(n: int = 400, seed: int = 3):
         make_example(
             question_keys=QUESTION_KEYS,
             required=REQUIRED,
-            ordered_required=REQUIRED,
+            ordered_required=ORDERED_REQUIRED,
+            property_types=PROPERTY_TYPES,
         )
         for _ in range(n)
     ]
@@ -54,7 +60,6 @@ class TestValidate:
             "target": {
                 "extracted": {"location": "Austin"},
                 "skipped_fields": ["location"],
-                "next_question": {"text": None},
             }
         }
         reason = validate(example, set(QUESTION_KEYS), set(REQUIRED))
@@ -66,7 +71,6 @@ class TestValidate:
             "target": {
                 "extracted": {"made_up": 1},
                 "skipped_fields": [],
-                "next_question": {"text": None},
             }
         }
         assert "unknown key" in (validate(example, set(QUESTION_KEYS), set(REQUIRED)) or "")
@@ -76,7 +80,6 @@ class TestValidate:
             "target": {
                 "extracted": {},
                 "skipped_fields": ["loading_docks"],
-                "next_question": {"text": None},
             }
         }
         assert "non-required" in (validate(example, set(QUESTION_KEYS), set(REQUIRED)) or "")
@@ -86,7 +89,6 @@ class TestValidate:
             "target": {
                 "extracted": {"location": "Austin"},
                 "skipped_fields": ["price"],
-                "next_question": {"text": "What type?"},
             }
         }
         assert validate(example, set(QUESTION_KEYS), set(REQUIRED)) is None
@@ -98,7 +100,7 @@ class TestLocationLabels:
         random.seed(11)
         states = {state for _, state in CITIES}
         for _ in range(300):
-            gold, fragment = _field_fragment("location")
+            gold, fragment = _field_fragment("location", PROPERTY_TYPES)
             if "," in gold:
                 _, state = gold.split(",", 1)
                 assert state.strip() in fragment, f"{gold!r} not stated in {fragment!r}"
@@ -122,7 +124,8 @@ class TestGeneratedExamples:
             answered = set(example["current_criteria"]) | set(example["target"]["extracted"])
             answered.discard("_skipped_fields")
             skipped = set(example["target"]["skipped_fields"])
-            assert example["next_question_key"] == _next_question_key(answered, skipped, REQUIRED)
+            assert example["next_question_key"] == _next_question_key(
+                answered, skipped, ORDERED_REQUIRED)
 
     def test_never_re_extracts_what_current_criteria_already_holds(self):
         for example in _examples():
@@ -157,7 +160,7 @@ class TestChatRecord:
         assert json.loads(record["messages"][-1]["content"]) == example["target"]
 
     def test_completion_carries_no_recomputed_fields(self, questions):
-        # P1 removed these from the schema; training data must not reintroduce them.
+        # The schema asks for two fields; training data must not teach a third.
         for example in _examples(n=50):
             completion = json.loads(to_chat_record(example, questions)["messages"][-1]["content"])
-            assert set(completion) == {"extracted", "skipped_fields", "next_question"}
+            assert set(completion) == {"extracted", "skipped_fields"}
