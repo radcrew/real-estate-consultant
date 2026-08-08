@@ -1,56 +1,71 @@
 [
   {
-    "key": "location",
-    "title": "Location",
-    "text": "Which city or area are you looking in?",
-    "type": "location",
-    "options": null,
+    "key": "property_type",
+    "title": "Property Type",
+    "text": "What type of property are you looking for?",
+    "type": "multi-select",
+    "options": [
+      {
+        "label": "Industrial",
+        "value": "industrial"
+      },
+      {
+        "label": "Retail",
+        "value": "retail"
+      },
+      {
+        "label": "Flex",
+        "value": "flex"
+      },
+      {
+        "label": "Land",
+        "value": "land"
+      },
+      {
+        "label": "Office",
+        "value": "office"
+      },
+      {
+        "label": "Multifamily",
+        "value": "multifamily"
+      },
+      {
+        "label": "Specialty",
+        "value": "specialty"
+      }
+    ],
     "order_index": 1,
     "required": true
   },
   {
-    "key": "property_type",
-    "title": "Property type",
-    "text": "What kind of space do you need?",
-    "type": "multiselect",
-    "options": ["Office", "Retail", "Industrial", "Warehouse", "Flex", "Land"],
+    "key": "location",
+    "title": "Location",
+    "text": "Where are you looking to search?",
+    "type": "location",
+    "options": null,
     "order_index": 2,
     "required": true
   },
   {
-    "key": "listing_type",
-    "title": "Buy or lease",
-    "text": "Are you looking to buy or lease?",
-    "type": "select",
-    "options": ["Sale", "Lease"],
-    "order_index": 3,
-    "required": true
-  },
-  {
     "key": "price",
-    "title": "Budget",
-    "text": "What budget range are you working with?",
+    "title": "Price",
+    "text": "What is your budget range?",
     "type": "range",
-    "options": { "unit": "USD" },
-    "order_index": 4,
+    "options": {
+      "unit": "USD"
+    },
+    "order_index": 3,
     "required": true
   },
   {
     "key": "size_sqft",
     "title": "Size",
-    "text": "How much space do you need?",
+    "text": "What size are you looking for (in square feet)?",
     "type": "range",
-    "options": { "unit": "sqft" },
-    "order_index": 5,
+    "options": {
+      "unit": "FT"
+    },
+    "order_index": 4,
     "required": true
-  },
-  {
-    "key": "loading_docks",
-    "title": "Loading docks",
-    "text": "How many loading docks do you need?",
-    "type": "number",
-    "options": null,
-    "order_index": 6,
-    "required": false
   }
 ]
