@@ -277,16 +277,33 @@ it is not a fix, and no phase should depend on it.
 
 ---
 
-## The 7B row: attempted, still not measurable
+## The 7B row: attempted three times, still not measurable
 
-The router accepted **6 calls** and then returned 402 again. The key, model id and harness
-path are all fine — this is depleted credits, not configuration. The runner aborted on the
-402 rather than burning the remaining turns, which is what `FATAL_STATUS` exists for.
+**Attempt on r4.** A one-token probe to the router returned `ok`, so the key, model id and
+harness path are all confirmed working. The eval then accepted **5 turns** and returned 402:
 
-The 5 scored turns were all `single-field`, the easiest category. **Not a baseline, not
-comparable to anything.** Two hints worth confirming, not believing: the 7B also over-emits
-(precision 0.500 on single-field gold), and the router showed p95 10985 ms against p50
-1612 ms on five requests — a tail a warm local process does not have.
+```
+You have depleted your monthly included credits.
+```
+
+The probe passes and the eval does not because an intake prompt is ~950 tokens against the
+probe's five. Whatever allowance remains covers trivial calls and nothing real. `7b-router-r4.json`
+holds those 5 turns and their raw outputs; it is **not a row** and must not be pasted into
+the r4 table.
+
+Earlier attempts on r2 got 6 calls and then 402. Same cause, same abort — which is what
+`FATAL_STATUS` exists for, and the reason ~97 turns were not burned against a dead key.
+
+Both times the scored turns were all `single-field`, the easiest category. **Not a
+baseline, not comparable to anything.** Two hints worth confirming rather than believing,
+consistent across r2 and r4: the 7B over-emits too (field precision 0.500 on r2, 0.625 on
+r4, both against single-field gold), and the router shows a long tail a warm local process
+does not have — p95 10985 ms against p50 1612 ms on r2, p95 2833 ms against p50 1882 ms on
+r4's five.
+
+The thresholds this row has to be judged against are now written down — see
+**The gate** in `INTAKE_MODEL_FINETUNE_PLAN.md`. They were set before any 7B number
+existed, which is the only time thresholds mean anything.
 
 ## What this does not settle
 
@@ -294,6 +311,13 @@ comparable to anything.** Two hints worth confirming, not believing: the 7B also
 still no measurement of the model this would replace, so "good enough" has no referent.
 Restoring credits or setting `OPENROUTER_API_KEY` is the only thing in the way, and it
 fixes the production outage at the same time.
+
+**And when it does close, it will close on a weak set.** Bootstrapping r4 gives field F1 a
+95% interval of 0.129 and skip recall 0.278, because 102 turns carry only 76 gold fields
+and 41 gold skips — a third of the turns are deliberately empty. Nothing below ~0.05 field
+F1 is enforceable. If the 7B row lands inside a margin, the honest answer is that the
+dataset cannot decide, not that the 0.5B passed. Growing the eval to ~400 turns is open
+decision 6 for that reason.
 
 ## Later rows
 

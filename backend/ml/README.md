@@ -144,7 +144,7 @@ python -m ml.train.merge                  # fold the adapter into the base weigh
 ```
 
 Loss is on completion tokens only — the prompt is masked to `-100`. On the current set
-that means **3.7% of tokens are supervised**; training on the rest would spend the
+that means **3.3% of tokens are supervised**; training on the rest would spend the
 gradient teaching the model to recite a schema it is handed at inference time anyway.
 
 The chat template comes from the tokenizer. The encoder asserts the prompt is a strict
@@ -153,21 +153,48 @@ wrong place trains on nothing useful and fails silently.
 
 ### Cost on CPU, measured
 
-On an i7-10750H (6 physical cores) the smoke run came in at **~196 s per optimizer step**
-at batch 1 × grad-accum 8, so roughly 24.5 s per example. A full 2-epoch run over 1800
-examples is about **24 hours**.
+On an i7-10750H (6 physical cores), measured from the smoke run: **~12.1 s per example**
+at batch 1 × grad-accum 8, excluding eval passes.
 
-That is the number open decision 2 needs. The options, in order of how much they cost you:
+That is half the 24.5 s/example this said before the questionnaire was fixed, and the
+reason is sequence length. Dropping two questions from the prompt and `next_question` from
+the target took the average row from 933 tokens to 718, and attention is quadratic in
+length, so a 23% shorter sequence costs well under 77% as much.
 
 | Path | Time | Note |
 |---|---|---|
-| Free hosted GPU notebook | minutes | A GPU you do not own, provision or pay for, used once, offline |
-| CPU, full set, 2 epochs | ~24 h | Run it overnight; nothing else needs the machine |
-| CPU, 600 examples, 1 epoch | ~4 h | Enough to see whether the adapter moves the metrics at all |
+| CPU, full set, 2 epochs | **~12 h** | Run it overnight; nothing else needs the machine |
+| CPU, 600 examples, 1 epoch | **~2 h** | Enough to see whether the adapter moves the metrics |
+| CPU, under ~600 examples | — | Not worth it; the effect lands inside the eval's noise |
+
+**Re-measure after any prompt change.** This number tracks sequence length, not the
+model, so a schema edit moves it.
 
 `bf16` is used on CUDA and `fp32` on CPU. The plan specifies bf16, which is right on a
 GPU; this CPU has neither AVX512-BF16 nor AMX, so bf16 would be emulated and cost speed
 rather than save it.
+
+## `questions.json` is generated, not written
+
+```bash
+python -m ml.eval.dump_questions        # overwrites ml/eval/questions.json from the DB
+```
+
+Both the harness and the data generator read `ml/eval/questions.json`. It used to be
+hand-written, and it drifted from the database on the first commit and stayed wrong for
+the life of the branch: it described **six** questions where the `questions` table has held
+**four** since 2026-04-21, and gave them plain-string options where the real rows use
+`{"label": ..., "value": ...}` dicts.
+
+Nothing caught it. Every eval turn and every training example was built against a
+questionnaire that does not exist, `where_criteria` never filtered on the two extra
+fields, and the guard that validates answers against configured choices silently matched
+nothing because it only understood the string form.
+
+So: **never edit this file by hand.** Change the questionnaire in the database, re-run the
+dump, then rebuild `dataset.jsonl` and `train.jsonl` — gold keys, gold values and
+`next_question_key` are all keyed to it. That is a new dataset revision, and rows from the
+old questionnaire are not comparable to rows from the new one.
 
 ## Running the eval
 
@@ -199,7 +226,7 @@ Useful flags:
 | `--concurrency N` | Leave at 1 for CPU serving; parallel requests contend for cores |
 | `--duplicate-schema` | Re-add the provider's schema copy, as intake sent before P1 |
 | `--no-json-mode` | For endpoints that reject `response_format` |
-| `--no-next-question` | Score next-question accuracy as n/a once the key leaves the schema |
+| `--no-next-question` | Score next-question accuracy as n/a. Always pass this: the backend picks the question from `questions.json`, so nothing the model writes there is used |
 
 ## Why the harness imports from `app`
 
