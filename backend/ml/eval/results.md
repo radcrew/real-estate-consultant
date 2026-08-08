@@ -9,13 +9,103 @@ table.** When the dataset changes, previous rows become historical and a new tab
 
 ## Dataset revisions
 
-| Rev | Turns | Notes |
-|---|---|---|
-| **r2 (current)** | 102 | skip 10 → 25, new `answer-and-skip` category, 26 holdout |
-| r1 | 52 | Original set. Rows below, kept for the conclusions they still support |
+| Rev | Turns | Questionnaire | Notes |
+|---|---|---|---|
+| **r4 (current)** | 102 | **the real one** | First revision built from the live `questions` table |
+| r3 | 110 | fictional | `bound-direction` added, skip turns decontaminated. Never published |
+| r2 | 102 | fictional | skip 10 → 25, new `answer-and-skip` category |
+| r1 | 52 | fictional | Original set |
 
 r1's 10 skip turns meant skip recall could not resolve anything finer than 0.1, which was
 useless for judging a change aimed squarely at skip detection. That is why r2 exists.
+
+### Everything before r4 was scored against a questionnaire that does not exist
+
+`ml/eval/questions.json` was hand-written when the harness was built and never checked
+against the database. It described **six** questions; the `questions` table has held
+**four** since 2026-04-21, and nothing on this branch added or removed a row. So
+`listing_type` and `loading_docks` have never existed, `where_criteria` does not filter on
+them, and **92 of r3's 110 turns referenced one of them**. A further 50 used property
+types the questionnaire never offered.
+
+Every r1, r2 and r3 number was therefore measured on a longer prompt with two extra
+extraction targets than production has ever sent. Those rows are kept below because the
+comparisons *within* a revision were internally consistent — INT4 costing nothing, v1
+against v2 — but no absolute figure from them describes the shipped product.
+
+r4 is a dump of the live table (`ml.eval.dump_questions`), with the dataset rebuilt against
+it: 8 turns dropped that answered a field which does not exist, 8 refusals re-pointed at a
+live field, and `Warehouse` mapped to `industrial` — no listing carries Warehouse.
+
+---
+
+## r4 — 102 turns, the real questionnaire
+
+Same serving setup as r2: llama.cpp b10290, 6 threads, `--parallel 1`, `--cache-reuse 256`,
+i7-10750H. All rows `--split all --no-next-question`. Prompt is 2689 chars, down from 3983,
+because the schema now describes four questions instead of six.
+
+| Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0.5b-lora-v2-q4km-r4 | LoRA v2 Q4_K_M | 102 | 0.990 | 0.805 | 0.921 | 0.859 | 0.657 | 0.690 | 0.707 | 1256 | 1689 |
+
+```bash
+python -m ml.eval.run --label 0.5b-lora-v2-q4km-r4 --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v2-q4_k_m
+```
+
+**This is v2 measured outside the conditions it was tuned for.** The adapter was trained
+against the six-question prompt with a three-key output object. It is not a ceiling for
+what a model trained on r4 data would reach, and it should not be read as a regression
+from r2's 0.926 — different questionnaire, different task.
+
+### Removing `next_question` from the schema broke the adapter
+
+The first r4 attempt scored raw JSON validity **0.794**: 21 of 102 replies were malformed,
+all in the same shape.
+
+```
+{"extracted":{"price":{"max":2000000}},"skipped_fields":[}}
+```
+
+It stops exactly where the third key used to begin. v2's fine-tune encoded a three-key
+object, so asking for two leaves it stranded mid-structure. Confirmed by running the same
+four turns twice against the same model, changing only the schema: 4 broken with two keys,
+4 valid with three.
+
+`_extract_json_object` cannot salvage `[}}`, so those turns fail outright — in production,
+not just in the harness. **A fine-tuned model's output shape is part of its contract; a
+schema change is a breaking change to the weights, not a prompt edit.**
+
+`next_question` is therefore back in the schema as a compatibility shim: required so the
+learned shape stays valid, carrying no description so there is no prose to copy into a
+reply, and its value discarded by `resolve_next_intake_question`. Raw JSON validity
+returned to 0.990. Delete the shim once a model trained on the two-key schema is serving.
+
+### Per category
+
+| Category | Turns | Field F1 | Value acc | Skip recall |
+|---|---|---|---|---|
+| `skip` | 25 | 1.000 | 1.000 | 0.720 |
+| `unit-ambiguity` | 12 | 1.000 | 0.750 | — |
+| `bound-direction` | 8 | 0.941 | 0.500 | — |
+| `multi-field` | 14 | 0.900 | 0.630 | — |
+| `single-field` | 9 | 0.889 | 0.875 | — |
+| `previously-skipped` | 8 | 0.800 | 0.500 | 0.875 |
+| `correction` | 8 | 0.706 | 0.667 | — |
+| `answer-and-skip` | 5 | 0.571 | 0.500 | 0.250 |
+| `complete` | 5 | n/a | n/a | 0.750 |
+| `empty-or-noise` | 8 | n/a | n/a | — |
+
+`bound-direction` shows the split this project keeps rediscovering: field F1 0.941 with
+value accuracy 0.500 means the right key and the right figure on the wrong side of the
+range. The deterministic corrector in `app/domain/bounds.py` fixes that downstream, and
+the harness cannot see it — it scores raw model output by design.
+
+`answer-and-skip` remains the weakest shape at 5 turns, too few to resolve anything.
+
+---
 
 ## Conventions the gold labels assume
 

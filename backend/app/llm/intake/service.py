@@ -14,10 +14,7 @@ from app.domain.intake_criteria import (
     drop_unconfigured_choices,
 )
 from app.domain.intake_next_question import (
-    find_question_row_by_key,
     first_question_row_in_missing,
-    match_row_for_text_suggestion,
-    suggested_question_as_dict,
 )
 from app.domain.intake_validation import merge_missing_fields
 from app.llm.intake.exceptions import raise_hf_opening_response_missing_text
@@ -180,57 +177,23 @@ def resolve_next_intake_question(
     suggested_question: object,
     missing_fields: list[str],
 ) -> IntakeSessionFirstQuestion | None:
-    """Let the model phrase the question; the backend decides whether to ask, and what.
+    """Pick the next question from ``missing_fields``, using the configured wording.
 
-    ``missing_fields`` is the backend's own record of what is still unanswered, and it
-    wins. The model writes ``next_question.text`` from the turn in front of it, without
-    knowing what was recorded, so it will ask for a field that same turn just filled in —
-    a completed session was still showing "What is your budget range?" after the budget
-    was given. P1 already stopped trusting ``next_question.key`` for this reason; whether
-    to ask at all belongs to the backend on the same grounds.
+    ``suggested_question`` is accepted and deliberately ignored. The model is still asked
+    for it — see ``build_intake_response_schema`` — because the tuned adapter emits
+    malformed JSON without the field, but nothing it writes there is used.
+
+    Four defects came from trusting that text. It is composed from the turn alone, with
+    no knowledge of what the backend recorded, so it asked for a field the same turn had
+    just filled in, echoed the user's own sentence back as a question, merged two
+    questions into one, and copied the schema's own description into a reply.
+    ``questions.json`` holds the wording and cannot get any of that wrong.
     """
-    # Nothing outstanding means no question, whatever the model wrote.
     if not missing_fields:
         return None
 
-    outstanding = set(missing_fields)
-    suggested = suggested_question_as_dict(suggested_question)
-    suggested_key = suggested.get("key")
-    suggested_text = suggested.get("text")
-
-    def _canonical() -> IntakeSessionFirstQuestion | None:
-        """Fall back to the wording configured in the questionnaire."""
-        row = first_question_row_in_missing(questions, missing_fields)
-        return map_question_to_model(row) if row else None
-
-    # Handle text suggestion
-    if isinstance(suggested_text, str) and (text := suggested_text.strip()):
-        row = match_row_for_text_suggestion(
-            questions,
-            suggested_key=suggested_key,
-            missing_fields=missing_fields,
-        )
-        # The model may only word a question the backend actually wants asked. Anything
-        # else — an unknown row, or one already answered — falls back to canonical text.
-        if row is None or row.get("key") not in outstanding:
-            return _canonical()
-
-        mapped = map_question_to_model(row)
-        return IntakeSessionFirstQuestion(
-            key=mapped.key,
-            title=mapped.title,
-            text=text,
-            type=mapped.type,
-            options=mapped.options,
-        )
-
-    # Handle key suggestion
-    if isinstance(suggested_key, str) and suggested_key in outstanding:
-        if row := find_question_row_by_key(questions, suggested_key):
-            return map_question_to_model(row)
-
-    # Fallback
-    return _canonical()
+    row = first_question_row_in_missing(questions, missing_fields)
+    return map_question_to_model(row) if row else None
 
 
 def _build_intake_parse_result(

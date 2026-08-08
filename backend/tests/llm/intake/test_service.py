@@ -158,15 +158,17 @@ class TestResolveNextIntakeQuestion:
         _q("budget", "range", order=2, text="Budget?", title="Budget"),
     ]
 
-    def test_text_suggestion_returns_first_question(self):
+    def test_model_authored_text_is_ignored(self):
+        """The model still emits next_question so its JSON stays well formed, but the
+        wording comes from the questionnaire — four defects came from trusting it."""
         result = resolve_next_intake_question(
             questions=self._QUESTIONS,
             suggested_question={"key": "location", "text": "Where would you like to live?"},
             missing_fields=["location"],
         )
         assert isinstance(result, IntakeSessionFirstQuestion)
-        assert result.text == "Where would you like to live?"
         assert result.key == "location"
+        assert result.text == "Where?"
 
     def test_nothing_missing_means_no_question(self):
         """A completed session kept asking because the model still wrote question text."""

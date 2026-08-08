@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from app.llm.intake.schema import (
     build_intake_response_schema,
     extract_question_keys,
@@ -66,7 +64,7 @@ class TestBuildIntakeResponseSchema:
 
     def test_top_level_required_keys_present(self):
         schema = build_intake_response_schema(questions=[_q("loc", "location", 1)])
-        assert set(schema["required"]) == {"extracted", "skipped_fields"}
+        assert set(schema["required"]) == {"extracted", "skipped_fields", "next_question"}
 
     def test_recomputed_fields_are_not_requested(self):
         # merge_missing_fields recomputes one and derives the other, so asking the
@@ -75,12 +73,17 @@ class TestBuildIntakeResponseSchema:
         assert "missing_fields" not in schema["properties"]
         assert "is_complete" not in schema["properties"]
 
-    def test_next_question_is_not_requested(self):
-        # The model wrote it from the turn alone and caused four defects: schema prose
-        # shown verbatim, a question on a completed session, the user's own sentence
-        # echoed back, and two questions at once. questions.json holds the wording.
+    def test_next_question_is_asked_for_but_carries_no_description(self):
+        # Asked for only so the tuned adapter, which learned a three-key object, keeps
+        # emitting valid JSON -- without it 21% of turns came back as
+        # '"skipped_fields":[}}'. The value is discarded by
+        # resolve_next_intake_question, and it carries no description so there is no
+        # prose for the model to copy into a reply.
         schema = build_intake_response_schema(questions=[_q("loc", "location", 1)])
-        assert "next_question" not in schema["properties"]
+        next_question = schema["properties"]["next_question"]
+        assert set(next_question["properties"]) == {"text"}
+        assert "description" not in next_question
+        assert "description" not in next_question["properties"]["text"]
 
     def test_skip_description_carries_no_example_phrases(self):
         # Example refusal phrasings in the schema get echoed back as if they were keys.

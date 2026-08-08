@@ -22,7 +22,8 @@ INTAKE_PARSE_SYSTEM_PROMPT_RULES = (
     "- ``previously_skipped_fields`` in the user message lists keys already skipped. "
     "Copy each one into ``skipped_fields`` — unless this message answers it, in which "
     "case put the value in ``extracted`` and leave the key out of ``skipped_fields``.\n"
-    "- Do not write a follow-up question. The backend chooses what to ask next."
+    "- ``next_question.text`` may be null. The backend chooses what to ask next, so "
+    "nothing you write there is used."
 )
 
 OPENING_QUESTION_SYSTEM_PROMPT_BASE = (

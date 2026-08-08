@@ -126,16 +126,11 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
         if (key := _question_key(row))
     }
 
-    # Only these two survive the backend. ``missing_fields`` is recomputed by
-    # ``merge_missing_fields`` and ``is_complete`` is derived from it, so asking the model
-    # for either buys prompt tokens and nothing else.
+    # Only ``extracted`` and ``skipped_fields`` are read. ``missing_fields`` is recomputed
+    # by ``merge_missing_fields`` and ``is_complete`` is derived from it, so asking the
+    # model for either buys prompt tokens and nothing else.
     #
-    # ``next_question`` is gone for a stronger reason: the model wrote it from the turn
-    # alone, without knowing what the backend had recorded, and it caused four separate
-    # defects — schema prose shown to users verbatim, a question asked on an already
-    # completed session, the user's own sentence echoed back, and two questions in one.
-    # ``questions.json`` already holds the wording and
-    # ``resolve_next_intake_question`` already picks the row, so nothing was gained.
+    # ``next_question`` is asked for but never read — see the note on it below.
     return {
         "type": "object",
         "additionalProperties": False,
@@ -157,8 +152,21 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
                     "Never ask about these again."
                 ),
             },
+            # Compatibility shim, not a request for content. The v2 adapter was tuned
+            # against a three-key object; asking for two makes it emit
+            # ``"skipped_fields":[}}`` and 21% of turns fail to parse. The field is
+            # required so the shape it learned stays valid, carries no description so
+            # there is no prose to copy into a reply, and its value is discarded by
+            # ``resolve_next_intake_question``.
+            #
+            # Delete this once a model trained on the two-key schema is serving.
+            "next_question": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {"text": {"type": ["string", "null"]}},
+            },
         },
-        "required": ["extracted", "skipped_fields"],
+        "required": ["extracted", "skipped_fields", "next_question"],
     }
 
 
