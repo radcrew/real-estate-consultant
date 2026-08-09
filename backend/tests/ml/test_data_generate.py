@@ -14,9 +14,11 @@ import pytest
 
 from ml.data.generate import (
     CITIES,
+    DEFAULT_PHRASINGS,
     DEFAULT_QUESTIONS,
     _field_fragment,
     _next_question_key,
+    load_phrasings,
     make_example,
     property_type_values,
     to_chat_record,
@@ -33,6 +35,7 @@ ORDERED_REQUIRED = [
     q["key"] for q in sorted(_QUESTIONS, key=lambda q: q["order_index"]) if q.get("required")
 ]
 PROPERTY_TYPES = property_type_values(_QUESTIONS)
+PHRASINGS = load_phrasings(DEFAULT_PHRASINGS)
 
 
 @pytest.fixture
@@ -48,6 +51,7 @@ def _examples(n: int = 400, seed: int = 3):
             required=REQUIRED,
             ordered_required=ORDERED_REQUIRED,
             property_types=PROPERTY_TYPES,
+            phrasings=PHRASINGS,
         )
         for _ in range(n)
     ]
@@ -100,7 +104,7 @@ class TestLocationLabels:
         random.seed(11)
         states = {state for _, state in CITIES}
         for _ in range(300):
-            gold, fragment = _field_fragment("location", PROPERTY_TYPES)
+            gold, fragment = _field_fragment("location", PROPERTY_TYPES, PHRASINGS)
             if "," in gold:
                 _, state = gold.split(",", 1)
                 assert state.strip() in fragment, f"{gold!r} not stated in {fragment!r}"
@@ -164,3 +168,39 @@ class TestChatRecord:
         for example in _examples(n=50):
             completion = json.loads(to_chat_record(example, questions)["messages"][-1]["content"])
             assert set(completion) == {"extracted", "skipped_fields"}
+
+
+class TestSynonymEvalSeparation:
+    """The generated phrasings are the training vocabulary; the eval must not reuse them.
+
+    Scoring a synonym turn on a wording the generator emits measures recall of that list,
+    not generalisation. This project has made that mistake twice already -- 14 refusal
+    strings, then 4 comparator phrasings -- and both times the eval looked healthy while
+    the model had learned a list. The phrasings file is regenerated, so overlap can appear
+    without anyone editing a turn.
+    """
+
+    def _synonym_turns(self):
+        from ml.eval.run import EVAL_DIR
+
+        lines = (EVAL_DIR / "dataset.jsonl").read_text(encoding="utf-8").splitlines()
+        rows = [json.loads(line) for line in lines if line.strip()]
+        return [r for r in rows if r["category"] == "property-synonym"]
+
+    def test_the_category_exists(self):
+        assert self._synonym_turns(), "no property-synonym turns; the fix is unmeasurable"
+
+    def test_turns_avoid_every_generated_phrasing(self):
+        phrasings = load_phrasings(DEFAULT_PHRASINGS)
+        trained = {p.lower() for pool in phrasings.values() for p in pool} | set(phrasings)
+        for row in self._synonym_turns():
+            text = row["user_input"].lower()
+            reused = sorted(w for w in trained if w in text)
+            assert not reused, f"{row['id']} reuses training vocabulary: {reused}"
+
+    def test_gold_is_a_configured_option(self):
+        questions = json.loads(Path(DEFAULT_QUESTIONS).read_text(encoding="utf-8"))
+        options = set(property_type_values(questions))
+        for row in self._synonym_turns():
+            for value in row["gold"]["extracted"]["property_type"]:
+                assert value in options, f"{row['id']} golds {value!r}, not an option"

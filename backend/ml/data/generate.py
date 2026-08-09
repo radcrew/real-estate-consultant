@@ -36,6 +36,7 @@ from app.schemas.llm_intake_parse import LlmParseModelOutput
 ML_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_QUESTIONS = ML_DIR / "eval" / "questions.json"
 DEFAULT_EVAL_SET = ML_DIR / "eval" / "dataset.jsonl"
+DEFAULT_PHRASINGS = ML_DIR / "data" / "property_type_phrasings.json"
 
 # Drawn from backend/dataset/raw-data.json so the distribution matches real listings.
 CITIES = [
@@ -195,6 +196,24 @@ PRICE_FMT = (_fmt_money, _price_value)
 SQFT_FMT = (_fmt_sqft, _sqft_value)
 
 
+def load_phrasings(path: Path) -> dict[str, list[str]]:
+    """Wordings a client uses for each option, from ``ml.data.make_phrasings``.
+
+    Every property_type example used to render the option word itself, so the most
+    reinforced rule in the set was *copy the noun you see* — and the tuned model echoed
+    "warehouse" back instead of answering "industrial". These phrasings put a different
+    word in the message from the one in the gold label, which is the only way the set can
+    teach anything other than copying.
+
+    Absent is not fatal: examples fall back to the literal option, which is the old
+    behaviour.
+    """
+    if not path.exists():
+        print(f"no phrasings at {path}; run ml.data.make_phrasings to teach generalisation")
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def property_type_values(questions: list[dict[str, Any]]) -> list[str]:
     """The property types this questionnaire actually offers.
 
@@ -220,7 +239,9 @@ def property_type_values(questions: list[dict[str, Any]]) -> list[str]:
     raise SystemExit("questions.json has no property_type options; run ml.eval.dump_questions")
 
 
-def _field_fragment(key: str, property_types: list[str]) -> tuple[Any, str]:
+def _field_fragment(
+    key: str, property_types: list[str], phrasings: dict[str, list[str]]
+) -> tuple[Any, str]:
     """Return (gold value, natural-language fragment) for one field."""
     if key == "location":
         city, state = random.choice(CITIES)
@@ -229,8 +250,13 @@ def _field_fragment(key: str, property_types: list[str]) -> tuple[Any, str]:
         return gold, template.format(city=city, state=state)
     if key == "property_type":
         picked = random.sample(property_types, random.choice([1, 1, 1, 2]))
-        words = " or ".join(t.lower() for t in picked)
-        return picked, random.choice(TYPE_TEMPLATES).format(types=words)
+        words = []
+        for option in picked:
+            pool = phrasings.get(option, [])
+            # Half literal. All-phrasing would teach the mirror-image mistake: the model
+            # would stop recognising the option words themselves.
+            words.append(random.choice(pool) if pool and random.random() < 0.5 else option)
+        return picked, random.choice(TYPE_TEMPLATES).format(types=" or ".join(words))
     if key == "listing_type":
         choice = random.choice(["Sale", "Lease"])
         return choice, random.choice(LISTING_TEMPLATES[choice])
@@ -258,6 +284,7 @@ def make_example(
     required: list[str],
     ordered_required: list[str],
     property_types: list[str],
+    phrasings: dict[str, list[str]],
 ) -> dict[str, Any]:
     """One training example. Shape is chosen first, so sparsity is controlled, not incidental."""
     # Weighted so over half the set teaches restraint rather than extraction. `skip` is
@@ -274,7 +301,7 @@ def make_example(
     # is already in current_criteria.
     if random.random() < 0.45:
         for key in random.sample(required, random.randint(1, max(1, len(required) - 2))):
-            prior[key], _ = _field_fragment(key, property_types)
+            prior[key], _ = _field_fragment(key, property_types, phrasings)
 
     remaining = [k for k in question_keys if k not in prior]
     if not remaining:
@@ -297,7 +324,7 @@ def make_example(
         # had empty `extracted`, so answering and skipping looked mutually exclusive.
         answerable = [k for k in remaining if k in required] or remaining
         answer_key = random.choice(answerable)
-        extracted[answer_key], fragment = _field_fragment(answer_key, property_types)
+        extracted[answer_key], fragment = _field_fragment(answer_key, property_types, phrasings)
         candidates = [
             k for k in required if k not in prior and k != answer_key
         ]
@@ -321,18 +348,18 @@ def make_example(
         available = [k for k in remaining if k not in carried]
         if available:
             key = random.choice(available)
-            extracted[key], fragment = _field_fragment(key, property_types)
+            extracted[key], fragment = _field_fragment(key, property_types, phrasings)
             fragments.append(fragment)
         user_input = ", ".join(fragments)
     elif shape == "complete":
         for key in required:
             if key not in prior:
-                prior[key], _ = _field_fragment(key, property_types)
+                prior[key], _ = _field_fragment(key, property_types, phrasings)
         user_input = random.choice(COMPLETE_PHRASES)
     else:
         count = 1 if shape == "single" else random.randint(2, min(4, len(remaining)))
         for key in random.sample(remaining, count):
-            extracted[key], fragment = _field_fragment(key, property_types)
+            extracted[key], fragment = _field_fragment(key, property_types, phrasings)
             fragments.append(fragment)
         user_input = ", ".join(fragments)
 
@@ -421,6 +448,7 @@ def main() -> int:
     parser.add_argument("--count", type=int, default=2000)
     parser.add_argument("--questions", default=str(DEFAULT_QUESTIONS))
     parser.add_argument("--eval-set", default=str(DEFAULT_EVAL_SET))
+    parser.add_argument("--phrasings", default=str(DEFAULT_PHRASINGS))
     parser.add_argument("--out", default=str(ML_DIR / "data" / "train.jsonl"))
     parser.add_argument("--val-out", default=str(ML_DIR / "data" / "val.jsonl"))
     parser.add_argument("--val-fraction", type=float, default=0.1)
@@ -431,6 +459,7 @@ def main() -> int:
     questions = json.loads(Path(args.questions).read_text(encoding="utf-8"))
     question_keys = [q["key"] for q in questions]
     property_types = property_type_values(questions)
+    phrasings = load_phrasings(Path(args.phrasings))
     required = [q["key"] for q in questions if q.get("required")]
     ordered_required = [
         q["key"] for q in sorted(questions, key=lambda q: q["order_index"]) if q.get("required")
@@ -450,6 +479,7 @@ def main() -> int:
             required=required,
             ordered_required=ordered_required,
             property_types=property_types,
+            phrasings=phrasings,
         )
         reason = validate(example, set(question_keys), set(required))
         if reason:
