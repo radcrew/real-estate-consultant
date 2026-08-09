@@ -199,6 +199,36 @@ def drop_self_describing_values(
     return cleaned
 
 
+_RANGE_KEYS = frozenset({"min", "max", "unit"})
+
+
+def _is_range(value: Any) -> bool:
+    return isinstance(value, dict) and bool(value) and set(value) <= _RANGE_KEYS
+
+
+def merge_criteria(current: dict[str, Any], extracted: dict[str, Any]) -> dict[str, Any]:
+    """Fold this turn's answers into what the session already knows.
+
+    A plain ``{**current, **extracted}`` replaces a range wholesale, so a turn that states
+    only the other bound destroys the one already recorded: "under $1M" followed by "more
+    than 100K" ends up as ``{"min": 100000}`` with the ceiling gone. The user stated two
+    bounds and the session keeps one.
+
+    Ranges therefore merge bound-wise, this turn winning per key. Corrections still work —
+    ``{"max": 1000000}`` then ``{"max": 3000000}`` gives ``{"max": 3000000}`` — because
+    only the bounds actually restated are overwritten. Every other type replaces, which is
+    what a corrected location or property type should do.
+
+    There is no way to *remove* a bound, which is the accepted cost: dropping one is far
+    rarer than adding the second, and silently losing a stated bound is the worse failure.
+    """
+    merged = dict(current)
+    for key, value in extracted.items():
+        existing = merged.get(key)
+        merged[key] = {**existing, **value} if _is_range(existing) and _is_range(value) else value
+    return merged
+
+
 def _choice_aliases(row: dict[str, Any]) -> dict[str, str]:
     """Map every accepted spelling (casefolded) to the value that should be stored.
 

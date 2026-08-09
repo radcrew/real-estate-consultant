@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -12,6 +13,7 @@ from app.domain.intake_criteria import (
     drop_placeholder_values,
     drop_self_describing_values,
     drop_unconfigured_choices,
+    merge_criteria,
 )
 from app.domain.intake_next_question import (
     first_question_row_in_missing,
@@ -29,7 +31,7 @@ from app.llm.providers.prompts import (
 from app.repositories.questions import map_question_to_model
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.schemas.llm_intake_parse import LlmOpeningQuestionOutput, LlmParseModelOutput
-import logging
+
 logger = logging.getLogger(__name__)
 
 QuestionRow = dict[str, Any]
@@ -90,7 +92,8 @@ def build_intake_messages(
         ensure_ascii=True,
     )
     print('-------- user_prompt --------', user_prompt, flush=True)
-    logger.debug("intake_prompt", extra={"system_prompt": system_prompt, "user_prompt": user_prompt})
+    logger.debug("intake_prompt",
+                 extra={"system_prompt": system_prompt, "user_prompt": user_prompt})
 
     return IntakePrompt(
         messages=[
@@ -228,7 +231,7 @@ def _build_intake_parse_result(
     # lone bound sits on is decided here from the message itself. No-op unless the
     # message states one direction and the model chose the other.
     extracted = correct_bound_direction(extracted, user_input)
-    merged_criteria = {**current_criteria, **extracted}
+    merged_criteria = merge_criteria(current_criteria, extracted)
 
     # Union carries a skip forward across turns, so the user is never re-asked. Then
     # subtract what is answered: a field the user has since filled in is no longer

@@ -445,7 +445,7 @@ def eval_input_keys(path: Path) -> set[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--count", type=int, default=2000)
+    parser.add_argument("--count", type=int, default=2500)
     parser.add_argument("--questions", default=str(DEFAULT_QUESTIONS))
     parser.add_argument("--eval-set", default=str(DEFAULT_EVAL_SET))
     parser.add_argument("--phrasings", default=str(DEFAULT_PHRASINGS))

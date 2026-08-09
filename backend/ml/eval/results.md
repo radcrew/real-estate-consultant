@@ -11,7 +11,8 @@ table.** When the dataset changes, previous rows become historical and a new tab
 
 | Rev | Turns | Questionnaire | Notes |
 |---|---|---|---|
-| **r4 (current)** | 102 | **the real one** | First revision built from the live `questions` table |
+| **r5 (current)** | 108 | the real one | `property-synonym` added — 6 turns on wordings the generator never emits |
+| r4 | 102 | the real one | First revision built from the live `questions` table |
 | r3 | 110 | fictional | `bound-direction` added, skip turns decontaminated. Never published |
 | r2 | 102 | fictional | skip 10 → 25, new `answer-and-skip` category |
 | r1 | 52 | fictional | Original set |
@@ -36,6 +37,67 @@ against v2 — but no absolute figure from them describes the shipped product.
 r4 is a dump of the live table (`ml.eval.dump_questions`), with the dataset rebuilt against
 it: 8 turns dropped that answered a field which does not exist, 8 refusals re-pointed at a
 live field, and `Warehouse` mapped to `industrial` — no listing carries Warehouse.
+
+---
+
+## r5 — 108 turns, `property-synonym` added
+
+Same serving setup throughout: llama.cpp b10290, 6 threads, `--parallel 1`,
+`--cache-reuse 256`, i7-10750H. All rows `--split all --no-next-question`.
+
+r5 adds six turns testing whether the model maps a client's wording onto a configured
+option — `a depot for our trucks`, `cold storage facility`, `an empty parcel to build on`.
+Every wording is checked against the generated training vocabulary before it is added, and
+a test enforces that on every run, because `property_type_phrasings.json` is regenerated
+and could otherwise drift into overlap.
+
+| Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0.5b-lora-v2-q4km-r5 | LoRA v2 Q4_K_M | 108 | 1.000 | 0.810 | 0.988 | 0.890 | 0.593 | 0.535 | 0.480 | 1144 | 1537 |
+
+```bash
+python -m ml.eval.run --label 0.5b-lora-v2-q4km-r5 --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v2-q4_k_m
+```
+
+### The defect the new category isolates
+
+| Category | Turns | Field F1 | Value acc | Skip recall |
+|---|---|---|---|---|
+| `unit-ambiguity` | 12 | 1.000 | 0.667 | — |
+| `single-field` | 9 | 0.947 | 0.778 | — |
+| `bound-direction` | 8 | 0.941 | 0.375 | — |
+| `correction` | 8 | 0.941 | 0.625 | — |
+| `multi-field` | 14 | 0.935 | 0.655 | — |
+| `previously-skipped` | 8 | 0.800 | 0.750 | 0.750 |
+| **`property-synonym`** | **6** | **0.800** | **0.000** | — |
+| `skip` | 25 | 0.667 | 1.000 | 0.480 |
+| `answer-and-skip` | 5 | 0.571 | 0.500 | 0.500 |
+| `complete` | 5 | n/a | n/a | 0.750 |
+| `empty-or-noise` | 8 | n/a | n/a | — |
+
+**Field F1 0.800 with value accuracy 0.000.** The model emits the `property_type` key on
+almost every turn and gets the value wrong on every one — it echoes the client's noun
+("warehouse", "a shop") instead of naming a configured option, so the value is dropped as
+unconfigured and the field goes unanswered.
+
+That is the cleanest signal this eval has produced. A floor of exactly zero means any
+movement is unambiguous, which is what the v3 training run is measured against.
+
+### Skip recall on this eval is too noisy to read from one run
+
+Skip recall came in at **0.480** here against **0.707** on r4 — over the *same 25 turns*,
+unchanged between revisions. Nothing about them differs; that is run-to-run variation at
+temperature 0.1.
+
+It matches the bootstrap measured on r4 (skip recall 95% interval 0.278 wide, on 41 gold
+skips), but observing it directly on identical turns is more convincing than the interval
+was. **Treat any single-run skip difference below ~0.25 as noise.**
+
+This makes the gate's 0.10 skip-recall threshold unenforceable as written: the metric's own
+run-to-run spread is more than twice the margin it is supposed to police. Either score each
+model twice and compare means, or the threshold needs revisiting.
 
 ---
 
