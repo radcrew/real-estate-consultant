@@ -30,6 +30,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from app.llm.intake.service import build_intake_messages
 from app.schemas.llm_intake_parse import LlmParseModelOutput
 from ml.paths import EVAL_DATASET_PATH, PHRASINGS_PATH, QUESTIONS_PATH, TRAIN_PATH, VAL_PATH
@@ -400,7 +402,7 @@ def validate(example: dict[str, Any], question_keys: set[str], required: set[str
         return f"key in both extracted and skipped: {sorted(both)}"
     try:
         LlmParseModelOutput.model_validate(target)
-    except Exception as exc:  # noqa: BLE001 - reported, not raised
+    except ValidationError as exc:
         return f"fails LlmParseModelOutput: {exc}"
     return None
 

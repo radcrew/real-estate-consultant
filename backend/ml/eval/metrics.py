@@ -11,6 +11,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from pydantic import ValidationError
+
 from app.schemas.llm_intake_parse import LlmParseModelOutput
 
 # Value comparison ------------------------------------------------------------------
@@ -81,6 +83,11 @@ def parse_raw_output(raw_text: str) -> tuple[bool, bool, LlmParseModelOutput | N
     Deliberately does **not** use the provider's fence-stripper: raw validity is the
     number we want, and ``_extract_json_object`` would hide a model that wraps its reply
     in markdown or pads it with commentary.
+
+    Only ``ValidationError`` counts as schema-invalid. A bare ``except Exception`` here
+    would fold a broken ``LlmParseModelOutput`` -- a renamed field, a bad annotation --
+    into ``schema_valid=False`` on every turn, and the run would finish and write a
+    plausible-looking table of zeros rather than failing.
     """
     try:
         json.loads(raw_text)
@@ -89,7 +96,7 @@ def parse_raw_output(raw_text: str) -> tuple[bool, bool, LlmParseModelOutput | N
 
     try:
         return True, True, LlmParseModelOutput.model_validate_json(raw_text)
-    except Exception:
+    except ValidationError:
         return True, False, None
 
 

@@ -11,6 +11,7 @@ import json
 import pytest
 
 from app.schemas.llm_intake_parse import LlmParseModelOutput
+from ml.eval import metrics
 from ml.eval.metrics import (
     aggregate,
     by_category,
@@ -103,6 +104,23 @@ class TestParseRawOutput:
 
     def test_empty_string_is_invalid(self):
         assert parse_raw_output("") == (False, False, None)
+
+    def test_a_broken_schema_class_raises_instead_of_scoring_zero(self, monkeypatch):
+        """Only ValidationError means "the model got it wrong".
+
+        Under a bare ``except Exception`` a fault in LlmParseModelOutput itself -- a
+        renamed field, a bad annotation -- reads as schema_valid=False on every turn. The
+        run then completes and writes a plausible table of zeros, which is the one failure
+        this harness must not produce quietly.
+        """
+        def exploding_validate(_raw):
+            raise AttributeError("LlmParseModelOutput is broken")
+
+        monkeypatch.setattr(
+            metrics.LlmParseModelOutput, "model_validate_json", exploding_validate
+        )
+        with pytest.raises(AttributeError):
+            parse_raw_output('{"extracted": {}, "skipped_fields": []}')
 
 
 class TestFieldScoring:
