@@ -107,8 +107,7 @@ stop. About a third of examples therefore have empty `extracted` (noise, greetin
 skips, confirmations), the average example names fewer than two fields, and no example
 ever lists a key in both `extracted` and `skipped_fields`.
 
-Every row is validated before it is written, and any row whose `(user_input,
-current_criteria)` matches the eval set is dropped, so training never contains a turn we
+Every row is validated before it is written, and any row whose `(user_input, current_criteria)` matches the eval set is dropped, so training never contains a turn we
 score on. Prompts come from `build_intake_messages`, so the training text is what the
 model will see at serving time.
 
@@ -161,11 +160,11 @@ reason is sequence length. Dropping two questions from the prompt and `next_ques
 the target took the average row from 933 tokens to 718, and attention is quadratic in
 length, so a 23% shorter sequence costs well under 77% as much.
 
-| Path | Time | Note |
-|---|---|---|
-| CPU, full set, 2 epochs | **~12 h** | Run it overnight; nothing else needs the machine |
-| CPU, 600 examples, 1 epoch | **~2 h** | Enough to see whether the adapter moves the metrics |
-| CPU, under ~600 examples | — | Not worth it; the effect lands inside the eval's noise |
+| Path                       | Time            | Note                                                   |
+| -------------------------- | --------------- | ------------------------------------------------------ |
+| CPU, full set, 2 epochs    | **~12 h** | Run it overnight; nothing else needs the machine       |
+| CPU, 600 examples, 1 epoch | **~2 h**  | Enough to see whether the adapter moves the metrics    |
+| CPU, under ~600 examples   | —              | Not worth it; the effect lands inside the eval's noise |
 
 **Re-measure after any prompt change.** This number tracks sequence length, not the
 model, so a schema edit moves it.
@@ -219,14 +218,14 @@ command prints a markdown row to paste into `ml/eval/results.md`.
 
 Useful flags:
 
-| Flag | Why |
-|---|---|
-| `--split holdout` | Score the slice reserved from training |
-| `--category skip` | Isolate one behaviour while iterating |
-| `--concurrency N` | Leave at 1 for CPU serving; parallel requests contend for cores |
-| `--duplicate-schema` | Re-add the provider's schema copy, as intake sent before P1 |
-| `--no-json-mode` | For endpoints that reject `response_format` |
-| `--no-next-question` | Score next-question accuracy as n/a. Always pass this: the backend picks the question from `questions.json`, so nothing the model writes there is used |
+| Flag                   | Why                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--split holdout`    | Score the slice reserved from training                                                                                                                  |
+| `--category skip`    | Isolate one behaviour while iterating                                                                                                                   |
+| `--concurrency N`    | Leave at 1 for CPU serving; parallel requests contend for cores                                                                                         |
+| `--duplicate-schema` | Re-add the provider's schema copy, as intake sent before P1                                                                                             |
+| `--no-json-mode`     | For endpoints that reject`response_format`                                                                                                            |
+| `--no-next-question` | Score next-question accuracy as n/a. Always pass this: the backend picks the question from`questions.json`, so nothing the model writes there is used |
 
 ## Why the harness imports from `app`
 

@@ -16,9 +16,27 @@ def _question_key(row: QuestionRow) -> str | None:
 
 
 def _string_options(options: Any) -> list[str]:
-    if isinstance(options, list):
-        return [str(value) for value in options if isinstance(value, (str, int, float))]
-    return []
+    """Selectable choices for a question, as the values the backend stores.
+
+    Rows come in two shapes: ``ml/eval/questions.json`` used plain strings, the database
+    uses ``{"label": "Industrial", "value": "industrial"}``. Reading only the string form
+    made this return ``[]`` for every real question, so the prompt listed no options and
+    the model had to guess the vocabulary — it answered "warehouse" for a questionnaire
+    that only offers "industrial", and the answer was then dropped as unconfigured.
+    """
+    if not isinstance(options, list):
+        return []
+    chosen: list[str] = []
+    for option in options:
+        if isinstance(option, dict):
+            option = next(
+                (text for key in ("value", "label")
+                 if isinstance(text := option.get(key), str) and text.strip()),
+                None,
+            )
+        if isinstance(option, (str, int, float)) and str(option).strip():
+            chosen.append(str(option).strip())
+    return chosen
 
 
 def extract_question_keys(

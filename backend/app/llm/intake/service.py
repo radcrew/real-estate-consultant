@@ -29,6 +29,8 @@ from app.llm.providers.prompts import (
 from app.repositories.questions import map_question_to_model
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.schemas.llm_intake_parse import LlmOpeningQuestionOutput, LlmParseModelOutput
+import logging
+logger = logging.getLogger(__name__)
 
 QuestionRow = dict[str, Any]
 
@@ -40,7 +42,7 @@ SKIPPED_FIELDS_KEY = "_skipped_fields"
 INTAKE_PARSE_TEMPERATURE = 0.1
 INTAKE_PARSE_MAX_TOKENS = 800
 
-
+print('-------- INTAKE_PARSE_TEMPERATURE --------', INTAKE_PARSE_TEMPERATURE, flush=True)
 @dataclass(frozen=True)
 class IntakePrompt:
     """The extraction request, plus the derived context needed to score its reply."""
@@ -71,10 +73,12 @@ def build_intake_messages(
     criteria_for_prompt = {k: v for k, v in current_criteria.items() if k != SKIPPED_FIELDS_KEY}
 
     intake_schema = render_intake_response_schema(questions=questions)
+    print('-------- intake_schema --------', intake_schema, flush=True)
     system_prompt = (
         f"{INTAKE_PARSE_SYSTEM_PROMPT_HEADER}{intake_schema}\n"
         f"{INTAKE_PARSE_SYSTEM_PROMPT_RULES}"
     )
+    print('-------- system_prompt --------', system_prompt, flush=True)
     user_prompt = json.dumps(
         {
             "user_input": user_input,
@@ -85,6 +89,9 @@ def build_intake_messages(
         },
         ensure_ascii=True,
     )
+    print('-------- user_prompt --------', user_prompt, flush=True)
+    logger.debug("intake_prompt", extra={"system_prompt": system_prompt, "user_prompt": user_prompt})
+
     return IntakePrompt(
         messages=[
             {"role": "system", "content": system_prompt},

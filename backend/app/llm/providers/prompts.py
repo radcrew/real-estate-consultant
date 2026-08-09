@@ -12,8 +12,8 @@ INTAKE_PARSE_SYSTEM_PROMPT_HEADER = (
 INTAKE_PARSE_SYSTEM_PROMPT_RULES = (
     "Rules:\n"
     "- Keep ``extracted`` sparse: include a property ONLY when this message states it. "
-    "Omit every property you are unsure about. Never guess, never copy defaults, and "
-    "never fill a property with the option list from the schema.\n"
+    "When the user's wording is a common synonym, category, or description of an allowed value, normalize it to the closest allowed option."
+    "For e.g, value for property_type field should be only one of these: Industrial, Retail, Flex, Office, Land, Multifamily, Speciality.\n"
     "- Every key you emit must come from question_keys. Never invent a key.\n"
     "- SKIP DETECTION (highest priority rule): if the user's message signals they do not "
     "want to answer the current topic — any refusal phrasing, however worded — you MUST "
