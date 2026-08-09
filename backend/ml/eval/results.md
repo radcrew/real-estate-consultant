@@ -53,13 +53,23 @@ and could otherwise drift into overlap.
 
 | Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| **0.5b-lora-v3-q4km** | **LoRA v3 Q4_K_M** | 108 | 1.000 | 0.874 | 0.927 | 0.899 | **0.842** | 0.897 | 0.854 | 1122 | 1670 |
 | 0.5b-lora-v2-q4km-r5 | LoRA v2 Q4_K_M | 108 | 1.000 | 0.810 | 0.988 | 0.890 | 0.593 | 0.535 | 0.480 | 1144 | 1537 |
 
 ```bash
 python -m ml.eval.run --label 0.5b-lora-v2-q4km-r5 --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v2-q4_k_m
+
+python -m ml.eval.run --label 0.5b-lora-v3-q4km --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v3-q4_k_m
 ```
+
+v3 is the same recipe as v2 — Qwen2.5-0.5B-Instruct, LoRA on all seven projections, Q4_K_M,
+380 MiB on disk, `quant size = 373.71 MiB (6.35 BPW)`. Only the training data changed, and
+it was trained on a Colab T4 rather than locally (`ml/train/COLAB.md`); the CPU run was
+~17 hours for 2250 examples at 2 epochs.
 
 ### The defect the new category isolates
 
@@ -84,6 +94,50 @@ unconfigured and the field goes unanswered.
 
 That is the cleanest signal this eval has produced. A floor of exactly zero means any
 movement is unambiguous, which is what the v3 training run is measured against.
+
+### v3 closes it
+
+Per category, v2 → v3 (field F1 / value acc / skip recall):
+
+| Category | Turns | Field F1 | Value acc | Skip recall |
+|---|---|---|---|---|
+| `unit-ambiguity` | 12 | 1.000 → 1.000 | 0.667 → 0.750 | — |
+| `single-field` | 9 | 0.947 → **1.000** | 0.778 → **1.000** | — |
+| `bound-direction` | 8 | 0.941 → 0.941 | 0.375 → 0.375 | — |
+| `correction` | 8 | 0.941 → 0.875 | 0.625 → 0.857 | — |
+| `multi-field` | 14 | 0.935 → 0.862 | 0.655 → 0.880 | — |
+| `previously-skipped` | 8 | 0.800 → 0.800 | 0.750 → **1.000** | 0.750 → 0.875 |
+| **`property-synonym`** | **6** | 0.800 → **0.923** | 0.000 → **1.000** | — |
+| `skip` | 25 | 0.667 → 0.667 | 1.000 → 1.000 | 0.480 → **0.800** |
+| `answer-and-skip` | 5 | 0.571 → **0.889** | 0.500 → **1.000** | 0.500 → **1.000** |
+| `complete` | 5 | n/a | n/a | 0.750 → **1.000** |
+| `empty-or-noise` | 8 | n/a | n/a | — |
+
+**All six synonym turns are correct.** Nothing in the code changed: no mapping table, no
+prompt edit. The training set was regenerated so half its `property_type` fragments use a
+client wording (`ml/data/make_phrasings.py`) instead of the literal option, and the model
+learned to normalize. Three earlier attempts at this through the prompt — `Should be one
+or more of:`, `Must be`, a structural `enum` — each scored 0/5.
+
+**Overall field F1 is flat** (0.890 → 0.899) and that is the honest headline: recall falls
+0.061 while precision gains 0.064. v3 emits fewer keys and is right more often about the
+ones it emits, which is why value accuracy moves 0.593 → 0.842. `multi-field` and
+`correction` lose field F1 while *gaining* value accuracy, the same trade in miniature —
+not damage from the over-generic `land` phrasings (`property`, `site`, `ground`), which
+would have shown up as a precision *drop*.
+
+**Skip recall 0.480 → 0.854 is above the noise band.** Repeated runs of the same turns have
+read 0.707 and 0.480, so anything under ~0.25 is unreadable; this is 0.374 and moves
+together with `answer-and-skip` (0.500 → 1.000) and `complete` (0.750 → 1.000). Skip
+precision 0.535 → 0.897 rules out the trivial explanation that v3 simply skips more.
+
+`bound-direction` value accuracy is unchanged at 0.375, as expected — nothing in this run
+targeted it, and `app/domain/bounds.py` corrects it downstream of the model.
+
+Raw JSON validity holds at 1.000 with `--no-next-question`, so v3 emits the two-key shape
+natively. Whether the `next_question` shim in `build_intake_response_schema` can be dropped
+is a separate test: it was added because *removing* the field from v2's schema produced 21%
+malformed JSON, and this row does not measure that.
 
 ### Skip recall on this eval is too noisy to read from one run
 
