@@ -206,6 +206,50 @@ def _is_range(value: Any) -> bool:
     return isinstance(value, dict) and bool(value) and set(value) <= _RANGE_KEYS
 
 
+def _numeric(value: Any) -> float | None:
+    """The value as a number, or None when it is not one.
+
+    Bounds are merged before ``normalize_merged_criteria`` coerces them, so a bound here
+    can still be a string or None straight from the model. Comparing those would raise.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _merge_range(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+    """Fold one turn's bounds into a stored range, dropping a bound it contradicts.
+
+    Bound-wise merging is what lets "under $1M" then "more than 100K" keep both. The same
+    rule turns a *correction* into nonsense: after "up to 32 sqft", the reply "more than
+    100" leaves the ceiling in place and stores ``min 100, max 32``. That range matches no
+    listing, and nothing downstream rejects it — it reaches the SQL filter intact.
+
+    When the bounds contradict, the one this turn stated wins and the carried-forward one
+    is dropped. Saying "more than 100" after "up to 32" cannot mean both; the ceiling is
+    what the user is replacing.
+
+    Equality counts as contradiction here, because a lone bound is phrased "more than 32"
+    or "at least 32" — after a stored ceiling of 32 that would collapse to *exactly* 32,
+    the one reading the words rule out. An exact size is still storable: it arrives as both
+    bounds in the same turn, which this never touches.
+
+    A turn that states both bounds inverted is also left as it came. Nothing was carried
+    forward, so there is no stale bound to identify, and guessing which end the user meant
+    would be inventing an answer.
+    """
+    merged = {**existing, **incoming}
+    low, high = _numeric(merged.get("min")), _numeric(merged.get("max"))
+    if low is None or high is None:
+        return merged
+
+    if "min" in incoming and "max" not in incoming and high <= low:
+        return {key: value for key, value in merged.items() if key != "max"}
+    if "max" in incoming and "min" not in incoming and low >= high:
+        return {key: value for key, value in merged.items() if key != "min"}
+    return merged
+
+
 def merge_criteria(current: dict[str, Any], extracted: dict[str, Any]) -> dict[str, Any]:
     """Fold this turn's answers into what the session already knows.
 
@@ -219,13 +263,18 @@ def merge_criteria(current: dict[str, Any], extracted: dict[str, Any]) -> dict[s
     only the bounds actually restated are overwritten. Every other type replaces, which is
     what a corrected location or property type should do.
 
-    There is no way to *remove* a bound, which is the accepted cost: dropping one is far
-    rarer than adding the second, and silently losing a stated bound is the worse failure.
+    A bound is only removed when this turn's bound contradicts it; see ``_merge_range``.
+    Short of that, dropping one is far rarer than adding the second, and silently losing a
+    stated bound is the worse failure.
     """
     merged = dict(current)
     for key, value in extracted.items():
         existing = merged.get(key)
-        merged[key] = {**existing, **value} if _is_range(existing) and _is_range(value) else value
+        merged[key] = (
+            _merge_range(existing, value)
+            if _is_range(existing) and _is_range(value)
+            else value
+        )
     return merged
 
 

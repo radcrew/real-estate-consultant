@@ -37,6 +37,79 @@ class TestRangesMergeBoundWise:
         ) == {"price": {"max": 1000000}, "size_sqft": {"min": 5000}}
 
 
+class TestContradictoryBoundsDropTheStaleOne:
+    def test_a_floor_above_the_stored_ceiling_drops_the_ceiling(self):
+        """"more than 100" after "up to 32" stored min 100 / max 32, which matches nothing."""
+        assert merge_criteria(
+            {"size_sqft": {"max": 32}}, {"size_sqft": {"min": 100}}
+        ) == {"size_sqft": {"min": 100}}
+
+    def test_a_ceiling_below_the_stored_floor_drops_the_floor(self):
+        assert merge_criteria(
+            {"price": {"min": 1000000}}, {"price": {"max": 500000}}
+        ) == {"price": {"max": 500000}}
+
+    def test_a_floor_equal_to_the_stored_ceiling_drops_the_ceiling(self):
+        """"no, more than 32" cannot mean "exactly 32", which is what keeping both gives."""
+        assert merge_criteria(
+            {"size_sqft": {"max": 32}}, {"size_sqft": {"min": 32}}
+        ) == {"size_sqft": {"min": 32}}
+
+    def test_a_ceiling_equal_to_the_stored_floor_drops_the_floor(self):
+        assert merge_criteria(
+            {"price": {"min": 500000}}, {"price": {"max": 500000}}
+        ) == {"price": {"max": 500000}}
+
+    def test_an_exact_size_stated_in_one_turn_keeps_both_bounds(self):
+        """The equality rule must not block the way a bare number is stored."""
+        assert merge_criteria(
+            {}, {"size_sqft": {"min": 32, "max": 32}}
+        ) == {"size_sqft": {"min": 32, "max": 32}}
+
+    def test_widening_off_an_exact_size_drops_the_ceiling(self):
+        assert merge_criteria(
+            {"size_sqft": {"min": 32, "max": 32}}, {"size_sqft": {"min": 32}}
+        ) == {"size_sqft": {"min": 32}}
+
+    def test_the_unit_survives_a_dropped_bound(self):
+        assert merge_criteria(
+            {"size_sqft": {"max": 32, "unit": "sqft"}}, {"size_sqft": {"min": 100}}
+        ) == {"size_sqft": {"min": 100, "unit": "sqft"}}
+
+    def test_a_turn_restating_both_bounds_inverted_is_left_alone(self):
+        """Nothing was carried forward, so there is no stale bound to identify."""
+        assert merge_criteria(
+            {"price": {"max": 500000}}, {"price": {"min": 900000, "max": 100000}}
+        ) == {"price": {"min": 900000, "max": 100000}}
+
+    def test_a_non_numeric_bound_does_not_raise(self):
+        assert merge_criteria(
+            {"size_sqft": {"max": "thirty two"}}, {"size_sqft": {"min": 100}}
+        ) == {"size_sqft": {"max": "thirty two", "min": 100}}
+
+    def test_a_null_bound_does_not_raise(self):
+        assert merge_criteria(
+            {"size_sqft": {"max": None}}, {"size_sqft": {"min": 100}}
+        ) == {"size_sqft": {"max": None, "min": 100}}
+
+    def test_floats_and_ints_compare(self):
+        assert merge_criteria(
+            {"price": {"max": 32.0}}, {"price": {"min": 100}}
+        ) == {"price": {"min": 100}}
+
+    def test_the_reported_session_ends_with_a_usable_range(self):
+        """32 -> "no, more than 32" -> "more than 32sqft" -> "more than 100sqft"."""
+        criteria: dict = {}
+        for extracted in (
+            {"size_sqft": {"max": 32}},
+            {"size_sqft": {"min": 32}},
+            {"size_sqft": {"min": 32}},
+            {"size_sqft": {"min": 100}},
+        ):
+            criteria = merge_criteria(criteria, extracted)
+        assert criteria == {"size_sqft": {"min": 100}}
+
+
 class TestEverythingElseReplaces:
     def test_a_corrected_location_replaces(self):
         assert merge_criteria(
