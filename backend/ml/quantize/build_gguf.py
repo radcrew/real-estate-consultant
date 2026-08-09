@@ -23,15 +23,12 @@ measures plain Q4_K_M and nothing else.
 from __future__ import annotations
 
 import argparse
-import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_OUT = REPO_ROOT / ".local" / "models"
-DEFAULT_LLAMA_BIN = REPO_ROOT / ".local" / "bin"
-DEFAULT_SRC = REPO_ROOT / ".local" / "llama.cpp"
+from ml.paths import LLAMA_BIN_DIR, LLAMA_SRC_DIR, MODELS_DIR, llama_exe
+
 LLAMA_REPO = "https://github.com/ggml-org/llama.cpp.git"
 # Pin the converter to the same build as the binaries in .local/bin. Conversion output
 # is version-sensitive, so a drifting master is a silent source of unreproducible GGUFs.
@@ -134,9 +131,9 @@ def quantize_flags(kind: str, imatrix: Path | None) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
-    parser.add_argument("--out", default=str(DEFAULT_OUT))
-    parser.add_argument("--llama-bin", default=str(DEFAULT_LLAMA_BIN))
-    parser.add_argument("--llama-src", default=str(DEFAULT_SRC))
+    parser.add_argument("--out", default=str(MODELS_DIR))
+    parser.add_argument("--llama-bin", default=str(LLAMA_BIN_DIR))
+    parser.add_argument("--llama-src", default=str(LLAMA_SRC_DIR))
     parser.add_argument("--llama-tag", default=DEFAULT_LLAMA_TAG)
     parser.add_argument(
         "--quant",
@@ -154,17 +151,9 @@ def main() -> int:
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    llama_bin = Path(args.llama_bin)
     quant_kinds = args.quant or ["Q4_K_M"]
 
-    exe_name = "llama-quantize.exe" if sys.platform == "win32" else "llama-quantize"
-    quantize_exe = llama_bin / exe_name
-    if not quantize_exe.exists():
-        found = shutil.which("llama-quantize")
-        if not found:
-            print(f"llama-quantize not found at {quantize_exe} or on PATH", file=sys.stderr)
-            return 1
-        quantize_exe = Path(found)
+    quantize_exe = llama_exe("llama-quantize", args.llama_bin)
 
     # Path(...).name, not split("/"), so a Windows path with backslashes names the
     # artifacts the same way a Hub id does.

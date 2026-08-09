@@ -37,9 +37,7 @@ from app.core.config import settings
 from app.core.supabase_sdk import close_supabase, get_supabase_sdk_client, init_supabase
 from app.repositories.questions import list_intake_questions
 from ml.data.generate import property_type_values
-
-ML_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_OUT = ML_DIR / "data" / "property_type_phrasings.json"
+from ml.paths import PHRASINGS_PATH
 
 ASK = (
     "List {n} different words or short phrases a commercial real-estate client might use "
@@ -109,7 +107,7 @@ async def main_async(argv: list[str] | None = None) -> int:
     parser.add_argument("--api-key", default=None, help="Defaults to OPENROUTER_API_KEY")
     parser.add_argument("--model", default="qwen/qwen-2.5-7b-instruct")
     parser.add_argument("--per-option", type=int, default=14)
-    parser.add_argument("--out", default=str(DEFAULT_OUT))
+    parser.add_argument("--out", default=str(PHRASINGS_PATH))
     args = parser.parse_args(argv)
 
     await init_supabase()

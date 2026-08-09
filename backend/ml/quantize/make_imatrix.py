@@ -24,11 +24,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-ML_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_MODELS = REPO_ROOT / ".local" / "models"
-DEFAULT_LLAMA_BIN = REPO_ROOT / ".local" / "bin"
-DEFAULT_TRAIN = ML_DIR / "data" / "train.jsonl"
+from ml.paths import LLAMA_BIN_DIR, MODELS_DIR, TRAIN_PATH, llama_exe
 
 
 def build_calibration(train_path: Path, out_path: Path, limit: int) -> int:
@@ -53,9 +49,9 @@ def build_calibration(train_path: Path, out_path: Path, limit: int) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gguf", required=True, help="F16 GGUF filename or path")
-    parser.add_argument("--models-dir", default=str(DEFAULT_MODELS))
-    parser.add_argument("--llama-bin", default=str(DEFAULT_LLAMA_BIN))
-    parser.add_argument("--train", default=str(DEFAULT_TRAIN))
+    parser.add_argument("--models-dir", default=str(MODELS_DIR))
+    parser.add_argument("--llama-bin", default=str(LLAMA_BIN_DIR))
+    parser.add_argument("--train", default=str(TRAIN_PATH))
     parser.add_argument(
         "--limit",
         type=int,
@@ -74,11 +70,7 @@ def main() -> int:
         print(f"GGUF not found: {gguf}", file=sys.stderr)
         return 1
 
-    exe_name = "llama-imatrix.exe" if sys.platform == "win32" else "llama-imatrix"
-    exe = Path(args.llama_bin) / exe_name
-    if not exe.exists():
-        print(f"llama-imatrix not found: {exe}", file=sys.stderr)
-        return 1
+    exe = llama_exe("llama-imatrix", args.llama_bin)
 
     calibration = models_dir / "calibration.txt"
     count = build_calibration(Path(args.train), calibration, args.limit)

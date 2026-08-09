@@ -35,34 +35,34 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_MODELS = REPO_ROOT / ".local" / "models"
-DEFAULT_LLAMA_BIN = REPO_ROOT / ".local" / "bin"
+from ml.paths import LLAMA_BIN_DIR, MODELS_DIR, llama_exe
 
 
 def physical_cores() -> int:
-    """Best-effort physical core count; falls back to half the logical count."""
-    try:
-        import subprocess as sp
+    """Best-effort physical core count; falls back to half the logical count.
 
-        if sys.platform == "win32":
-            out = sp.check_output(
+    ``-t`` is part of what makes a results row reproducible, so a wrong count is worth
+    knowing about. The fallback prints rather than passing silently.
+    """
+    if sys.platform == "win32":
+        try:
+            out = subprocess.check_output(
                 ["powershell", "-NoProfile", "-Command",
                  "(Get-CimInstance Win32_Processor).NumberOfCores"],
                 text=True,
-                stderr=sp.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             return max(1, sum(int(n) for n in out.split()))
-    except Exception:
-        pass
+        except (subprocess.SubprocessError, OSError, ValueError) as exc:
+            print(f"could not read physical core count ({exc}); halving the logical count")
     return max(1, (os.cpu_count() or 2) // 2)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", required=True, help="GGUF filename or full path")
-    parser.add_argument("--models-dir", default=str(DEFAULT_MODELS))
-    parser.add_argument("--llama-bin", default=str(DEFAULT_LLAMA_BIN))
+    parser.add_argument("--models-dir", default=str(MODELS_DIR))
+    parser.add_argument("--llama-bin", default=str(LLAMA_BIN_DIR))
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--ctx-size", type=int, default=4096)
@@ -80,11 +80,7 @@ def main() -> int:
         print(f"model not found: {model_path}", file=sys.stderr)
         return 1
 
-    exe_name = "llama-server.exe" if sys.platform == "win32" else "llama-server"
-    exe = Path(args.llama_bin) / exe_name
-    if not exe.exists():
-        print(f"llama-server not found: {exe}", file=sys.stderr)
-        return 1
+    exe = llama_exe("llama-server", args.llama_bin)
 
     threads = args.threads or physical_cores()
     alias = args.alias or model_path.stem

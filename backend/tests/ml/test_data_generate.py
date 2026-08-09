@@ -14,8 +14,6 @@ import pytest
 
 from ml.data.generate import (
     CITIES,
-    DEFAULT_PHRASINGS,
-    DEFAULT_QUESTIONS,
     _field_fragment,
     _next_question_key,
     load_phrasings,
@@ -24,18 +22,19 @@ from ml.data.generate import (
     to_chat_record,
     validate,
 )
+from ml.paths import EVAL_DATASET_PATH, PHRASINGS_PATH, QUESTIONS_PATH
 
 # Derived from the questionnaire, never restated. A hardcoded copy is what let the
 # generator and the eval spend the whole branch describing six questions the database
 # has never had.
-_QUESTIONS = json.loads(Path(DEFAULT_QUESTIONS).read_text(encoding="utf-8"))
+_QUESTIONS = json.loads(Path(QUESTIONS_PATH).read_text(encoding="utf-8"))
 QUESTION_KEYS = [q["key"] for q in _QUESTIONS]
 REQUIRED = [q["key"] for q in _QUESTIONS if q.get("required")]
 ORDERED_REQUIRED = [
     q["key"] for q in sorted(_QUESTIONS, key=lambda q: q["order_index"]) if q.get("required")
 ]
 PROPERTY_TYPES = property_type_values(_QUESTIONS)
-PHRASINGS = load_phrasings(DEFAULT_PHRASINGS)
+PHRASINGS = load_phrasings(PHRASINGS_PATH)
 
 
 @pytest.fixture
@@ -181,9 +180,7 @@ class TestSynonymEvalSeparation:
     """
 
     def _synonym_turns(self):
-        from ml.eval.run import EVAL_DIR
-
-        lines = (EVAL_DIR / "dataset.jsonl").read_text(encoding="utf-8").splitlines()
+        lines = EVAL_DATASET_PATH.read_text(encoding="utf-8").splitlines()
         rows = [json.loads(line) for line in lines if line.strip()]
         return [r for r in rows if r["category"] == "property-synonym"]
 
@@ -191,7 +188,7 @@ class TestSynonymEvalSeparation:
         assert self._synonym_turns(), "no property-synonym turns; the fix is unmeasurable"
 
     def test_turns_avoid_every_generated_phrasing(self):
-        phrasings = load_phrasings(DEFAULT_PHRASINGS)
+        phrasings = load_phrasings(PHRASINGS_PATH)
         trained = {p.lower() for pool in phrasings.values() for p in pool} | set(phrasings)
         for row in self._synonym_turns():
             text = row["user_input"].lower()
@@ -199,7 +196,7 @@ class TestSynonymEvalSeparation:
             assert not reused, f"{row['id']} reuses training vocabulary: {reused}"
 
     def test_gold_is_a_configured_option(self):
-        questions = json.loads(Path(DEFAULT_QUESTIONS).read_text(encoding="utf-8"))
+        questions = json.loads(Path(QUESTIONS_PATH).read_text(encoding="utf-8"))
         options = set(property_type_values(questions))
         for row in self._synonym_turns():
             for value in row["gold"]["extracted"]["property_type"]:

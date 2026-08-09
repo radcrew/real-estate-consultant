@@ -32,11 +32,7 @@ from typing import Any
 
 from app.llm.intake.service import build_intake_messages
 from app.schemas.llm_intake_parse import LlmParseModelOutput
-
-ML_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_QUESTIONS = ML_DIR / "eval" / "questions.json"
-DEFAULT_EVAL_SET = ML_DIR / "eval" / "dataset.jsonl"
-DEFAULT_PHRASINGS = ML_DIR / "data" / "property_type_phrasings.json"
+from ml.paths import EVAL_DATASET_PATH, PHRASINGS_PATH, QUESTIONS_PATH, TRAIN_PATH, VAL_PATH
 
 # Drawn from backend/dataset/raw-data.json so the distribution matches real listings.
 CITIES = [
@@ -446,11 +442,11 @@ def eval_input_keys(path: Path) -> set[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--count", type=int, default=2500)
-    parser.add_argument("--questions", default=str(DEFAULT_QUESTIONS))
-    parser.add_argument("--eval-set", default=str(DEFAULT_EVAL_SET))
-    parser.add_argument("--phrasings", default=str(DEFAULT_PHRASINGS))
-    parser.add_argument("--out", default=str(ML_DIR / "data" / "train.jsonl"))
-    parser.add_argument("--val-out", default=str(ML_DIR / "data" / "val.jsonl"))
+    parser.add_argument("--questions", default=str(QUESTIONS_PATH))
+    parser.add_argument("--eval-set", default=str(EVAL_DATASET_PATH))
+    parser.add_argument("--phrasings", default=str(PHRASINGS_PATH))
+    parser.add_argument("--out", default=str(TRAIN_PATH))
+    parser.add_argument("--val-out", default=str(VAL_PATH))
     parser.add_argument("--val-fraction", type=float, default=0.1)
     parser.add_argument("--seed", type=int, default=17)
     args = parser.parse_args()

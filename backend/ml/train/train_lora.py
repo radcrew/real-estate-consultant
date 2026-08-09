@@ -39,10 +39,10 @@ from transformers import (
     TrainingArguments,
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-ML_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_BASE = REPO_ROOT / ".local" / "models" / "Qwen2.5-0.5B-Instruct"
-DEFAULT_OUT = REPO_ROOT / ".local" / "models" / "lora-intake"
+from ml.paths import MODELS_DIR, TRAIN_PATH, VAL_PATH
+
+DEFAULT_BASE = MODELS_DIR / "Qwen2.5-0.5B-Instruct"
+DEFAULT_OUT = MODELS_DIR / "lora-intake"
 
 # All attention and MLP projections, per the plan. Attention alone underfits the value
 # formatting; the MLP projections are where "omit this property" lives.
@@ -153,8 +153,8 @@ def pick_precision() -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base", default=str(DEFAULT_BASE))
-    parser.add_argument("--train", default=str(ML_DIR / "data" / "train.jsonl"))
-    parser.add_argument("--val", default=str(ML_DIR / "data" / "val.jsonl"))
+    parser.add_argument("--train", default=str(TRAIN_PATH))
+    parser.add_argument("--val", default=str(VAL_PATH))
     parser.add_argument("--out", default=str(DEFAULT_OUT))
     # p99 total length is 1014 tokens on the current set; 1088 clears the max with room.
     parser.add_argument("--max-len", type=int, default=1088)

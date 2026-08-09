@@ -336,18 +336,18 @@ class TestDatasetIntegrity:
 
 @pytest.fixture
 def dataset_rows():
-    from ml.eval.run import EVAL_DIR
+    from ml.paths import EVAL_DATASET_PATH
 
-    path = EVAL_DIR / "dataset.jsonl"
+    path = EVAL_DATASET_PATH
     lines = path.read_text(encoding="utf-8").splitlines()
     return [json.loads(line) for line in lines if line.strip()]
 
 
 @pytest.fixture
 def questions():
-    from ml.eval.run import EVAL_DIR
+    from ml.paths import QUESTIONS_PATH
 
-    return json.loads((EVAL_DIR / "questions.json").read_text(encoding="utf-8"))
+    return json.loads(QUESTIONS_PATH.read_text(encoding="utf-8"))
 
 
 @pytest.fixture

@@ -40,9 +40,7 @@ from ml.eval.metrics import (
     parse_raw_output,
     score_turn,
 )
-
-EVAL_DIR = Path(__file__).resolve().parent
-RESULTS_DIR = EVAL_DIR / "results"
+from ml.paths import EVAL_DATASET_PATH, QUESTIONS_PATH, RESULTS_DIR
 
 # Aborting the whole run on these avoids burning an entire dataset against a dead key.
 FATAL_STATUS = {401, 402, 403}
@@ -215,8 +213,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", default=settings.hf_model)
     parser.add_argument("--base-url", default=settings.hf_base_url)
     parser.add_argument("--api-key", default=None, help="Defaults to HF_TOKEN")
-    parser.add_argument("--dataset", default=str(EVAL_DIR / "dataset.jsonl"))
-    parser.add_argument("--questions", default=str(EVAL_DIR / "questions.json"))
+    parser.add_argument("--dataset", default=str(EVAL_DATASET_PATH))
+    parser.add_argument("--questions", default=str(QUESTIONS_PATH))
     parser.add_argument("--split", choices=["dev", "holdout", "all"], default="dev")
     parser.add_argument("--category", default=None, help="Restrict to one category")
     parser.add_argument("--limit", type=int, default=None)

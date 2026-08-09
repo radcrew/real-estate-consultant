@@ -31,8 +31,7 @@ from pathlib import Path
 
 from app.core.supabase_sdk import close_supabase, get_supabase_sdk_client, init_supabase
 from app.repositories.questions import list_intake_questions
-
-EVAL_DIR = Path(__file__).resolve().parent
+from ml.paths import QUESTIONS_PATH
 
 
 async def fetch_questions() -> list[dict]:
@@ -45,7 +44,7 @@ async def fetch_questions() -> list[dict]:
 
 async def main_async(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", default=str(EVAL_DIR / "questions.json"))
+    parser.add_argument("--out", default=str(QUESTIONS_PATH))
     args = parser.parse_args(argv)
 
     questions = await fetch_questions()

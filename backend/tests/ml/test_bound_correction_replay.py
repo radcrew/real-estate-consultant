@@ -24,14 +24,14 @@ import pytest
 
 from app.domain.bounds import correct_bound_direction
 from ml.eval.metrics import values_equal
-from ml.eval.run import EVAL_DIR
+from ml.paths import EVAL_DATASET_PATH, RESULTS_DIR
 
-RESULTS = sorted((EVAL_DIR / "results").glob("*.json"))
+RESULTS = sorted(RESULTS_DIR.glob("*.json"))
 
 
 @pytest.fixture(scope="module")
 def gold_by_id() -> dict[str, dict[str, Any]]:
-    lines = (EVAL_DIR / "dataset.jsonl").read_text(encoding="utf-8").splitlines()
+    lines = EVAL_DATASET_PATH.read_text(encoding="utf-8").splitlines()
     rows = [json.loads(line) for line in lines if line.strip()]
     return {row["id"]: row for row in rows}
 

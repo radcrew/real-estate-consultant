@@ -21,11 +21,11 @@ import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-MODELS = REPO_ROOT / ".local" / "models"
-DEFAULT_BASE = MODELS / "Qwen2.5-0.5B-Instruct"
-DEFAULT_ADAPTER = MODELS / "lora-intake"
-DEFAULT_OUT = MODELS / "Qwen2.5-0.5B-Instruct-intake"
+from ml.paths import MODELS_DIR
+
+DEFAULT_BASE = MODELS_DIR / "Qwen2.5-0.5B-Instruct"
+DEFAULT_ADAPTER = MODELS_DIR / "lora-intake"
+DEFAULT_OUT = MODELS_DIR / "Qwen2.5-0.5B-Instruct-intake"
 
 
 def main() -> int:
