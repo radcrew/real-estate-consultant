@@ -57,10 +57,6 @@ TYPE_TEMPLATES = [
     "we need {types} space", "{types} please", "looking for {types}",
     "something {types}", "{types} would work",
 ]
-LISTING_TEMPLATES = {
-    "Sale": ["we want to buy", "looking to purchase", "buying, not leasing", "for sale"],
-    "Lease": ["we want to lease", "looking to rent", "leasing", "for lease"],
-}
 # A refusal and a piece of noise both produce empty ``extracted``; the only signal
 # separating them is phrasing. The first pass used 14 refusal strings and the model
 # learned the strings, not the concept - it answered four of ten eval refusals by
@@ -101,15 +97,25 @@ COMPLETE_PHRASES = [
     "yep, we're good", "no changes needed", "confirmed", "that all looks right",
 ]
 
-# Labels a user would plausibly use when naming a field they want to skip.
+# Labels a user would plausibly use when naming a field they want to skip. Keyed by the
+# questionnaire's required fields; ``_skip_label`` falls back for any key added later.
 FIELD_LABELS = {
     "location": ["location", "city", "area"],
     "property_type": ["property type", "space type", "building type"],
-    "listing_type": ["buy or lease", "sale or lease", "listing type"],
     "price": ["budget", "price", "price range"],
     "size_sqft": ["size", "square footage", "size question"],
-    "loading_docks": ["loading docks", "docks"],
 }
+
+
+def _skip_label(key: str) -> str:
+    """A phrase for naming ``key`` in a refusal.
+
+    A new required question would otherwise raise KeyError mid-generation. The fallback is
+    poorer training text than a hand-written label, so add one here when that happens —
+    but a plain de-underscored key is a real thing a user would type, and generating is
+    better than crashing.
+    """
+    return random.choice(FIELD_LABELS.get(key) or [key.replace("_", " ")])
 
 
 def _fmt_money(value: int) -> str:
@@ -253,19 +259,16 @@ def _field_fragment(
             # would stop recognising the option words themselves.
             words.append(random.choice(pool) if pool and random.random() < 0.5 else option)
         return picked, random.choice(TYPE_TEMPLATES).format(types=" or ".join(words))
-    if key == "listing_type":
-        choice = random.choice(["Sale", "Lease"])
-        return choice, random.choice(LISTING_TEMPLATES[choice])
     if key == "price":
         bounds, phrase = _range_phrase(PRICE_FMT)
         return bounds, random.choice([f"budget {phrase}", phrase, f"we can spend {phrase}"])
     if key == "size_sqft":
         bounds, phrase = _range_phrase(SQFT_FMT)
         return bounds, phrase
-    if key == "loading_docks":
-        count = random.randint(1, 8)
-        return count, random.choice([f"{count} loading docks", f"we need {count} docks"])
-    raise ValueError(f"no generator for {key}")
+    # Reached when the questionnaire gains a key this generator has no renderer for.
+    # Raising is deliberate: silently skipping would ship a set that never teaches the
+    # new field, and the shortfall would look like ordinary deduplication loss.
+    raise ValueError(f"no generator for {key}; add one before regenerating")
 
 
 def _next_question_key(
@@ -327,7 +330,7 @@ def make_example(
         if candidates:
             skip_key = random.choice(candidates)
             skipped = [skip_key]
-            label = random.choice(FIELD_LABELS[skip_key])
+            label = _skip_label(skip_key)
             refusal = random.choice([
                 f"but skip the {label}", f"but let's skip {label}",
                 f"no preference on {label} though", f"{label} doesn't matter",

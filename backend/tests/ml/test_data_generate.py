@@ -14,8 +14,10 @@ import pytest
 
 from ml.data.generate import (
     CITIES,
+    FIELD_LABELS,
     _field_fragment,
     _next_question_key,
+    _skip_label,
     load_phrasings,
     make_example,
     property_type_values,
@@ -79,10 +81,11 @@ class TestValidate:
         assert "unknown key" in (validate(example, set(QUESTION_KEYS), set(REQUIRED)) or "")
 
     def test_rejects_skipping_a_non_required_key(self):
+        """Every live question is required, so any key here is one by definition."""
         example = {
             "target": {
                 "extracted": {},
-                "skipped_fields": ["loading_docks"],
+                "skipped_fields": ["not_a_required_field"],
             }
         }
         assert "non-required" in (validate(example, set(QUESTION_KEYS), set(REQUIRED)) or "")
@@ -95,6 +98,36 @@ class TestValidate:
             }
         }
         assert validate(example, set(QUESTION_KEYS), set(REQUIRED)) is None
+
+
+class TestGeneratorTracksTheQuestionnaire:
+    """No renderer for a field the questionnaire does not ask, and none missing either.
+
+    ``listing_type`` and ``loading_docks`` survived here for a whole branch after r4
+    dropped them -- real listing columns, never intake questions -- which is the residue
+    of the six-question fiction. Dead branches are unreachable rather than wrong, so
+    nothing failed; the file just went on reading as though those fields were supported.
+    """
+
+    def test_every_required_key_has_a_skip_label(self):
+        for key in REQUIRED:
+            assert key in FIELD_LABELS, f"{key} would fall back to a de-underscored key"
+
+    def test_no_skip_label_for_a_field_that_is_not_asked(self):
+        assert not set(FIELD_LABELS) - set(QUESTION_KEYS)
+
+    def test_every_question_key_can_be_rendered(self):
+        random.seed(5)
+        for key in QUESTION_KEYS:
+            gold, fragment = _field_fragment(key, PROPERTY_TYPES, PHRASINGS)
+            assert gold is not None and fragment
+
+    def test_an_unknown_key_raises_rather_than_generating_nothing(self):
+        with pytest.raises(ValueError, match="no generator"):
+            _field_fragment("clear_height", PROPERTY_TYPES, PHRASINGS)
+
+    def test_the_skip_label_fallback_is_usable_text(self):
+        assert _skip_label("clear_height") == "clear height"
 
 
 class TestLocationLabels:
