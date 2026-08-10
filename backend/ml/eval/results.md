@@ -11,7 +11,8 @@ table.** When the dataset changes, previous rows become historical and a new tab
 
 | Rev | Turns | Questionnaire | Notes |
 |---|---|---|---|
-| **r5 (current)** | 108 | the real one | `property-synonym` added — 6 turns on wordings the generator never emits |
+| **r6 (current)** | 118 | the real one | `pending-answer` added — 7 turns on bare values, plus 3 unmarked corrections |
+| r5 | 108 | the real one | `property-synonym` added — 6 turns on wordings the generator never emits |
 | r4 | 102 | the real one | First revision built from the live `questions` table |
 | r3 | 110 | fictional | `bound-direction` added, skip turns decontaminated. Never published |
 | r2 | 102 | fictional | skip 10 → 25, new `answer-and-skip` category |
@@ -37,6 +38,64 @@ against v2 — but no absolute figure from them describes the shipped product.
 r4 is a dump of the live table (`ml.eval.dump_questions`), with the dataset rebuilt against
 it: 8 turns dropped that answered a field which does not exist, 8 refusals re-pointed at a
 live field, and `Warehouse` mapped to `industrial` — no listing carries Warehouse.
+
+---
+
+## r6 — 118 turns, `pending-answer` added
+
+Same serving setup as r5: llama.cpp b10290, 6 threads, `--parallel 1`, `--cache-reuse 256`,
+i7-10750H. All rows `--split all --no-next-question`.
+
+r5 could not measure the change it was about to be used to judge. Nothing in it asked the
+model to attribute a value that the message alone does not identify — the only short inputs
+were `''`, `meh`, `yep`, `...`, `ok`, all noise or refusals — so a fix for *"10" answering
+the size question became a $10 budget* would have scored identically to no fix at all.
+
+r6 adds seven `pending-answer` turns and three unmarked corrections. The sharpest is a
+matched pair: `5,000` under two different `current_criteria`, gold `price` in one and
+`size_sqft` in the other. Identical message, different answer, and nothing but
+`pending_question` separates them — a model reading magnitude instead of the pending
+question gets exactly one of the two wrong.
+
+The three unmarked corrections exist because all eight r5 corrections carry a marker
+(`actually`, `scratch that`, `change that to`). The bare form — `5,000 sqft` after a wrong
+size — is the one that failed in production, and it was untested.
+
+| Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0.5b-lora-v3-q4km-r6 | LoRA v3 Q4_K_M | 118 | 1.000 | 0.832 | 0.913 | 0.870 | 0.821 | 0.914 | 0.780 | 1079 | 1599 |
+
+```bash
+python -m ml.eval.run --label 0.5b-lora-v3-q4km-r6 --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v3-q4_k_m
+```
+
+This is v3 re-scored, not a new model — the r5 row above measures the same GGUF on 108
+turns. It is here so v4 has a baseline on the instrument it will be judged by.
+
+v3 fails 4 of the 10 new turns, and the split matters:
+
+| Turn | v3 emitted | Gold | What it shows |
+|---|---|---|---|
+| `pending-bare-size-k` | `price {max: 25000}` | `size_sqft {min/max: 25000}` | Attribution. `25k` went to the wrong field entirely |
+| `pending-bare-5000-as-size` | `size_sqft {max: 5000}` | `size_sqft {min/max: 5000}` | Right field, ceiling instead of exact |
+| `pending-overridden-by-unit` | `size_sqft {max: 20000}` | `size_sqft {min/max: 20000}` | Right field, ceiling instead of exact |
+| `correct-size-bare` | `size_sqft {max: 5000}` | `size_sqft {min/max: 5000}` | Correction landed, ceiling instead of exact |
+
+Only the first is a pure attribution miss. The other three are the max-only bare bound
+`ml/data/generate.py` documents — a bare size read as a ceiling of 5,000 sqft rather than a
+size of 5,000 — which is a search that matches nothing in production. Both failure modes
+are targets of the v4 training set, so the category should move on both counts or the
+change did not land.
+
+`pending-answer` value accuracy of **0.667** and `correction` of **0.800** are the numbers
+to beat. Note the matched pair is already half-right at v3: it gets `5,000` as a price and
+misses it as a size, which is what guessing from magnitude looks like.
+
+Skip recall reads 0.780 against r5's 0.854 on **the same 25 unchanged skip turns** — every
+r6 addition golds `skipped_fields: []`. That is run-to-run variation, not a regression; see
+the note under r4 on the same effect.
 
 ---
 
