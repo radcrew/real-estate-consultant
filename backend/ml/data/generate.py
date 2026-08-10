@@ -120,11 +120,23 @@ def _skip_label(key: str) -> str:
     return random.choice(FIELD_LABELS.get(key) or [key.replace("_", " ")])
 
 
+def _in_millions(value: int) -> str:
+    """"$2.5M" / "2.5M" / "$2.5 million" -- including below a million: "$0.5M"."""
+    millions = value / 1_000_000
+    return random.choice([f"${millions:g}M", f"{millions:g}M", f"${millions:g} million"])
+
+
 def _fmt_money(value: int) -> str:
     if value >= 1_000_000 and value % 100_000 == 0:
-        millions = value / 1_000_000
-        text = f"{millions:g}M"
-        return random.choice([f"${text}", f"{text}", f"${millions:g} million"])
+        return _in_millions(value)
+    # Sub-million budgets written in millions. M-notation used to start at 1,000,000, so
+    # the model only ever saw a leading digit of 1 or more and broke on a leading zero
+    # two ways: "$0.1M" came back as the bare token 0.1M -- invalid JSON, not merely a
+    # wrong number -- and "$0.1 million" as 1000000, a factor of ten out.
+    #
+    # Kept a minority form, because "$500k" is still how most people write this.
+    if value >= 100_000 and value % 50_000 == 0 and random.random() < 0.3:
+        return _in_millions(value)
     if value >= 1000 and value % 1000 == 0:
         return random.choice([f"${value:,}", f"${value // 1000}k"])
     return f"${value:,}"
@@ -141,6 +153,10 @@ def _price_value() -> int:
     return random.choice([
         random.randrange(200_000, 5_000_000, 100_000),
         random.randrange(20_000, 200_000, 5_000),
+        # Round six-figure budgets. Without this the two ranges above meet at 200k, so
+        # the band a client is most likely to state in millions -- "$0.5M" -- was reachable
+        # only as one of eight values, and M-notation had almost nothing to attach to.
+        random.randrange(100_000, 1_000_000, 50_000),
     ])
 
 

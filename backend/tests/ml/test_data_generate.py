@@ -16,7 +16,9 @@ from ml.data.generate import (
     CITIES,
     FIELD_LABELS,
     _field_fragment,
+    _fmt_money,
     _next_question_key,
+    _range_phrase,
     _skip_label,
     load_phrasings,
     make_example,
@@ -128,6 +130,59 @@ class TestGeneratorTracksTheQuestionnaire:
 
     def test_the_skip_label_fallback_is_usable_text(self):
         assert _skip_label("clear_height") == "clear height"
+
+
+    def test_woven_sentences_are_generated(self):
+        """Raw make_example output; the written set runs higher, since dedup culls the
+        collapsing shapes (skip, noise) far harder than it culls extraction phrasings."""
+        examples = _examples(n=1200, seed=7)
+        clause_markers = ("something in", "looking in", "somewhere around", "area please")
+        woven = [
+            e for e in examples
+            if len(e["target"]["extracted"]) >= 2
+            and " in " in e["user_input"]
+            and not any(m in e["user_input"] for m in clause_markers)
+        ]
+        share = len(woven) / len(examples)
+        assert share >= 0.045, f"only {share:.1%} weave the shape v3 failed on"
+class TestSubMillionMillionsNotation:
+    """M-notation used to start at 1,000,000, so a leading zero was never seen.
+
+    v3 broke on it two ways, neither of them a rounding slip: "$0.1M" came back as the
+    bare token ``0.1M`` -- invalid JSON, so the turn fails outright -- and "$0.1 million"
+    as 1000000, a factor of ten out and silently wrong.
+    """
+
+    def _money(self, value: int, n: int = 200) -> set[str]:
+        random.seed(4)
+        return {_fmt_money(value) for _ in range(n)}
+
+    @pytest.mark.parametrize("value", [100_000, 250_000, 500_000, 900_000])
+    def test_a_round_sub_million_budget_can_be_written_in_millions(self, value):
+        forms = self._money(value)
+        assert any("M" in f or "million" in f for f in forms), f"{value}: {sorted(forms)}"
+
+    @pytest.mark.parametrize("value", [100_000, 500_000])
+    def test_the_k_and_long_forms_survive_alongside_it(self, value):
+        """Most people still write "$500k"; this must stay the common form."""
+        forms = self._money(value)
+        assert any(f.endswith("k") for f in forms)
+        assert any("," in f for f in forms)
+
+    def test_a_value_that_is_not_round_is_never_written_in_millions(self):
+        assert not any("M" in f or "million" in f for f in self._money(95_000))
+
+    def test_the_stated_figure_always_matches_the_gold_bound(self):
+        """The whole point: "0.4M" in the text must gold 400000, not 4000000."""
+        random.seed(31)
+        checked = 0
+        for _ in range(1500):
+            bounds, phrase = _range_phrase(PRICE_NUMBERS)
+            values = {v for v in bounds.values() if v}
+            for frac in re.findall(r"\b(0\.\d+)\s?(?:M|million)", phrase):
+                checked += 1
+                assert int(float(frac) * 1_000_000) in values, f"{phrase!r} -> {bounds}"
+        assert checked, "no sub-million M-notation generated at all"
 
 
 class TestLocationLabels:
