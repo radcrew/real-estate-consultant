@@ -43,18 +43,52 @@ CITIES = [
     ("Phoenix", "AZ"), ("Miami", "FL"), ("Seattle", "WA"), ("Chicago", "IL"),
     ("Atlanta", "GA"), ("Portland", "OR"), ("Nashville", "TN"), ("Charlotte", "NC"),
     ("Wailuku", "HI"), ("Boise", "ID"), ("Reno", "NV"), ("Tampa", "FL"),
+    ("San Francisco", "CA"), ("Los Angeles", "CA"), ("San Diego", "CA"),
+    ("Sacramento", "CA"), ("Las Vegas", "NV"), ("Salt Lake City", "UT"),
+    ("Kansas City", "MO"), ("St. Louis", "MO"), ("Columbus", "OH"),
+    ("Indianapolis", "IN"), ("Raleigh", "NC"), ("Orlando", "FL"),
+    ("Jacksonville", "FL"), ("San Antonio", "TX"), ("Fort Worth", "TX"),
+    ("Oklahoma City", "OK"), ("Memphis", "TN"), ("Louisville", "KY"),
+    ("Milwaukee", "WI"), ("Minneapolis", "MN"), ("Pittsburgh", "PA"),
+    ("Philadelphia", "PA"), ("Baltimore", "MD"), ("Richmond", "VA"),
+    ("Albuquerque", "NM"), ("Tucson", "AZ"), ("Omaha", "NE"), ("Tulsa", "OK"),
 ]
 
-# (template, whether the phrasing names the state). Gold must contain exactly what the
-# message states: labelling "Tampa area please" as "Tampa, FL" would teach the model to
-# invent a state, which is the over-emission P2 found.
+# How clients actually type a city, mapped to the name that goes in gold. Unlike the
+# "never add a region it omits" rule -- which stops "Tampa" being labelled "Tampa, FL" --
+# these are the *same* place under a shorter name, so normalizing is not inventing.
+#
+# "located in SF" returned nothing at all: no message in the v3 set contained a nickname,
+# so the model had never been shown that one resolves to a city.
+CITY_ALIASES = {
+    "SF": "San Francisco", "San Fran": "San Francisco", "the Bay Area": "San Francisco",
+    "LA": "Los Angeles", "L.A.": "Los Angeles",
+    "NYC": "New York", "New York City": "New York", "Manhattan": "New York",
+    "Vegas": "Las Vegas", "Philly": "Philadelphia", "ATX": "Austin",
+    "DFW": "Dallas", "H-town": "Houston", "SLC": "Salt Lake City",
+    "KC": "Kansas City", "OKC": "Oklahoma City", "NOLA": "New Orleans",
+    "PDX": "Portland", "ABQ": "Albuquerque", "the Twin Cities": "Minneapolis",
+    "SoCal": "Los Angeles", "the Valley": "Phoenix",
+}
+
+# A state on its own is a legitimate answer -- "shopping mall in California" -- and the v3
+# set never produced one, so every location it saw was a city. Gold is the state as
+# written; there is no city to resolve it to.
+STATES = [
+    "California", "Texas", "Florida", "Colorado", "Arizona", "Washington",
+    "Oregon", "Nevada", "Georgia", "Tennessee", "North Carolina", "South Carolina",
+    "Illinois", "Ohio", "Michigan", "Pennsylvania", "New York", "New Jersey",
+    "Massachusetts", "Virginia", "Maryland", "Missouri", "Minnesota", "Utah",
+    "Idaho", "Oklahoma", "Kansas", "Indiana", "Wisconsin", "Kentucky",
+]
+
+# Standalone location clauses. ``_place`` decides what the place is called and what gold
+# it carries, so these only wrap it -- otherwise a template naming {city}, {state} could
+# not express "SF" or "California" at all.
 LOCATION_TEMPLATES = [
-    ("I'm looking in {city}, {state}", True),
-    ("we need something in {city}, {state}", True),
-    ("{city}, {state}", True),
-    ("somewhere around {city}", False),
-    ("{city} area please", False),
-    ("looking at {city}", False),
+    "I'm looking in {place}", "we need something in {place}", "{place}",
+    "somewhere around {place}", "{place} area please", "looking at {place}",
+    "located in {place}", "in {place}", "{place} market", "around {place}",
 ]
 TYPE_TEMPLATES = [
     "we need {types} space", "{types} please", "looking for {types}",
@@ -100,6 +134,26 @@ COMPLETE_PHRASES = [
     "yep, we're good", "no changes needed", "confirmed", "that all looks right",
 ]
 
+# Requirements the questionnaire does not ask about. They belong in no field, so gold
+# ignores them entirely -- which is the behaviour being taught.
+#
+# "costs more than 100K, located in SF, 3 floor, industrial property! need to have good
+# view!" states two of these. v3 had seen almost none, and a model trained only on
+# messages where every clause maps to a field has no example of leaving one out. Several
+# carry numbers on purpose ("3 floors", "12 ft ceilings"), because the live failure is a
+# stray figure being read as size or price.
+DISTRACTORS = [
+    "3 floors", "two storeys", "single storey", "ground floor only", "top floor",
+    "need a good view", "good natural light", "corner lot", "street frontage",
+    "must have parking", "parking for 20 cars", "close to the highway",
+    "near public transport", "walking distance to downtown",
+    "12 ft ceilings", "high ceilings", "a loading dock would help",
+    "three phase power", "air conditioned", "newly renovated", "move-in ready",
+    "somewhere quiet", "no basement", "fenced yard", "24/7 access",
+    "pet friendly", "wheelchair accessible", "fibre internet",
+    "we'd like it modern", "nothing too old", "something with character",
+]
+
 # Labels a user would plausibly use when naming a field they want to skip. Keyed by the
 # questionnaire's required fields; ``_skip_label`` falls back for any key added later.
 FIELD_LABELS = {
@@ -124,7 +178,25 @@ def _skip_label(key: str) -> str:
 def _in_millions(value: int) -> str:
     """"$2.5M" / "2.5M" / "$2.5 million" -- including below a million: "$0.5M"."""
     millions = value / 1_000_000
-    return random.choice([f"${millions:g}M", f"{millions:g}M", f"${millions:g} million"])
+    return random.choice([
+        f"${millions:g}M", f"{millions:g}M", f"${millions:g}m",
+        f"${millions:g} million", f"{millions:g} million", f"{millions:g} mil",
+    ])
+
+
+def _in_thousands(value: int) -> str:
+    """"$500k" / "500K" / "500 grand" / "500k bucks".
+
+    v3 wrote only "${n}k": always a dollar sign, always lowercase. So "costs more than
+    100K" and "less than 10K bucks" -- both real messages -- arrived in a form the model
+    had never seen, and it read neither as a budget.
+    """
+    thousands = value // 1000
+    return random.choice([
+        f"${thousands}k", f"${thousands}K", f"{thousands}k", f"{thousands}K",
+        f"${thousands}k", f"{thousands} grand", f"{thousands}k bucks",
+        f"${thousands},000", f"{thousands} thousand",
+    ])
 
 
 def _fmt_money(value: int) -> str:
@@ -139,7 +211,7 @@ def _fmt_money(value: int) -> str:
     if value >= 100_000 and value % 50_000 == 0 and random.random() < 0.3:
         return _in_millions(value)
     if value >= 1000 and value % 1000 == 0:
-        return random.choice([f"${value:,}", f"${value // 1000}k"])
+        return random.choice([f"${value:,}", f"{value:,} dollars", _in_thousands(value)])
     return f"${value:,}"
 
 
@@ -293,15 +365,37 @@ def _type_words(
 
 
 def _place(names_state: bool | None = None) -> tuple[str, str]:
-    """A place name and the gold that matches it exactly.
+    """Return (gold, the words the message uses).
 
-    Gold must contain only what the message says: labelling "Tampa" as "Tampa, FL" teaches
-    the model to invent a region.
+    Four shapes, because v3 only ever produced the first two and failed on the others:
+
+    * ``Austin`` -- bare city, gold identical
+    * ``Austin, TX`` -- city and state, gold identical
+    * ``SF`` -- a nickname, gold **resolved** to ``San Francisco``
+    * ``California`` -- a state alone, gold identical
+
+    The nickname is the one case where gold differs from the words, and it is the same
+    normalization ``property_type`` does for "warehouse" -> industrial: a shorter name for
+    the same place, not a region invented out of nothing. The "never add a region it
+    omits" rule still holds -- ``Tampa`` is never labelled ``Tampa, FL``.
     """
-    city, state = random.choice(CITIES)
     if names_state is None:
-        names_state = random.random() < 0.5
-    return (f"{city}, {state}", f"{city}, {state}") if names_state else (city, city)
+        shape = random.choices(["city", "city_state", "alias", "state"],
+                               weights=[30, 35, 20, 15])[0]
+    else:
+        shape = "city_state" if names_state else "city"
+
+    if shape == "alias":
+        alias, canonical = random.choice(list(CITY_ALIASES.items()))
+        return canonical, alias
+    if shape == "state":
+        state = random.choice(STATES)
+        return state, state
+
+    city, state = random.choice(CITIES)
+    if shape == "city_state":
+        return f"{city}, {state}", f"{city}, {state}"
+    return city, city
 
 
 def _field_piece(
@@ -330,10 +424,8 @@ def _field_fragment(
 ) -> tuple[Any, str]:
     """Return (gold value, natural-language fragment) for one field."""
     if key == "location":
-        city, state = random.choice(CITIES)
-        template, names_state = random.choice(LOCATION_TEMPLATES)
-        gold = f"{city}, {state}" if names_state else city
-        return gold, template.format(city=city, state=state)
+        gold, place = _place()
+        return gold, random.choice(LOCATION_TEMPLATES).format(place=place)
     if key == "property_type":
         picked, words = _type_words(property_types, phrasings)
         return picked, random.choice(TYPE_TEMPLATES).format(types=words)
@@ -356,6 +448,39 @@ SENTENCE_OPENERS = ["", "", "looking for ", "we want to buy ", "we need ", "I ne
 # Attached to the type when it reads naturally: "office space in Seattle".
 TYPE_SUFFIXES = ["", "", " space", " property"]
 # How a trailing bound joins on. "that costs" only fits price.
+def _add_distractors(text: str) -> str:
+    """Fold in one or two requirements the questionnaire does not cover.
+
+    Gold is untouched, so the example teaches that a clause with no field is left out
+    rather than forced into the nearest one.
+    """
+    if not text:
+        return text
+    extras = random.sample(DISTRACTORS, random.choice([1, 1, 2]))
+    parts = [text, *extras]
+    if random.random() < 0.4:
+        random.shuffle(parts)
+    return ", ".join(parts)
+
+
+def _rough_up(text: str) -> str:
+    """Punctuation and casing a real client uses and a template never produces.
+
+    v3 saw no exclamation marks at all and no sentence-cased messages, so wording it had
+    otherwise learned arrived looking unfamiliar.
+    """
+    if not text:
+        return text
+    roll = random.random()
+    if roll < 0.10:
+        text = text[0].upper() + text[1:]
+    elif roll < 0.14:
+        text = text.upper()
+    tail = random.choices(["", "", "", "!", ".", "!!", " please", " thanks"],
+                          weights=[60, 10, 10, 8, 6, 2, 2, 2])[0]
+    return text + tail
+
+
 def _attach(part: str, *, first: bool) -> str:
     """Join a trailing bound onto the sentence.
 
@@ -509,6 +634,14 @@ def make_example(
                 extracted[key], fragment = _field_fragment(key, property_types, phrasings)
                 fragments.append(fragment)
             user_input = ", ".join(fragments)
+
+    # Applied once, here, so every shape gets them rather than only the ones edited last.
+    # `noise` is exempt: its whole job is bare greetings and typos, and appending a
+    # requirement to "hi" would turn a say-nothing example into a say-something one.
+    if shape != "noise":
+        if extracted and random.random() < 0.22:
+            user_input = _add_distractors(user_input)
+        user_input = _rough_up(user_input)
 
     current_criteria = dict(prior)
     if skipped and shape == "carried-skip":

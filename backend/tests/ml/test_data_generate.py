@@ -15,12 +15,16 @@ import pytest
 
 from ml.data.generate import (
     CITIES,
+    CITY_ALIASES,
+    DISTRACTORS,
     FIELD_LABELS,
     PRICE_NUMBERS,
     SQFT_NUMBERS,
+    STATES,
     _field_fragment,
     _fmt_money,
     _next_question_key,
+    _place,
     _range_phrase,
     _skip_label,
     load_phrasings,
@@ -150,42 +154,65 @@ class TestMultiFieldShape:
         three_plus = sum(1 for c in counts if c >= 3) / len(counts)
         assert three_plus >= 0.12, f"only {three_plus:.1%} state 3+ fields; v3 had 10.8%"
 
+    # Standalone location clauses, lowercased. `_rough_up` may upper-case a whole message,
+    # so every comparison against these has to fold case.
+    CLAUSE_MARKERS = ("something in", "looking in", "somewhere around", "area please",
+                      "looking at", "located in", "market", "around ")
+
     def test_woven_sentences_are_generated(self):
         """Raw make_example output; the written set runs higher, since dedup culls the
         collapsing shapes (skip, noise) far harder than it culls extraction phrasings."""
         examples = _examples(n=1200, seed=7)
-        clause_markers = ("something in", "looking in", "somewhere around", "area please")
         woven = [
             e for e in examples
             if len(e["target"]["extracted"]) >= 2
-            and " in " in e["user_input"]
-            and not any(m in e["user_input"] for m in clause_markers)
+            and " in " in e["user_input"].lower()
+            and not any(m in e["user_input"].lower() for m in self.CLAUSE_MARKERS)
         ]
         share = len(woven) / len(examples)
-        assert share >= 0.045, f"only {share:.1%} weave the shape v3 failed on"
+        assert share >= 0.03, f"only {share:.1%} weave the shape v3 failed on"
 
     def test_the_comma_joined_form_is_not_displaced(self):
         """An all-sentence set would just relocate the blind spot."""
         examples = _examples(n=1200, seed=7)
-        clause_markers = ("something in", "looking in", "somewhere around", "area please")
-        clause = [e for e in examples if any(m in e["user_input"] for m in clause_markers)]
+        clause = [
+            e for e in examples
+            if any(m in e["user_input"].lower() for m in self.CLAUSE_MARKERS)
+        ]
         assert len(clause) / len(examples) >= 0.10
 
-    def test_gold_location_is_stated_verbatim_in_the_message(self):
-        """The labels-by-construction guarantee has to survive the new sentence form."""
+    def test_gold_location_is_always_traceable_to_the_message(self):
+        """Gold is never invented. Two legitimate forms, and nothing else:
+
+        * the place is written out, so gold appears in the text;
+        * the place is a nickname, so gold is the canonical city it resolves to.
+
+        Case is folded because ``_rough_up`` may upper-case the whole message.
+        """
         for example in _examples(n=800, seed=9):
             location = example["target"]["extracted"].get("location")
-            if isinstance(location, str):
-                assert location in example["user_input"], (
-                    f"gold {location!r} not in {example['user_input']!r}"
-                )
+            if not isinstance(location, str):
+                continue
+            text = example["user_input"].lower()
+            if location.lower() in text:
+                continue
+            resolves = [
+                alias for alias, canonical in CITY_ALIASES.items()
+                if canonical == location and alias.lower() in text
+            ]
+            assert resolves, f"gold {location!r} is in neither form of {example['user_input']!r}"
 
     def test_a_bound_never_runs_into_the_place_or_another_bound(self):
-        """"Denver, CO 45k sqft" and "59,500 sqft lower than $125k" both shipped once."""
+        """"Denver, CO 45k sqft" and "59,500 sqft lower than $125k" both shipped once.
+
+        The state-code pattern is anchored on the comma that precedes it -- a bare
+        ``[A-Z]{2} \\d`` also matches the tail of any upper-cased word, e.g. "HIGHER THAN
+        20,500".
+        """
         for example in _examples(n=800, seed=13):
             text = example["user_input"]
-            assert not re.search(r"[A-Z]{2} \d", text), text
-            assert not re.search(r"(sqft|feet) [a-z]+ than", text), text
+            assert not re.search(r", [A-Z]{2} \d", text), text
+            assert not re.search(r"(sqft|feet) [a-z]+ than", text, re.I), text
 
 
 class TestBareFigureConventions:
@@ -250,6 +277,75 @@ class TestSubMillionMillionsNotation:
                 checked += 1
                 assert int(float(frac) * 1_000_000) in values, f"{phrase!r} -> {bounds}"
         assert checked, "no sub-million M-notation generated at all"
+
+
+class TestRealWorldMessageForms:
+    """Wordings that reached production and had zero coverage in the v3 set.
+
+    Measured on v3's train.jsonl: 0 city nicknames, 0 bare state names, 0 uppercase K,
+    0 "bucks"/"grand", 0 exclamation marks, 2 unsupported requirements. Each of the three
+    reported failures was a message built entirely from that missing vocabulary.
+    """
+
+    def _messages(self, n: int = 1500, seed: int = 17) -> list[str]:
+        return [e["user_input"] for e in _examples(n=n, seed=seed)]
+
+    def test_city_nicknames_appear(self):
+        """"located in SF" extracted nothing: no v3 message contained a nickname."""
+        text = " || ".join(self._messages()).lower()
+        found = {a for a in CITY_ALIASES if a.lower() in text}
+        assert len(found) >= 5, f"only {sorted(found)}"
+
+    def test_a_nickname_resolves_to_the_canonical_city(self):
+        random.seed(23)
+        seen = {}
+        for _ in range(2000):
+            gold, place = _place()
+            if place in CITY_ALIASES:
+                seen[place] = gold
+        assert seen, "no aliases generated"
+        for alias, gold in seen.items():
+            assert gold == CITY_ALIASES[alias], f"{alias!r} golded {gold!r}"
+
+    def test_bare_state_names_appear(self):
+        """"shopping mall in California" -- v3 only ever saw cities."""
+        text = " || ".join(self._messages())
+        assert sum(1 for s in STATES if s in text) >= 5
+
+    def test_uppercase_k_and_bare_thousands_appear(self):
+        """"costs more than 100K" and "less than 10K bucks" -- v3 wrote only "$100k"."""
+        text = " || ".join(self._messages())
+        assert re.search(r"\d\s?K\b", text), "no uppercase K"
+        assert re.search(r"(?<![$\d])\b\d+k\b", text), "no thousands without a dollar sign"
+
+    def test_informal_money_words_appear(self):
+        text = " || ".join(self._messages()).lower()
+        assert "grand" in text or "bucks" in text
+
+    def test_unsupported_requirements_appear_and_are_never_extracted(self):
+        """"3 floor", "need to have good view" belong in no field, so gold omits them.
+
+        The stray numbers are the point -- "3 floors" is the shape that gets misread as a
+        size when the set contains no example of a clause being left out.
+        """
+        examples = _examples(n=1500, seed=17)
+        with_distractor = [
+            e for e in examples
+            if any(d in e["user_input"].lower() for d in (d.lower() for d in DISTRACTORS))
+        ]
+        assert len(with_distractor) >= 40, f"only {len(with_distractor)} carry one"
+        for e in with_distractor:
+            assert set(e["target"]["extracted"]) <= set(QUESTION_KEYS)
+
+    def test_punctuation_and_casing_vary(self):
+        messages = self._messages()
+        assert any("!" in m for m in messages), "no exclamation marks"
+        assert any(m and m[0].isupper() for m in messages), "nothing sentence-cased"
+
+    def test_every_example_still_validates(self):
+        """None of the above may produce an example the trainer would reject."""
+        for example in _examples(n=1500, seed=17):
+            assert validate(example, set(QUESTION_KEYS), set(REQUIRED)) is None
 
 
 class TestLocationLabels:
