@@ -38,7 +38,7 @@ QUESTIONS_PATH = EVAL_DIR / "questions.json"
 EVAL_DATASET_PATH = EVAL_DIR / "dataset.jsonl"
 RESULTS_DIR = EVAL_DIR / "results"
 TRAIN_PATH = DATA_DIR / "train.jsonl"
-VAL_PATH = DATA_DIR / "val.jsonl"
+VAL_PATH = DATA_DIR / "validation.jsonl"
 PHRASINGS_PATH = DATA_DIR / "property_type_phrasings.json"
 
 
