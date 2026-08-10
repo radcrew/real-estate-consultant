@@ -27,8 +27,9 @@ import argparse
 import json
 import random
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
@@ -184,36 +185,54 @@ BETWEEN_PHRASES = [
 ]
 
 
-def _range_phrase(fmt) -> tuple[dict[str, int], str]:
+class FieldNumbers(NamedTuple):
+    """How one numeric field renders and samples, and what a bare figure means for it.
+
+    Replaces a bare ``(callable, callable)`` tuple indexed as ``fmt[0]`` / ``fmt[1]``,
+    where only the first element formatted and nothing said what the second did.
+    """
+
+    render: Callable[[int], str]  # 4200 -> "4,200 sqft"
+    sample: Callable[[], int]  # draw a plausible value
+    bare_is_exact: bool  # see _range_phrase
+
+
+def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
     """Return (gold bounds, phrasing).
 
     Weights are set on the **gold** distribution, not the style names: ``bare`` also
-    yields a ``max`` bound, so explicit ``max`` is damped to compensate. The result is
-    roughly 40% max-only, 40% min-only, 20% two-sided — parity is the point, because the
-    imbalance is what let a learned prior override an explicit comparator.
+    yields a ``max`` bound for price, so explicit ``max`` is damped to compensate. The
+    result is roughly 40% max-only, 40% min-only, 20% two-sided — parity is the point,
+    because the imbalance is what let a learned prior override an explicit comparator.
     """
     style = random.choices(["max", "min", "between", "bare"], weights=[25, 40, 20, 15])[0]
     if style == "max":
-        value = fmt[1]()
-        return {"max": value}, random.choice(MAX_PHRASES).format(v=fmt[0](value))
+        value = numbers.sample()
+        return {"max": value}, random.choice(MAX_PHRASES).format(v=numbers.render(value))
     if style == "min":
-        value = fmt[1]()
-        return {"min": value}, random.choice(MIN_PHRASES).format(v=fmt[0](value))
+        value = numbers.sample()
+        return {"min": value}, random.choice(MIN_PHRASES).format(v=numbers.render(value))
     if style == "bare":
-        # A figure with no comparator is an upper bound. The eval has always tested this
-        # ("half a million"), but v2 never generated it — every phrasing carried a
-        # comparator word, so the convention was scored and never taught.
-        value = fmt[1]()
-        return {"max": value}, fmt[0](value)
-    low = fmt[1]()
-    high = low + fmt[1]()
+        # A figure with no comparator means different things per field, and the gold
+        # conventions in results.md say so: a bare *budget* is a ceiling ("half a million"
+        # -> max), a bare *size* is exact ("10,000 square feet" -> min == max).
+        #
+        # v3 generated max-only for both, so a user answering the size question with "32"
+        # got {"max": 32} -- a ceiling of 32 sqft -- and every later correction stacked
+        # against it. Scored on the eval as a value-accuracy miss, in production as a
+        # search that matches nothing.
+        value = numbers.sample()
+        bounds = {"min": value, "max": value} if numbers.bare_is_exact else {"max": value}
+        return bounds, numbers.render(value)
+    low = numbers.sample()
+    high = low + numbers.sample()
     return {"min": low, "max": high}, random.choice(BETWEEN_PHRASES).format(
-        lo=fmt[0](low), hi=fmt[0](high)
+        lo=numbers.render(low), hi=numbers.render(high)
     )
 
 
-PRICE_FMT = (_fmt_money, _price_value)
-SQFT_FMT = (_fmt_sqft, _sqft_value)
+PRICE_NUMBERS = FieldNumbers(_fmt_money, _price_value, bare_is_exact=False)
+SQFT_NUMBERS = FieldNumbers(_fmt_sqft, _sqft_value, bare_is_exact=True)
 
 
 def load_phrasings(path: Path) -> dict[str, list[str]]:
@@ -259,6 +278,53 @@ def property_type_values(questions: list[dict[str, Any]]) -> list[str]:
     raise SystemExit("questions.json has no property_type options; run ml.eval.dump_questions")
 
 
+def _type_words(
+    property_types: list[str], phrasings: dict[str, list[str]]
+) -> tuple[list[str], str]:
+    """Pick one or two types and render them as the user would name them."""
+    picked = random.sample(property_types, random.choice([1, 1, 1, 2]))
+    words = []
+    for option in picked:
+        pool = phrasings.get(option, [])
+        # Half literal. All-phrasing would teach the mirror-image mistake: the model
+        # would stop recognising the option words themselves.
+        words.append(random.choice(pool) if pool and random.random() < 0.5 else option)
+    return picked, " or ".join(words)
+
+
+def _place(names_state: bool | None = None) -> tuple[str, str]:
+    """A place name and the gold that matches it exactly.
+
+    Gold must contain only what the message says: labelling "Tampa" as "Tampa, FL" teaches
+    the model to invent a region.
+    """
+    city, state = random.choice(CITIES)
+    if names_state is None:
+        names_state = random.random() < 0.5
+    return (f"{city}, {state}", f"{city}, {state}") if names_state else (city, city)
+
+
+def _field_piece(
+    key: str, property_types: list[str], phrasings: dict[str, list[str]]
+) -> tuple[Any, str]:
+    """Return (gold value, a bare phrase that slots into a sentence).
+
+    The difference from ``_field_fragment`` is that a piece is not a standalone clause:
+    "Miami" rather than "I'm looking in Miami", "retail" rather than "we need retail
+    space". ``_connected_sentence`` weaves pieces together.
+    """
+    if key == "location":
+        return _place()
+    if key == "property_type":
+        picked, words = _type_words(property_types, phrasings)
+        return picked, words
+    if key == "price":
+        return _range_phrase(PRICE_NUMBERS)
+    if key == "size_sqft":
+        return _range_phrase(SQFT_NUMBERS)
+    raise ValueError(f"no piece renderer for {key}; add one before regenerating")
+
+
 def _field_fragment(
     key: str, property_types: list[str], phrasings: dict[str, list[str]]
 ) -> tuple[Any, str]:
@@ -269,24 +335,62 @@ def _field_fragment(
         gold = f"{city}, {state}" if names_state else city
         return gold, template.format(city=city, state=state)
     if key == "property_type":
-        picked = random.sample(property_types, random.choice([1, 1, 1, 2]))
-        words = []
-        for option in picked:
-            pool = phrasings.get(option, [])
-            # Half literal. All-phrasing would teach the mirror-image mistake: the model
-            # would stop recognising the option words themselves.
-            words.append(random.choice(pool) if pool and random.random() < 0.5 else option)
-        return picked, random.choice(TYPE_TEMPLATES).format(types=" or ".join(words))
+        picked, words = _type_words(property_types, phrasings)
+        return picked, random.choice(TYPE_TEMPLATES).format(types=words)
     if key == "price":
-        bounds, phrase = _range_phrase(PRICE_FMT)
+        bounds, phrase = _range_phrase(PRICE_NUMBERS)
         return bounds, random.choice([f"budget {phrase}", phrase, f"we can spend {phrase}"])
     if key == "size_sqft":
-        bounds, phrase = _range_phrase(SQFT_FMT)
+        bounds, phrase = _range_phrase(SQFT_NUMBERS)
         return bounds, phrase
     # Reached when the questionnaire gains a key this generator has no renderer for.
     # Raising is deliberate: silently skipping would ship a set that never teaches the
     # new field, and the shortfall would look like ordinary deduplication loss.
     raise ValueError(f"no generator for {key}; add one before regenerating")
+
+
+# Openers for a woven sentence. Empty is included because "retail in Miami under $3M" is
+# how people actually type.
+SENTENCE_OPENERS = ["", "", "looking for ", "we want to buy ", "we need ", "I need ",
+                    "after ", "trying to find ", "we're after "]
+# Attached to the type when it reads naturally: "office space in Seattle".
+TYPE_SUFFIXES = ["", "", " space", " property"]
+# How a trailing bound joins on. "that costs" only fits price.
+def _attach(part: str, *, first: bool) -> str:
+    """Join a trailing bound onto the sentence.
+
+    Only a bound that opens with a comparator word can attach without a comma, and only
+    directly after the place. A bare figure there reads as noise -- "Denver, CO 45k sqft"
+    -- and a second bound run on reads as one phrase: "up to 59,500 sqft lower than
+    $125k". Both appeared in the first draft of this function.
+    """
+    if first and part[:1].isalpha():
+        return random.choice([", ", ", ", " ", " "]) + part
+    return ", " + part
+
+
+def _connected_sentence(pieces: dict[str, str]) -> str | None:
+    """Weave field pieces into one flowing sentence, or None if they do not fit.
+
+    v3 dropped ``location`` from every multi-field message that embedded it as a
+    prepositional phrase — "retail in Miami under $3M" returned type and price only, on
+    four of five multi-field eval turns and in production. It is not a merge bug: with an
+    empty ``current_criteria`` the key is still absent from the model's reply.
+
+    The cause is that this generator only ever produced comma-joined standalone clauses
+    ("we need retail space, I'm looking in Miami, budget up to $3M"), so a place named
+    mid-sentence was close to unseen. This is the missing shape.
+
+    Requires both a type and a place, which is exactly the failing pattern; anything else
+    falls back to the comma-joined form.
+    """
+    if "property_type" not in pieces or "location" not in pieces:
+        return None
+    head = f"{random.choice(SENTENCE_OPENERS)}{pieces['property_type']}"
+    head += f"{random.choice(TYPE_SUFFIXES)} in {pieces['location']}"
+    # Size before price reads more naturally than the reverse ("5,000 sqft, under $2M").
+    tail = [pieces[key] for key in ("size_sqft", "price") if key in pieces]
+    return head + "".join(_attach(part, first=i == 0) for i, part in enumerate(tail))
 
 
 def _next_question_key(
@@ -316,7 +420,11 @@ def make_example(
     skipped: list[str] = []
     # Some turns start mid-conversation, so the model must learn not to re-extract what
     # is already in current_criteria.
-    if random.random() < 0.45:
+    #
+    # Never for `multi`: a pre-filled prior shrinks `remaining`, which caps how many
+    # fields the message can state. That is why v3 saw so few 3- and 4-field examples --
+    # 10.8% of the set -- and learned to stop at two.
+    if shape != "multi" and random.random() < 0.45:
         for key in random.sample(required, random.randint(1, max(1, len(required) - 2))):
             prior[key], _ = _field_fragment(key, property_types, phrasings)
 
@@ -373,12 +481,34 @@ def make_example(
             if key not in prior:
                 prior[key], _ = _field_fragment(key, property_types, phrasings)
         user_input = random.choice(COMPLETE_PHRASES)
+    elif shape == "single":
+        key = random.choice(remaining)
+        extracted[key], fragment = _field_fragment(key, property_types, phrasings)
+        user_input = fragment
     else:
-        count = 1 if shape == "single" else random.randint(2, min(4, len(remaining)))
-        for key in random.sample(remaining, count):
-            extracted[key], fragment = _field_fragment(key, property_types, phrasings)
-            fragments.append(fragment)
-        user_input = ", ".join(fragments)
+        # Skewed high on purpose. A flat randint(2, 4) still leaves 3- and 4-field
+        # messages rarer than 2-field ones once the other shapes are counted, and
+        # under-representing them is what taught v3 to stop after two keys.
+        count = min(len(remaining), random.choices([2, 3, 4], weights=[30, 40, 30])[0])
+        keys = random.sample(remaining, count)
+        # Most qualifying messages are woven into one sentence; the rest stay comma-joined
+        # clauses. Weighted toward weaving because that is the shape v3 failed on, but not
+        # all of it -- an all-sentence set would just move the blind spot, and the
+        # comma-joined form is still ~14% of the set through the other shapes.
+        pieces = {}
+        for key in keys:
+            extracted[key], pieces[key] = _field_piece(key, property_types, phrasings)
+        sentence = _connected_sentence(pieces) if random.random() < 0.6 else None
+        if sentence is not None:
+            user_input = sentence
+        else:
+            # Re-render as standalone clauses; gold is re-taken because the wording, and
+            # therefore what the message actually states, differs between the two forms.
+            extracted = {}
+            for key in keys:
+                extracted[key], fragment = _field_fragment(key, property_types, phrasings)
+                fragments.append(fragment)
+            user_input = ", ".join(fragments)
 
     current_criteria = dict(prior)
     if skipped and shape == "carried-skip":

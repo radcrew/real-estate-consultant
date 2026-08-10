@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 from pathlib import Path
 
 import pytest
@@ -15,6 +16,8 @@ import pytest
 from ml.data.generate import (
     CITIES,
     FIELD_LABELS,
+    PRICE_NUMBERS,
+    SQFT_NUMBERS,
     _field_fragment,
     _fmt_money,
     _next_question_key,
@@ -132,6 +135,21 @@ class TestGeneratorTracksTheQuestionnaire:
         assert _skip_label("clear_height") == "clear height"
 
 
+class TestMultiFieldShape:
+    """v3 dropped ``location`` from every message that named it mid-sentence.
+
+    "retail in Miami under $3M" returned type and price only -- on four of five
+    multi-field eval turns, and in production. Not a merge bug: with an empty
+    current_criteria the key is still missing from the reply. The set only ever held
+    comma-joined standalone clauses, and 77% of it extracted at most one field.
+    """
+
+    def test_a_real_share_of_examples_state_three_or_more_fields(self):
+        examples = _examples(n=1200, seed=7)
+        counts = [len(e["target"]["extracted"]) for e in examples]
+        three_plus = sum(1 for c in counts if c >= 3) / len(counts)
+        assert three_plus >= 0.12, f"only {three_plus:.1%} state 3+ fields; v3 had 10.8%"
+
     def test_woven_sentences_are_generated(self):
         """Raw make_example output; the written set runs higher, since dedup culls the
         collapsing shapes (skip, noise) far harder than it culls extraction phrasings."""
@@ -145,6 +163,55 @@ class TestGeneratorTracksTheQuestionnaire:
         ]
         share = len(woven) / len(examples)
         assert share >= 0.045, f"only {share:.1%} weave the shape v3 failed on"
+
+    def test_the_comma_joined_form_is_not_displaced(self):
+        """An all-sentence set would just relocate the blind spot."""
+        examples = _examples(n=1200, seed=7)
+        clause_markers = ("something in", "looking in", "somewhere around", "area please")
+        clause = [e for e in examples if any(m in e["user_input"] for m in clause_markers)]
+        assert len(clause) / len(examples) >= 0.10
+
+    def test_gold_location_is_stated_verbatim_in_the_message(self):
+        """The labels-by-construction guarantee has to survive the new sentence form."""
+        for example in _examples(n=800, seed=9):
+            location = example["target"]["extracted"].get("location")
+            if isinstance(location, str):
+                assert location in example["user_input"], (
+                    f"gold {location!r} not in {example['user_input']!r}"
+                )
+
+    def test_a_bound_never_runs_into_the_place_or_another_bound(self):
+        """"Denver, CO 45k sqft" and "59,500 sqft lower than $125k" both shipped once."""
+        for example in _examples(n=800, seed=13):
+            text = example["user_input"]
+            assert not re.search(r"[A-Z]{2} \d", text), text
+            assert not re.search(r"(sqft|feet) [a-z]+ than", text), text
+
+
+class TestBareFigureConventions:
+    """results.md: a bare budget is a ceiling, a bare size is exact.
+
+    v3 generated max-only for both, so answering the size question with "32" trained
+    ``{"max": 32}`` -- a 32 sqft ceiling -- and every later correction stacked against it.
+    """
+
+    def _bounds(self, key: str, n: int = 900):
+        random.seed(21)
+        return [_field_fragment(key, PROPERTY_TYPES, PHRASINGS)[0] for _ in range(n)]
+
+    def test_a_bare_size_sets_both_bounds_equal(self):
+        exact = [b for b in self._bounds("size_sqft") if b.get("min") == b.get("max")]
+        assert exact, "no exact sizes generated; the convention is scored but never taught"
+
+    def test_a_bare_budget_is_a_ceiling_never_an_exact_price(self):
+        for bounds in self._bounds("price"):
+            assert not (bounds.get("min") is not None and bounds["min"] == bounds.get("max"))
+
+    def test_the_field_decides_what_bare_means(self):
+        assert SQFT_NUMBERS.bare_is_exact
+        assert not PRICE_NUMBERS.bare_is_exact
+
+
 class TestSubMillionMillionsNotation:
     """M-notation used to start at 1,000,000, so a leading zero was never seen.
 
