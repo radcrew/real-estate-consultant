@@ -63,16 +63,65 @@ size — is the one that failed in production, and it was untested.
 
 | Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
 |---|---|---|---|---|---|---|---|---|---|---|---|
+| 0.5b-lora-v4-f16 | LoRA v4 F16 | 118 | 1.000 | **0.946** | **0.957** | **0.951** | **0.864** | 0.838 | 0.756 | 1185 | 2398 |
+| **0.5b-lora-v4-q4km** | **LoRA v4 Q4_K_M** | 118 | 1.000 | 0.915 | 0.935 | **0.925** | **0.849** | 0.912 | 0.756 | 865 | 1306 |
 | 0.5b-lora-v3-q4km-r6 | LoRA v3 Q4_K_M | 118 | 1.000 | 0.832 | 0.913 | 0.870 | 0.821 | 0.914 | 0.780 | 1079 | 1599 |
 
 ```bash
 python -m ml.eval.run --label 0.5b-lora-v3-q4km-r6 --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v3-q4_k_m
+
+python -m ml.eval.run --label 0.5b-lora-v4-f16 --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v4-f16
+
+python -m ml.eval.run --label 0.5b-lora-v4-q4km --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m
 ```
 
-This is v3 re-scored, not a new model — the r5 row above measures the same GGUF on 108
-turns. It is here so v4 has a baseline on the instrument it will be judged by.
+The v3 row is a re-score, not a new model — the r5 row below measures the same GGUF on 108
+turns. It is here so v4 has a baseline on the instrument it is judged by.
+
+### What this v4 is, and is not
+
+**This v4 was trained on the dataset generated *before* `pending_question` existed.** The
+`train.jsonl` behind it carries the seven old shapes and no `pending_question` key —
+verified, not assumed. Its gains over v3 come from the earlier generator work (wider
+vocabulary, multi-field sentences, exact bare sizes); the `correction` and `pending-answer`
+shapes are **not** in it, and neither is the prompt field they teach.
+
+That makes the row a useful control rather than a result: it is what the new eval turns
+score when the fix is absent, on a model that is otherwise ahead of v3.
+
+Quantization costs what it usually costs here — F1 0.951 → 0.925, value accuracy
+0.864 → 0.849 — and buys back a third of the latency (p50 1185 → 865 ms).
+
+### Where it still fails, and why that is the point
+
+Q4 misses 4 of the 10 r6 additions, in three distinct modes:
+
+| Turn | Emitted | Gold | Mode |
+|---|---|---|---|
+| `pending-bare-size-k` | `price {max: 250000}` | `size_sqft {min/max: 25000}` | Attribution — `25k` went to the wrong field, and misparsed |
+| `pending-bare-5000-as-size` | `price {max: 5000000}` | `size_sqft {min/max: 5000}` | Echo — repeated the stored budget verbatim |
+| `correct-size-bare` | `size_sqft {min: 5000, max: 10000}` | `size_sqft {min/max: 5000}` | Correction stacked against the old bound |
+| `pending-bare-5000-as-price` | `price {value: 5000}` | `price {max: 5000}` | Invented key; F16 gets this one right, so it is quantization damage |
+
+The first three are precisely what `pending-answer` and `correction` exist to teach, and
+this model saw neither. The echo case is the clearest: `current_criteria` held
+`price {max: 5000000}` and the reply `5,000` came back as that same stored ceiling.
+
+`pending-overridden-by-unit` **passes** at both F16 and Q4 where v3 failed it — the bare
+size read as exact rather than as a ceiling. That fix was in the earlier generator commit
+and is already in this training set, which is why it moved and the other three did not.
+
+So the numbers to beat with a v4 trained on the current data are
+**`pending-answer` value accuracy 0.800 and `correction` 0.800**, not v3's 0.667/0.800.
+A retrained v4 needs a distinct label; this row already owns `0.5b-lora-v4-q4km`.
+
+### The v3 baseline, for contrast
 
 v3 fails 4 of the 10 new turns, and the split matters:
 
@@ -85,13 +134,24 @@ v3 fails 4 of the 10 new turns, and the split matters:
 
 Only the first is a pure attribution miss. The other three are the max-only bare bound
 `ml/data/generate.py` documents — a bare size read as a ceiling of 5,000 sqft rather than a
-size of 5,000 — which is a search that matches nothing in production. Both failure modes
-are targets of the v4 training set, so the category should move on both counts or the
-change did not land.
+size of 5,000 — which is a search that matches nothing in production. The v4 row above
+clears exactly one of them (`pending-overridden-by-unit`), which is the part its training
+set actually covered.
 
-`pending-answer` value accuracy of **0.667** and `correction` of **0.800** are the numbers
-to beat. Note the matched pair is already half-right at v3: it gets `5,000` as a price and
-misses it as a size, which is what guessing from magnitude looks like.
+Both models get the matched pair half-right, and both miss the same half: `5,000` scores as
+a price and fails as a size. That is what reading magnitude instead of `pending_question`
+looks like, and it is unchanged from v3 to this v4 — as it must be, since neither was
+trained on the field.
+
+### Artifact sizes
+
+| File | On disk | Note |
+|---|---|---|
+| `qwen2.5-0.5b-instruct-intake-v4-f16.gguf` | 994 MB | conversion target, eval baseline |
+| `qwen2.5-0.5b-instruct-intake-v4-q4_k_m.gguf` | 398 MB | `quant size = 373.71 MiB (6.35 BPW)` |
+
+144 of 290 tensors required fallback quantization, identical to v2 and v3 — the 896-wide
+tensors still do not divide evenly for every K-quant, so Q4_K_M is really ~6.35 BPW.
 
 Skip recall reads 0.780 against r5's 0.854 on **the same 25 unchanged skip turns** — every
 r6 addition golds `skipped_fields: []`. That is run-to-run variation, not a regression; see
