@@ -17,6 +17,7 @@ from app.domain.intake_criteria import (
 )
 from app.domain.intake_next_question import (
     first_question_row_in_missing,
+    pending_question_key,
 )
 from app.domain.intake_validation import merge_missing_fields
 from app.llm.intake.exceptions import raise_hf_opening_response_missing_text
@@ -72,6 +73,12 @@ def build_intake_messages(
         key for key in current_criteria.get(SKIPPED_FIELDS_KEY, []) if isinstance(key, str)
     ]
     criteria_for_prompt = {k: v for k, v in current_criteria.items() if k != SKIPPED_FIELDS_KEY}
+    pending_question = pending_question_key(
+        questions,
+        answered=criteria_for_prompt,
+        required_fields=required_fields,
+        skipped=previously_skipped,
+    )
 
     intake_schema = render_intake_response_schema(questions=questions)
     system_prompt = (
@@ -85,6 +92,7 @@ def build_intake_messages(
             "question_keys": question_keys,
             "required_fields": required_fields,
             "previously_skipped_fields": previously_skipped,
+            "pending_question": pending_question,
         },
         ensure_ascii=True,
     )

@@ -199,7 +199,34 @@ def _in_thousands(value: int) -> str:
     ])
 
 
+# Figures written out rather than digitised. The eval has scored "half a million", "a
+# quarter of a million" and "one and a half million tops" since r1, and the generator has
+# never produced one -- those turns tested a wording training never taught.
+MONEY_IN_WORDS = {
+    250_000: ["a quarter of a million", "quarter of a million", "250 thousand"],
+    500_000: ["half a million", "a half million", "500 thousand"],
+    750_000: ["three quarters of a million", "750 thousand"],
+    1_000_000: ["a million", "one million", "1 mil"],
+    1_500_000: ["one and a half million", "a million and a half", "1.5 mil"],
+    2_000_000: ["two million", "a couple million", "2 mil"],
+    3_000_000: ["three million", "3 mil"],
+    5_000_000: ["five million", "5 mil"],
+}
+SQFT_IN_WORDS = {
+    5_000: ["five thousand square feet"],
+    10_000: ["ten thousand square feet"],
+    20_000: ["twenty thousand square feet"],
+    50_000: ["fifty thousand square feet"],
+}
+
+# "about 5,000 sqft" is still a bound, not a new kind of value -- gold is unchanged. Only
+# the wording softens, and v3 saw none of it.
+APPROX_PREFIXES = ["around ", "about ", "roughly ", "approximately ", "~", "somewhere near "]
+
+
 def _fmt_money(value: int) -> str:
+    if value in MONEY_IN_WORDS and random.random() < 0.25:
+        return random.choice(MONEY_IN_WORDS[value])
     if value >= 1_000_000 and value % 100_000 == 0:
         return _in_millions(value)
     # Sub-million budgets written in millions. M-notation used to start at 1,000,000, so
@@ -215,11 +242,24 @@ def _fmt_money(value: int) -> str:
     return f"${value:,}"
 
 
+# Every way this industry writes square feet. v3 wrote only "sqft" and "square feet", so
+# "sq ft", "sq. ft." and the ubiquitous "SF" were all unseen.
+#
+# "SF" is deliberately included even though CITY_ALIASES maps it to San Francisco: in
+# commercial real estate it means square feet far more often, and the disambiguating
+# signal -- a figure immediately before it -- is exactly what training should teach. Both
+# senses appear in the set so context has to do the work.
+SQFT_UNITS = ["sqft", "sq ft", "sq. ft.", "SF", "square feet", "square foot",
+              "sf", "sq.ft.", "square footage"]
+
+
 def _fmt_sqft(value: int) -> str:
-    if value >= 1000 and value % 1000 == 0:
-        return random.choice([f"{value:,} sqft", f"{value // 1000}k sqft",
-                              f"{value:,} square feet"])
-    return f"{value:,} sqft"
+    if value in SQFT_IN_WORDS and random.random() < 0.2:
+        return random.choice(SQFT_IN_WORDS[value])
+    unit = random.choice(SQFT_UNITS)
+    if value >= 1000 and value % 1000 == 0 and random.random() < 0.35:
+        return f"{value // 1000}k {unit}"
+    return f"{value:,} {unit}"
 
 
 def _price_value() -> int:
@@ -254,7 +294,13 @@ MIN_PHRASES = [
 BETWEEN_PHRASES = [
     "between {lo} and {hi}", "from {lo} to {hi}", "{lo} to {hi}",
     "more than {lo} but under {hi}", "at least {lo} and no more than {hi}",
+    "in the {lo} to {hi} range", "anywhere from {lo} up to {hi}",
+    "{lo} minimum, {hi} maximum", "no less than {lo}, no more than {hi}",
 ]
+# Hyphenated ranges, which is how one is usually typed. Kept apart from BETWEEN_PHRASES
+# because the low side drops its unit -- "10,000-15,000 sqft", never
+# "10,000 sqft-15,000 sqft", which is what a shared template produces.
+HYPHEN_PHRASES = ["{lo}-{hi}", "{lo} - {hi}", "{lo}–{hi}"]
 
 
 class FieldNumbers(NamedTuple):
@@ -267,6 +313,9 @@ class FieldNumbers(NamedTuple):
     render: Callable[[int], str]  # 4200 -> "4,200 sqft"
     sample: Callable[[], int]  # draw a plausible value
     bare_is_exact: bool  # see _range_phrase
+    # The low side of a hyphenated range, where the unit belongs only on the high side:
+    # "10,000-15,000 sqft". Money keeps its symbol, since "$500k-$1M" is how it is written.
+    render_low: Callable[[int], str]
 
 
 def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
@@ -278,6 +327,16 @@ def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
     because the imbalance is what let a learned prior override an explicit comparator.
     """
     style = random.choices(["max", "min", "between", "bare"], weights=[25, 40, 20, 15])[0]
+
+    def soften(text: str) -> str:
+        """Sometimes hedge a bare figure. The bound is unchanged; only the wording is.
+
+        Only bare figures. Prefixing one that already carries a comparator produces
+        "we can spend above around 35,000 dollars", which no one writes -- the comparator
+        already conveys the imprecision.
+        """
+        return random.choice(APPROX_PREFIXES) + text if random.random() < 0.15 else text
+
     if style == "max":
         value = numbers.sample()
         return {"max": value}, random.choice(MAX_PHRASES).format(v=numbers.render(value))
@@ -295,16 +354,24 @@ def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
         # search that matches nothing.
         value = numbers.sample()
         bounds = {"min": value, "max": value} if numbers.bare_is_exact else {"max": value}
-        return bounds, numbers.render(value)
+        return bounds, soften(numbers.render(value))
     low = numbers.sample()
     high = low + numbers.sample()
+    if random.random() < 0.3:
+        return {"min": low, "max": high}, random.choice(HYPHEN_PHRASES).format(
+            lo=numbers.render_low(low), hi=numbers.render(high)
+        )
     return {"min": low, "max": high}, random.choice(BETWEEN_PHRASES).format(
         lo=numbers.render(low), hi=numbers.render(high)
     )
 
 
-PRICE_NUMBERS = FieldNumbers(_fmt_money, _price_value, bare_is_exact=False)
-SQFT_NUMBERS = FieldNumbers(_fmt_sqft, _sqft_value, bare_is_exact=True)
+PRICE_NUMBERS = FieldNumbers(
+    _fmt_money, _price_value, bare_is_exact=False, render_low=_fmt_money
+)
+SQFT_NUMBERS = FieldNumbers(
+    _fmt_sqft, _sqft_value, bare_is_exact=True, render_low=lambda v: f"{v:,}"
+)
 
 
 def load_phrasings(path: Path) -> dict[str, list[str]]:
@@ -417,6 +484,35 @@ def _field_piece(
     if key == "size_sqft":
         return _range_phrase(SQFT_NUMBERS)
     raise ValueError(f"no piece renderer for {key}; add one before regenerating")
+
+
+def _bare_answer(
+    key: str, property_types: list[str], phrasings: dict[str, list[str]]
+) -> tuple[Any, str]:
+    """A reply that is only a value -- what someone types when asked a direct question.
+
+    For the numeric fields this is a naked figure with no unit and no currency symbol, so
+    the message carries no clue which field it belongs to. That is deliberate: it is the
+    turn that made "10" become a $10 budget, and only ``pending_question`` resolves it.
+
+    Bounds follow the same convention as any bare figure: a budget is a ceiling, a size is
+    exact.
+    """
+    if key == "location":
+        gold, place = _place()
+        return gold, place
+    if key == "property_type":
+        picked, words = _type_words(property_types, phrasings)
+        return picked, words
+    if key == "price":
+        value = _price_value()
+        text = random.choice([f"{value:,}", str(value), _fmt_money(value)])
+        return {"max": value}, text
+    if key == "size_sqft":
+        value = _sqft_value()
+        text = random.choice([f"{value:,}", str(value), _fmt_sqft(value)])
+        return {"min": value, "max": value}, text
+    raise ValueError(f"no bare answer for {key}; add one before regenerating")
 
 
 def _field_fragment(
@@ -537,8 +633,14 @@ def make_example(
     # over-weighted against its target share because refusal phrasings collapse under
     # deduplication far harder than extraction phrasings do.
     shape = random.choices(
-        ["single", "multi", "skip", "noise", "carried-skip", "complete", "answer-and-skip"],
-        weights=[22, 18, 28, 14, 7, 4, 7],
+        ["single", "multi", "skip", "noise", "carried-skip", "complete",
+         "answer-and-skip", "correction", "pending-answer"],
+        # `multi` is held at 20 because ~70% of its examples state 3+ fields, and that
+        # share is the location-drop fix -- adding shapes below it once pushed 3+ down to
+        # 11%, back to the v3 level the fix exists to move. `skip` stays over-weighted
+        # against its target share because refusal phrasings collapse under dedup far
+        # harder than extraction phrasings do.
+        weights=[16, 20, 23, 9, 5, 4, 6, 9, 8],
     )[0]
 
     prior: dict[str, Any] = {}
@@ -549,7 +651,10 @@ def make_example(
     # Never for `multi`: a pre-filled prior shrinks `remaining`, which caps how many
     # fields the message can state. That is why v3 saw so few 3- and 4-field examples --
     # 10.8% of the set -- and learned to stop at two.
-    if shape != "multi" and random.random() < 0.45:
+    #
+    # `correction` fills its own prior below, because it needs a field that is already
+    # answered -- the opposite of what `remaining` selects for.
+    if shape not in ("multi", "correction", "pending-answer") and random.random() < 0.45:
         for key in random.sample(required, random.randint(1, max(1, len(required) - 2))):
             prior[key], _ = _field_fragment(key, property_types, phrasings)
 
@@ -560,7 +665,42 @@ def make_example(
     extracted: dict[str, Any] = {}
     fragments: list[str] = []
 
-    if shape == "noise":
+    if shape == "pending-answer":
+        # Answer the outstanding question with a value and nothing else. Every other
+        # required field is filled, so `pending_question` in the prompt names exactly the
+        # one this message answers -- which is the only thing that disambiguates it.
+        #
+        # "10" is price after the budget question and size_sqft after the size question.
+        # Identical message, different field, and the message itself cannot say which:
+        # that is why the prompt carries pending_question and why this shape exists.
+        target = random.choice(required)
+        for key in required:
+            if key != target:
+                prior[key], _ = _field_fragment(key, property_types, phrasings)
+        extracted[target], user_input = _bare_answer(target, property_types, phrasings)
+    elif shape == "correction":
+        # A field that is ALREADY answered, restated. Every other shape draws from
+        # `remaining`, so v3 never saw gold overlap current_criteria and learned that an
+        # answered field is closed. In production a user correcting a stored value got
+        # their old value echoed back unchanged, turn after turn.
+        #
+        # Half carry an explicit marker ("actually", "make it") and half are a bare
+        # restatement, because the bare form is what failed: "100sqft" after a wrong size
+        # is a correction whether or not the user says so.
+        for key in random.sample(required, random.randint(1, max(1, len(required) - 1))):
+            prior[key], _ = _field_fragment(key, property_types, phrasings)
+        target = random.choice(list(prior))
+        extracted[target], fragment = _field_fragment(target, property_types, phrasings)
+        if random.random() < 0.5:
+            marker = random.choice([
+                "actually", "actually, make it", "sorry, make that", "no,", "scratch that,",
+                "change that to", "let's say", "on second thought,", "correction:",
+                "I meant", "no I meant", "update that to",
+            ])
+            user_input = f"{marker} {fragment}"
+        else:
+            user_input = fragment
+    elif shape == "noise":
         user_input = random.choice(NOISE_INPUTS)
     elif shape == "skip":
         target = _next_question_key(set(prior), set(), ordered_required)

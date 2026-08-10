@@ -348,6 +348,61 @@ class TestRealWorldMessageForms:
             assert validate(example, set(QUESTION_KEYS), set(REQUIRED)) is None
 
 
+class TestNumberAndUnitWordings:
+    """Forms the eval scores, or a client types, that v3 never generated."""
+
+    def _phrases(self, key: str, n: int = 4000, seed: int = 1) -> str:
+        random.seed(seed)
+        return " || ".join(_field_fragment(key, PROPERTY_TYPES, PHRASINGS)[1] for _ in range(n))
+
+    def test_money_written_in_words(self):
+        """"half a million" and "a quarter of a million" have been eval turns since r1."""
+        text = self._phrases("price").lower()
+        assert "half a million" in text
+        assert "quarter of a million" in text
+
+    def test_every_square_foot_unit_appears(self):
+        text = self._phrases("size_sqft")
+        for unit in ("sqft", "sq ft", "sq. ft.", "square feet", "square footage"):
+            assert unit in text, f"{unit!r} never generated"
+        assert re.search(r"\d[\d,]*\s?SF\b", text), "SF as a unit never generated"
+
+    def test_sf_is_generated_in_both_senses(self):
+        """SF means square feet far more often than San Francisco in this industry.
+
+        Both are in the set on purpose: the disambiguating signal is a figure immediately
+        before it, and only context can carry that.
+        """
+        sizes = self._phrases("size_sqft")
+        assert re.search(r"\d[\d,]*\s?SF\b", sizes)
+        assert "SF" in CITY_ALIASES and CITY_ALIASES["SF"] == "San Francisco"
+
+    def test_approximate_qualifiers_appear_without_changing_the_bound(self):
+        random.seed(5)
+        softened = 0
+        for _ in range(3000):
+            bounds, phrase = _range_phrase(PRICE_NUMBERS)
+            if any(p.strip() in phrase for p in ("around", "about", "roughly", "approximately")):
+                softened += 1
+                assert bounds, "a softened figure still states a bound"
+        assert softened, "no approximate wording generated"
+
+    def test_hyphenated_ranges_appear(self):
+        random.seed(9)
+        phrases = [_range_phrase(SQFT_NUMBERS)[1] for _ in range(3000)]
+        assert any(re.search(r"\d[\d,]*\s?-\s?\d", p) for p in phrases)
+
+    def test_a_written_out_figure_still_golds_the_number(self):
+        """"half a million" must gold 500000, not a string."""
+        random.seed(11)
+        for _ in range(4000):
+            bounds, phrase = _range_phrase(PRICE_NUMBERS)
+            if "half a million" in phrase:
+                assert 500_000 in bounds.values(), f"{phrase!r} -> {bounds}"
+            if "quarter of a million" in phrase:
+                assert 250_000 in bounds.values(), f"{phrase!r} -> {bounds}"
+
+
 class TestLocationLabels:
     def test_gold_never_invents_a_state(self):
         """A phrasing that names only the city must not be labelled "City, ST"."""
@@ -382,9 +437,36 @@ class TestGeneratedExamples:
                 answered, skipped, ORDERED_REQUIRED)
 
     def test_never_re_extracts_what_current_criteria_already_holds(self):
+        """Restating a stored value is only correct when the message is a correction.
+
+        Everywhere else it is the over-emission P2 measured: copying the payload back
+        instead of reading the message.
+        """
         for example in _examples():
+            if example["shape"] == "correction":
+                continue
             prior = set(example["current_criteria"]) - {"_skipped_fields"}
             assert not prior & set(example["target"]["extracted"])
+
+    def test_a_correction_restates_a_field_that_is_already_answered(self):
+        """The inverse: a correction MUST overlap current_criteria, or it teaches nothing."""
+        corrections = [e for e in _examples(n=1200, seed=7) if e["shape"] == "correction"]
+        assert corrections, "no correction examples generated"
+        for example in corrections:
+            prior = set(example["current_criteria"]) - {"_skipped_fields"}
+            extracted = set(example["target"]["extracted"])
+            assert extracted, f"correction extracted nothing: {example['user_input']!r}"
+            assert extracted <= prior, "a correction must restate an answered field"
+
+    def test_corrections_come_with_and_without_an_explicit_marker(self):
+        """"100sqft" after a wrong size is a correction whether or not the user says so."""
+        corrections = [e for e in _examples(n=1200, seed=7) if e["shape"] == "correction"]
+        markers = ("actually", "scratch that", "make it", "make that", "i meant",
+                   "no,", "change that", "let's say", "correction:", "update that")
+        marked = [e for e in corrections
+                  if any(m in e["user_input"].lower() for m in markers)]
+        assert marked, "no marked corrections"
+        assert len(marked) < len(corrections), "every correction is marked; the bare form failed"
 
     def test_a_real_share_of_examples_extract_nothing(self):
         # Teaching restraint is the whole point; an all-fields set would train the
