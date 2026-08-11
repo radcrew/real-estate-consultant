@@ -282,20 +282,52 @@ def _sqft_value() -> int:
 # 445 upper-bound examples against 199 lower. It generalised unseen *upper* wordings fine
 # ("less than", "lower than") because the prior agreed, and inverted unseen *lower* ones:
 # "higher than $500K" came back as {"max": 500000}.
+# Kept symmetric on purpose. r6 scored `nothing over $2M` correct and `nothing below
+# 5,000 sqft` wrong on v3, v4 f16 and v4 q4 alike, and the asymmetry below is why: the max
+# list carried a negated form ("not over") and the min list carried none, so the model
+# learned to negate in one direction only. Every negation added to one list now has a
+# counterpart in the other.
+#
+# "floor" and "ceiling" are bound words the set never taught. Every occurrence of "floor"
+# in the generated data was `ground floor` / `top floor` / `office floor` -- a storey,
+# never a budget floor -- so `$400k floor on the budget` had nothing to attach to and came
+# back as a ceiling. Both senses stay in the set, as with "SF" in SQFT_UNITS:
+# the disambiguating signal is the figure beside it, and context has to do the work.
+#
+# None of these is an eval wording. `nothing over {v}` and `just shy of {v}` were both
+# here for a draft, and both are a bound-direction turn verbatim -- adding them scores
+# the turn without teaching anything the neighbouring phrasings do not. The neighbours
+# are the honest form of the same lesson, and TestBoundWordingEvalSeparation pins it.
 MAX_PHRASES = [
     "up to {v}", "no more than {v}", "under {v}", "less than {v}", "lower than {v}",
     "below {v}", "at most {v}", "not over {v}", "{v} or less", "{v} max", "maximum {v}",
+    "nothing above {v}", "never more than {v}", "no higher than {v}",
+    "{v} ceiling", "a ceiling of {v}", "capped at {v}", "just under {v}",
 ]
 MIN_PHRASES = [
     "at least {v}", "no less than {v}", "more than {v}", "higher than {v}", "over {v}",
     "above {v}", "starting at {v}", "north of {v}", "{v} or more", "{v} and up",
     "minimum {v}",
+    "nothing under {v}", "not below {v}", "never less than {v}",
+    "{v} floor", "a floor of {v}", "no lower than {v}", "at minimum {v}",
 ]
 BETWEEN_PHRASES = [
     "between {lo} and {hi}", "from {lo} to {hi}", "{lo} to {hi}",
     "more than {lo} but under {hi}", "at least {lo} and no more than {hi}",
     "in the {lo} to {hi} range", "anywhere from {lo} up to {hi}",
     "{lo} minimum, {hi} maximum", "no less than {lo}, no more than {hi}",
+]
+# The same range with the ceiling stated first. Every template above puts {lo} before
+# {hi}, so position and direction never disagreed and the model learned to read the
+# order instead of the comparator: given "lower than $2M, higher than $500K" all three
+# r6 models returned min $2M / max $500K -- first figure to min, second to max, both
+# comparators ignored. These are the counter-examples that make position uninformative.
+# The comma-joined form deliberately uses different comparators than that turn does, so
+# what it scores stays "reads the comparator", not "has seen this sentence".
+REVERSED_BETWEEN_PHRASES = [
+    "under {hi} but over {lo}", "no more than {hi} and no less than {lo}",
+    "at most {hi}, at least {lo}", "{hi} ceiling, {lo} floor",
+    "{hi} maximum, {lo} minimum", "below {hi} but above {lo}",
 ]
 # Hyphenated ranges, which is how one is usually typed. Kept apart from BETWEEN_PHRASES
 # because the low side drops its unit -- "10,000-15,000 sqft", never
@@ -360,6 +392,13 @@ def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
     if random.random() < 0.3:
         return {"min": low, "max": high}, random.choice(HYPHEN_PHRASES).format(
             lo=numbers.render_low(low), hi=numbers.render(high)
+        )
+    # Held well below the {lo}-first share: stating the ceiling first is the rarer way to
+    # write a range, and over-weighting it would only move the positional prior rather
+    # than remove it. The gold is identical either way -- only the word order differs.
+    if random.random() < 0.25:
+        return {"min": low, "max": high}, random.choice(REVERSED_BETWEEN_PHRASES).format(
+            lo=numbers.render(low), hi=numbers.render(high)
         )
     return {"min": low, "max": high}, random.choice(BETWEEN_PHRASES).format(
         lo=numbers.render(low), hi=numbers.render(high)
@@ -842,6 +881,30 @@ def to_chat_record(
     }
 
 
+def collision_key(text: str) -> str:
+    """Fold the variation ``_rough_up`` adds, so a roughened wording still collides.
+
+    The guard used to compare raw strings, and roughening runs *after* an example is
+    built. So the eval turn "that's everything" shipped into the r6 training set four
+    times over -- ``THAT'S EVERYTHING``, ``That's everything``, ``That's everything.``,
+    ``That's everything!!`` -- and "yes that's correct" three times. Both are completion
+    turns, where the wording is the entire signal, so the category was scoring recall on
+    two of its four turns while the guard reported them held out.
+
+    Returns ``""`` for a blank message, which both callers read as "no wording here" and
+    skip. The eval's empty and whitespace turns score a behaviour rather than a phrasing
+    -- emit nothing when there is nothing -- and there is nothing to memorise. Holding
+    them out would leave that behaviour untaught while the eval went on scoring it.
+    """
+    text = text.lower().strip()
+    if not text:
+        return ""
+    for tail in (" please", " thanks"):
+        if text.endswith(tail):
+            text = text[: -len(tail)]
+    return text.rstrip("!. ").strip()
+
+
 def eval_input_keys(path: Path) -> set[str]:
     """Wordings the eval scores on, so training never teaches one of them.
 
@@ -856,11 +919,12 @@ def eval_input_keys(path: Path) -> set[str]:
     """
     if not path.exists():
         return set()
-    return {
-        json.loads(line)["user_input"]
+    keys = {
+        collision_key(json.loads(line)["user_input"])
         for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     }
+    return keys - {""}
 
 
 def main() -> int:
@@ -905,7 +969,7 @@ def main() -> int:
         if reason:
             rejected[reason.split(":")[0]] += 1
             continue
-        if example["user_input"] in held_out:
+        if collision_key(example["user_input"]) in held_out:
             rejected["collides with eval set"] += 1
             continue
         identity = (

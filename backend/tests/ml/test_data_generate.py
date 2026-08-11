@@ -6,6 +6,7 @@ wrong behaviour. These tests pin the properties the P2 baseline says matter most
 
 from __future__ import annotations
 
+import collections
 import json
 import random
 import re
@@ -14,11 +15,15 @@ from pathlib import Path
 import pytest
 
 from ml.data.generate import (
+    BETWEEN_PHRASES,
     CITIES,
     CITY_ALIASES,
     DISTRACTORS,
     FIELD_LABELS,
+    MAX_PHRASES,
+    MIN_PHRASES,
     PRICE_NUMBERS,
+    REVERSED_BETWEEN_PHRASES,
     SQFT_NUMBERS,
     STATES,
     _field_fragment,
@@ -27,6 +32,8 @@ from ml.data.generate import (
     _place,
     _range_phrase,
     _skip_label,
+    collision_key,
+    eval_input_keys,
     load_phrasings,
     make_example,
     property_type_values,
@@ -403,6 +410,153 @@ class TestNumberAndUnitWordings:
                 assert 250_000 in bounds.values(), f"{phrase!r} -> {bounds}"
 
 
+class TestBoundDirectionVocabulary:
+    """r6 scored ``bound-direction`` at 0.375 value accuracy on v3, v4 f16 and v4 q4 alike.
+
+    Identical to three decimals across two training runs and two quantizations, so neither
+    noise nor the quantizer: the wordings were simply not in the set. Counted on that
+    train.jsonl -- ``ceiling`` 0, ``shy of`` 0, ``nothing below`` 0, ``no lower`` 0,
+    ``at minimum`` 0 -- and all 24 hits for ``floor`` were ``ground floor`` / ``top floor``,
+    a storey rather than a budget floor.
+
+    The failures line up with the gaps one for one. ``nothing over $2M`` scored correct and
+    ``nothing below 5,000 sqft`` did not, because the max list carried a negated form and
+    the min list carried none; the model had learned to negate in one direction only.
+    """
+
+    def _phrases(self, numbers, n: int = 6000, seed: int = 2):
+        random.seed(seed)
+        return [_range_phrase(numbers) for _ in range(n)]
+
+    # Every negated form in these lists leads with the negator, so a prefix test is exact.
+    NEGATORS = ("no ", "not ", "never ", "nothing ")
+
+    def _negated(self, pool: list[str]) -> list[str]:
+        return [p for p in pool if p.startswith(self.NEGATORS)]
+
+    def test_both_directions_offer_the_same_breadth(self):
+        """v2 had 4 upper wordings against 3 lower and inverted every unseen lower one."""
+        assert len(MIN_PHRASES) == len(MAX_PHRASES)
+
+    def test_every_negated_wording_has_a_counterpart_in_the_other_direction(self):
+        """Asymmetry here is not a style question; it is what "nothing below" failed on.
+
+        The count is what matters, not the pairing -- a model that has seen five negated
+        ceilings and one negated floor learns that a negation means a ceiling.
+        """
+        lower, upper = self._negated(MIN_PHRASES), self._negated(MAX_PHRASES)
+        assert len(lower) == len(upper), f"min {lower}\nmax {upper}"
+        assert len(lower) >= 4, "too few negated forms for either side to generalise"
+
+    def test_floor_states_a_lower_bound_and_ceiling_an_upper_one(self):
+        """The two words the set never used in their bound sense.
+
+        Neither is inferable: no amount of generalisation tells a model that a budget
+        floor is a minimum, because the word carries that meaning lexically or not at all.
+        """
+        seen = collections.Counter()
+        for bounds, phrase in self._phrases(PRICE_NUMBERS):
+            # A reversed range states both, and is covered by the range tests below.
+            if "floor" in phrase and "ceiling" not in phrase:
+                seen["floor"] += 1
+                assert bounds.get("min") is not None, f"{phrase!r} -> {bounds}"
+            if "ceiling" in phrase and "floor" not in phrase:
+                seen["ceiling"] += 1
+                assert bounds.get("max") is not None, f"{phrase!r} -> {bounds}"
+        assert seen["floor"] and seen["ceiling"], seen
+
+    def test_the_storey_sense_of_floor_survives_alongside_the_bound_sense(self):
+        """Both senses stay in the set, as with "SF" in SQFT_UNITS.
+
+        Teaching the bound sense by removing the other one would only move the ambiguity:
+        "ground floor only" is a real thing clients write, and it belongs in no field.
+        """
+        text = " || ".join(e["user_input"] for e in _examples(n=1500, seed=17)).lower()
+        assert "ground floor" in text or "top floor" in text
+
+    def test_a_range_may_be_stated_ceiling_first(self):
+        """Templates, not samples: position must not encode direction anywhere.
+
+        Every ``between`` wording put {lo} first, so order and comparator never disagreed
+        and all three r6 models read the order instead -- "lower than $2M, higher than
+        $500K" came back as min $2M / max $500K, both comparators ignored.
+        """
+        for template in BETWEEN_PHRASES:
+            assert template.index("{lo}") < template.index("{hi}"), template
+        for template in REVERSED_BETWEEN_PHRASES:
+            assert template.index("{hi}") < template.index("{lo}"), template
+
+    def _matches_any(self, phrase: str, templates: list[str]) -> bool:
+        for template in templates:
+            parts = [re.escape(p) for p in re.split(r"\{lo\}|\{hi\}", template)]
+            if re.fullmatch(".+?".join(parts), phrase):
+                return True
+        return False
+
+    def test_the_ceiling_first_form_is_a_minority_but_a_real_one(self):
+        """Held below the {lo}-first share on purpose: over-weighting it would relocate
+        the positional prior rather than remove it."""
+        reversed_seen = forward = 0
+        for _, phrase in self._phrases(SQFT_NUMBERS):
+            reversed_seen += self._matches_any(phrase, REVERSED_BETWEEN_PHRASES)
+            forward += self._matches_any(phrase, BETWEEN_PHRASES)
+        assert forward and reversed_seen, f"forward {forward}, reversed {reversed_seen}"
+        share = reversed_seen / (forward + reversed_seen)
+        assert 0.15 <= share <= 0.40, f"{share:.1%} of ranges state the ceiling first"
+
+    def test_no_range_ever_golds_a_min_above_its_max(self):
+        """The failure mode a reversed template invites: swap the figures, not the words."""
+        for numbers in (PRICE_NUMBERS, SQFT_NUMBERS):
+            for bounds, phrase in self._phrases(numbers):
+                if bounds.get("min") is not None and bounds.get("max") is not None:
+                    assert bounds["min"] <= bounds["max"], f"{phrase!r} -> {bounds}"
+
+
+class TestBoundWordingEvalSeparation:
+    """``bound-direction`` turns must stay wordings the generator does not emit.
+
+    The sibling of TestSynonymEvalSeparation, and the same mistake it exists to catch: a
+    turn scored on a phrasing the set produces measures recall of a list. Two of the
+    phrasings added for this fix were a turn verbatim -- "nothing over {v}" and "just shy
+    of {v}" -- and one of those turns already scored correct, so the pair bought a
+    guaranteed pass and cost the only honest reading of the category.
+
+    Scoped to ``bound-direction`` deliberately. Other categories reuse "up to" and "at
+    least" freely, and should: those are the core comparators, and a set that withheld
+    them would be teaching nothing. This category is the one that exists to ask whether
+    direction survives an unseen wording.
+
+    One exemption, taken knowingly: ``floor`` and ``ceiling`` are taught, and two turns
+    use them. A lexical item has no unseen-wording generalisation to test -- see
+    TestBoundDirectionVocabulary -- so those turns now measure vocabulary, and the rule
+    below only holds them to not being a whole template instance.
+    """
+
+    # A placeholder stands for a figure, not for arbitrary text. With ``.+?`` the one-word
+    # templates swallow whole sentences: "{v} ceiling" would "match" `$500K floor, $2M
+    # ceiling` and the rule would flag every turn that ends in a bound word.
+    FIGURE = (r"[~$]?[\d,.]+\s?(?:k|K|M|mil|million|sqft|sq\.? ?ft\.?|SF|sf|"
+              r"square feet|square foot|square footage)?")
+
+    def _turns(self):
+        lines = EVAL_DATASET_PATH.read_text(encoding="utf-8").splitlines()
+        rows = [json.loads(line) for line in lines if line.strip()]
+        return [r for r in rows if r["category"] == "bound-direction"]
+
+    def test_the_category_exists(self):
+        assert self._turns(), "no bound-direction turns; the weakest cell is unmeasurable"
+
+    def test_no_turn_is_an_instance_of_a_generated_wording(self):
+        templates = MIN_PHRASES + MAX_PHRASES + BETWEEN_PHRASES + REVERSED_BETWEEN_PHRASES
+        for row in self._turns():
+            for template in templates:
+                parts = re.split(r"\{v\}|\{lo\}|\{hi\}", template)
+                pattern = self.FIGURE.join(re.escape(p) for p in parts)
+                assert not re.fullmatch(pattern, row["user_input"], re.I), (
+                    f"{row['id']} scores the training wording {template!r}"
+                )
+
+
 class TestLocationLabels:
     def test_gold_never_invents_a_state(self):
         """A phrasing that names only the city must not be labelled "City, ST"."""
@@ -500,6 +654,66 @@ class TestChatRecord:
         for example in _examples(n=50):
             completion = json.loads(to_chat_record(example, questions)["messages"][-1]["content"])
             assert set(completion) == {"extracted", "skipped_fields"}
+
+
+class TestEvalCollisionGuard:
+    """The hold-out has to survive ``_rough_up``, which runs after the example is built.
+
+    Comparing raw strings let seven rows through in r6: "that's everything" four ways
+    (upper-cased, sentence-cased, with a full stop, with "!!") and "yes that's correct"
+    three. Both are ``complete`` turns, where the wording is the entire signal, so half
+    that eval category was scoring recall -- and the generator's own rejection count
+    reported them held out the whole time.
+    """
+
+    @pytest.mark.parametrize("roughened", [
+        "THAT'S EVERYTHING", "That's everything", "That's everything.",
+        "That's everything!!", "that's everything please", "  that's everything  ",
+    ])
+    def test_every_form_rough_up_can_produce_still_collides(self, roughened):
+        assert collision_key(roughened) == collision_key("that's everything")
+
+    def test_a_different_wording_does_not_collide(self):
+        """Folding case and punctuation, not meaning -- an over-eager key would reject
+        legitimate variety and quietly shrink the set."""
+        assert collision_key("that's all") != collision_key("that's everything")
+        assert collision_key("up to $2 million") != collision_key("up to $3 million")
+
+    def test_a_blank_message_is_not_treated_as_a_held_out_wording(self):
+        """The empty and whitespace turns score a behaviour, not a phrasing.
+
+        Holding them out would leave the set with no example of a blank message at all,
+        so the eval would go on scoring behaviour that training had stopped teaching.
+        """
+        assert collision_key("") == ""
+        assert collision_key("   \n ") == ""
+        assert "" not in eval_input_keys(Path(EVAL_DATASET_PATH))
+
+    def test_the_hold_out_covers_every_eval_turn_that_has_a_wording(self):
+        rows = [json.loads(line) for line
+                in Path(EVAL_DATASET_PATH).read_text(encoding="utf-8").splitlines()
+                if line.strip()]
+        keys = eval_input_keys(Path(EVAL_DATASET_PATH))
+        for row in rows:
+            key = collision_key(row["user_input"])
+            assert not key or key in keys, f"{row['id']} is not held out"
+
+    def test_the_guard_is_load_bearing_and_the_raw_comparison_was_not_enough(self):
+        """Two claims, both on real generator output at the seed ``main`` uses.
+
+        A guard that never fires proves nothing, and one whose every catch the old raw
+        comparison would also have made is not a fix. Both have to hold, or this class is
+        testing a key nothing routes through.
+        """
+        keys = eval_input_keys(Path(EVAL_DATASET_PATH))
+        collided = [e["user_input"] for e in _examples(n=2500, seed=17)
+                    if collision_key(e["user_input"]) in keys]
+        assert len(collided) >= 20, f"only {len(collided)} collisions in 2500 draws"
+
+        raw = {json.loads(line)["user_input"] for line
+               in Path(EVAL_DATASET_PATH).read_text(encoding="utf-8").splitlines()
+               if line.strip()}
+        assert [t for t in collided if t not in raw], "no roughened collision in the sample"
 
 
 class TestSynonymEvalSeparation:
