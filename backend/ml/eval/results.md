@@ -11,7 +11,8 @@ table.** When the dataset changes, previous rows become historical and a new tab
 
 | Rev | Turns | Questionnaire | Notes |
 |---|---|---|---|
-| **r6 (current)** | 118 | the real one | `pending-answer` added — 7 turns on bare values, plus 3 unmarked corrections |
+| **r7 (current)** | 125 | the real one | Square yards, and `ground` as a type rather than a storey — 7 turns, all from one reported message. Not yet scored |
+| r6 | 118 | the real one | `pending-answer` added — 7 turns on bare values, plus 3 unmarked corrections |
 | r5 | 108 | the real one | `property-synonym` added — 6 turns on wordings the generator never emits |
 | r4 | 102 | the real one | First revision built from the live `questions` table |
 | r3 | 110 | fictional | `bound-direction` added, skip turns decontaminated. Never published |
@@ -38,6 +39,49 @@ against v2 — but no absolute figure from them describes the shipped product.
 r4 is a dump of the live table (`ml.eval.dump_questions`), with the dataset rebuilt against
 it: 8 turns dropped that answered a field which does not exist, 8 refusals re-pointed at a
 live field, and `Warehouse` mapped to `industrial` — no listing carries Warehouse.
+
+---
+
+## r7 — 125 turns, square yards and the `ground` collision
+
+Not scored yet: every GGUF in this file predates the training data these turns describe,
+so a row now would only restate that the set never taught them.
+
+All seven come from one reported message — `warehouse, restaurant, shop, 1500 yard ground`
+— which returned `property_type: [industrial, retail, retail]` and no size. Three separate
+defects, and only one of them was the model:
+
+**The repeat was ours.** `drop_unconfigured_choices` canonicalises `shop` and `restaurant`
+onto the same stored value and never deduplicated, so the duplicate was created by that
+function rather than passed through it. The model was right to emit all three — it read
+three things the client named. Worth noting that no eval row in this file would ever have
+caught it: `ml/eval/metrics.py` normalises a list to a `frozenset`, so a repeated value
+scores identical to a clean one. It is a defect in what the client is shown, not in
+extraction, and it is fixed in the domain layer with `tests/domain/test_intake_choices.py`.
+
+**`ground` lost to `ground floor`.** `ground` is a configured `land` phrasing, and
+`ground floor` is a `DISTRACTORS` entry the set teaches the model to ignore. Counted on
+the training set behind these models, the ignore sense outnumbered the type sense 18 to 8
+— so the token's own statistics said "skip me". Same shape as `SF`/San Francisco and the
+`floor` fix above; only the ratio was wrong. Ambiguous phrasings are now drawn 4× (21
+against 14 in the current set), and `ground floor` stays exactly where it was.
+
+**`1500 yard` could not have been extracted.** All 22 occurrences of `yard` in the set were
+`fenced yard`, a distractor: the only thing the word had ever been used for was noise.
+There was no square-yard unit anywhere and nothing converted. Square yards are now a
+size unit with the gold in sqft — `1,500 yards` golds 13,500 — which makes it **the only
+unit in the set where the stated figure and the gold figure differ**, so it is the only
+place the model has to convert rather than copy.
+
+Yards are deliberately kept out of two-figure phrasings. Each side of a range renders
+independently, so no shared unit can be agreed: a hyphenated range whose high side picks
+yards produces `9,000-1,500 yards`, and no reading of that text yields the gold. A plot is
+quoted as a single figure anyway. `TestSquareYards` pins the conversion, the single-figure
+rule and the surviving `fenced yard` distractor.
+
+The turns split 5 dev / 2 holdout. `type-ground-trailing` is the reported message intact;
+`type-ground-alone` and `type-ground-floor-is-not-land` isolate the two senses so a failure
+on the compound turn can be attributed rather than guessed at.
 
 ---
 
@@ -142,6 +186,57 @@ Both models get the matched pair half-right, and both miss the same half: `5,000
 a price and fails as a size. That is what reading magnitude instead of `pending_question`
 looks like, and it is unchanged from v3 to this v4 — as it must be, since neither was
 trained on the field.
+
+### `bound-direction` is the weakest cell in the table, and it is a vocabulary gap
+
+Value accuracy **0.375 on all three rows** — v3 Q4, v4 F16, v4 Q4 — identical to three
+decimals across two training runs and two quantizations. That rules out noise and rules
+out the quantizer. v4 scores field F1 **1.000** on the same eight turns: right field,
+right figure, wrong direction.
+
+| Turn | Message | Gold | v4 Q4 emitted |
+|---|---|---|---|
+| `bound-min-floor` | `$400k floor on the budget` | `price {min}` | `price {max: 400000}` |
+| `bound-min-nothing-below` | `nothing below 5,000 sqft` | `size_sqft {min}` | `size_sqft {max: 5000}` |
+| `bound-max-shy-of` | `just shy of 8,000 square feet` | `size_sqft {max}` | `size_sqft {min: 8000}` |
+| `bound-split-two-clauses` | `… lower than $2M, … higher than $500K` | `{min: 500000, max: 2000000}` | `{min: 2000000, max: 500000}` |
+| `bound-split-floor-ceiling` | `$500K floor, $2M ceiling` | `{min: 500000, max: 2000000}` | `{min: 500000, max: 500000}` |
+
+Counted on the training set behind these models, the cause is not subtle: `ceiling` 0,
+`shy of` 0, `nothing below` 0, `no lower` 0, `at minimum` 0 — and every occurrence of
+`floor` was `ground floor` / `top floor` / `office floor`, a storey rather than a budget
+floor. Three of the five failures are words the set never used in their bound sense.
+
+The other two are structural, and the pairs that pass make the diagnosis exact:
+
+* `nothing over $2M` **passes** and `nothing below 5,000 sqft` **fails**. The max list
+  carried a negated form (`not over`) and the min list carried none, so the model learned
+  to negate in one direction only.
+* Both split turns state the ceiling first and both come back positionally — first figure
+  to `min`, second to `max`, comparators ignored. Every `between` template put the low
+  figure first, so position and direction never once disagreed in training. F16 emits
+  `{min: 2000000, max: 500000}`: an inverted range, which no gold label has ever contained.
+
+`ml/data/generate.py` now carries symmetric negations (five per direction), `floor` and
+`ceiling` in their bound sense alongside the storey sense already in `DISTRACTORS`, and a
+`REVERSED_BETWEEN_PHRASES` list at ~23% of two-sided ranges. Pinned by
+`TestBoundDirectionVocabulary`. None of it is an eval wording — `nothing over {v}` and
+`just shy of {v}` were both in the first draft, both are a turn above verbatim, and
+`TestBoundWordingEvalSeparation` now rejects any template that reproduces one.
+
+**Unrelated leak found while checking that.** The eval hold-out compared raw strings, but
+`_rough_up` runs *after* an example is built, so seven rows carrying two eval wordings
+shipped into this training set: `that's everything` four ways (upper-cased,
+sentence-cased, with a full stop, with `!!`) and `yes that's correct` three. Both are
+`complete` turns, where the wording is the entire signal — so half that category was
+scoring recall while the generator reported them held out. The guard now folds case and
+the roughening tail before comparing; blank messages are exempt, since the empty and
+whitespace turns score a behaviour rather than a phrasing.
+
+So **`complete` recall in every row in this file is optimistic**, and no rerun of these
+GGUFs recovers it: the contamination is in their training set, not in the eval. Two of
+the five `complete` turns are affected. The first model trained after this commit is the
+first whose `complete` number means what it says.
 
 ### Artifact sizes
 
