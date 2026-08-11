@@ -11,7 +11,7 @@ table.** When the dataset changes, previous rows become historical and a new tab
 
 | Rev | Turns | Questionnaire | Notes |
 |---|---|---|---|
-| **r7 (current)** | 125 | the real one | Square yards, and `ground` as a type rather than a storey — 7 turns, all from one reported message. Not yet scored |
+| **r7 (current)** | 129 | the real one | Square yards, `ground` as a type, and budgets past $5M — 11 turns from two reported messages. Not yet scored |
 | r6 | 118 | the real one | `pending-answer` added — 7 turns on bare values, plus 3 unmarked corrections |
 | r5 | 108 | the real one | `property-synonym` added — 6 turns on wordings the generator never emits |
 | r4 | 102 | the real one | First revision built from the live `questions` table |
@@ -42,14 +42,42 @@ live field, and `Warehouse` mapped to `industrial` — no listing carries Wareho
 
 ---
 
-## r7 — 125 turns, square yards and the `ground` collision
+## r7 — 129 turns, square yards, the `ground` collision, and budgets past $5M
 
 Not scored yet: every GGUF in this file predates the training data these turns describe,
 so a row now would only restate that the set never taught them.
 
-All seven come from one reported message — `warehouse, restaurant, shop, 1500 yard ground`
-— which returned `property_type: [industrial, retail, retail]` and no size. Three separate
-defects, and only one of them was the model:
+Eleven turns from two reported messages. Every one of the four defects below is a gap in
+what the generator could produce, and none of them was reachable by the eval as it stood.
+
+### `from $30M to $40M` → `3,000,000 - 4,000,000`
+
+A factor of ten, in both bounds. Not a parse failure: `_price_value` stopped at $4.9M, so
+**every M-notation figure the set had ever produced carried a single digit before the
+decimal point** — integer parts 0 through 8, never two. `$30M` was a token shape the model
+had never seen, and `$3.0M`, which it had seen hundreds of times, is one dot away.
+
+| | before | after |
+|---|---|---|
+| price golds `< $1M` | 596 | 514 |
+| `$1–5M` | 257 | 208 |
+| `$5–10M` | 17 | 25 |
+| `$10–100M` | **0** | 117 |
+| `≥ $100M` | **0** | 29 |
+| M-notation, two-digit integer part | **0** | 117 |
+| M-notation, three-digit | **0** | 27 |
+
+Widening the sampler forced a second change. `high = low + sample()` draws the two ends of
+a range from unrelated bands, which was merely odd at `between $25,000 and $4.5M` and is
+untenable at $150M, where the same line pairs a $45,000 floor with a $92.5M ceiling. The
+span is now proportional to the floor, so both ends stay in one world at any magnitude,
+and the ceiling is rounded on its **own** magnitude rather than the floor's — a $950,000
+floor rounded on the floor's grain gives $1,905,000, which `_fmt_money` writes as `$1905k`.
+
+### `warehouse, restaurant, shop, 1500 yard ground`
+
+Returned `property_type: [industrial, retail, retail]` and no size. Three defects, and only
+one of them was the model:
 
 **The repeat was ours.** `drop_unconfigured_choices` canonicalises `shop` and `restaurant`
 onto the same stored value and never deduplicated, so the duplicate was created by that
@@ -63,8 +91,14 @@ extraction, and it is fixed in the domain layer with `tests/domain/test_intake_c
 `ground floor` is a `DISTRACTORS` entry the set teaches the model to ignore. Counted on
 the training set behind these models, the ignore sense outnumbered the type sense 18 to 8
 — so the token's own statistics said "skip me". Same shape as `SF`/San Francisco and the
-`floor` fix above; only the ratio was wrong. Ambiguous phrasings are now drawn 4× (21
-against 14 in the current set), and `ground floor` stays exactly where it was.
+`floor` fix above; only the ratio was wrong.
+
+Ambiguous phrasings are now drawn 8×, and `ground floor` stays exactly where it was. The
+weight is measured rather than picked: at 4× the two senses landed within noise of each
+other — five seeds ran 16v19, 18v16, 25v7, 11v14, 17v16, so which sense won came down to
+the draw. At 8× the worst of those five is 1.3:1 while `ground` still takes only about a
+quarter of `land`'s mentions. `TestAmbiguousTypeWords` aggregates over three seeds for the
+same reason: a property that holds only on a lucky seed is not the property this needs.
 
 **`1500 yard` could not have been extracted.** All 22 occurrences of `yard` in the set were
 `fenced yard`, a distractor: the only thing the word had ever been used for was noise.
@@ -79,9 +113,18 @@ yards produces `9,000-1,500 yards`, and no reading of that text yields the gold.
 quoted as a single figure anyway. `TestSquareYards` pins the conversion, the single-figure
 rule and the surviving `fenced yard` distractor.
 
-The turns split 5 dev / 2 holdout. `type-ground-trailing` is the reported message intact;
-`type-ground-alone` and `type-ground-floor-is-not-land` isolate the two senses so a failure
-on the compound turn can be attributed rather than guessed at.
+### The turns
+
+8 dev / 3 holdout. Both reported messages are in the set intact — `type-ground-trailing`
+and `unit-price-two-digit-millions` — and each is paired with turns that isolate one
+variable, so a failure on a compound turn can be attributed rather than guessed at:
+
+* `type-ground-alone` and `type-ground-floor-is-not-land` split the two senses of `ground`.
+* `unit-price-single-digit-millions` is `from $3M to $4M`, the same sentence one order of
+  magnitude down. A model that reads the leading digit and drops the rest scores exactly
+  one of the pair — the same design as r6's matched `5,000`.
+* `unit-fenced-yard-is-not-a-size` keeps the distractor honest: `yard` with no figure in
+  front of it still states no size.
 
 ---
 

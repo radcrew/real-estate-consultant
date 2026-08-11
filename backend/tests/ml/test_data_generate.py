@@ -33,6 +33,7 @@ from ml.data.generate import (
     _fmt_money,
     _next_question_key,
     _place,
+    _price_value,
     _range_phrase,
     _skip_label,
     _type_words,
@@ -288,6 +289,106 @@ class TestSubMillionMillionsNotation:
                 checked += 1
                 assert int(float(frac) * 1_000_000) in values, f"{phrase!r} -> {bounds}"
         assert checked, "no sub-million M-notation generated at all"
+
+
+class TestBudgetMagnitude:
+    """"from $30M to $40M" came back as 3,000,000 - 4,000,000: a factor of ten, twice.
+
+    Not a parse failure. The sampler stopped at $4.9M, so every M-notation figure the set
+    ever produced had a single digit before the decimal point -- integer parts 0 through 8,
+    never two. "$30M" was a token shape the model had never seen and "$3.0M", which it had
+    seen hundreds of times, is one dot away. Commercial real estate does not stop at $5M.
+    """
+
+    # Anything after a decimal point is a fractional part, not a second figure: without
+    # the lookbehind, "0.15M" reads as the two-digit "15M" and the gap hides itself.
+    M_FIGURE = re.compile(r"(?<![\d.])(\d+)(?:\.\d+)?\s?(?:M\b|million\b|mil\b)", re.I)
+
+    def _values(self, n: int = 20000, seed: int = 3) -> list[int]:
+        random.seed(seed)
+        return [_price_value() for _ in range(n)]
+
+    def test_budgets_reach_tens_of_millions(self):
+        values = self._values()
+        assert max(values) >= 100_000_000, f"tops out at {max(values):,}"
+        two_digit = [v for v in values if 10_000_000 <= v < 100_000_000]
+        assert len(two_digit) / len(values) >= 0.08, f"only {len(two_digit)} of {len(values)}"
+
+    def test_the_common_bands_still_dominate(self):
+        """A widened sampler must not turn an ordinary $500k budget into the rare case."""
+        values = self._values()
+        assert sum(1 for v in values if v < 1_000_000) / len(values) >= 0.5
+
+    def test_hundreds_of_millions_stay_rarer_than_tens(self):
+        values = self._values()
+        tens = sum(1 for v in values if 10_000_000 <= v < 100_000_000)
+        hundreds = sum(1 for v in values if v >= 100_000_000)
+        assert 0 < hundreds < tens, f"tens {tens}, hundreds {hundreds}"
+
+    def test_two_digit_millions_are_actually_written_that_way(self):
+        """The band is only worth anything if ``_fmt_money`` renders it as "$30M"."""
+        random.seed(7)
+        digits = collections.Counter()
+        for _ in range(8000):
+            for match in self.M_FIGURE.finditer(_fmt_money(_price_value())):
+                digits[len(match.group(1))] += 1
+        assert digits[2] >= 100, dict(digits)
+        assert digits[1] > digits[2] > digits[3], dict(digits)
+
+    # The whole figure, fraction included, so "12.5M" is checked as 12.5 rather than 12.
+    M_VALUE = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)\s?(?:M\b|million\b|mil\b)", re.I)
+
+    def test_a_stated_million_figure_always_equals_its_gold(self):
+        """The failure mode itself: "$30M" in the text must gold 30000000."""
+        random.seed(13)
+        checked = 0
+        for _ in range(8000):
+            bounds, phrase = _range_phrase(PRICE_NUMBERS)
+            for match in self.M_VALUE.finditer(phrase):
+                checked += 1
+                # round, not int: float("65.6") * 1e6 is 65599999.99, and truncating it
+                # fails a figure the generator got exactly right.
+                stated = round(float(match.group(1)) * 1_000_000)
+                assert stated in bounds.values(), f"{phrase!r} -> {bounds}"
+        assert checked, "no M-notation generated at all"
+
+
+class TestRangeEndpointsAgree:
+    """The two ends of a range are one client's budget, not two independent draws.
+
+    ``low + sample()`` was tolerable while budgets stopped at $5M -- "between $25,000 and
+    $4.5M" is odd, not absurd. At $150M the same code pairs a $45,000 floor with a $92.5M
+    ceiling, which nobody writes and which teaches that the two figures are unrelated.
+    """
+
+    def _ranges(self, numbers, n: int = 8000, seed: int = 5):
+        random.seed(seed)
+        out = []
+        for _ in range(n):
+            bounds, phrase = _range_phrase(numbers)
+            if (bounds.get("min") is not None and bounds.get("max") is not None
+                    and bounds["min"] != bounds["max"]):
+                out.append((bounds, phrase))
+        return out
+
+    @pytest.mark.parametrize("numbers", [PRICE_NUMBERS, SQFT_NUMBERS])
+    def test_the_ceiling_stays_within_a_few_multiples_of_the_floor(self, numbers):
+        ranges = self._ranges(numbers)
+        assert ranges, "no two-sided ranges generated"
+        for bounds, phrase in ranges:
+            ratio = bounds["max"] / bounds["min"]
+            assert 1.0 < ratio <= 4.0, f"{phrase!r} -> {bounds} ({ratio:.1f}x)"
+
+    def test_the_ceiling_is_a_figure_someone_would_say(self):
+        """A million-and-up ceiling has to be a clean multiple, or M-notation gets ugly.
+
+        $1,905,000 is what a floor-derived grain produces from a $950,000 floor, and
+        ``_fmt_money`` writes it as "$1905k".
+        """
+        for bounds, phrase in self._ranges(PRICE_NUMBERS):
+            high = bounds["max"]
+            grain = 100_000 if high >= 1_000_000 else 5_000 if high >= 100_000 else 500
+            assert high % grain == 0, f"{phrase!r} -> {high:,}"
 
 
 class TestRealWorldMessageForms:
@@ -762,10 +863,19 @@ class TestAmbiguousTypeWords:
                 assert phrase in PHRASINGS[option], f"{option}: {phrase!r} is not a phrasing"
 
     def test_the_type_sense_outweighs_the_distractor_sense(self):
-        text = " || ".join(self._messages())
-        land = len(re.findall(r"\bground\b(?!\s+floor)", text, re.I))
-        storey = len(re.findall(r"\bground\s+floor\b", text, re.I))
-        assert land > storey, f"ground-as-land {land}, ground floor {storey}"
+        """Aggregated over seeds on purpose.
+
+        One 2500-example draw puts both senses in the teens, where the winner is decided
+        by the draw rather than by the weighting -- five seeds at the old 4x weight ran
+        16v19, 18v16, 25v7, 11v14, 17v16. A property that only holds on a lucky seed is
+        not the property this fix needs.
+        """
+        land = storey = 0
+        for seed in (17, 3, 99):
+            text = " || ".join(self._messages(seed=seed))
+            land += len(re.findall(r"\bground\b(?!\s+floor)", text, re.I))
+            storey += len(re.findall(r"\bground\s+floor\b", text, re.I))
+        assert land > storey * 1.1, f"ground-as-land {land}, ground floor {storey}"
 
     def test_the_storey_sense_is_not_driven_out(self):
         """Weighting the type sense must not remove the collision it exists to teach."""

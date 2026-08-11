@@ -292,14 +292,35 @@ def _fmt_sqft_solo(value: int) -> str:
 
 
 def _price_value() -> int:
-    return random.choice([
-        random.randrange(200_000, 5_000_000, 100_000),
-        random.randrange(20_000, 200_000, 5_000),
-        # Round six-figure budgets. Without this the two ranges above meet at 200k, so
+    """A budget, drawn from one of four bands.
+
+    The institutional band is why this is no longer a flat ``random.choice``. "from $30M
+    to $40M" came back as 3,000,000 - 4,000,000, a factor of ten out in both bounds, and
+    the set explains it exactly: the sampler stopped at $4.9M, so **every** M-notation
+    figure ever generated had a single digit before the decimal point -- the integer parts
+    across the whole set were 0 through 8, never two digits. "$30M" was a token shape the
+    model had never seen, and "$3.0M" -- which it had seen hundreds of times -- is one dot
+    away. Commercial real estate does not stop at five million.
+    """
+    band = random.choices(["mid", "small", "round", "large"], weights=[30, 30, 25, 15])[0]
+    if band == "small":
+        return random.randrange(20_000, 200_000, 5_000)
+    if band == "round":
+        # Round six-figure budgets. Without this the two bands above meet at 200k, so
         # the band a client is most likely to state in millions -- "$0.5M" -- was reachable
         # only as one of eight values, and M-notation had almost nothing to attach to.
-        random.randrange(100_000, 1_000_000, 50_000),
-    ])
+        return random.randrange(100_000, 1_000_000, 50_000)
+    if band == "large":
+        # Starts where "mid" stops, so the two are continuous. Multiples of 500k keep
+        # `_in_millions` to one decimal place: "$42.5M", never "$42.4713M".
+        #
+        # Skewed low on purpose. $10-50M is an ordinary institutional deal and $100M+ is
+        # not; a flat draw to $150M put a third of the band in three digits, which teaches
+        # the rare shape as often as the common one.
+        if random.random() < 0.8:
+            return random.randrange(5_000_000, 60_000_000, 500_000)
+        return random.randrange(60_000_000, 200_000_000, 1_000_000)
+    return random.randrange(200_000, 5_000_000, 100_000)
 
 
 def _sqft_value() -> int:
@@ -387,6 +408,27 @@ class FieldNumbers(NamedTuple):
     render_solo: Callable[[int], str]
 
 
+def _range_high(low: int) -> int:
+    """A ceiling a client would state beside ``low``, not a second independent draw.
+
+    ``low + sample()`` takes the two ends from unrelated bands. That was merely odd while
+    budgets stopped at $5M -- "between $25,000 and $4.5M" -- and is untenable once the
+    sampler reaches $150M, where the same code pairs a $45,000 floor with a $92.5M
+    ceiling. Nobody writes that, and the model would be learning that the two figures in
+    a range are unrelated.
+
+    Scaling the span to the floor keeps both ends in one world at any magnitude, and the
+    grain keeps the ceiling a figure someone would say. It is taken from the ceiling's own
+    magnitude rather than the floor's, because those differ across a power of ten: a
+    $950,000 floor rounded on the floor's grain yields $1,905,000, which ``_fmt_money``
+    writes as "$1905k".
+    """
+    high = low + int(low * random.uniform(0.2, 2.0))
+    grain = 100_000 if high >= 1_000_000 else 5_000 if high >= 100_000 else 500
+    # Rounding down can meet or cross the floor when the span is short next to the grain.
+    return max(low + grain, high - high % grain)
+
+
 def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
     """Return (gold bounds, phrasing).
 
@@ -425,7 +467,7 @@ def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
         bounds = {"min": value, "max": value} if numbers.bare_is_exact else {"max": value}
         return bounds, soften(numbers.render_solo(value))
     low = numbers.sample()
-    high = low + numbers.sample()
+    high = _range_high(low)
     if random.random() < 0.3:
         return {"min": low, "max": high}, random.choice(HYPHEN_PHRASES).format(
             lo=numbers.render_low(low), hi=numbers.render(high)
@@ -507,7 +549,11 @@ def property_type_values(questions: list[dict[str, Any]]) -> list[str]:
 #
 # Keyed by option, so a phrasing that stops being generated simply stops being weighted.
 AMBIGUOUS_TYPE_PHRASINGS = {"land": ("ground",)}
-_AMBIGUOUS_WEIGHT = 4.0
+# Measured, not guessed. At 4x the two senses land within noise of each other -- five
+# seeds ran 16v19, 18v16, 25v7, 11v14, 17v16 -- so whether the type sense outnumbers the
+# distractor came down to the draw. At 8x the worst of those five is 1.3:1, while `ground`
+# still takes only about a quarter of land's mentions: a thumb on the scale, not a rewrite.
+_AMBIGUOUS_WEIGHT = 8.0
 
 
 def _phrasing_weights(option: str, pool: list[str]) -> list[float]:
