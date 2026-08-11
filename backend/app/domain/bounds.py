@@ -148,6 +148,44 @@ def numbers_with_direction(text: str) -> list[tuple[float, str | None]]:
     return paired
 
 
+def _significant_digits(value: float) -> str:
+    """The digits without their magnitude: 30000000 and 3000000 both give "3".
+
+    13500 gives "135" and 1500 gives "15", so a square-yard conversion -- the one place
+    the model is *supposed* to return a figure the message does not contain -- cannot be
+    mistaken for a magnitude slip.
+    """
+    if value <= 0:
+        return ""
+    text = f"{value:.10f}".rstrip("0").rstrip(".").replace(".", "")
+    return text.strip("0") or "0"
+
+
+def _rescaled(bound: float, figures: list[tuple[float, str | None]]):
+    """A message figure differing from ``bound`` only in magnitude, nearest one first.
+
+    The 0.5B reads a large budget correctly and then writes it short. Measured on the
+    served Q4, stock and tuned alike, every miss keeps the significant digits and loses
+    zeros: "$30M" -> 3,000,000, "$150M" -> 1,500,000, "$45,000,000" -> 4,500,000. The
+    largest value it produced anywhere on a magnitude ladder was 9,500,000.
+
+    Equal significant digits at different values already implies the two are a power of
+    ten apart, so there is nothing further to check.
+
+    **Exactly one candidate, or nothing.** Two figures sharing a bound's digits mean the
+    message cannot say which was mis-sized, and guessing turns a dropped field into a
+    wrong one. "costs less than $1M, size is bigger than 100sqft" is the case: the model
+    invents ``size_sqft.max = 10000``, whose digits match both 1000000 and 100, and the
+    invented bound has to stay droppable. Nearest-wins picked one of the two and stored a
+    10,000x error.
+    """
+    digits = _significant_digits(bound)
+    if not digits:
+        return None
+    candidates = [f for f in figures if f[0] != bound and _significant_digits(f[0]) == digits]
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def _correct_one(value: dict[str, Any], figures: list[tuple[float, str | None]]) -> dict[str, Any]:
     """Rebuild one range value from the figures the message actually contains."""
     stated = {side: value[side] for side in ("min", "max") if value.get(side) is not None}
@@ -165,7 +203,12 @@ def _correct_one(value: dict[str, Any], figures: list[tuple[float, str | None]])
             continue
         match = next((f for f in figures if f[0] == numeric), None)
         if match is None:
-            continue  # no figure in the message supports this bound: invented
+            # Before calling it invented: the same digits at another magnitude means the
+            # model read the figure and mis-sized it, and the message settles the size.
+            match = _rescaled(numeric, figures)
+            if match is None:
+                continue  # no figure in the message supports this bound: invented
+            bound = int(match[0]) if float(match[0]).is_integer() else match[0]
         matched_any = True
         rebuilt[match[1] or side] = bound
 

@@ -161,3 +161,91 @@ class TestCorrectBoundDirection:
 
     def test_empty_extraction(self):
         assert correct_bound_direction({}, "lower than $2M") == {}
+
+
+class TestMagnitudeCorrection:
+    """The 0.5B reads a large budget and then writes it short.
+
+    Measured on the served Q4 with the production prompt, stock and tuned alike -- v4 was
+    byte-for-byte identical to the untuned model on every probe, so this is a capacity
+    limit rather than anything fine-tuning did:
+
+        up to $3M   -> 3,000,000  ok      up to $30M  ->  3,000,000   10x low
+        up to $9.5M -> 9,500,000  ok      up to $150M ->  1,500,000  100x low
+        up to 30k   ->    30,000  ok      $45,000,000 ->  4,500,000   10x low
+
+    Two things hold in every miss: the significant digits are right, and the largest value
+    it produced anywhere on the ladder was 9,500,000. It is losing zeros, not misreading
+    the figure -- and "$30M" is 30000000 by arithmetic, which does not need a model.
+    """
+
+    @pytest.mark.parametrize(("emitted", "message", "expected"), [
+        ({"max": 3000000}, "up to $30M", {"max": 30000000}),
+        ({"max": 1500000}, "up to $150M", {"max": 150000000}),
+        ({"max": 900000}, "up to $9M", {"max": 9000000}),
+        ({"max": 1250000}, "$12.5M ceiling", {"max": 12500000}),
+        # No M-notation at all: eight plain digits still come back one zero short.
+        ({"max": 4500000}, "no more than $45,000,000", {"max": 45000000}),
+        ({"max": 3000000}, "budget is 30 million dollars", {"max": 30000000}),
+    ])
+    def test_a_bound_short_by_a_power_of_ten_is_resized(self, emitted, message, expected):
+        assert correct_bound_direction({"price": emitted}, message) == {"price": expected}
+
+    def test_both_ends_of_a_range_are_resized(self):
+        """The reported message. Both bounds land 10x low, and both are recoverable."""
+        assert correct_bound_direction(
+            {"price": {"min": 3000000, "max": 4000000}}, "from $30M to $40M"
+        ) == {"price": {"min": 30000000, "max": 40000000}}
+
+    def test_a_correct_figure_is_untouched(self):
+        value = {"price": {"max": 3000000}}
+        assert correct_bound_direction(value, "up to $3M") == value
+
+    def test_a_message_stating_both_magnitudes_is_untouched(self):
+        """"$3M" and "$30M" are both present, so neither bound is missing its figure."""
+        value = {"price": {"min": 3000000, "max": 30000000}}
+        assert correct_bound_direction(value, "between $3M and $30M") == value
+
+    def test_a_unit_conversion_is_not_a_magnitude_slip(self):
+        """1,500 square yards is 13,500 sqft, and the model is right to say so.
+
+        The digits differ -- "135" against "15" -- which is what keeps the one figure the
+        model is *supposed* to transform out of reach of this correction.
+        """
+        value = {"size_sqft": {"min": 13500, "max": 13500}}
+        assert correct_bound_direction(value, "1500 yard") == value
+
+    def test_a_figure_the_parser_cannot_read_still_stands(self):
+        value = {"price": {"max": 500000}}
+        assert correct_bound_direction(value, "up to half a million") == value
+
+    def test_a_second_field_with_different_digits_does_not_interfere(self):
+        """The common mixed message: the size figure shares no digits with the budget."""
+        assert correct_bound_direction(
+            {"price": {"max": 3000000}, "size_sqft": {"min": 2000, "max": 2000}},
+            "we need 2,000 sqft and the budget goes up to $30M",
+        ) == {"price": {"max": 30000000}, "size_sqft": {"min": 2000, "max": 2000}}
+
+    def test_two_candidates_mean_the_message_cannot_say(self):
+        """Both 300 and 30000000 share the digits "3", so neither is chosen.
+
+        The model's own answer then stands, per the rule above: a bound matching no figure
+        at all is left alone rather than dropped, because the model may have normalised
+        something the parser cannot read. So this message stays wrong -- deliberately.
+        Guessing between two candidates would turn it wrong in a *different* way, and one
+        of those two errors is recoverable by asking again.
+        """
+        assert correct_bound_direction(
+            {"price": {"max": 3000000}}, "300 sqft minimum, budget up to $30M"
+        ) == {"price": {"max": 3000000}}
+
+    def test_a_resized_bound_still_takes_its_own_comparator(self):
+        """Resizing and side-correction compose: "$30M" here is a floor, not a ceiling."""
+        assert correct_bound_direction(
+            {"price": {"max": 3000000}}, "nothing below $30M"
+        ) == {"price": {"min": 30000000}}
+
+    def test_a_resized_bound_is_an_integer(self):
+        """The model emits ints; a float here would change the stored JSON shape."""
+        result = correct_bound_direction({"price": {"max": 3000000}}, "up to $30M")
+        assert isinstance(result["price"]["max"], int)
