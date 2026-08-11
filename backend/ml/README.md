@@ -124,8 +124,42 @@ option word: both would put a wrong label on a training example.
 
 ## 3. Generating training data
 
+Regenerate, then check the file before you train on it:
+
 ```bash
-python -m ml.data.generate                  # 2500 by default
+cd backend
+python -m ml.data.generate --count 2500
+python -c "
+import json,collections
+c=collections.Counter(); keys=set()
+for l in open('ml/data/train.jsonl',encoding='utf-8'):
+    d=json.loads(l); c[d['shape']]+=1
+    keys |= set(json.loads(d['messages'][1]['content']))
+assert 'pending_question' in keys, 'prompt field missing'
+assert {'correction','pending-answer'} <= set(c), f'missing shapes: {sorted(c)}'
+print('ok:', dict(c))
+"
+```
+
+The two assertions catch different staleness, and neither substitutes for the other. v4
+trained on a set generated before `pending_question` existed and the notebook's guard
+passed, because it read only the **target** — where a stale row and a current row look
+identical. A field the prompt carries has to be checked against the prompt, and a shape
+against the shape counts. Run this before uploading to Colab: `train/train.ipynb` cell 2
+repeats both checks, but by then a failure costs a browser round trip.
+
+`cd backend` is load-bearing. `generate.py` writes through `ml/paths.py` and lands in the
+right place from anywhere, but the check opens `ml/data/train.jsonl` as a relative path
+and finds it only from `backend/`.
+
+Its counts are lower than the generator's own shape mix below and should be: the check
+reads `train.jsonl` alone, the generator reports across both files. `multi 520` against
+`multi 571` is the 90/10 split, not a discrepancy.
+
+Other useful forms:
+
+```bash
+python -m ml.data.generate                  # 2500 is the default anyway
 python -m ml.data.generate --count 4000 --seed 23
 ```
 
