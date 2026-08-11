@@ -48,6 +48,31 @@ class TestMultiSelect:
         result = _clean({"property_type": ["Office", "Retail", "Industrial", "Warehouse", "Flex"]})
         assert len(result["property_type"]) == 5
 
+    def test_a_repeated_choice_is_stored_once(self):
+        """Reported: "warehouse, restaurant, shop" stored industrial, retail, retail.
+
+        Two of the three phrasings are the same type, and the model is right to emit both
+        -- it is reading three things the client named. The repeat has to die here.
+        """
+        assert _clean({"property_type": ["Industrial", "Retail", "Retail"]}) == {
+            "property_type": ["Industrial", "Retail"]
+        }
+
+    def test_spellings_that_canonicalise_together_collapse(self):
+        """Canonicalisation is what creates the duplicate, so case must collapse too."""
+        assert _clean({"property_type": ["retail", "RETAIL", "Retail"]}) == {
+            "property_type": ["Retail"]
+        }
+
+    def test_deduping_preserves_the_order_the_client_said_them_in(self):
+        result = _clean({"property_type": ["Flex", "Office", "flex", "Retail"]})
+        assert result["property_type"] == ["Flex", "Office", "Retail"]
+
+    def test_a_repeated_option_dump_is_still_a_dump(self):
+        """Dedup must not let the schema-copy through by making the set look shorter."""
+        assert _clean({"property_type": ["Office", "Office", "Retail", "Industrial",
+                                         "Warehouse", "Flex", "Land"]}) == {}
+
 
 class TestDatabaseOptionShape:
     """The live rows store options as {"label": ..., "value": ...}, not plain strings.

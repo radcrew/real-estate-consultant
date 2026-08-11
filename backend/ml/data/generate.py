@@ -253,13 +253,42 @@ SQFT_UNITS = ["sqft", "sq ft", "sq. ft.", "SF", "square feet", "square foot",
               "sf", "sq.ft.", "square footage"]
 
 
+# Square yards. The everyday unit for a plot in South-Asian markets, where "1500 yard"
+# means 1,500 square yards -- 13,500 sqft -- and the figure is never written in feet.
+#
+# This is the one unit in the set where the message figure and the gold figure differ, so
+# it is the only place the model has to *convert* rather than copy. "1500 yard ground"
+# came back from production with no size at all, and the reason was in the set: all 22
+# occurrences of "yard" were `fenced yard`, a DISTRACTORS entry, so the only thing the
+# word had ever been used for was noise. `fenced yard` stays -- the disambiguating signal
+# is the figure in front of it, exactly as with "SF" -- but it is no longer alone.
+SQYD_UNITS = ["yard", "yards", "sq yard", "sq yards", "square yard", "square yards",
+              "sq yd", "sq. yd.", "gaj"]
+SQFT_PER_SQYD = 9
+
+
 def _fmt_sqft(value: int) -> str:
+    """Square feet, always. Safe to pair with another figure in the same phrase."""
     if value in SQFT_IN_WORDS and random.random() < 0.2:
         return random.choice(SQFT_IN_WORDS[value])
     unit = random.choice(SQFT_UNITS)
     if value >= 1000 and value % 1000 == 0 and random.random() < 0.35:
         return f"{value // 1000}k {unit}"
     return f"{value:,} {unit}"
+
+
+def _fmt_sqft_solo(value: int) -> str:
+    """The only figure in its phrase, so it may be stated in square yards.
+
+    Yards are kept out of two-figure phrasings on purpose. Each side of a range renders
+    independently, so a shared unit cannot be agreed on: "9,000-1,500 yards" is what a
+    hyphenated range produces when the high side picks yards and the low side does not,
+    and no reading of that text yields the gold. A plot is quoted as a single figure
+    anyway, which is where the unit actually occurs.
+    """
+    if value % SQFT_PER_SQYD == 0 and random.random() < 0.45:
+        return f"{value // SQFT_PER_SQYD:,} {random.choice(SQYD_UNITS)}"
+    return _fmt_sqft(value)
 
 
 def _price_value() -> int:
@@ -274,6 +303,11 @@ def _price_value() -> int:
 
 
 def _sqft_value() -> int:
+    # A fifth of the draws are a whole number of square yards, so the yard renderer has
+    # round figures to state. 13,500 sqft is "1,500 yards"; 13,700 sqft is 1,522.2 yards,
+    # which nobody writes, and rounding the text would put the gold out by 2 sqft.
+    if random.random() < 0.2:
+        return random.randrange(100, 6_500, 50) * SQFT_PER_SQYD
     return random.randrange(1_000, 60_000, 500)
 
 
@@ -348,6 +382,9 @@ class FieldNumbers(NamedTuple):
     # The low side of a hyphenated range, where the unit belongs only on the high side:
     # "10,000-15,000 sqft". Money keeps its symbol, since "$500k-$1M" is how it is written.
     render_low: Callable[[int], str]
+    # The only figure in its phrase. Free to pick a unit the other renderers cannot, since
+    # there is no second figure it has to agree with -- square yards, for size.
+    render_solo: Callable[[int], str]
 
 
 def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
@@ -371,10 +408,10 @@ def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
 
     if style == "max":
         value = numbers.sample()
-        return {"max": value}, random.choice(MAX_PHRASES).format(v=numbers.render(value))
+        return {"max": value}, random.choice(MAX_PHRASES).format(v=numbers.render_solo(value))
     if style == "min":
         value = numbers.sample()
-        return {"min": value}, random.choice(MIN_PHRASES).format(v=numbers.render(value))
+        return {"min": value}, random.choice(MIN_PHRASES).format(v=numbers.render_solo(value))
     if style == "bare":
         # A figure with no comparator means different things per field, and the gold
         # conventions in results.md say so: a bare *budget* is a ceiling ("half a million"
@@ -386,7 +423,7 @@ def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
         # search that matches nothing.
         value = numbers.sample()
         bounds = {"min": value, "max": value} if numbers.bare_is_exact else {"max": value}
-        return bounds, soften(numbers.render(value))
+        return bounds, soften(numbers.render_solo(value))
     low = numbers.sample()
     high = low + numbers.sample()
     if random.random() < 0.3:
@@ -406,10 +443,12 @@ def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
 
 
 PRICE_NUMBERS = FieldNumbers(
-    _fmt_money, _price_value, bare_is_exact=False, render_low=_fmt_money
+    _fmt_money, _price_value, bare_is_exact=False,
+    render_low=_fmt_money, render_solo=_fmt_money,
 )
 SQFT_NUMBERS = FieldNumbers(
-    _fmt_sqft, _sqft_value, bare_is_exact=True, render_low=lambda v: f"{v:,}"
+    _fmt_sqft, _sqft_value, bare_is_exact=True,
+    render_low=lambda v: f"{v:,}", render_solo=_fmt_sqft_solo,
 )
 
 
@@ -456,6 +495,26 @@ def property_type_values(questions: list[dict[str, Any]]) -> list[str]:
     raise SystemExit("questions.json has no property_type options; run ml.eval.dump_questions")
 
 
+# Type phrasings that also occur in the set with a meaning that is not a type, drawn
+# extra often so the collision is decided by context rather than by frequency.
+#
+# `ground` is a configured `land` phrasing, and `ground floor` is a DISTRACTORS entry --
+# a storey, extracted into nothing. A flat draw over land's phrasings put `ground` in ~8
+# messages against 18 for `ground floor`, so the token's own statistics said "ignore me",
+# and "warehouse, restaurant, shop, 1500 yard ground" came back from production with no
+# `land` at all. Both senses stay, as with "SF" and with "floor" in MIN_PHRASES; only the
+# ratio changes.
+#
+# Keyed by option, so a phrasing that stops being generated simply stops being weighted.
+AMBIGUOUS_TYPE_PHRASINGS = {"land": ("ground",)}
+_AMBIGUOUS_WEIGHT = 4.0
+
+
+def _phrasing_weights(option: str, pool: list[str]) -> list[float]:
+    ambiguous = AMBIGUOUS_TYPE_PHRASINGS.get(option, ())
+    return [_AMBIGUOUS_WEIGHT if p in ambiguous else 1.0 for p in pool]
+
+
 def _type_words(
     property_types: list[str], phrasings: dict[str, list[str]]
 ) -> tuple[list[str], str]:
@@ -466,7 +525,10 @@ def _type_words(
         pool = phrasings.get(option, [])
         # Half literal. All-phrasing would teach the mirror-image mistake: the model
         # would stop recognising the option words themselves.
-        words.append(random.choice(pool) if pool and random.random() < 0.5 else option)
+        if pool and random.random() < 0.5:
+            words.append(random.choices(pool, weights=_phrasing_weights(option, pool))[0])
+        else:
+            words.append(option)
     return picked, " or ".join(words)
 
 
@@ -549,7 +611,7 @@ def _bare_answer(
         return {"max": value}, text
     if key == "size_sqft":
         value = _sqft_value()
-        text = random.choice([f"{value:,}", str(value), _fmt_sqft(value)])
+        text = random.choice([f"{value:,}", str(value), _fmt_sqft_solo(value)])
         return {"min": value, "max": value}, text
     raise ValueError(f"no bare answer for {key}; add one before regenerating")
 

@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from ml.data.generate import (
+    AMBIGUOUS_TYPE_PHRASINGS,
     BETWEEN_PHRASES,
     CITIES,
     CITY_ALIASES,
@@ -25,6 +26,8 @@ from ml.data.generate import (
     PRICE_NUMBERS,
     REVERSED_BETWEEN_PHRASES,
     SQFT_NUMBERS,
+    SQFT_PER_SQYD,
+    SQYD_UNITS,
     STATES,
     _field_fragment,
     _fmt_money,
@@ -32,6 +35,7 @@ from ml.data.generate import (
     _place,
     _range_phrase,
     _skip_label,
+    _type_words,
     collision_key,
     eval_input_keys,
     load_phrasings,
@@ -654,6 +658,138 @@ class TestChatRecord:
         for example in _examples(n=50):
             completion = json.loads(to_chat_record(example, questions)["messages"][-1]["content"])
             assert set(completion) == {"extracted", "skipped_fields"}
+
+
+class TestSquareYards:
+    """"1500 yard ground" returned no size at all, and the set is why.
+
+    All 22 occurrences of "yard" were ``fenced yard``, a ``DISTRACTORS`` entry, so the
+    only thing the word had ever been used for was noise. Square yards are the everyday
+    plot unit in South-Asian markets, and this is the one unit where the stated figure and
+    the gold figure differ -- 1,500 yards is 13,500 sqft -- so it is the only place the
+    model has to convert rather than copy.
+    """
+
+    # Longest first, so "square yards" is not consumed as "yards" with a stray prefix.
+    _UNIT = "|".join(re.escape(u) for u in sorted(SQYD_UNITS, key=len, reverse=True))
+    FIGURE = re.compile(rf"([\d,]+)\s+(?:{_UNIT})\b")
+
+    def _phrases(self, n: int = 6000, seed: int = 8):
+        random.seed(seed)
+        return [_range_phrase(SQFT_NUMBERS) for _ in range(n)]
+
+    def test_yards_are_generated_at_all(self):
+        stated = [p for _, p in self._phrases() if self.FIGURE.search(p)]
+        assert len(stated) >= 100, f"only {len(stated)} yard phrasings in 6000"
+
+    def test_every_unit_spelling_appears(self):
+        # ``\b`` cannot follow "sq. yd." -- the trailing dot is not a word character, so a
+        # boundary needs a word character after it and a space never provides one.
+        text = " || ".join(p for _, p in self._phrases(n=12000))
+        for unit in SQYD_UNITS:
+            assert re.search(rf"\d\s+{re.escape(unit)}(?!\w)", text), f"{unit!r} never seen"
+
+    def test_a_stated_yard_figure_golds_nine_times_itself(self):
+        """The whole point. "1,500 yards" must gold 13500, not 1500."""
+        checked = 0
+        for bounds, phrase in self._phrases():
+            match = self.FIGURE.search(phrase)
+            if not match:
+                continue
+            checked += 1
+            stated = int(match.group(1).replace(",", "")) * SQFT_PER_SQYD
+            assert stated in bounds.values(), f"{phrase!r} -> {bounds}"
+        assert checked, "no yard figure generated at all"
+
+    def test_a_yard_figure_is_never_fractional(self):
+        """Rounding the text would put the gold out by a few sqft, silently."""
+        for _, phrase in self._phrases():
+            match = self.FIGURE.search(phrase)
+            if match:
+                assert "." not in match.group(1), phrase
+
+    def test_yards_never_share_a_phrase_with_a_second_figure(self):
+        """Each side of a range renders independently, so no shared unit can be agreed.
+
+        "9,000-1,500 yards" is what a hyphenated range produces when the high side picks
+        yards and the low side does not, and no reading of that text yields the gold.
+        """
+        for _, phrase in self._phrases():
+            if any(unit in phrase for unit in SQYD_UNITS):
+                assert len(re.findall(r"\d[\d,]*", phrase)) == 1, phrase
+
+    def test_a_bare_yard_answer_is_exact_like_any_bare_size(self):
+        random.seed(12)
+        seen = 0
+        for _ in range(4000):
+            bounds, fragment = _field_fragment("size_sqft", PROPERTY_TYPES, PHRASINGS)
+            match = self.FIGURE.search(fragment)
+            if match and bounds.get("min") == bounds.get("max"):
+                seen += 1
+                assert bounds["min"] == int(match.group(1).replace(",", "")) * SQFT_PER_SQYD
+        assert seen, "no exact yard answer generated"
+
+    def test_the_fenced_yard_distractor_still_exists(self):
+        """Both senses stay in the set; the disambiguating signal is the figure.
+
+        Removing the distractor would teach "yard means size" unconditionally, which is
+        the mirror of the bug -- "a fenced yard would be nice" states no size at all.
+        """
+        assert any("yard" in d for d in DISTRACTORS)
+
+    def test_money_is_untouched_by_the_solo_renderer(self):
+        """``render_solo`` exists for size; price must render exactly as it always did."""
+        assert PRICE_NUMBERS.render_solo is PRICE_NUMBERS.render
+
+
+class TestAmbiguousTypeWords:
+    """A type word that also appears with a non-type meaning must win on context.
+
+    ``ground`` is a configured ``land`` phrasing and ``ground floor`` is a distractor. A
+    flat draw over land's phrasings put ``ground`` in ~8 messages against 18 for ``ground
+    floor``, so the token's own statistics said "ignore me", and "warehouse, restaurant,
+    shop, 1500 yard ground" came back from production with no ``land`` at all.
+    """
+
+    def _messages(self, n: int = 2500, seed: int = 17) -> list[str]:
+        return [e["user_input"] for e in _examples(n=n, seed=seed)]
+
+    def test_every_weighted_phrasing_is_one_the_generator_can_draw(self):
+        """A typo here weights nothing and fails silently."""
+        for option, phrasings in AMBIGUOUS_TYPE_PHRASINGS.items():
+            assert option in PHRASINGS, f"{option} is not a configured type"
+            for phrase in phrasings:
+                assert phrase in PHRASINGS[option], f"{option}: {phrase!r} is not a phrasing"
+
+    def test_the_type_sense_outweighs_the_distractor_sense(self):
+        text = " || ".join(self._messages())
+        land = len(re.findall(r"\bground\b(?!\s+floor)", text, re.I))
+        storey = len(re.findall(r"\bground\s+floor\b", text, re.I))
+        assert land > storey, f"ground-as-land {land}, ground floor {storey}"
+
+    def test_the_storey_sense_is_not_driven_out(self):
+        """Weighting the type sense must not remove the collision it exists to teach."""
+        text = " || ".join(self._messages())
+        assert re.search(r"\bground\s+floor\b", text, re.I)
+
+    def test_a_weighted_phrasing_still_golds_its_option(self):
+        for example in _examples(n=2500, seed=17):
+            if re.search(r"\bground\b(?!\s+floor)", example["user_input"], re.I):
+                assert "land" in example["target"]["extracted"].get("property_type", []), (
+                    example["user_input"]
+                )
+
+    def test_the_other_phrasings_are_not_crowded_out(self):
+        """Weight 4 of ~9, drawn half the time -- a boost, not a takeover."""
+        random.seed(4)
+        drawn = collections.Counter()
+        for _ in range(8000):
+            picked, words = _type_words(PROPERTY_TYPES, PHRASINGS)
+            if picked == ["land"]:
+                drawn[words] += 1
+        assert drawn, "land was never the only type picked"
+        assert drawn["ground"] / sum(drawn.values()) < 0.35, drawn.most_common(5)
+        assert len([w for w in drawn if w != "ground"]) >= 5, drawn
 
 
 class TestEvalCollisionGuard:

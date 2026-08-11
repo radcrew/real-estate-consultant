@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any
 
 from app.utils.values import clean_str_or_none
@@ -322,6 +323,19 @@ def _canonical_choice(value: str, aliases: dict[str, str]) -> str | None:
     return aliases.get(value.strip().casefold())
 
 
+def _dedupe(values: Iterable[str]) -> list[str]:
+    """First occurrence wins, order preserved.
+
+    ``warehouse, restaurant, shop`` came back from production as
+    ``["industrial", "retail", "retail"]``: three phrasings, two of them the same type.
+    Canonicalisation is what creates the repeat -- distinct inputs map onto one stored
+    value -- so it has to be undone here rather than upstream, and ``["Retail", "retail"]``
+    collapses the same way. A repeated value widens no search and reads as a defect in the
+    summary the client is shown.
+    """
+    return list(dict.fromkeys(values))
+
+
 def _is_option_dump(chosen: list[str], aliases: dict[str, str]) -> bool:
     """True when a multi-select answer is simply the whole option list.
 
@@ -364,11 +378,11 @@ def drop_unconfigured_choices(
             continue
 
         if qtype in _MULTI_SELECT_TYPES:
-            chosen = [
+            chosen = _dedupe(
                 canonical
                 for item in _normalize_multi_select(value)
                 if (canonical := _canonical_choice(item, aliases)) is not None
-            ]
+            )
             if chosen and not _is_option_dump(chosen, aliases):
                 cleaned[key] = chosen
             continue
