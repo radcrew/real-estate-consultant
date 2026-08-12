@@ -470,3 +470,116 @@ Two things to check before adding a turn, both of which have gone wrong before:
 
 Adding or changing turns starts a new dataset revision. Rows scored against different
 revisions are not comparable and must not share a table.
+
+## After a fine-tune: from adapter zip to a results row
+
+The steps below are one pass, in order, with v5 as the worked example. Everything before
+this point produced an adapter; nothing after it changes the weights, so a mistake here
+costs a re-run rather than a re-train.
+
+Unzip into `.local/models/`, then confirm the run before spending an hour on it:
+
+```bash
+cd backend
+python -c "
+import json; s=json.load(open('../.local/models/lora-intake-v5/checkpoint-338/trainer_state.json'))
+print(s['epoch'], s['global_step'], s['num_train_epochs'])"
+```
+
+`global_step` × batch × grad-accum has to equal the rows in the `train.jsonl` you uploaded,
+times the epochs. 338 × 2 × 4 = 2704 against 2700 rows is one epoch; anything else means
+the notebook and the dataset disagree and the row you are about to measure is not the run
+you think it is. Check `adapter_config.json` against the previous version at the same
+time — `r`, `lora_alpha`, `lora_dropout`, `target_modules`. **A hyperparameter that moved
+alongside the data confounds the comparison**, which is the same trap the epoch count set
+in §4.
+
+### 0. Re-score the incumbent first, if this dataset revision has never been scored
+
+```bash
+python -m ml.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m.gguf
+python -m ml.eval.run --label 0.5b-lora-v4-q4km-r7 --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m
+```
+
+Rows from different revisions do not share a table, so a new model scored on a fresh
+revision has nothing to be compared against and the whole run answers no question. This
+costs one eval pass against a GGUF that already exists. v3 was re-scored for r6 and v4 for
+r7 for exactly this reason; the label carries the revision suffix so it cannot be mistaken
+for the original row.
+
+### 1. Merge, convert, quantize
+
+```bash
+python -m ml.train.merge --adapter ../.local/models/lora-intake-v5 \
+  --out ../.local/models/Qwen2.5-0.5B-Instruct-intake-v5
+python -m ml.quantize.build_gguf --model ../.local/models/Qwen2.5-0.5B-Instruct-intake-v5
+```
+
+Paths are ordinary relative paths resolved against the cwd, and every command in this file
+runs from `backend/` — hence `../.local`, not `.local`. The merged directory name decides
+the GGUF names, so `Qwen2.5-0.5B-Instruct-intake-v5` is what produces
+`qwen2.5-0.5b-instruct-intake-v5-{f16,q4_k_m}.gguf` and the eval `--model` ids below.
+
+**No `--imatrix`.** Measured at F1 0.901 against 0.935 for an hour per build; see §5.
+Record the two artifact sizes and the `quant size` / fallback-tensor lines in `results.md`.
+
+### 2. Score F16, then Q4_K_M, one server at a time
+
+```bash
+python -m ml.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v5-f16.gguf
+python -m ml.eval.run --label 0.5b-lora-v5-f16 --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v5-f16
+
+# stop the first server before starting the second — same port, and the p50/p95
+# columns are only meaningful if nothing else is contending for the cores
+python -m ml.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v5-q4_k_m.gguf
+python -m ml.eval.run --label 0.5b-lora-v5-q4km --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v5-q4_k_m
+```
+
+F16 first: with both rows in hand, a v5 failure that F16 also fails is training and one it
+passes is quantization damage. Three of v5's four regressions against v4 were the latter,
+and there is no way to say that from the Q4 row alone.
+
+Poll `/v1/models` rather than `/health` when scripting the wait — it names the model being
+served, so you cannot start an eval against the previous GGUF still shutting down.
+
+**Every run needs a label no `results/` file already owns.** The file is
+`results/<label>.json` and a rebuild overwrites it silently.
+
+### 3. Read the turns before writing the row
+
+The summary table hides the two things worth knowing. Diff the per-turn outcomes against
+the baseline run rather than reading category cells:
+
+```bash
+python - <<'PY'
+import json
+def turns(lab):
+    return {t['turn_id']: t for t in
+            json.load(open(f'ml/eval/results/{lab}.json', encoding='utf-8'))['turns']}
+def ok(t):
+    return (t['field_fp'] == 0 and t['field_fn'] == 0 and t['skip_fp'] == 0
+            and t['skip_fn'] == 0
+            and (t['value_compared'] == 0 or t['value_correct'] == t['value_compared']))
+old, new = turns('0.5b-lora-v4-q4km-r7'), turns('0.5b-lora-v5-q4km')
+print('regressed:', [i for i in new if ok(old[i]) and not ok(new[i])])
+print('fixed    :', len([i for i in new if not ok(old[i]) and ok(new[i])]))
+PY
+```
+
+A category can hold flat while turns move in both directions underneath it, and per-category
+numbers on 5–8 turns are coarse by construction — one turn is 0.125 or 0.200. Read
+`raw_output` for every regression and for every turn the training change was aimed at.
+`value_compared == 0` means the turn golds no values, so it must not count as a value miss.
+
+### 4. Record it
+
+A new revision starts a new table in `results.md`, with the serving flags, the three
+commands verbatim, and a statement of what changed between the models and what did not.
+"Only `train.jsonl` changed" is the sentence that makes every number in the table
+attributable; if it is not true, say what else moved.

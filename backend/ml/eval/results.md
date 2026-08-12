@@ -11,7 +11,7 @@ table.** When the dataset changes, previous rows become historical and a new tab
 
 | Rev | Turns | Questionnaire | Notes |
 |---|---|---|---|
-| **r7 (current)** | 129 | the real one | Square yards, `ground` as a type, and budgets past $5M — 11 turns from two reported messages. Not yet scored |
+| **r7 (current)** | 129 | the real one | Square yards, `ground` as a type, and budgets past $5M — 11 turns from two reported messages. First scored by v5 |
 | r6 | 118 | the real one | `pending-answer` added — 7 turns on bare values, plus 3 unmarked corrections |
 | r5 | 108 | the real one | `property-synonym` added — 6 turns on wordings the generator never emits |
 | r4 | 102 | the real one | First revision built from the live `questions` table |
@@ -44,8 +44,38 @@ live field, and `Warehouse` mapped to `industrial` — no listing carries Wareho
 
 ## r7 — 129 turns, square yards, the `ground` collision, and budgets past $5M
 
-Not scored yet: every GGUF in this file predates the training data these turns describe,
-so a row now would only restate that the set never taught them.
+Same binaries and serving flags as r6 — `.local/bin` unchanged, 6 threads, `--parallel 1`,
+`--cache-reuse 256`, `-c 4096`, i7-10750H. All rows `--split all --no-next-question`.
+
+| Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0.5b-lora-v5-f16 | LoRA v5 F16 | 129 | 1.000 | **0.963** | **0.972** | **0.967** | **0.951** | 0.850 | 0.829 | 1274 | 3370 |
+| **0.5b-lora-v5-q4km** | **LoRA v5 Q4_K_M** | 129 | 1.000 | 0.944 | 0.962 | **0.953** | **0.931** | 0.854 | 0.854 | 1106 | 1624 |
+| 0.5b-lora-v4-q4km-r7 | LoRA v4 Q4_K_M | 129 | 1.000 | 0.907 | 0.915 | 0.911 | 0.804 | 0.886 | 0.756 | 1082 | 1631 |
+
+```bash
+python -m ml.eval.run --label 0.5b-lora-v4-q4km-r7 --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m
+
+python -m ml.eval.run --label 0.5b-lora-v5-f16 --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v5-f16
+
+python -m ml.eval.run --label 0.5b-lora-v5-q4km --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v5-q4_k_m
+```
+
+The v4 row is a re-score, not a new model — the r6 table measures the same GGUF on 118
+turns. It is here so v5 has a baseline on the instrument it is judged by, and it is the
+only v4 number comparable to a v5 number.
+
+**v5 is v4's recipe with different data.** Same base, same LoRA config, same
+`num_train_epochs=1` / 338 steps, seed 17. Only `train.jsonl` changed — it now carries
+`pending_question`, the `correction` and `pending-answer` shapes, square yards, 8×
+ambiguous phrasings, two- and three-digit M-notation, and symmetric bound vocabulary. So
+every difference below is attributable to the training set.
 
 Eleven turns from two reported messages. Every one of the four defects below is a gap in
 what the generator could produce, and none of them was reachable by the eval as it stood.
@@ -125,6 +155,142 @@ variable, so a failure on a compound turn can be attributed rather than guessed 
   one of the pair — the same design as r6's matched `5,000`.
 * `unit-fenced-yard-is-not-a-size` keeps the distractor honest: `yard` with no figure in
   front of it still states no size.
+
+### v5 clears 22 of v4's 41 failures and regresses 4
+
+Counted as whole turns — every field, every value and every skip correct:
+
+| | Turns fully correct |
+|---|---|
+| v4 Q4_K_M | 88 / 129 |
+| v5 F16 | **108 / 129** |
+| v5 Q4_K_M | **106 / 129** |
+
+Per category, v4 Q4 → v5 Q4 (field F1 / value acc / skip recall):
+
+| Category | Turns | Field F1 | Value acc | Skip recall |
+|---|---|---|---|---|
+| `unit-ambiguity` | 20 | 0.905 → **1.000** | 0.632 → **0.952** | — |
+| `bound-direction` | 8 | 1.000 → 1.000 | 0.375 → **0.875** | — |
+| `pending-answer` | 7 | 0.714 → **0.857** | 0.800 → **1.000** | — |
+| `correction` | 11 | 0.909 → 0.909 | 0.800 → **0.900** | — |
+| `single-field` | 10 | 0.947 → **1.000** | 0.889 → 0.900 | — |
+| `multi-field` | 16 | 0.955 → **0.985** | 0.906 → 0.909 | — |
+| `skip` | 25 | 1.000 → 1.000 | 1.000 → 1.000 | 0.840 → **0.920** |
+| `previously-skipped` | 8 | 0.889 → 0.889 | 1.000 → 1.000 | 0.750 → 0.875 |
+| `property-synonym` | 6 | 0.833 → 0.833 | 1.000 → 1.000 | — |
+| `answer-and-skip` | 5 | 0.889 → 0.889 | 1.000 → 1.000 | 1.000 → 0.750 |
+| `complete` | 5 | n/a | n/a | 0.000 → 0.500 |
+| `empty-or-noise` | 8 | n/a | n/a | — |
+
+`unit-ambiguity` and `bound-direction` are where the data work landed, and both were aimed
+at directly. Nothing regressed at category level except `answer-and-skip` and `complete`,
+both at 5 turns, where one turn is 0.200 and neither movement is readable.
+
+### The r7 additions: 8 of 9, and the one that fails is the compound
+
+| Turn | v4 Q4 | v5 Q4 | Split |
+|---|---|---|---|
+| `type-ground-alone` | fail | **pass** | dev |
+| `type-ground-floor-is-not-land` | pass | pass | dev |
+| `unit-yards-bare` | fail | **pass** | dev |
+| `unit-yards-gaj` | fail | **pass** | holdout |
+| `unit-yards-min-bound` | fail | **pass** | dev |
+| `unit-fenced-yard-is-not-a-size` | pass | pass | dev |
+| `unit-price-two-digit-millions` | fail | **pass** | dev |
+| `unit-price-single-digit-millions` | pass | pass | dev |
+| `type-ground-trailing` | fail | **fail** | holdout |
+
+The isolating turns are what make the remaining failure legible. `ground` in both senses,
+yards in all three phrasings, and both magnitudes of M-notation now pass **individually** —
+so neither the 8× weighting nor the square-yard unit nor the widened price sampler is
+still missing. What fails is only the compound, `warehouse, restaurant, shop, 1500 yard
+ground`:
+
+```
+gold  property_type [industrial, retail, land]   size_sqft {min: 13500, max: 13500}
+v5    property_type [industrial, retail, retail] size_sqft {min: 13500, max: 13500}
+```
+
+**The yard conversion landed** — 1,500 → 13,500, the one place in the set where gold and
+stated figure differ. `ground` is dropped only when it trails three other type words, which
+is a compound-parse limit rather than the vocabulary gap the 8× weight was measured
+against. Worth noting the duplicate `retail` is now emitted by the *model*, where the
+reported production repeat came from `drop_unconfigured_choices`; `metrics.py` normalises
+the list to a `frozenset`, so it costs nothing here and the domain-layer dedupe removes it
+downstream. The missing `land` is the whole failure.
+
+### `bound-direction` finally moves
+
+0.375 across v3 Q4, v4 F16 and v4 Q4 — identical to three decimals — and **0.875** on both
+v5 artifacts. Four of the five recorded failures pass:
+
+| Turn | v4 Q4 | v5 Q4 |
+|---|---|---|
+| `bound-min-floor` | `price {max}` | **`price {min}`** |
+| `bound-min-nothing-below` | `size_sqft {max}` | **`size_sqft {min}`** |
+| `bound-split-two-clauses` | inverted range | **`{min: 500000, max: 2000000}`** |
+| `bound-split-floor-ceiling` | `{min: 500000, max: 500000}` | **`{min: 500000, max: 2000000}`** |
+| `bound-max-shy-of` | `size_sqft {min}` | `size_sqft {min}` |
+
+`just shy of` is the one still wrong, and it is the one the training set is *not allowed* to
+contain: `TestBoundWordingEvalSeparation` rejects any template reproducing an eval wording,
+and this turn's phrasing is one of the two that were caught doing exactly that. It is
+therefore the only honest generalisation reading in the category, and it is still 0/1.
+
+### What quantization costs, and three of the four regressions are it
+
+F16 → Q4_K_M: field F1 0.967 → 0.953, value accuracy 0.951 → 0.931, two turns. That is
+about half what it cost v4 on r6 (0.951 → 0.925), and p95 falls 3370 → 1624 ms.
+
+Four turns pass on v4 and fail on v5 Q4. **F16 gets three of them right**, so they are
+quantization damage rather than a training regression:
+
+| Turn | v5 Q4 emitted | Gold | F16 |
+|---|---|---|---|
+| `multi-four-fields` | `price {min: 3000000}` | `price {max}` | pass |
+| `single-type-land` | spurious `skipped_fields: [location]` | `[]` | pass |
+| `multi-two-types-and-city` | `[industrial, warehouse]` | `[industrial]` | pass |
+| `carry-two-then-unskip` | `property_type` in both `extracted` and `skipped_fields` | skip `price` only | fail |
+
+`multi-four-fields` is the sharpest of these — `under $3M` read as a floor, on a holdout
+turn, in the category the bound work just fixed. `multi-two-types-and-city` is cosmetic in
+production: `warehouse` is unconfigured, so the domain layer canonicalises and dedupes it
+back to `[industrial]`.
+
+Only `carry-two-then-unskip` fails at both precisions, and it violates an invariant the
+generator enforces on every training row — **no key appears in both `extracted` and
+`skipped_fields`**. Two other turns show the same shape (`carry-skip-unskip`,
+`as-type-and-listing`), so it is a pattern rather than one draw.
+
+### Still open
+
+* **`pending-bare-size-k`** — `25k` against a pending size question still lands as
+  `price {max: 25000}`. Unchanged from v3 and v4; the only r6 attribution failure the new
+  `pending-answer` data did not fix, and the category otherwise scores value accuracy 1.000.
+* **Spurious skips are the remaining precision cost.** Skip precision 0.854 against v4's
+  0.886 is the one headline number that did not improve, and the invented-skip turns above
+  are why.
+* **The scorer cannot see a hallucinated skip of a non-field.** `correct-type-narrow` emits
+  `skipped_fields: ["flex"]` and scores `skip_fp = 0`, because `flex` is not a question key
+  and is dropped before comparison; `invented_keys_total` counts only `extracted`, so it
+  reads 0. `single-type-land`'s `["location"]` scores 1 for the same behaviour. Worth
+  closing before skip precision is used as a gate.
+* **`complete` skip recall is honest for the first time.** v5 is the first model trained
+  after the `_rough_up` hold-out leak was fixed, so 0.500 here is not comparable to the
+  optimistic numbers in every row above it. On 5 turns it resolves nothing either way.
+* **The gate still cannot close.** Nothing here measures the 7B incumbent; see below.
+
+### Artifact sizes
+
+| File | On disk | Note |
+|---|---|---|
+| `qwen2.5-0.5b-instruct-intake-v5-f16.gguf` | 994 MB | conversion target, eval baseline |
+| `qwen2.5-0.5b-instruct-intake-v5-q4_k_m.gguf` | 398 MB | `quant size = 373.71 MiB (6.35 BPW)` |
+
+144 of 290 tensors required fallback quantization, identical to v2, v3 and v4 — the 896-wide
+tensors still do not divide evenly for every K-quant. No imatrix: measured at 0.901 against
+0.935 on r1 and not retried.
 
 ---
 
