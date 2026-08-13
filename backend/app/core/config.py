@@ -67,6 +67,25 @@ class Settings(BaseSettings):
     openrouter_input_cost_per_1m: float = 0.0
     openrouter_output_cost_per_1m: float = 0.0
 
+    # Region for both Bedrock clients. Required: neither boto3 nor the Anthropic Bedrock
+    # client applies a default. Credentials are resolved by the standard boto3 chain
+    # (env vars on Vercel, instance/task role on AWS compute) and so are not repeated here.
+    aws_region: str = ""
+
+    # Chat runs on the Bedrock Messages API endpoint, whose model IDs carry an `anthropic.`
+    # prefix and no date suffix. Embeddings run on bedrock-runtime InvokeModel, whose IDs
+    # are versioned instead. The two conventions are not interchangeable.
+    bedrock_chat_model: str = "anthropic.claude-sonnet-5"
+    bedrock_effort: str = "low"
+    # Adaptive thinking is on by default on Claude 5 models and counts against max_tokens.
+    # Callers size max_tokens for models without thinking, so leave it off for extraction.
+    bedrock_disable_thinking: bool = True
+    bedrock_embedding_model: str = "cohere.embed-english-v3"
+    # Cohere Embed v3 accepts roughly 96 texts per InvokeModel call.
+    bedrock_embedding_batch_size: int = 96
+    bedrock_input_cost_per_1m: float = 0.0
+    bedrock_output_cost_per_1m: float = 0.0
+
     log_level: str = "INFO"
 
     # SolarWinds Observability bulk HTTP log ingestion. Leave blank to disable.
