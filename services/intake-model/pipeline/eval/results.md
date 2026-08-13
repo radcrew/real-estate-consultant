@@ -11,7 +11,8 @@ table.** When the dataset changes, previous rows become historical and a new tab
 
 | Rev | Turns | Questionnaire | Notes |
 |---|---|---|---|
-| **r7 (current)** | 129 | the real one | Square yards, `ground` as a type, and budgets past $5M — 11 turns from two reported messages. First scored by v5 |
+| **r8 (current)** | 129 | the real one | Same turns as r7. Eight size golds moved from exact to max-only, following the convention change: a bare figure carrying a unit is a ceiling. First scored by v6 |
+| r7 | 129 | the real one | Square yards, `ground` as a type, and budgets past $5M — 11 turns from two reported messages. First scored by v5 |
 | r6 | 118 | the real one | `pending-answer` added — 7 turns on bare values, plus 3 unmarked corrections |
 | r5 | 108 | the real one | `property-synonym` added — 6 turns on wordings the generator never emits |
 | r4 | 102 | the real one | First revision built from the live `questions` table |
@@ -39,6 +40,106 @@ against v2 — but no absolute figure from them describes the shipped product.
 r4 is a dump of the live table (`pipeline.eval.dump_questions`), with the dataset rebuilt against
 it: 8 turns dropped that answered a field which does not exist, 8 refusals re-pointed at a
 live field, and `Warehouse` mapped to `industrial` — no listing carries Warehouse.
+
+---
+
+## r8 — 129 turns, bare sizes golded as ceilings
+
+Same 129 turns as r7 and the same binaries and serving flags — `.local/bin` unchanged, 6
+threads, `--parallel 1`, `--cache-reuse 256`, `-c 4096`, i7-10750H. All rows `--split all
+--no-next-question`.
+
+**No turn was added or reworded. Eight golds changed shape.** A bare figure carrying a
+unit is now a ceiling rather than an exact area, so `10,000 square feet`, `20,000 sqft`
+(×2), `5,000 sqft`, `8,000 sqft`, `1,500 yards`, `800 gaj` and `1500 yard` moved from
+`{"min": n, "max": n}` to `{"max": n}`. The two unitless answers — `5,000` and `25k`
+against the size question — stay exact, which is the v3 lesson: max-only there turned an
+answer of `32` into a 32 sqft ceiling that every later correction stacked against.
+
+Rows are therefore not comparable with r7, and v5 was re-scored here to give v6 something
+to be measured against.
+
+| Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0.5b-lora-v6-f16 | LoRA v6 F16 | 129 | 1.000 | **0.971** | 0.962 | **0.967** | **0.931** | **0.897** | 0.854 | 1187 | 2021 |
+| **0.5b-lora-v6-q4km** | **LoRA v6 Q4_K_M** | 129 | 1.000 | 0.944 | 0.962 | 0.953 | **0.912** | 0.881 | **0.902** | 1020 | 1366 |
+| 0.5b-lora-v5-q4km-r8 | LoRA v5 Q4_K_M | 129 | 1.000 | 0.944 | 0.962 | 0.953 | 0.853 | 0.854 | 0.854 | 1027 | 1490 |
+
+```bash
+python -m pipeline.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v6-q4_k_m.gguf
+python -m pipeline.eval.run --label 0.5b-lora-v6-q4km --split all --no-next-question \
+  --base-url http://127.0.0.1:8080/v1 --api-key local \
+  --model qwen2.5-0.5b-instruct-intake-v6-q4_k_m
+```
+
+Artifact sizes are unchanged from v5: 994 MB F16, 398 MB Q4_K_M, 6.35 BPW, 144 of 290
+tensors requiring fallback quantization. Only `train.jsonl` changed between v5 and v6 —
+same base, same adapter hyperparameters (r=16, alpha=32, dropout 0.05, all seven
+projections), 338 steps × batch 2 × grad-accum 4 against 2,700 rows, one epoch. Final
+eval loss rose, 0.0110 to 0.0278, which is the harder set rather than a worse fit.
+
+### What the data change bought, and what it cost
+
+Field F1 is flat at 0.953. **Value accuracy carries the whole result: 0.853 to 0.912.**
+Per-turn, v6 fixes 10 and regresses 4, net +6, 100 → 106 of 129 passing.
+
+Five of the ten fixes are the re-golded turns themselves, which only says v6 learned the
+convention it was trained on. The other five are not: `multi-four-fields`,
+`complete-after-skips`, `single-type-land`, `complete-add-docks-after-skips` and
+`bound-max-shy-of`. `unit-ambiguity` moved 0.810 → 0.905 on 20 turns.
+
+The four regressions, each read from `raw_output`:
+
+| Turn | Input | v6 | v5 |
+|---|---|---|---|
+| `type-ground-alone` | `just open ground for now` | `{}` | `property_type: ["land"]` |
+| `gibberish` | `asdkjfh`, prior Austin | echoed `location: Austin, Texas` | `{}` |
+| `skip-surprise-me` | `surprise me` | no skip | `skipped: property_type` |
+| `bound-split-two-clauses` | `lower than $2M, higher than $500K` | `200000-500000` | correct |
+
+**`type-ground-alone` is a cost of the fix, not noise.** r7 records `ground` as
+knife-edge — 8 land-sense messages against 18 for `ground floor`, so the token's own
+statistics said *ignore me*, which is why ambiguous phrasings are weighted 8×. v6 adds 74
+messages that are nothing but an unmapped clause, gold empty, and `ground floor only` and
+`top floor` are among them. That is the same balance tipping back. If the 8× weight is
+raised to compensate, this is the turn to watch.
+
+### The two production failures this revision was built for, neither of which it scores
+
+Both were reported from the app and both are fixed, but the eval cannot see either — no
+turn golds a size at or above 100,000 sqft, and no turn is a standalone unmapped clause.
+Measured by probing the served model through `build_intake_messages`:
+
+| Message | v5 behaviour | v6 |
+|---|---|---|
+| `I need a 100k sqft industrial warehouse with 32ft clear height in Chicago` | `price: 100000`, no size | `size_sqft {"max": 100000}`, `industrial`, `Chicago` |
+| `3 floors`, with `property_type: ["office"]` already set | overwrote type with `multifamily` | `{}`, office untouched |
+
+The first is the sentence `INTAKE_OPENING_MESSAGE` suggests to every user. It failed
+because `_sqft_value` stopped at 59,500 while `_price_value` draws exactly 100,000 in ~2%
+of budgets, so `100k` had only ever been money. **Turns for both belong in r9**; until
+they exist, these two rows are the only evidence and they are not in the table.
+
+### Where the units still fail, and why it is the same defect again
+
+Probing past the sampler ranges finds the bug class that produced this revision, twice
+more:
+
+| Message | v6 | Correct | Sampler range |
+|---|---|---|---|
+| `130k yard` | 117,000 | 1,170,000 | yards stop at 6,500 |
+| `130k square meters` | 165,000 | 1,399,307 | metres stop at 90,000 m² |
+| `$10M` | 1,000,000 | 10,000,000 | *inside* the 5M–60M band |
+
+The first two are coverage: a figure past where the sampler stops is a shape the model was
+taught is impossible rather than rare, which is exactly what `_price_value` documents and
+what `_sqft_value` was just fixed for. The third is not — $10M is well inside the band, so
+that one is model error at 0.5B, and it is worth noting the backend discards it anyway
+since `correct_bound_direction` drops a bound whose value appears nowhere in the message.
+
+Square metres are the weakest addition. ×10.7639 is a genuinely harder conversion than the
+yards' ×9, and 1,399,307 does not fall out of pattern-matching. It deserves its own eval
+category rather than being smeared across `unit-ambiguity`.
 
 ---
 
