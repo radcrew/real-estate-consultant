@@ -86,18 +86,26 @@ Weights, GGUFs and generated datasets go to the Hub or object storage, never int
 Two things live outside the venv, both in `<repo>/.local/`:
 
 1. **llama.cpp binaries** — download the release zip for your platform from
-   `ggml-org/llama.cpp` and unzip into `.local/bin/`. On an AVX2 CPU with no AVX-512,
-   the plain `bin-win-cpu-x64` build is correct; it dispatches at runtime.
-2. **Model artifacts** — `.local/models/`, produced by the scripts below.
+   `ggml-org/llama.cpp` and unzip into `<repo>/.local/bin/`. On an AVX2 CPU with no
+   AVX-512, the plain `bin-win-cpu-x64` build is correct; it dispatches at runtime.
+2. **Model artifacts** — `<repo>/.local/models/`, produced by the scripts below.
 
 The conversion and training dependencies are the `train` extra, never a base dependency,
 so a machine that only scores an existing GGUF never downloads torch:
 
 ```bash
 pip install -e ../../backend                                         # provides `app`
+pip install -e .                                                     # provides `pipeline`
+
+# Only to train, merge or convert. Skip both on a machine that just scores a GGUF.
 pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU build, not CUDA
 pip install -e ".[train]"
 ```
+
+Install this package too, not just the backend. Without it `python -m pipeline.…` happens
+to work from this directory — `-m` puts the cwd on `sys.path` — and fails from anywhere
+else with `ModuleNotFoundError: No module named 'pipeline'`, which reads as a broken move
+rather than a missing install.
 
 One venv covers this project and the backend — reuse `backend/.venv` rather than building a
 second one, since the two editable installs add no downloads to it and torch is the only
@@ -390,8 +398,9 @@ reason — measuring the two together makes a regression unattributable to eithe
 ### Importance matrix
 
 ```bash
-python -m pipeline.quantize.make_imatrix --gguf qwen2.5-0.5b-instruct-intake-f16.gguf
-python -m pipeline.quantize.build_gguf --model <merged-dir> \
+python -m pipeline.quantize.make_imatrix --gguf qwen2.5-0.5b-instruct-intake-v4-f16.gguf
+python -m pipeline.quantize.build_gguf \
+  --model ../../.local/models/Qwen2.5-0.5B-Instruct-intake-v4 \
   --imatrix ../../.local/models/imatrix.dat
 ```
 
@@ -422,7 +431,9 @@ in someone's shell history. See `pipeline/serve/README.md` for the production de
 
 ## 7. Running the eval
 
-From `backend/`, with `.env` present (the settings module loads it at import):
+From this directory, like every other command here. The backend's `.env` still has to
+exist — `--model` and `--base-url` default to the settings — but it is loaded by absolute
+path from `app/core/config.py`, so the cwd does not have to be `backend/`:
 
 ```bash
 # A local llama-server, no credits and no cloud involved
@@ -491,9 +502,9 @@ categories, 92 dev / 37 holdout:
  "gold": {"extracted": {}, "skipped_fields": [], "next_question_key": null}}
 ```
 
-Follow the labelling conventions in `eval/results.md`, and use the gold conventions above
-rather than inventing new ones — scoring against a different convention marks a correctly
-trained model wrong.
+Follow the labelling conventions in `pipeline/eval/results.md`, and use the gold
+conventions above rather than inventing new ones — scoring against a different convention
+marks a correctly trained model wrong.
 
 Two things to check before adding a turn, both of which have gone wrong before:
 
