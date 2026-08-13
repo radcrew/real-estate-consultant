@@ -150,14 +150,25 @@ One env var per task — routing changes are a redeploy, never a code change. **
 paid path off:**
 
 ```python
-llm_route_intake_parse:     str = "openrouter"   # → "qwen" once that branch merges
-llm_route_opening_question: str = "openrouter"
-llm_route_fit_explanation:  str = "openrouter"
-llm_route_outreach_draft:   str = "openrouter"
-llm_route_embeddings:       str = "huggingface"  # → "bedrock" in phase D
-llm_route_default:          str = "openrouter"
-llm_route_fallback:         str = "openrouter"
+llm_route_intake_parse:     str = "auto"   # → "qwen" once that branch merges
+llm_route_opening_question: str = "auto"
+llm_route_fit_explanation:  str = "auto"
+llm_route_outreach_draft:   str = "auto"
+llm_route_embeddings:       str = "auto"   # → "bedrock" in phase C
+llm_route_default:          str = "auto"
 ```
+
+`"auto"` defers to the key-presence order in `providers/chat.py`, which checks Bedrock **last**
+(§8). An earlier draft defaulted these to `"openrouter"`; that was wrong — it would break any
+deployment configured with only `HF_TOKEN`. `"auto"` gets the same "no metered path by accident"
+outcome while keeping the change a genuine no-op.
+
+Resolution order per task: **task pin → `llm_route_default` → auto**. An unknown name raises 503
+and logs the bad value rather than falling back, so a typo cannot quietly send traffic to a
+provider you did not choose.
+
+`llm_route_embeddings` is not decorative: key-presence checks Bedrock last, so while `HF_TOKEN`
+is set an explicit pin is the *only* way to reach Bedrock embeddings.
 
 Call sites gain one keyword argument:
 
@@ -172,10 +183,28 @@ parsed_output = await generate_structured_output(
 Four one-line edits. `task` defaults to `None` → `llm_route_default`, so an un-annotated call site
 still works.
 
-### 3.3 Fallback — explicit, bounded, logged
+**Import cycle to be aware of.** `routing.py` imports `chat.py` and `embeddings.py` for its
+`"auto"` fallback, so the facades cannot import routing at module scope. They import it inside the
+function body, and `LlmTask` is imported under `TYPE_CHECKING` so the annotation still resolves.
+The alternative — extracting the key-presence resolvers into a third module — is more churn for
+the same result; revisit only if the cycle grows.
 
-Fallback matters here because the primary is a self-hosted model with no vendor SLA, and a 0.5B
-has less headroom on unusual input than a large model.
+### 3.3 Fallback — deferred until the Qwen branch
+
+> **Not implemented, deliberately.** Its purpose is protecting against a self-hosted model with
+> no vendor SLA — but every current route is OpenRouter, HF, or Bedrock, all managed. Drawing the
+> retryable/non-retryable line correctly needs the Qwen provider's real exceptions, so building it
+> now would mean guessing at a failure taxonomy that does not exist yet. It belongs in the same
+> change as `QwenLambdaProvider`.
+
+When it is built, the design below stands. Note it needs one prerequisite the current code does
+not have: **infrastructure failures are not distinguishable from content failures by status code
+alone** — `raise_bedrock_api_error` and `raise_bedrock_completion_parse_failed` both produce 502.
+Expect to introduce a marker (a `ProviderUnavailable` subclass, or an explicit retryable flag on
+the raisers) before the catch clause can be written honestly.
+
+Fallback matters because the primary is a self-hosted model with no vendor SLA, and a 0.5B has
+less headroom on unusual input than a large model.
 
 - Trigger on **infrastructure failure only** — Lambda invoke error, timeout, throttle, breaker
   open. **Never** on a validation failure or refusal; that just buys the same bad answer twice.
@@ -226,13 +255,14 @@ has less headroom on unusual input than a large model.
 
 | File | Status |
 |---|---|
-| `app/core/config.py` — AWS + Bedrock settings | ✅ step 1 |
+| `app/core/config.py` — AWS + Bedrock + route settings | ✅ steps 1, 6 |
 | `app/llm/providers/exceptions.py` — `raise_bedrock_*` | ✅ step 2 |
 | `app/llm/providers/bedrock_chat.py` — `BedrockChatProvider` | ✅ step 3 |
-| `app/llm/providers/bedrock_embeddings.py` — `BedrockEmbeddingsProvider` | step 4 |
-| `app/llm/providers/{chat,embeddings}.py` — add `"bedrock"` | step 5 |
-| `app/llm/providers/routing.py` — `LlmTask`, fallback, breaker | step 6 |
-| `app/llm/{intake,fit,outreach}/service.py` — `task=` kwarg | step 7 |
+| `app/llm/providers/bedrock_embeddings.py` — `BedrockEmbeddingsProvider` | ✅ step 4 |
+| `app/llm/providers/{chat,embeddings}.py` — add `"bedrock"`, route the facades | ✅ steps 5, 7 |
+| `app/llm/providers/routing.py` — `LlmTask`, per-task resolution | ✅ step 6 |
+| `app/llm/{intake,fit,outreach}/service.py` — `task=` kwarg | ✅ step 7 |
+| Fallback + circuit breaker (§3.3) | deferred — see below |
 | `app/repositories/properties.py` — vector upsert + k-NN query | phase B |
 | `infra/qwen-lambda/` — Dockerfile, handler, model, grammars | phase E |
 
@@ -343,6 +373,12 @@ Cost after §15 is roughly **$0.00002 per search** — the cheapest meaningful u
 Implementation: chunk to `bedrock_embedding_batch_size` (96); **preserve order** —
 `similar_listings.py:61` zips vectors positionally against candidate rows, so reordering silently
 mis-scores every listing; assert `len(vectors) == len(texts)`.
+
+⚠️ **The boto3 client must be built lazily.** Unlike `AsyncAnthropicBedrockMantle`, which
+constructs fine with a blank region (and merely yields an unusable URL), `boto3.client()` *raises*
+— `ValueError` for `""`, `NoRegionError` for `None`. An eager module-level client would therefore
+fail at import on every machine where `AWS_REGION` is unset, including CI. The provider builds it
+on first use, behind the region guard, and two tests pin that.
 
 ### 6.2 Chat — built, not routed
 
@@ -472,13 +508,18 @@ Every provider takes an injectable client, so no network access is required.
 
 | Test | Asserts |
 |---|---|
-| `test_routing::test_task_routes_to_configured_provider` | each `LlmTask` → the right provider |
-| `test_routing::test_infra_error_triggers_fallback` | timeout/5xx → fallback called once |
-| `test_routing::test_validation_error_does_not_fallback` | parse failure → raises, no second call |
+| `test_routing::*` | ✅ 21 tests — per-task pins, fall-through to default, auto, unknown-pin raises, table coverage |
 | `test_bedrock_chat::*` | ✅ 16 tests — system split, temperature dropped, thinking off, stop-reason mapping, error mapping |
+| `test_bedrock_embeddings::*` | ✅ 18 tests — batching, **input order preserved**, lazy client, botocore error mapping |
 | `test_exceptions::test_user_facing_copy_does_not_vary_by_provider` | ✅ copy pinned across providers |
-| `test_bedrock_embeddings::test_batches_and_preserves_order` | 200 texts → chunked, input order |
+| `test_chat::test_forwards_task_to_the_router` | ✅ a dropped `task=` kwarg fails loudly |
+| `test_routing::test_infra_error_triggers_fallback` | deferred with §3.3 |
 | `test_qwen_lambda::test_temperature_forwarded` | Qwen **does** get `temperature` |
+
+⚠️ **A trap that bit three times.** Test config helpers build a bare `MagicMock`, whose unset
+attributes are truthy — so an unset credential looks configured and an unset route looks pinned.
+Every `_config` helper now sets all credentials *and* all route settings explicitly. Any new
+`Settings` field read during resolution must be added to those helpers.
 
 Plus a **grammar conformance test in the Lambda image build**: generate N outputs from the real
 model under the grammar and assert every one validates. That is the check that catches a schema
