@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import NoReturn
 
+from anthropic import AnthropicError
+from anthropic import APITimeoutError as AnthropicAPITimeoutError
+from botocore.exceptions import BotoCoreError, ClientError
 from openai import APITimeoutError, OpenAIError
 from pydantic import ValidationError
 
@@ -12,6 +15,12 @@ from app.utils.exceptions import (
     raise_gateway_timeout,
     raise_service_unavailable,
 )
+
+# Bedrock is reached through two SDKs: the Anthropic SDK for chat (Messages API) and
+# boto3/botocore for embeddings (bedrock-runtime InvokeModel). Both funnel into the same
+# raisers, so the failure a caller sees never depends on which client produced it.
+BedrockTimeout = AnthropicAPITimeoutError | BotoCoreError
+BedrockCallFailure = AnthropicError | BotoCoreError | ClientError
 
 
 def raise_ai_unavailable() -> NoReturn:
@@ -86,6 +95,56 @@ def raise_hf_structured_reply_incomplete() -> NoReturn:
 
 
 def raise_openrouter_structured_reply_incomplete() -> NoReturn:
+    raise_bad_gateway(
+        "The assistant's reply didn't come through completely. "
+        "Please try again in a moment.",
+    )
+
+
+def raise_bedrock_not_configured() -> NoReturn:
+    raise_service_unavailable("AWS region is not configured.")
+
+
+def raise_bedrock_access_denied(*, cause: BedrockCallFailure) -> NoReturn:
+    """Model access is not enabled for this account/region in the Bedrock console."""
+    raise_service_unavailable(
+        "The AI service is not configured for this account.",
+        cause=cause,
+    )
+
+
+def raise_bedrock_rate_limited(*, cause: BedrockCallFailure) -> NoReturn:
+    raise_service_unavailable(
+        "The AI service is busy right now. Please try again in a moment.",
+        cause=cause,
+    )
+
+
+def raise_bedrock_request_timeout(*, cause: BedrockTimeout) -> NoReturn:
+    raise_gateway_timeout("Timed out while calling AWS Bedrock.", cause=cause)
+
+
+def raise_bedrock_api_error(*, cause: BedrockCallFailure) -> NoReturn:
+    raise_bad_gateway(
+        "The AI service is temporarily unavailable. Please try again later.",
+        cause=cause,
+    )
+
+
+def raise_bedrock_completion_parse_failed(*, cause: ValidationError) -> NoReturn:
+    raise_bad_gateway(
+        "We couldn't process the assistant's reply. Please try again in a moment.",
+        cause=cause,
+    )
+
+
+def raise_bedrock_structured_refusal(*, refusal: str) -> NoReturn:
+    raise_bad_gateway(
+        "The AI service was unable to process this request. Please try again later.",
+    )
+
+
+def raise_bedrock_structured_reply_incomplete() -> NoReturn:
     raise_bad_gateway(
         "The assistant's reply didn't come through completely. "
         "Please try again in a moment.",
