@@ -1,7 +1,7 @@
-"""Write ``ml/eval/questions.json`` from the live ``questions`` table.
+"""Write ``pipeline/eval/questions.json`` from the live ``questions`` table.
 
-    cd backend
-    python -m ml.eval.dump_questions
+    cd services/intake-model
+    python -m pipeline.eval.dump_questions
 
 ``questions.json`` was hand-authored when the harness was built and drifted from
 production immediately — it described six questions where the database has had four
@@ -31,7 +31,7 @@ from pathlib import Path
 
 from app.core.supabase_sdk import close_supabase, get_supabase_sdk_client, init_supabase
 from app.repositories.questions import list_intake_questions
-from ml.paths import QUESTIONS_PATH
+from pipeline.paths import QUESTIONS_PATH
 
 
 async def fetch_questions() -> list[dict]:

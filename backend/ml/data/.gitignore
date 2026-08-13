@@ -1,3 +1,0 @@
-*.jsonl
-# Build artifact from ml.data.make_phrasings -- regenerate, never edit.
-property_type_phrasings.json

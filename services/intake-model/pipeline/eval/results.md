@@ -1,6 +1,6 @@
 # Intake extraction: eval results
 
-Every row is one `ml/eval/run.py` invocation. **Record the command**, because a row is
+Every row is one `pipeline/eval/run.py` invocation. **Record the command**, because a row is
 only meaningful alongside the dataset revision, the split, and whether the duplicate
 schema copy and JSON mode were on.
 
@@ -24,7 +24,7 @@ useless for judging a change aimed squarely at skip detection. That is why r2 ex
 
 ### Everything before r4 was scored against a questionnaire that does not exist
 
-`ml/eval/questions.json` was hand-written when the harness was built and never checked
+`pipeline/eval/questions.json` was hand-written when the harness was built and never checked
 against the database. It described **six** questions; the `questions` table has held
 **four** since 2026-04-21, and nothing on this branch added or removed a row. So
 `listing_type` and `loading_docks` have never existed, `where_criteria` does not filter on
@@ -36,7 +36,7 @@ extraction targets than production has ever sent. Those rows are kept below beca
 comparisons *within* a revision were internally consistent — INT4 costing nothing, v1
 against v2 — but no absolute figure from them describes the shipped product.
 
-r4 is a dump of the live table (`ml.eval.dump_questions`), with the dataset rebuilt against
+r4 is a dump of the live table (`pipeline.eval.dump_questions`), with the dataset rebuilt against
 it: 8 turns dropped that answered a field which does not exist, 8 refusals re-pointed at a
 live field, and `Warehouse` mapped to `industrial` — no listing carries Warehouse.
 
@@ -54,15 +54,15 @@ Same binaries and serving flags as r6 — `.local/bin` unchanged, 6 threads, `--
 | 0.5b-lora-v4-q4km-r7 | LoRA v4 Q4_K_M | 129 | 1.000 | 0.907 | 0.915 | 0.911 | 0.804 | 0.886 | 0.756 | 1082 | 1631 |
 
 ```bash
-python -m ml.eval.run --label 0.5b-lora-v4-q4km-r7 --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v4-q4km-r7 --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m
 
-python -m ml.eval.run --label 0.5b-lora-v5-f16 --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v5-f16 --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v5-f16
 
-python -m ml.eval.run --label 0.5b-lora-v5-q4km --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v5-q4km --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v5-q4_k_m
 ```
@@ -113,7 +113,7 @@ one of them was the model:
 onto the same stored value and never deduplicated, so the duplicate was created by that
 function rather than passed through it. The model was right to emit all three — it read
 three things the client named. Worth noting that no eval row in this file would ever have
-caught it: `ml/eval/metrics.py` normalises a list to a `frozenset`, so a repeated value
+caught it: `pipeline/eval/metrics.py` normalises a list to a `frozenset`, so a repeated value
 scores identical to a clean one. It is a defect in what the client is shown, not in
 extraction, and it is fixed in the domain layer with `tests/domain/test_intake_choices.py`.
 
@@ -321,15 +321,15 @@ size — is the one that failed in production, and it was untested.
 | 0.5b-lora-v3-q4km-r6 | LoRA v3 Q4_K_M | 118 | 1.000 | 0.832 | 0.913 | 0.870 | 0.821 | 0.914 | 0.780 | 1079 | 1599 |
 
 ```bash
-python -m ml.eval.run --label 0.5b-lora-v3-q4km-r6 --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v3-q4km-r6 --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v3-q4_k_m
 
-python -m ml.eval.run --label 0.5b-lora-v4-f16 --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v4-f16 --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v4-f16
 
-python -m ml.eval.run --label 0.5b-lora-v4-q4km --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v4-q4km --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m
 ```
@@ -386,7 +386,7 @@ v3 fails 4 of the 10 new turns, and the split matters:
 | `correct-size-bare` | `size_sqft {max: 5000}` | `size_sqft {min/max: 5000}` | Correction landed, ceiling instead of exact |
 
 Only the first is a pure attribution miss. The other three are the max-only bare bound
-`ml/data/generate.py` documents — a bare size read as a ceiling of 5,000 sqft rather than a
+`pipeline/data/generate.py` documents — a bare size read as a ceiling of 5,000 sqft rather than a
 size of 5,000 — which is a search that matches nothing in production. The v4 row above
 clears exactly one of them (`pending-overridden-by-unit`), which is the part its training
 set actually covered.
@@ -426,7 +426,7 @@ The other two are structural, and the pairs that pass make the diagnosis exact:
   figure first, so position and direction never once disagreed in training. F16 emits
   `{min: 2000000, max: 500000}`: an inverted range, which no gold label has ever contained.
 
-`ml/data/generate.py` now carries symmetric negations (five per direction), `floor` and
+`pipeline/data/generate.py` now carries symmetric negations (five per direction), `floor` and
 `ceiling` in their bound sense alongside the storey sense already in `DISTRACTORS`, and a
 `REVERSED_BETWEEN_PHRASES` list at ~23% of two-sided ranges. Pinned by
 `TestBoundDirectionVocabulary`. None of it is an eval wording — `nothing over {v}` and
@@ -480,18 +480,18 @@ and could otherwise drift into overlap.
 | 0.5b-lora-v2-q4km-r5 | LoRA v2 Q4_K_M | 108 | 1.000 | 0.810 | 0.988 | 0.890 | 0.593 | 0.535 | 0.480 | 1144 | 1537 |
 
 ```bash
-python -m ml.eval.run --label 0.5b-lora-v2-q4km-r5 --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v2-q4km-r5 --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v2-q4_k_m
 
-python -m ml.eval.run --label 0.5b-lora-v3-q4km --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v3-q4km --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v3-q4_k_m
 ```
 
 v3 is the same recipe as v2 — Qwen2.5-0.5B-Instruct, LoRA on all seven projections, Q4_K_M,
 380 MiB on disk, `quant size = 373.71 MiB (6.35 BPW)`. Only the training data changed, and
-it was trained on a Colab T4 rather than locally (`ml/train/COLAB.md`); the CPU run was
+it was trained on a Colab T4 rather than locally (`pipeline/train/COLAB.md`); the CPU run was
 ~17 hours for 2250 examples at 2 epochs.
 
 ### The defect the new category isolates
@@ -538,7 +538,7 @@ Per category, v2 → v3 (field F1 / value acc / skip recall):
 
 **All six synonym turns are correct.** Nothing in the code changed: no mapping table, no
 prompt edit. The training set was regenerated so half its `property_type` fragments use a
-client wording (`ml/data/make_phrasings.py`) instead of the literal option, and the model
+client wording (`pipeline/data/make_phrasings.py`) instead of the literal option, and the model
 learned to normalize. Three earlier attempts at this through the prompt — `Should be one
 or more of:`, `Must be`, a structural `enum` — each scored 0/5.
 
@@ -589,7 +589,7 @@ because the schema now describes four questions instead of six.
 | 0.5b-lora-v2-q4km-r4 | LoRA v2 Q4_K_M | 102 | 0.990 | 0.805 | 0.921 | 0.859 | 0.657 | 0.690 | 0.707 | 1256 | 1689 |
 
 ```bash
-python -m ml.eval.run --label 0.5b-lora-v2-q4km-r4 --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v2-q4km-r4 --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v2-q4_k_m
 ```
@@ -679,7 +679,7 @@ cores, AVX2, no AVX-512). All rows `--split all --no-next-question`.
 | `7b-router` | the incumbent | — | **blocked on credits, see below** ||||||||
 
 ```bash
-python -m ml.eval.run --label 0.5b-lora-v2-q4km --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v2-q4km --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v2-q4_k_m
 ```

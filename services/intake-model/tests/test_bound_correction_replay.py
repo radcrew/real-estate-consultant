@@ -1,6 +1,6 @@
 """Replay recorded eval outputs through the bound-direction corrector.
 
-``ml/eval/results/*.json`` stores the raw reply for every scored turn, which makes it a
+``pipeline/eval/results/*.json`` stores the raw reply for every scored turn, which makes it a
 free corpus of real model mistakes. The corrector is a heuristic over message text, so
 the risk that matters is not "does it fix things" but "does it break things it should
 have left alone" — and these recordings are the only place that question can be asked
@@ -23,8 +23,8 @@ from typing import Any
 import pytest
 
 from app.domain.bounds import correct_bound_direction
-from ml.eval.metrics import values_equal
-from ml.paths import EVAL_DATASET_PATH, RESULTS_DIR
+from pipeline.eval.metrics import values_equal
+from pipeline.paths import EVAL_DATASET_PATH, RESULTS_DIR
 
 RESULTS = sorted(RESULTS_DIR.glob("*.json"))
 
@@ -37,7 +37,7 @@ def gold_by_id() -> dict[str, dict[str, Any]]:
 
 
 def _matching_values(extracted: dict[str, Any], gold: dict[str, Any]) -> int:
-    """Values that agree with gold, scored the way ``ml/eval`` scores them."""
+    """Values that agree with gold, scored the way ``pipeline/eval`` scores them."""
     return sum(
         1 for key in set(extracted) & set(gold) if values_equal(gold[key], extracted[key])
     )

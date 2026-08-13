@@ -1,7 +1,7 @@
 """Scoring for intake extraction eval runs.
 
 Pure functions only — no network, no config, no model. Everything here is unit-tested in
-``backend/tests/ml/test_eval_metrics.py`` so a metric change is a visible diff rather
+``services/intake-model/tests/test_eval_metrics.py`` so a metric change is a visible diff rather
 than a silently different number in a results table.
 """
 

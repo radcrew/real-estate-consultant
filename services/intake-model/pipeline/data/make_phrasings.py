@@ -1,14 +1,14 @@
 """Generate natural phrasings for each configured property type, asked of a model.
 
-    cd backend
-    python -m ml.data.make_phrasings --base-url https://openrouter.ai/api/v1 \
+    cd services/intake-model
+    python -m pipeline.data.make_phrasings --base-url https://openrouter.ai/api/v1 \
       --api-key "$OPENROUTER_API_KEY" --model qwen/qwen-2.5-7b-instruct
 
 The tuned intake model echoes the user's noun into ``property_type`` — "warehouse", "shop",
 "apartment block" — so the value is not a configured option and gets dropped, leaving the
-field unanswered. Every ``property_type`` example in ``ml.data.generate`` renders the option
-word itself, so across ~2160 examples not one has a message word differing from its gold
-word. The most reinforced rule in the set is *copy the noun you see*.
+field unanswered. Every ``property_type`` example in ``pipeline.data.generate`` renders
+the option word itself, so across ~2160 examples not one has a message word differing from
+its gold word. The most reinforced rule in the set is *copy the noun you see*.
 
 This writes the vocabulary that breaks that: phrasings a client would actually use, paired
 with the option they mean. Gold stays the option; only the wording varies. The list is
@@ -36,8 +36,8 @@ from openai import AsyncOpenAI
 from app.core.config import settings
 from app.core.supabase_sdk import close_supabase, get_supabase_sdk_client, init_supabase
 from app.repositories.questions import list_intake_questions
-from ml.data.generate import property_type_values
-from ml.paths import PHRASINGS_PATH
+from pipeline.data.generate import property_type_values
+from pipeline.paths import PHRASINGS_PATH
 
 ASK = (
     "List {n} different words or short phrases a commercial real-estate client might use "

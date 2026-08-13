@@ -18,11 +18,12 @@ def _question_key(row: QuestionRow) -> str | None:
 def _string_options(options: Any) -> list[str]:
     """Selectable choices for a question, as the values the backend stores.
 
-    Rows come in two shapes: ``ml/eval/questions.json`` used plain strings, the database
-    uses ``{"label": "Industrial", "value": "industrial"}``. Reading only the string form
-    made this return ``[]`` for every real question, so the prompt listed no options and
-    the model had to guess the vocabulary — it answered "warehouse" for a questionnaire
-    that only offers "industrial", and the answer was then dropped as unconfigured.
+    Rows come in two shapes: ``intake-model/pipeline/eval/questions.json`` used plain
+    strings, the database uses ``{"label": "Industrial", "value": "industrial"}``. Reading
+    only the string form made this return ``[]`` for every real question, so the prompt
+    listed no options and the model had to guess the vocabulary — it answered "warehouse"
+    for a questionnaire that only offers "industrial", and the answer was then dropped as
+    unconfigured.
     """
     if not isinstance(options, list):
         return []
@@ -120,9 +121,10 @@ def _add_question_description(schema: dict[str, Any], row: QuestionRow) -> dict[
     """Append the question this field answers, **after** any extraction guidance.
 
     Order matters. The model copies this string into ``next_question.text`` — see the
-    stock-model outputs in ``ml/eval/results/0.5b-stock-q4km.json``, where every leaked
-    question is the wording followed by the guidance that trailed it. Putting the
-    question last means a copied tail is the question itself, not prompt scaffolding.
+    stock-model outputs in ``intake-model/pipeline/eval/results/0.5b-stock-q4km.json``,
+    where every leaked question is the wording followed by the guidance that trailed it.
+    Putting the question last means a copied tail is the question itself, not prompt
+    scaffolding.
     """
     text = row.get("text")
     if isinstance(text, str) and text.strip():

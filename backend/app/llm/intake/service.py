@@ -40,8 +40,8 @@ QuestionRow = dict[str, Any]
 # Reserved criteria key holding required fields the user explicitly declined to answer.
 SKIPPED_FIELDS_KEY = "_skipped_fields"
 
-# Decode settings for criteria extraction. Named so ``ml/eval`` scores the same decode
-# production runs; changing one here changes both.
+# Decode settings for criteria extraction. Named so the intake-model eval harness scores
+# the same decode production runs; changing one here changes both.
 INTAKE_PARSE_TEMPERATURE = 0.1
 INTAKE_PARSE_MAX_TOKENS = 800
 
@@ -64,9 +64,9 @@ def build_intake_messages(
 ) -> IntakePrompt:
     """Build the criteria-extraction request sent for one intake turn.
 
-    Shared with ``ml/eval`` so the harness cannot score a prompt production never sends.
-    Constant content (schema, rules) stays ahead of variable content (the turn payload)
-    so a served prefix cache keeps hitting.
+    Shared with the intake-model eval harness so it cannot score a prompt production never
+    sends. Constant content (schema, rules) stays ahead of variable content (the turn
+    payload) so a served prefix cache keeps hitting.
     """
     question_keys, required_fields = extract_question_keys(questions)
     previously_skipped = [

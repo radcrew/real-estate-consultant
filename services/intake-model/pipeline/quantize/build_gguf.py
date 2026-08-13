@@ -3,8 +3,8 @@
 Scripted rather than remembered: the flags below decide what a results row means, and
 they get lost between runs otherwise.
 
-    cd backend
-    python -m ml.quantize.build_gguf --model Qwen/Qwen2.5-0.5B-Instruct
+    cd services/intake-model
+    python -m pipeline.quantize.build_gguf --model Qwen/Qwen2.5-0.5B-Instruct
 
 Produces, under ``--out`` (default ``<repo>/.local/models``):
 
@@ -27,7 +27,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from ml.paths import LLAMA_BIN_DIR, LLAMA_SRC_DIR, MODELS_DIR, llama_exe
+from pipeline.paths import LLAMA_BIN_DIR, LLAMA_SRC_DIR, MODELS_DIR, llama_exe
 
 LLAMA_REPO = "https://github.com/ggml-org/llama.cpp.git"
 # Pin the converter to the same build as the binaries in .local/bin. Conversion output
@@ -57,7 +57,7 @@ def _is_local_path(model_id: str) -> bool:
 def snapshot(model_id: str, out_dir: Path) -> Path:
     """Resolve ``--model`` to a directory of full weights.
 
-    Accepts a Hub repo id or a local directory — ``ml.train.merge`` output is passed
+    Accepts a Hub repo id or a local directory — ``pipeline.train.merge`` output is passed
     this way at P6. A local-looking path that does not exist fails here rather than
     falling through to the Hub, which would report it as an invalid repo id and send
     you looking in the wrong place.
@@ -67,14 +67,14 @@ def snapshot(model_id: str, out_dir: Path) -> Path:
         if not local.is_dir():
             raise SystemExit(
                 f"no model directory at {local}\n"
-                "Run ml.train.train_lora and then ml.train.merge first: "
+                "Run pipeline.train.train_lora and then pipeline.train.merge first: "
                 "convert_hf_to_gguf.py reads full weights, not a LoRA adapter."
             )
         if not any(local.glob("*.safetensors")):
             raise SystemExit(
                 f"{local} contains no *.safetensors.\n"
                 "That looks like an adapter directory, not a merged model. "
-                "Run ml.train.merge --adapter <that dir> --out <merged dir>."
+                "Run pipeline.train.merge --adapter <that dir> --out <merged dir>."
             )
         print(f"using local model: {local}")
         return local
@@ -183,7 +183,7 @@ def main() -> int:
     for path in sorted(out_dir.glob(f"{stem}*.gguf")):
         print(f"  {path.name:<44} {path.stat().st_size / 1e6:>8.0f} MB")
     # ASCII only: the default Windows console encoding (cp1252) cannot encode dashes.
-    print("\nRecord these sizes in ml/eval/results.md; estimates run low.")
+    print("\nRecord these sizes in pipeline/eval/results.md; estimates run low.")
     return 0
 
 

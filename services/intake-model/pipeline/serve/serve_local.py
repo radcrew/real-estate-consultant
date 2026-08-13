@@ -1,11 +1,11 @@
 """Start ``llama-server`` with the flags the eval assumes.
 
-    cd backend
-    python -m ml.serve.serve_local --model qwen2.5-0.5b-instruct-q4_k_m.gguf
+    cd services/intake-model
+    python -m pipeline.serve.serve_local --model qwen2.5-0.5b-instruct-q4_k_m.gguf
 
 Then, in another shell:
 
-    python -m ml.eval.run --label 0.5b-q4km-local \
+    python -m pipeline.eval.run --label 0.5b-q4km-local \
         --base-url http://127.0.0.1:8080/v1 --api-key local \
         --model qwen2.5-0.5b-instruct-q4_k_m
 
@@ -35,7 +35,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from ml.paths import LLAMA_BIN_DIR, MODELS_DIR, llama_exe
+from pipeline.paths import LLAMA_BIN_DIR, MODELS_DIR, llama_exe
 
 
 def physical_cores() -> int:

@@ -1,8 +1,8 @@
 """Tests for comparator-based bound-direction correction.
 
 Every wording here is one the intake model was measured on in
-``ml/eval/results/0.5b-lora-v2-q4km-r3.json``, or a near neighbour of one, so a change
-that breaks these is a change that breaks a case we know occurs.
+``intake-model/pipeline/eval/results/0.5b-lora-v2-q4km-r3.json``, or a near neighbour of
+one, so a change that breaks these is a change that breaks a case we know occurs.
 """
 
 import pytest

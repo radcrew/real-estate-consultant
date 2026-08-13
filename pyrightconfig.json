@@ -23,6 +23,15 @@
         "services/ingestion",
         "services/ingestion/.venv/Lib/site-packages"
       ]
+    },
+    {
+      "root": "services/intake-model",
+      "pythonVersion": "3.11",
+      "extraPaths": [
+        "services/intake-model",
+        "backend",
+        "backend/.venv/Lib/site-packages"
+      ]
     }
   ]
 }

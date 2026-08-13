@@ -283,10 +283,11 @@ def _choice_aliases(row: dict[str, Any]) -> dict[str, str]:
     """Map every accepted spelling (casefolded) to the value that should be stored.
 
     Question rows come in two shapes and both occur in this codebase:
-    ``ml/eval/questions.json`` uses plain strings (``["Office", "Retail"]``) while the
-    database uses ``[{"label": "Industrial", "value": "industrial"}]``. Reading only the
-    string form made this filter a silent no-op against real data — every DB option is a
-    dict, so nothing was ever recognised and every value passed through.
+    ``intake-model/pipeline/eval/questions.json`` uses plain strings
+    (``["Office", "Retail"]``) while the database uses
+    ``[{"label": "Industrial", "value": "industrial"}]``. Reading only the string form made
+    this filter a silent no-op against real data — every DB option is a dict, so nothing
+    was ever recognised and every value passed through.
 
     Label and value are both accepted spellings; ``value`` is what gets stored. Search
     compares ``property_type`` with ``ilike``, so the choice of canonical casing does not

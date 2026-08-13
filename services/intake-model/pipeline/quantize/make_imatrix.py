@@ -1,11 +1,12 @@
 """Build an importance matrix from our own training data, for P6 quantization.
 
-    cd backend
-    python -m ml.quantize.make_imatrix --gguf qwen2.5-0.5b-instruct-intake-f16.gguf
+    cd services/intake-model
+    python -m pipeline.quantize.make_imatrix --gguf qwen2.5-0.5b-instruct-intake-f16.gguf
 
 Writes ``calibration.txt`` and ``imatrix.dat`` beside the GGUFs, then:
 
-    python -m ml.quantize.build_gguf --model <merged-dir> --imatrix .local/models/imatrix.dat
+    python -m pipeline.quantize.build_gguf --model <merged-dir> \
+        --imatrix ../../.local/models/imatrix.dat
 
 ``llama-quantize`` decides which weights tolerate 4 bits. Left to itself it uses a generic
 notion of importance; given an imatrix it uses activations measured on text you supply.
@@ -24,13 +25,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-from ml.paths import LLAMA_BIN_DIR, MODELS_DIR, TRAIN_PATH, llama_exe
+from pipeline.paths import LLAMA_BIN_DIR, MODELS_DIR, TRAIN_PATH, llama_exe
 
 
 def build_calibration(train_path: Path, out_path: Path, limit: int) -> int:
     """Render chat records to plain text, one example per chunk."""
     if not train_path.exists():
-        raise SystemExit(f"no training data at {train_path}; run ml.data.generate first")
+        raise SystemExit(f"no training data at {train_path}; run pipeline.data.generate first")
 
     chunks: list[str] = []
     for line in train_path.read_text(encoding="utf-8").splitlines():
@@ -91,7 +92,7 @@ def main() -> int:
         return result.returncode
 
     print(f"\nimatrix -> {out}")
-    print("Next: ml.quantize.build_gguf --imatrix on the merged model.")
+    print("Next: pipeline.quantize.build_gguf --imatrix on the merged model.")
     return 0
 
 

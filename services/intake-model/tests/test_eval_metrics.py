@@ -11,8 +11,8 @@ import json
 import pytest
 
 from app.schemas.llm_intake_parse import LlmParseModelOutput
-from ml.eval import metrics
-from ml.eval.metrics import (
+from pipeline.eval import metrics
+from pipeline.eval.metrics import (
     aggregate,
     by_category,
     fmt,
@@ -354,7 +354,7 @@ class TestDatasetIntegrity:
 
 @pytest.fixture
 def dataset_rows():
-    from ml.paths import EVAL_DATASET_PATH
+    from pipeline.paths import EVAL_DATASET_PATH
 
     path = EVAL_DATASET_PATH
     lines = path.read_text(encoding="utf-8").splitlines()
@@ -363,7 +363,7 @@ def dataset_rows():
 
 @pytest.fixture
 def questions():
-    from ml.paths import QUESTIONS_PATH
+    from pipeline.paths import QUESTIONS_PATH
 
     return json.loads(QUESTIONS_PATH.read_text(encoding="utf-8"))
 

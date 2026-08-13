@@ -1,12 +1,12 @@
 """LoRA fine-tune of Qwen2.5-0.5B-Instruct for intake criteria extraction.
 
-    cd backend
-    python -m ml.train.train_lora --smoke          # a few steps, verifies the pipeline
-    python -m ml.train.train_lora                  # the real run
+    cd services/intake-model
+    python -m pipeline.train.train_lora --smoke          # a few steps, verifies the pipeline
+    python -m pipeline.train.train_lora                  # the real run
 
 A one-off offline job, not part of the running app. Produces a LoRA adapter under
-``<repo>/.local/models/lora-intake/``; ``ml.train.merge`` folds it into the base weights
-so ``ml.quantize.build_gguf`` can convert the result.
+``<repo>/.local/models/lora-intake/``; ``pipeline.train.merge`` folds it into the base weights
+so ``pipeline.quantize.build_gguf`` can convert the result.
 
 Two decisions carry most of the weight here:
 
@@ -39,7 +39,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from ml.paths import MODELS_DIR, TRAIN_PATH, VAL_PATH
+from pipeline.paths import MODELS_DIR, TRAIN_PATH, VAL_PATH
 
 DEFAULT_BASE = MODELS_DIR / "Qwen2.5-0.5B-Instruct"
 DEFAULT_OUT = MODELS_DIR / "lora-intake"
@@ -266,7 +266,10 @@ def main() -> int:
     model.save_pretrained(str(out_dir))
     tokenizer.save_pretrained(str(out_dir))
     print(f"\nadapter saved to {out_dir}")
-    print("Next: python -m ml.train.merge, then ml.quantize.build_gguf on the merged dir.")
+    print(
+        "Next: python -m pipeline.train.merge, "
+        "then pipeline.quantize.build_gguf on the merged dir."
+    )
     return 0
 
 

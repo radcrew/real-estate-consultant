@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from ml.data.generate import (
+from pipeline.data.generate import (
     AMBIGUOUS_TYPE_PHRASINGS,
     BETWEEN_PHRASES,
     CITIES,
@@ -45,7 +45,7 @@ from ml.data.generate import (
     to_chat_record,
     validate,
 )
-from ml.paths import EVAL_DATASET_PATH, PHRASINGS_PATH, QUESTIONS_PATH
+from pipeline.paths import EVAL_DATASET_PATH, PHRASINGS_PATH, QUESTIONS_PATH
 
 # Derived from the questionnaire, never restated. A hardcoded copy is what let the
 # generator and the eval spend the whole branch describing six questions the database

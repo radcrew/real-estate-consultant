@@ -1,8 +1,8 @@
 """Run the intake extraction eval against any OpenAI-compatible endpoint.
 
-    cd backend
-    python -m ml.eval.run --label "7b-router" --model "Qwen/Qwen2.5-7B-Instruct"
-    python -m ml.eval.run --label "0.5b-q4" --base-url http://localhost:8080/v1 \
+    cd services/intake-model
+    python -m pipeline.eval.run --label "7b-router" --model "Qwen/Qwen2.5-7B-Instruct"
+    python -m pipeline.eval.run --label "0.5b-q4" --base-url http://localhost:8080/v1 \
         --api-key local --model qwen2.5-0.5b-instruct-q4_k_m
 
 Prompts come from ``build_intake_messages`` and the decode settings come from
@@ -31,7 +31,7 @@ from app.llm.intake.service import (
 )
 from app.llm.providers.huggingface import structured_output_messages
 from app.schemas.llm_intake_parse import LlmParseModelOutput
-from ml.eval.metrics import (
+from pipeline.eval.metrics import (
     TurnScore,
     aggregate,
     by_category,
@@ -40,7 +40,7 @@ from ml.eval.metrics import (
     parse_raw_output,
     score_turn,
 )
-from ml.paths import EVAL_DATASET_PATH, QUESTIONS_PATH, RESULTS_DIR
+from pipeline.paths import EVAL_DATASET_PATH, QUESTIONS_PATH, RESULTS_DIR
 
 # Aborting the whole run on these avoids burning an entire dataset against a dead key.
 FATAL_STATUS = {401, 402, 403}
@@ -308,7 +308,7 @@ async def main_async(argv: list[str] | None = None) -> int:
     )
 
     print(f"\nWrote {out_path}\n")
-    print("Paste into ml/eval/results.md:\n")
+    print("Paste into pipeline/eval/results.md:\n")
     print(markdown_row(args.label, args.model, args.base_url, summary))
     print("\nPer category (field F1 / value acc / skip recall):")
     for name, agg in categories.items():

@@ -1,10 +1,12 @@
-# `backend/ml`
+# `services/intake-model`
 
 Offline model work for intake criteria extraction: evaluation, data generation, LoRA
 training, quantization and serving recipes. **Nothing here runs inside the API.**
 
-`ml/eval/results.md` is the record of what every model scored and why — read it before
-changing anything here, since most of what follows exists because of a number in it.
+`pipeline/eval/results.md` is the record of what every model scored and why — read it
+before changing anything here, since most of what follows exists because of a number in it.
+
+Every command below runs from this directory, `services/intake-model/`.
 
 ## The pipeline, end to end
 
@@ -13,14 +15,14 @@ scratch. Nothing in `.local/` is precious.
 
 ```
 questions table (DB)
-  └─ ml.eval.dump_questions ──→ ml/eval/questions.json      the questionnaire, generated
-       └─ ml.data.make_phrasings ──→ property_type_phrasings.json   how clients say each type
-            └─ ml.data.generate ──→ train.jsonl + validation.jsonl
-                 └─ train/train.ipynb (Colab GPU)  or  ml.train.train_lora (CPU)
-                      └─ ml.train.merge ──→ full weights
-                           └─ ml.quantize.build_gguf ──→ F16 + Q4_K_M GGUFs
-                                └─ ml.serve.serve_local ──→ llama-server on :8080
-                                     └─ ml.eval.run ──→ results/<label>.json + a table row
+  └─ pipeline.eval.dump_questions ──→ pipeline/eval/questions.json      the questionnaire, generated
+       └─ pipeline.data.make_phrasings ──→ property_type_phrasings.json   how clients say each type
+            └─ pipeline.data.generate ──→ train.jsonl + validation.jsonl
+                 └─ train/train.ipynb (Colab GPU)  or  pipeline.train.train_lora (CPU)
+                      └─ pipeline.train.merge ──→ full weights
+                           └─ pipeline.quantize.build_gguf ──→ F16 + Q4_K_M GGUFs
+                                └─ pipeline.serve.serve_local ──→ llama-server on :8080
+                                     └─ pipeline.eval.run ──→ results/<label>.json + a table row
 ```
 
 Steps 1 and 2 only need re-running when the questionnaire changes. Steps 3 onward are the
@@ -29,26 +31,53 @@ loop you actually iterate on.
 ## Layout
 
 ```
-ml/
-  eval/       # dataset, questions, metrics, runner, results table
-  data/       # phrasing and training-set generation; generated JSONL gitignored
-  train/      # LoRA config, CPU entry point, and the Colab notebook
-  quantize/   # fetch, convert and quantize into GGUFs
-  serve/      # llama-server flags
+services/intake-model/     # the project: what it is for
+  pipeline/                # the package: what it is
+    eval/       # dataset, questions, metrics, runner, results table
+    data/       # phrasing and training-set generation; generated JSONL gitignored
+    train/      # LoRA config, CPU entry point, and the Colab notebook
+    quantize/   # fetch, convert and quantize into GGUFs
+    serve/      # llama-server flags
+  tests/
 ```
 
+The directory and the import name differ on purpose, the same way `services/ingestion/`
+holds a package called `app`: the directory says which model this is for, the package says
+what the code is. So it is `python -m pipeline.eval.run` from `services/intake-model/`, and
+`pipeline` never appears without that directory to qualify it.
+
 Binaries, weights and GGUFs live in `<repo>/.local/`, which is gitignored. Nothing
-multi-gigabyte belongs in this tree — `ml/quantize` rebuilds all of it. Paths are resolved
-in one place, `ml/paths.py`; no module recomputes the repo root or searches for a
-llama.cpp binary on its own.
+multi-gigabyte belongs in this tree — `pipeline/quantize` rebuilds all of it. Paths are
+resolved in one place, `pipeline/paths.py`; no module recomputes the repo root or
+searches for a llama.cpp binary on its own.
 
-`ml/` is listed in `.vercelignore`, so none of it is uploaded to the serverless
-function. It lives under `backend/` anyway so the harness can
-`from app.llm.intake.service import build_intake_messages` without a `sys.path` hack,
-and so one venv covers both.
+### Why it sits in `services/`, and how it still imports `app`
 
-Tests live in `backend/tests/ml/`, because `testpaths = ["tests"]` means pytest never
-collects anything under `ml/`.
+Nothing here is deployed, so nothing here needs to be excluded from a deploy: it is outside
+`backend/` entirely, which is a stronger guarantee than the `.vercelignore` line it used to
+rely on. It sits beside the other non-API units — `ingestion`, `mcp` — because that is what
+`services/` holds.
+
+The harness does still import from the backend, and that is deliberate:
+
+```python
+from app.llm.intake.service import build_intake_messages   # the function production calls
+```
+
+A prompt change in the backend changes what the harness scores on the next run, which is
+the only thing stopping the two from drifting apart. Living next door used to be what made
+that import work; now an editable install does, with no `sys.path` hack in either case:
+
+```bash
+pip install -e ../../backend
+```
+
+If that install is missing, every entry point here fails at import with
+`ModuleNotFoundError: No module named 'app'`. That is the intended failure — it is loud,
+and it names the fix.
+
+Tests live in `tests/`, alongside this file rather than in the backend's suite, because
+`testpaths = ["tests"]` in each project means neither collects the other's.
 
 Weights, GGUFs and generated datasets go to the Hub or object storage, never into git.
 
@@ -61,23 +90,28 @@ Two things live outside the venv, both in `<repo>/.local/`:
    the plain `bin-win-cpu-x64` build is correct; it dispatches at runtime.
 2. **Model artifacts** — `.local/models/`, produced by the scripts below.
 
-The conversion and training dependencies are an optional extra, never in
-`requirements.txt`, because Vercel installs from that file and anything in it ships:
+The conversion and training dependencies are the `train` extra, never a base dependency,
+so a machine that only scores an existing GGUF never downloads torch:
 
 ```bash
+pip install -e ../../backend                                         # provides `app`
 pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU build, not CUDA
-pip install -e ".[ml]"
+pip install -e ".[train]"
 ```
+
+One venv covers this project and the backend — reuse `backend/.venv` rather than building a
+second one, since the two editable installs add no downloads to it and torch is the only
+heavy wheel involved. `pyrightconfig.json` resolves `app` for this tree the same way.
 
 ---
 
 ## 1. The questionnaire is generated, not written
 
 ```bash
-python -m ml.eval.dump_questions        # overwrites ml/eval/questions.json from the DB
+python -m pipeline.eval.dump_questions        # overwrites pipeline/eval/questions.json from the DB
 ```
 
-Both the harness and the data generator read `ml/eval/questions.json`. It used to be
+Both the harness and the data generator read `pipeline/eval/questions.json`. It used to be
 hand-written, and it drifted from the database on the first commit and stayed wrong for
 the life of the branch: it described **six** questions where the `questions` table has held
 **four** since 2026-04-21, and gave them plain-string options where the real rows use
@@ -94,17 +128,17 @@ dump, then rebuild `dataset.jsonl` and `train.jsonl` — gold keys, gold values 
 old questionnaire are not comparable to rows from the new one.
 
 The four live questions, in order: `property_type` (multi-select), `location`, `price`,
-`size_sqft`. `ml/data/generate.py` raises rather than skipping if the questionnaire gains
+`size_sqft`. `pipeline/data/generate.py` raises rather than skipping if the questionnaire gains
 a key it has no renderer for — silently omitting one would ship a set that never teaches
 the new field, and the shortfall would look like ordinary deduplication loss.
 
 ## 2. Property-type phrasings
 
 ```bash
-python -m ml.data.make_phrasings --model qwen/qwen-2.5-7b-instruct
+python -m pipeline.data.make_phrasings --model qwen/qwen-2.5-7b-instruct
 ```
 
-Writes `ml/data/property_type_phrasings.json`, which is **gitignored — a build artifact,
+Writes `pipeline/data/property_type_phrasings.json`, which is **gitignored — a build artifact,
 regenerated rather than edited.**
 
 The generator renders the option word itself half the time. Without this file it would
@@ -127,12 +161,12 @@ option word: both would put a wrong label on a training example.
 Regenerate, then check the file before you train on it:
 
 ```bash
-cd backend
-python -m ml.data.generate --count 2500
+cd services/intake-model
+python -m pipeline.data.generate --count 2500
 python -c "
 import json,collections
 c=collections.Counter(); keys=set()
-for l in open('ml/data/train.jsonl',encoding='utf-8'):
+for l in open('pipeline/data/train.jsonl',encoding='utf-8'):
     d=json.loads(l); c[d['shape']]+=1
     keys |= set(json.loads(d['messages'][1]['content']))
 assert 'pending_question' in keys, 'prompt field missing'
@@ -148,9 +182,9 @@ identical. A field the prompt carries has to be checked against the prompt, and 
 against the shape counts. Run this before uploading to Colab: `train/train.ipynb` cell 2
 repeats both checks, but by then a failure costs a browser round trip.
 
-`cd backend` is load-bearing. `generate.py` writes through `ml/paths.py` and lands in the
-right place from anywhere, but the check opens `ml/data/train.jsonl` as a relative path
-and finds it only from `backend/`.
+`cd services/intake-model` is load-bearing. `generate.py` writes through
+`pipeline/paths.py` and lands in the right place from anywhere, but the check opens
+`pipeline/data/train.jsonl` as a relative path and finds it only from here.
 
 Its counts are lower than the generator's own shape mix below and should be: the check
 reads `train.jsonl` alone, the generator reports across both files. `multi 520` against
@@ -159,12 +193,12 @@ reads `train.jsonl` alone, the generator reports across both files. `multi 520` 
 Other useful forms:
 
 ```bash
-python -m ml.data.generate                  # 2500 is the default anyway
-python -m ml.data.generate --count 4000 --seed 23
+python -m pipeline.data.generate                  # 2500 is the default anyway
+python -m pipeline.data.generate --count 4000 --seed 23
 ```
 
-Writes `ml/data/train.jsonl` and `ml/data/validation.jsonl`, both gitignored, split by
-`--val-fraction` (0.1). The names matter: `ml/paths.py` calls the second one
+Writes `pipeline/data/train.jsonl` and `pipeline/data/validation.jsonl`, both gitignored, split by
+`--val-fraction` (0.1). The names matter: `pipeline/paths.py` calls the second one
 `validation.jsonl` and nothing writes `val.jsonl`.
 
 Labels are correct by construction: a criteria dict is chosen first, rendered into natural
@@ -176,8 +210,8 @@ training set without anyone editing a template.
 ### What a run currently produces
 
 ```
-wrote  2250 -> ml/data/train.jsonl
-wrote   250 -> ml/data/validation.jsonl
+wrote  2250 -> pipeline/data/train.jsonl
+wrote   250 -> pipeline/data/validation.jsonl
 
 shape mix:
   multi 571   single 463   skip 459   correction 249   pending-answer 218
@@ -208,7 +242,7 @@ Nine shapes, each teaching one behaviour:
 The P2 baseline put the stock 0.5B at precision 0.15 with recall 1.0 — it already finds
 every field; what it cannot do is stop. So about a quarter of examples have empty
 `extracted`, the average example names fewer than two fields, and no example ever lists a
-key in both `extracted` and `skipped_fields`. `tests/ml/test_data_generate.py` fails if
+key in both `extracted` and `skipped_fields`. `tests/test_data_generate.py` fails if
 any of those drift.
 
 ### Gold conventions
@@ -288,8 +322,8 @@ thousand mostly adds extraction examples rather than negative ones.
 
 ### On Colab (what v4 used)
 
-`ml/train/train.ipynb`. Upload `train.jsonl` and `validation.jsonl`, run top to bottom,
-download `lora-intake-v4.zip` and unzip into `.local/models/`. LoRA r=16, alpha=32,
+`pipeline/train/train.ipynb`. Upload `train.jsonl` and `validation.jsonl`, run top to bottom,
+download `lora-intake-v4.zip` and unzip into `<repo>/.local/models/`. LoRA r=16, alpha=32,
 dropout 0.05, all seven projections, `MAX_LEN` 1088, batch 2 × grad-accum 4, bf16,
 gradient checkpointing. Roughly 17 MB of adapter.
 
@@ -303,8 +337,8 @@ model is loaded, so a bad mask costs seconds rather than a GPU hour.
 ### On CPU
 
 ```bash
-python -m ml.train.train_lora --smoke     # a handful of steps, verifies the pipeline
-python -m ml.train.train_lora             # the real run
+python -m pipeline.train.train_lora --smoke     # a handful of steps, verifies the pipeline
+python -m pipeline.train.train_lora             # the real run
 ```
 
 Loss is on completion tokens only — the prompt is masked to `-100`. Measured on the
@@ -339,9 +373,10 @@ and the notebook currently sets 1, so a 1-epoch run on new data confounds *new d
 ## 5. Merging and quantizing
 
 ```bash
-python -m ml.train.merge --adapter .local/models/lora-intake-v4 \
-  --out .local/models/Qwen2.5-0.5B-Instruct-intake-v4
-python -m ml.quantize.build_gguf --model .local/models/Qwen2.5-0.5B-Instruct-intake-v4
+python -m pipeline.train.merge --adapter ../../.local/models/lora-intake-v4 \
+  --out ../../.local/models/Qwen2.5-0.5B-Instruct-intake-v4
+python -m pipeline.quantize.build_gguf \
+  --model ../../.local/models/Qwen2.5-0.5B-Instruct-intake-v4
 ```
 
 `convert_hf_to_gguf.py` reads full weights, not adapters, so the merge is required. The
@@ -355,8 +390,9 @@ reason — measuring the two together makes a regression unattributable to eithe
 ### Importance matrix
 
 ```bash
-python -m ml.quantize.make_imatrix --gguf qwen2.5-0.5b-instruct-intake-f16.gguf
-python -m ml.quantize.build_gguf --model <merged-dir> --imatrix .local/models/imatrix.dat
+python -m pipeline.quantize.make_imatrix --gguf qwen2.5-0.5b-instruct-intake-f16.gguf
+python -m pipeline.quantize.build_gguf --model <merged-dir> \
+  --imatrix ../../.local/models/imatrix.dat
 ```
 
 `llama-quantize` has to decide which weights tolerate 4 bits. Unaided it uses a generic
@@ -377,12 +413,12 @@ Q4_K_M.**
 ## 6. Serving locally
 
 ```bash
-python -m ml.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m.gguf
+python -m pipeline.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m.gguf
 ```
 
 Threads default to physical cores, `--parallel` to 1, and prefix caching is on. Those
 choices decide what a latency number means, which is why they are in a script rather than
-in someone's shell history. See `ml/serve/README.md` for the production deployment.
+in someone's shell history. See `pipeline/serve/README.md` for the production deployment.
 
 ## 7. Running the eval
 
@@ -390,20 +426,20 @@ From `backend/`, with `.env` present (the settings module loads it at import):
 
 ```bash
 # A local llama-server, no credits and no cloud involved
-python -m ml.eval.run --label 0.5b-lora-v4-q4km --split all --no-next-question \
+python -m pipeline.eval.run --label 0.5b-lora-v4-q4km --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m
 
 # The incumbent, on the hosted router
-python -m ml.eval.run --label 7b-router --model "Qwen/Qwen2.5-7B-Instruct"
+python -m pipeline.eval.run --label 7b-router --model "Qwen/Qwen2.5-7B-Instruct"
 
 # The held-out split, which never enters training
-python -m ml.eval.run --label 0.5b-lora-v4-q4km-holdout --split holdout ...
+python -m pipeline.eval.run --label 0.5b-lora-v4-q4km-holdout --split holdout ...
 ```
 
-Results are written to `ml/eval/results/<label>.json` — per-turn scores plus the raw model
+Results are written to `pipeline/eval/results/<label>.json` — per-turn scores plus the raw model
 output for every turn, which is where failure modes are actually visible. The command
-prints a markdown row to paste into `ml/eval/results.md`.
+prints a markdown row to paste into `pipeline/eval/results.md`.
 
 **Give every run a distinct label.** The file is `results/<label>.json` and a rebuild
 overwrites it silently, so a re-trained model reusing an old label destroys the row it was
@@ -446,7 +482,7 @@ retry, because raw JSON validity is one of the numbers being measured.
 
 ## Adding turns to the eval set
 
-`ml/eval/dataset.jsonl`, one JSON object per line. Currently 129 turns across 12
+`pipeline/eval/dataset.jsonl`, one JSON object per line. Currently 129 turns across 12
 categories, 92 dev / 37 holdout:
 
 ```json
@@ -477,12 +513,12 @@ The steps below are one pass, in order, with v5 as the worked example. Everythin
 this point produced an adapter; nothing after it changes the weights, so a mistake here
 costs a re-run rather than a re-train.
 
-Unzip into `.local/models/`, then confirm the run before spending an hour on it:
+Unzip into `<repo>/.local/models/`, then confirm the run before spending an hour on it:
 
 ```bash
-cd backend
+cd services/intake-model
 python -c "
-import json; s=json.load(open('../.local/models/lora-intake-v5/checkpoint-338/trainer_state.json'))
+import json; s=json.load(open('../../.local/models/lora-intake-v5/checkpoint-338/trainer_state.json'))
 print(s['epoch'], s['global_step'], s['num_train_epochs'])"
 ```
 
@@ -497,8 +533,8 @@ in §4.
 ### 0. Re-score the incumbent first, if this dataset revision has never been scored
 
 ```bash
-python -m ml.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m.gguf
-python -m ml.eval.run --label 0.5b-lora-v4-q4km-r7 --split all --no-next-question \
+python -m pipeline.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m.gguf
+python -m pipeline.eval.run --label 0.5b-lora-v4-q4km-r7 --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v4-q4_k_m
 ```
@@ -512,13 +548,16 @@ for the original row.
 ### 1. Merge, convert, quantize
 
 ```bash
-python -m ml.train.merge --adapter ../.local/models/lora-intake-v5 \
-  --out ../.local/models/Qwen2.5-0.5B-Instruct-intake-v5
-python -m ml.quantize.build_gguf --model ../.local/models/Qwen2.5-0.5B-Instruct-intake-v5
+python -m pipeline.train.merge --adapter ../../.local/models/lora-intake-v5 \
+  --out ../../.local/models/Qwen2.5-0.5B-Instruct-intake-v5
+python -m pipeline.quantize.build_gguf \
+  --model ../../.local/models/Qwen2.5-0.5B-Instruct-intake-v5
 ```
 
 Paths are ordinary relative paths resolved against the cwd, and every command in this file
-runs from `backend/` — hence `../.local`, not `.local`. The merged directory name decides
+runs from `services/intake-model/` — hence `../../.local`, not `.local`. That is two levels
+now, not one; a stale `../.local` resolves inside `services/` and fails as "model not
+found". The merged directory name decides
 the GGUF names, so `Qwen2.5-0.5B-Instruct-intake-v5` is what produces
 `qwen2.5-0.5b-instruct-intake-v5-{f16,q4_k_m}.gguf` and the eval `--model` ids below.
 
@@ -528,15 +567,15 @@ Record the two artifact sizes and the `quant size` / fallback-tensor lines in `r
 ### 2. Score F16, then Q4_K_M, one server at a time
 
 ```bash
-python -m ml.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v5-f16.gguf
-python -m ml.eval.run --label 0.5b-lora-v5-f16 --split all --no-next-question \
+python -m pipeline.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v5-f16.gguf
+python -m pipeline.eval.run --label 0.5b-lora-v5-f16 --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v5-f16
 
 # stop the first server before starting the second — same port, and the p50/p95
 # columns are only meaningful if nothing else is contending for the cores
-python -m ml.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v5-q4_k_m.gguf
-python -m ml.eval.run --label 0.5b-lora-v5-q4km --split all --no-next-question \
+python -m pipeline.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v5-q4_k_m.gguf
+python -m pipeline.eval.run --label 0.5b-lora-v5-q4km --split all --no-next-question \
   --base-url http://127.0.0.1:8080/v1 --api-key local \
   --model qwen2.5-0.5b-instruct-intake-v5-q4_k_m
 ```
@@ -561,7 +600,7 @@ python - <<'PY'
 import json
 def turns(lab):
     return {t['turn_id']: t for t in
-            json.load(open(f'ml/eval/results/{lab}.json', encoding='utf-8'))['turns']}
+            json.load(open(f'pipeline/eval/results/{lab}.json', encoding='utf-8'))['turns']}
 def ok(t):
     return (t['field_fp'] == 0 and t['field_fn'] == 0 and t['skip_fp'] == 0
             and t['skip_fn'] == 0

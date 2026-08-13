@@ -1,14 +1,14 @@
 """Generate programmatically-labelled intake training examples.
 
-    cd backend
-    python -m ml.data.generate --count 2000 --out ml/data/train.jsonl
+    cd services/intake-model
+    python -m pipeline.data.generate --count 2000 --out pipeline/data/train.jsonl
 
 Labels are correct by construction: a target criteria dict is chosen first, then rendered
 into natural language, and the dict is kept as gold. Nothing is inferred from model output,
 so there is no teacher to be wrong.
 
 **What this set has to teach is precision, not recall.** The P2 baseline
-(``ml/eval/results.md``) put the stock 0.5B at precision 0.15 with recall 1.0: it returns
+(``pipeline/eval/results.md``) put the stock 0.5B at precision 0.15 with recall 1.0: it returns
 every schema property on every turn, nulls included, and lists the same key in ``extracted``
 and ``skipped_fields`` at once. So the generator is built around negative space —
 
@@ -35,7 +35,13 @@ from pydantic import ValidationError
 
 from app.llm.intake.service import build_intake_messages
 from app.schemas.llm_intake_parse import LlmParseModelOutput
-from ml.paths import EVAL_DATASET_PATH, PHRASINGS_PATH, QUESTIONS_PATH, TRAIN_PATH, VAL_PATH
+from pipeline.paths import (
+    EVAL_DATASET_PATH,
+    PHRASINGS_PATH,
+    QUESTIONS_PATH,
+    TRAIN_PATH,
+    VAL_PATH,
+)
 
 # Drawn from backend/dataset/raw-data.json so the distribution matches real listings.
 CITIES = [
@@ -495,7 +501,7 @@ SQFT_NUMBERS = FieldNumbers(
 
 
 def load_phrasings(path: Path) -> dict[str, list[str]]:
-    """Wordings a client uses for each option, from ``ml.data.make_phrasings``.
+    """Wordings a client uses for each option, from ``pipeline.data.make_phrasings``.
 
     Every property_type example used to render the option word itself, so the most
     reinforced rule in the set was *copy the noun you see* — and the tuned model echoed
@@ -507,7 +513,10 @@ def load_phrasings(path: Path) -> dict[str, list[str]]:
     behaviour.
     """
     if not path.exists():
-        print(f"no phrasings at {path}; run ml.data.make_phrasings to teach generalisation")
+        print(
+            f"no phrasings at {path}; "
+            "run pipeline.data.make_phrasings to teach generalisation"
+        )
         return {}
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -534,7 +543,9 @@ def property_type_values(questions: list[dict[str, Any]]) -> list[str]:
             )
             and value.strip()
         ]
-    raise SystemExit("questions.json has no property_type options; run ml.eval.dump_questions")
+    raise SystemExit(
+        "questions.json has no property_type options; run pipeline.eval.dump_questions"
+    )
 
 
 # Type phrasings that also occur in the set with a meaning that is not a type, drawn

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from ml import paths
+from pipeline import paths
 
 
 class TestAnchors:
@@ -18,8 +18,18 @@ class TestAnchors:
     def test_backend_dir_is_where_pyproject_lives(self):
         assert (paths.BACKEND_DIR / "pyproject.toml").is_file()
 
-    def test_ml_dir_is_this_package(self):
-        assert (paths.ML_DIR / "paths.py").is_file()
+    def test_package_dir_is_this_package(self):
+        assert (paths.PACKAGE_DIR / "paths.py").is_file()
+
+    def test_service_dir_is_where_this_projects_pyproject_lives(self):
+        """The service root, not the backend's — the two each own one."""
+        assert (paths.SERVICE_DIR / "pyproject.toml").is_file()
+        assert paths.SERVICE_DIR != paths.BACKEND_DIR
+
+    def test_backend_is_a_sibling_not_an_ancestor(self):
+        """Guards the move out of the backend tree: ``app`` now comes from an install."""
+        assert paths.BACKEND_DIR not in paths.PACKAGE_DIR.parents
+        assert paths.BACKEND_DIR.parent == paths.REPO_ROOT
 
     def test_local_dir_sits_beside_backend_not_inside_it(self):
         """Anything under backend/ risks being swept into a deploy."""

@@ -1,7 +1,7 @@
 """Fold a LoRA adapter into the base weights, producing a model GGUF conversion can read.
 
-    cd backend
-    python -m ml.train.merge
+    cd services/intake-model
+    python -m pipeline.train.merge
 
 ``convert_hf_to_gguf.py`` reads full weights, not adapters, so this step is required
 before quantization. It is also the point where the plan's order matters:
@@ -21,7 +21,7 @@ import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from ml.paths import MODELS_DIR
+from pipeline.paths import MODELS_DIR
 
 DEFAULT_BASE = MODELS_DIR / "Qwen2.5-0.5B-Instruct"
 DEFAULT_ADAPTER = MODELS_DIR / "lora-intake"
@@ -37,7 +37,7 @@ def main() -> int:
 
     adapter = Path(args.adapter)
     if not adapter.exists():
-        print(f"no adapter at {adapter}; run ml.train.train_lora first")
+        print(f"no adapter at {adapter}; run pipeline.train.train_lora first")
         return 1
 
     print(f"base    {args.base}")
@@ -53,7 +53,7 @@ def main() -> int:
     # directory, and a mismatched one produces a model that decodes to noise.
     AutoTokenizer.from_pretrained(args.base).save_pretrained(str(out))
     print(f"\nmerged -> {out}")
-    print(f"Next: python -m ml.quantize.build_gguf --model {out}")
+    print(f"Next: python -m pipeline.quantize.build_gguf --model {out}")
     return 0
 
 

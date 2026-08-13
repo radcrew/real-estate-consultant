@@ -47,8 +47,8 @@ def structured_output_messages(
 ) -> list[dict[str, Any]]:
     """Prepend the schema instruction the provider sends with every structured request.
 
-    Module-level so ``ml/eval`` can reproduce the exact request without reaching into
-    the provider or restating the instruction.
+    Module-level so the intake-model eval harness can reproduce the exact request without
+    reaching into the provider or restating the instruction.
     """
     schema = response_format.model_json_schema()
     instruction = (

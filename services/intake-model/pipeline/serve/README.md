@@ -5,7 +5,7 @@ Two files here. `serve_local.py` runs the model on your machine for evaluation;
 difference is supervision, TLS and a credential.
 
 **The artifact to ship is `qwen2.5-0.5b-instruct-intake-q4_k_m.gguf`** — the plain Q4
-quant, not the imatrix one. See `ml/eval/results.md`: the imatrix scored 0.901 against
+quant, not the imatrix one. See `pipeline/eval/results.md`: the imatrix scored 0.901 against
 0.935 and costs an hour per build.
 
 ## The shape of the deployment
@@ -78,8 +78,8 @@ round trip is no longer negligible.
 curl -H "Authorization: Bearer $KEY" https://llm.example.com/v1/models
 
 # Then score the deployed endpoint with the same harness used for every other row.
-cd backend
-python -m ml.eval.run --label 0.5b-lora-q4km-prod --split all --no-next-question \
+cd services/intake-model
+python -m pipeline.eval.run --label 0.5b-lora-q4km-prod --split all --no-next-question \
   --base-url https://llm.example.com/v1 --api-key "$KEY" \
   --model qwen2.5-0.5b-instruct-intake
 ```

@@ -2,11 +2,15 @@
 
 Five modules each computed ``Path(__file__).resolve().parents[3]`` for the repo root, and
 three wrote out the same Windows-aware executable search. That is one hard-coded directory
-depth per file: moving ``ml/`` a level, or adding a subpackage, silently repoints the
+depth per file: moving this package a level, or adding a subpackage, silently repoints the
 defaults, and because they are ``argparse`` defaults the break surfaces as "model not
 found" in a different module than the one that moved.
 
-Depth is now asserted in ``tests/ml/test_paths.py`` rather than repeated.
+That is not hypothetical — the move out of the backend tree into
+``services/intake-model/pipeline/`` added a level and turned ``BACKEND_DIR`` from a
+parent into a sibling lookup. One file changed.
+
+Depth is now asserted in ``tests/test_paths.py`` rather than repeated.
 
 Nothing here touches the filesystem at import time — these are locations, not guarantees
 that anything exists. ``llama_exe`` is the exception, because "which binary would run" has
@@ -19,10 +23,17 @@ import shutil
 import sys
 from pathlib import Path
 
-# ml/paths.py -> ml/ -> backend/ -> repo root. Kept as parents[2] in exactly one file.
-ML_DIR = Path(__file__).resolve().parent
-BACKEND_DIR = ML_DIR.parent
-REPO_ROOT = ML_DIR.parents[1]
+# pipeline/paths.py -> pipeline/ -> intake-model/ -> services/ -> repo root.
+# Kept as parents[2] in exactly one file.
+PACKAGE_DIR = Path(__file__).resolve().parent
+SERVICE_DIR = PACKAGE_DIR.parent
+REPO_ROOT = PACKAGE_DIR.parents[2]
+
+# Named rather than derived from ``PACKAGE_DIR``: this package no longer lives under
+# ``backend/``, so the backend is a sibling looked up from the root, not a parent walked
+# up to. ``app`` is importable because the backend is installed into this venv (see
+# pyproject), not because of where these directories sit.
+BACKEND_DIR = REPO_ROOT / "backend"
 
 # Untracked scratch space for weights, GGUFs and llama.cpp itself. Deliberately outside
 # backend/ so nothing here can be swept into a deploy.
@@ -31,8 +42,8 @@ MODELS_DIR = LOCAL_DIR / "models"
 LLAMA_BIN_DIR = LOCAL_DIR / "bin"
 LLAMA_SRC_DIR = LOCAL_DIR / "llama.cpp"
 
-DATA_DIR = ML_DIR / "data"
-EVAL_DIR = ML_DIR / "eval"
+DATA_DIR = PACKAGE_DIR / "data"
+EVAL_DIR = PACKAGE_DIR / "eval"
 
 QUESTIONS_PATH = EVAL_DIR / "questions.json"
 EVAL_DATASET_PATH = EVAL_DIR / "dataset.jsonl"
