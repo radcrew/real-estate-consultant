@@ -272,6 +272,32 @@ SQYD_UNITS = ["yard", "yards", "sq yard", "sq yards", "square yard", "square yar
               "sq yd", "sq. yd.", "gaj"]
 SQFT_PER_SQYD = 9
 
+# Square metres, the other unit a client states and the gold does not use. Same rule as
+# yards -- gold is square feet, so the model converts rather than copies -- but the factor
+# is not an integer, so a value cannot be tested for metre-compatibility with a modulo the
+# way `value % SQFT_PER_SQYD` tests yards. Values are generated *from* a round metre
+# figure instead, and `_sqm_figure` recovers it by round-trip.
+#
+# That round-trip also succeeds on roughly one ordinary sqft draw in eleven -- the image
+# of `_sqm_to_sqft` covers about 1/10.76 of the integers, and a draw landing in it is
+# indistinguishable from a generated one. That is harmless rather than a mislabel: the
+# metre figure printed is a correct statement of that same area, so the example teaches
+# the same conversion. It only means metre coverage is somewhat wider than the 15% draw
+# rate below suggests.
+SQM_UNITS = ["square meters", "square metres", "sq m", "sqm", "sq. m.", "m2",
+             "square meter", "square metre"]
+SQFT_PER_SQM = 10.7639
+
+
+def _sqm_to_sqft(sqm: int) -> int:
+    return round(sqm * SQFT_PER_SQM)
+
+
+def _sqm_figure(value: int) -> int | None:
+    """The round metre figure ``value`` was generated from, or None if it was not."""
+    sqm = round(value / SQFT_PER_SQM)
+    return sqm if sqm > 0 and _sqm_to_sqft(sqm) == value else None
+
 
 def _fmt_sqft(value: int) -> str:
     """Square feet, always. Safe to pair with another figure in the same phrase."""
@@ -294,6 +320,8 @@ def _fmt_sqft_solo(value: int) -> str:
     """
     if value % SQFT_PER_SQYD == 0 and random.random() < 0.45:
         return f"{value // SQFT_PER_SQYD:,} {random.choice(SQYD_UNITS)}"
+    if (sqm := _sqm_figure(value)) is not None and random.random() < 0.45:
+        return f"{sqm:,} {random.choice(SQM_UNITS)}"
     return _fmt_sqft(value)
 
 
@@ -335,6 +363,21 @@ def _sqft_value() -> int:
     # which nobody writes, and rounding the text would put the gold out by 2 sqft.
     if random.random() < 0.2:
         return random.randrange(100, 6_500, 50) * SQFT_PER_SQYD
+    # Round metre figures, so the metre renderer has something clean to state. Drawn to
+    # 90,000 m2 because that is ~970k sqft, the top of the six-figure band below.
+    if random.random() < 0.15:
+        return _sqm_to_sqft(random.randrange(100, 90_000, 50))
+    # Six-figure sizes. This stopped at 59,500, so no size the model ever saw reached
+    # 100,000 -- while `_price_value` draws exactly 100,000 in ~2% of budgets. "100k" was
+    # therefore money and nothing else, and "100k sqft industrial warehouse" came back as
+    # {"price": {"max": 100000}} with no size at all. The wording the app *suggests* to
+    # every user, in INTAKE_OPENING_MESSAGE, asks for 100k sqft.
+    #
+    # This is the defect `_price_value` documents, in the other field: a sampler that
+    # stops short does not teach a shape as rare, it teaches it as impossible. Capped
+    # below 1,000,000 because `_fmt_sqft` has no M-notation and would write "1000k sqft".
+    if random.random() < 0.25:
+        return random.randrange(60_000, 1_000_000, 10_000)
     return random.randrange(1_000, 60_000, 500)
 
 
@@ -461,14 +504,14 @@ def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
         value = numbers.sample()
         return {"min": value}, random.choice(MIN_PHRASES).format(v=numbers.render_solo(value))
     if style == "bare":
-        # A figure with no comparator means different things per field, and the gold
-        # conventions in results.md say so: a bare *budget* is a ceiling ("half a million"
-        # -> max), a bare *size* is exact ("10,000 square feet" -> min == max).
+        # A figure with no comparator is a ceiling in both fields: "half a million" is a
+        # budget the client is shopping under, and "130k sqft" is a size they are shopping
+        # under too. Neither states a floor, and reading either as exact makes the search
+        # match only listings that hit the figure dead on.
         #
-        # v3 generated max-only for both, so a user answering the size question with "32"
-        # got {"max": 32} -- a ceiling of 32 sqft -- and every later correction stacked
-        # against it. Scored on the eval as a value-accuracy miss, in production as a
-        # search that matches nothing.
+        # This is *unit-carrying* bare only. A naked figure answering a direct question
+        # stays exact -- see `_bare_answer`, where v3's max-only turned an answer of "32"
+        # into a 32 sqft ceiling that every later correction stacked against.
         value = numbers.sample()
         bounds = {"min": value, "max": value} if numbers.bare_is_exact else {"max": value}
         return bounds, soften(numbers.render_solo(value))
@@ -495,7 +538,7 @@ PRICE_NUMBERS = FieldNumbers(
     render_low=_fmt_money, render_solo=_fmt_money,
 )
 SQFT_NUMBERS = FieldNumbers(
-    _fmt_sqft, _sqft_value, bare_is_exact=True,
+    _fmt_sqft, _sqft_value, bare_is_exact=False,
     render_low=lambda v: f"{v:,}", render_solo=_fmt_sqft_solo,
 )
 
@@ -653,8 +696,12 @@ def _bare_answer(
     the message carries no clue which field it belongs to. That is deliberate: it is the
     turn that made "10" become a $10 budget, and only ``pending_question`` resolves it.
 
-    Bounds follow the same convention as any bare figure: a budget is a ceiling, a size is
-    exact.
+    Bounds split on whether a unit survives into the text. A naked figure is exact for
+    size: this is the turn that made "10" a $10 budget, and v3's max-only made an answer
+    of "32" a 32 sqft ceiling with every later correction stacking against it. Once a unit
+    is attached the message reads the same as "130k sqft" anywhere else, so it takes the
+    same ceiling gold -- otherwise one string carries two golds depending on the shape it
+    landed in, which is supervision the model cannot resolve.
     """
     if key == "location":
         gold, place = _place()
@@ -668,8 +715,9 @@ def _bare_answer(
         return {"max": value}, text
     if key == "size_sqft":
         value = _sqft_value()
-        text = random.choice([f"{value:,}", str(value), _fmt_sqft_solo(value)])
-        return {"min": value, "max": value}, text
+        if random.random() < 0.34:
+            return {"max": value}, _fmt_sqft_solo(value)
+        return {"min": value, "max": value}, random.choice([f"{value:,}", str(value)])
     raise ValueError(f"no bare answer for {key}; add one before regenerating")
 
 
@@ -859,7 +907,17 @@ def make_example(
         else:
             user_input = fragment
     elif shape == "noise":
-        user_input = random.choice(NOISE_INPUTS)
+        # A requirement the questionnaire does not cover, stated *alone*. DISTRACTORS only
+        # ever arrived appended to a message that answered something (see the `if
+        # extracted` guard below), so a message that is nothing but an unmapped clause was
+        # never taught -- and "3 floors" on its own came back as property_type
+        # multifamily, the type it most often sat beside. Gold is empty here for exactly
+        # the reason it ignores the appended form, and `prior` is carried, so the example
+        # also teaches that a clause with no field disturbs no answered one.
+        if random.random() < 0.3:
+            user_input = ", ".join(random.sample(DISTRACTORS, random.choice([1, 1, 2])))
+        else:
+            user_input = random.choice(NOISE_INPUTS)
     elif shape == "skip":
         target = _next_question_key(set(prior), set(), ordered_required)
         if target is None:

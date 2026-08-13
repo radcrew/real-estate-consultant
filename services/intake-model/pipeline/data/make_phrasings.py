@@ -37,7 +37,7 @@ from app.core.config import settings
 from app.core.supabase_sdk import close_supabase, get_supabase_sdk_client, init_supabase
 from app.repositories.questions import list_intake_questions
 from pipeline.data.generate import property_type_values
-from pipeline.paths import PHRASINGS_PATH
+from pipeline.paths import EVAL_DATASET_PATH, PHRASINGS_PATH
 
 ASK = (
     "List {n} different words or short phrases a commercial real-estate client might use "
@@ -65,6 +65,35 @@ def _clean(line: str) -> str | None:
     if not text.isascii():
         return None
     return text
+
+
+def synonym_eval_wordings(path: Path) -> list[str]:
+    """Turns from the one category that exists to measure generalisation.
+
+    A ``property-synonym`` turn scores whether the model handles a noun the training set
+    never taught. If a phrasing generated here also appears in one of those turns, the
+    turn measures recall of this file instead, and the category stops answering the
+    question it was added for.
+
+    This used to be checked only by ``TestSynonymEvalSeparation``, which catches the
+    collision after a run rather than preventing it. The file is regenerated at
+    temperature 0.8, so the colliding word differs run to run — ``flats`` reached
+    ``multifamily`` on the run that prompted this — and the failure reads as new each
+    time rather than as the same structural gap.
+    """
+    if not path.exists():
+        return []
+    rows = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    return [r["user_input"].lower() for r in rows if r.get("category") == "property-synonym"]
+
+
+def reaches_eval(phrase: str, wordings: list[str]) -> bool:
+    """Substring, not word match — the same test ``TestSynonymEvalSeparation`` applies."""
+    return any(phrase.lower() in text for text in wordings)
 
 
 def _answer_matches(reply: str, option: str) -> bool:
@@ -107,6 +136,7 @@ async def main_async(argv: list[str] | None = None) -> int:
     parser.add_argument("--api-key", default=None, help="Defaults to OPENROUTER_API_KEY")
     parser.add_argument("--model", default="qwen/qwen-2.5-7b-instruct")
     parser.add_argument("--per-option", type=int, default=14)
+    parser.add_argument("--eval-set", default=str(EVAL_DATASET_PATH))
     parser.add_argument("--out", default=str(PHRASINGS_PATH))
     args = parser.parse_args(argv)
 
@@ -124,12 +154,19 @@ async def main_async(argv: list[str] | None = None) -> int:
     client = AsyncOpenAI(base_url=args.base_url, api_key=api_key, timeout=120, max_retries=0)
     print(f"asking {args.model} for {args.per_option} phrasings per option\n")
 
+    held_out = synonym_eval_wordings(Path(args.eval_set))
+    print(f"holding out vocabulary from {len(held_out)} property-synonym turns\n")
+
     phrasings: dict[str, list[str]] = {}
     for option in options:
         proposed = await propose(client, args.model, option, args.per_option)
         # An option word is not a phrasing for itself, and a candidate claimed by two
         # options is ambiguous — both would put a wrong label on a training example.
         candidates = [p for p in proposed if p not in options]
+        # A phrasing the eval already scores turns that turn into a recall check.
+        if leaked := [p for p in candidates if reaches_eval(p, held_out)]:
+            print(f"  {option:<12} holding out {leaked}: scored by a property-synonym turn")
+            candidates = [p for p in candidates if p not in leaked]
         checks = await asyncio.gather(
             *(round_trips(client, args.model, p, option, options) for p in candidates)
         )

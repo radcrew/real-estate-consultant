@@ -27,8 +27,10 @@ from pipeline.data.generate import (
     REVERSED_BETWEEN_PHRASES,
     SQFT_NUMBERS,
     SQFT_PER_SQYD,
+    SQM_UNITS,
     SQYD_UNITS,
     STATES,
+    _bare_answer,
     _field_fragment,
     _fmt_money,
     _next_question_key,
@@ -36,6 +38,7 @@ from pipeline.data.generate import (
     _price_value,
     _range_phrase,
     _skip_label,
+    _sqm_to_sqft,
     _type_words,
     collision_key,
     eval_input_keys,
@@ -228,27 +231,59 @@ class TestMultiFieldShape:
 
 
 class TestBareFigureConventions:
-    """results.md: a bare budget is a ceiling, a bare size is exact.
+    """results.md: a bare figure carrying a unit is a ceiling, in both fields.
 
-    v3 generated max-only for both, so answering the size question with "32" trained
-    ``{"max": 32}`` -- a 32 sqft ceiling -- and every later correction stacked against it.
+    "130k sqft" and "half a million" both state what the client is shopping *under*.
+    Golding either as exact makes the search match only listings that hit the figure dead
+    on, which is not what the sentence says.
+
+    One exception, and it is the shape rather than the field that decides it: a naked
+    figure answering a direct question stays exact for size. v3's max-only turned an
+    answer of "32" into a 32 sqft ceiling that every later correction stacked against.
     """
 
     def _bounds(self, key: str, n: int = 900):
         random.seed(21)
         return [_field_fragment(key, PROPERTY_TYPES, PHRASINGS)[0] for _ in range(n)]
 
-    def test_a_bare_size_sets_both_bounds_equal(self):
-        exact = [b for b in self._bounds("size_sqft") if b.get("min") == b.get("max")]
-        assert exact, "no exact sizes generated; the convention is scored but never taught"
+    def _is_exact(self, bounds: dict) -> bool:
+        return bounds.get("min") is not None and bounds["min"] == bounds.get("max")
+
+    def test_a_bare_size_is_a_ceiling_never_an_exact_area(self):
+        for bounds in self._bounds("size_sqft"):
+            assert not self._is_exact(bounds), bounds
 
     def test_a_bare_budget_is_a_ceiling_never_an_exact_price(self):
         for bounds in self._bounds("price"):
-            assert not (bounds.get("min") is not None and bounds["min"] == bounds.get("max"))
+            assert not self._is_exact(bounds), bounds
 
-    def test_the_field_decides_what_bare_means(self):
-        assert SQFT_NUMBERS.bare_is_exact
+    def test_neither_field_treats_a_bare_figure_as_exact(self):
+        assert not SQFT_NUMBERS.bare_is_exact
         assert not PRICE_NUMBERS.bare_is_exact
+
+    def test_a_unitless_size_answer_is_still_exact(self):
+        """The v3 exception. Without this, "32" is a 32 sqft ceiling again."""
+        random.seed(21)
+        seen = 0
+        for _ in range(900):
+            bounds, text = _bare_answer("size_sqft", PROPERTY_TYPES, PHRASINGS)
+            if re.search(r"[a-z]", text, re.I):  # a unit survived into the text
+                continue
+            seen += 1
+            assert self._is_exact(bounds), f"{text!r} -> {bounds}"
+        assert seen, "no unitless size answers generated"
+
+    def test_a_size_answer_that_keeps_its_unit_is_a_ceiling(self):
+        """Otherwise one string carries two golds depending on the shape it landed in."""
+        random.seed(21)
+        seen = 0
+        for _ in range(900):
+            bounds, text = _bare_answer("size_sqft", PROPERTY_TYPES, PHRASINGS)
+            if not re.search(r"[a-z]", text, re.I):
+                continue
+            seen += 1
+            assert not self._is_exact(bounds), f"{text!r} -> {bounds}"
+        assert seen, "no unit-carrying size answers generated"
 
 
 class TestSubMillionMillionsNotation:
@@ -819,16 +854,21 @@ class TestSquareYards:
             if any(unit in phrase for unit in SQYD_UNITS):
                 assert len(re.findall(r"\d[\d,]*", phrase)) == 1, phrase
 
-    def test_a_bare_yard_answer_is_exact_like_any_bare_size(self):
+    def test_a_bare_yard_answer_is_a_ceiling_like_any_bare_size(self):
+        """The conversion is unchanged by the ceiling convention; only the bound shape is.
+
+        Worth pinning separately: a unit that has to be converted *and* a bound shape that
+        just moved are the two things most likely to be got wrong together.
+        """
         random.seed(12)
         seen = 0
         for _ in range(4000):
             bounds, fragment = _field_fragment("size_sqft", PROPERTY_TYPES, PHRASINGS)
             match = self.FIGURE.search(fragment)
-            if match and bounds.get("min") == bounds.get("max"):
+            if match and set(bounds) == {"max"}:
                 seen += 1
-                assert bounds["min"] == int(match.group(1).replace(",", "")) * SQFT_PER_SQYD
-        assert seen, "no exact yard answer generated"
+                assert bounds["max"] == int(match.group(1).replace(",", "")) * SQFT_PER_SQYD
+        assert seen, "no bare yard answer generated"
 
     def test_the_fenced_yard_distractor_still_exists(self):
         """Both senses stay in the set; the disambiguating signal is the figure.
@@ -841,6 +881,69 @@ class TestSquareYards:
     def test_money_is_untouched_by_the_solo_renderer(self):
         """``render_solo`` exists for size; price must render exactly as it always did."""
         assert PRICE_NUMBERS.render_solo is PRICE_NUMBERS.render
+
+
+class TestSquareMetres:
+    """The metric twin of the yard case: stated in metres, golded in square feet.
+
+    Unlike yards the factor is not an integer, so a metre-compatible value cannot be
+    recognised with a modulo -- values are generated from a round metre figure and
+    recovered by round-trip. A factor that drifted here would gold every metric size
+    wrong while every test that only reads sqft went on passing, which is exactly the
+    kind of silent mislabel this file exists to catch.
+    """
+
+    # Longest first, so "square meters" is not consumed as "square meter" with a stray "s".
+    _UNIT = "|".join(re.escape(u) for u in sorted(SQM_UNITS, key=len, reverse=True))
+    FIGURE = re.compile(rf"([\d,]+)\s+(?:{_UNIT})(?!\w)")
+
+    def _phrases(self, n: int = 6000, seed: int = 8):
+        random.seed(seed)
+        return [_range_phrase(SQFT_NUMBERS) for _ in range(n)]
+
+    def test_metres_are_generated_at_all(self):
+        stated = [p for _, p in self._phrases() if self.FIGURE.search(p)]
+        assert len(stated) >= 100, f"only {len(stated)} metre phrasings in 6000"
+
+    def test_every_unit_spelling_appears(self):
+        text = " || ".join(p for _, p in self._phrases(n=12000))
+        for unit in SQM_UNITS:
+            assert re.search(rf"\d\s+{re.escape(unit)}(?!\w)", text), f"{unit!r} never seen"
+
+    def test_a_stated_metre_figure_golds_square_feet(self):
+        """The whole point. "130,000 sq m" must gold 1399307, not 130000."""
+        checked = 0
+        for bounds, phrase in self._phrases():
+            match = self.FIGURE.search(phrase)
+            if not match:
+                continue
+            checked += 1
+            stated = _sqm_to_sqft(int(match.group(1).replace(",", "")))
+            assert stated in bounds.values(), f"{phrase!r} -> {bounds}"
+        assert checked, "no metre figure generated at all"
+
+    def test_a_metre_figure_is_never_fractional(self):
+        """A fractional metre figure would make the gold unreachable by any clean reading."""
+        for _, phrase in self._phrases():
+            match = self.FIGURE.search(phrase)
+            if match:
+                assert "." not in match.group(1), phrase
+
+    def test_metres_never_share_a_phrase_with_a_second_figure(self):
+        """Same reason as yards: each side of a range picks its unit independently.
+
+        The digit is required not to follow a letter, because "m2" carries one itself and
+        would otherwise read as a second figure in "not over 30,100 m2".
+        """
+        for _, phrase in self._phrases():
+            if self.FIGURE.search(phrase):
+                assert len(re.findall(r"(?<![a-zA-Z])\d[\d,]*", phrase)) == 1, phrase
+
+    def test_metres_and_yards_are_not_confused_for_each_other(self):
+        """A phrase states one unit family or the other, never both."""
+        for _, phrase in self._phrases():
+            if self.FIGURE.search(phrase):
+                assert not re.search(r"\d\s+(?:yard|gaj|sq\.? ?yd)", phrase), phrase
 
 
 class TestAmbiguousTypeWords:
