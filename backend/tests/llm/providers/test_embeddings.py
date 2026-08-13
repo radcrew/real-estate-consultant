@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
+from app.llm.providers.bedrock_embeddings import bedrock_embeddings_provider
 from app.llm.providers.embeddings import (
     embed,
     resolve_embeddings_provider,
@@ -15,10 +16,18 @@ from app.llm.providers.huggingface import huggingface_provider
 from app.llm.providers.openrouter import openrouter_provider
 
 
-def _config(*, openrouter_api_key: str = "", hf_token: str = "") -> MagicMock:
+def _config(
+    *,
+    openrouter_api_key: str = "",
+    hf_token: str = "",
+    aws_region: str = "",
+) -> MagicMock:
+    # Every credential must be set explicitly: a bare MagicMock attribute is truthy,
+    # so an unset field would look configured and quietly select the wrong provider.
     mock = MagicMock()
     mock.openrouter_api_key = openrouter_api_key
     mock.hf_token = hf_token
+    mock.aws_region = aws_region
     return mock
 
 
@@ -35,6 +44,15 @@ class TestResolveEmbeddingsProviderName:
         config = _config(openrouter_api_key="or-key")
         assert resolve_embeddings_provider_name(config=config) == "openrouter"
 
+    def test_bedrock_when_only_aws_region(self):
+        config = _config(aws_region="us-east-1")
+        assert resolve_embeddings_provider_name(config=config) == "bedrock"
+
+    def test_bedrock_does_not_displace_huggingface(self):
+        """Bedrock bills per token, so a configured region must not silently take over."""
+        config = _config(hf_token="hf-key", aws_region="us-east-1")
+        assert resolve_embeddings_provider_name(config=config) == "huggingface"
+
     def test_none_when_no_keys(self):
         config = _config()
         assert resolve_embeddings_provider_name(config=config) is None
@@ -48,6 +66,10 @@ class TestResolveEmbeddingsProvider:
     def test_returns_openrouter_provider(self):
         config = _config(openrouter_api_key="or-key")
         assert resolve_embeddings_provider(config=config) is openrouter_provider
+
+    def test_returns_bedrock_provider(self):
+        config = _config(aws_region="us-east-1")
+        assert resolve_embeddings_provider(config=config) is bedrock_embeddings_provider
 
     def test_raises_embeddings_unavailable_when_no_keys(self):
         config = _config()

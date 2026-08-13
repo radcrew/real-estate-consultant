@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 from pydantic import BaseModel
 
+from app.llm.providers.bedrock_chat import bedrock_chat_provider
 from app.llm.providers.chat import (
     generate_structured_output,
     resolve_chat_provider,
@@ -20,10 +21,18 @@ class _Schema(BaseModel):
     text: str
 
 
-def _config(*, openrouter_api_key: str = "", hf_token: str = "") -> MagicMock:
+def _config(
+    *,
+    openrouter_api_key: str = "",
+    hf_token: str = "",
+    aws_region: str = "",
+) -> MagicMock:
+    # Every credential must be set explicitly: a bare MagicMock attribute is truthy,
+    # so an unset field would look configured and quietly select the wrong provider.
     mock = MagicMock()
     mock.openrouter_api_key = openrouter_api_key
     mock.hf_token = hf_token
+    mock.aws_region = aws_region
     return mock
 
 
@@ -40,6 +49,19 @@ class TestResolveChatProviderName:
         config = _config(openrouter_api_key="or-key")
         assert resolve_chat_provider_name(config=config) == "openrouter"
 
+    def test_bedrock_when_only_aws_region(self):
+        config = _config(aws_region="us-east-1")
+        assert resolve_chat_provider_name(config=config) == "bedrock"
+
+    def test_bedrock_does_not_displace_openrouter(self):
+        """Bedrock bills per token, so a configured region must not silently take over."""
+        config = _config(openrouter_api_key="or-key", aws_region="us-east-1")
+        assert resolve_chat_provider_name(config=config) == "openrouter"
+
+    def test_bedrock_does_not_displace_huggingface(self):
+        config = _config(hf_token="hf-key", aws_region="us-east-1")
+        assert resolve_chat_provider_name(config=config) == "huggingface"
+
     def test_none_when_no_keys(self):
         config = _config()
         assert resolve_chat_provider_name(config=config) is None
@@ -53,6 +75,10 @@ class TestResolveChatProvider:
     def test_returns_huggingface_provider(self):
         config = _config(hf_token="hf-key")
         assert resolve_chat_provider(config=config) is huggingface_provider
+
+    def test_returns_bedrock_provider(self):
+        config = _config(aws_region="us-east-1")
+        assert resolve_chat_provider(config=config) is bedrock_chat_provider
 
     def test_raises_ai_unavailable_when_no_keys(self):
         config = _config()

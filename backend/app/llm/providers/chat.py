@@ -7,19 +7,27 @@ from typing import Any, Literal
 from app.core.config import Settings
 from app.core.config import settings as app_settings
 from app.llm.providers.base import ChatProvider, StructuredOutputT
+from app.llm.providers.bedrock_chat import bedrock_chat_provider
 from app.llm.providers.exceptions import raise_ai_unavailable
 from app.llm.providers.huggingface import huggingface_provider
 from app.llm.providers.openrouter import openrouter_provider
 
-ChatProviderName = Literal["openrouter", "huggingface"]
+ChatProviderName = Literal["openrouter", "huggingface", "bedrock"]
 
 
 def resolve_chat_provider_name(*, config: Settings) -> ChatProviderName | None:
-    """Return the configured chat provider name, or None when no LLM keys are set."""
+    """Return the configured chat provider name, or None when no LLM keys are set.
+
+    Bedrock is checked last on purpose: it bills per token from the first request,
+    so merely configuring a region must never silently displace a cheaper provider
+    that is already working.
+    """
     if config.openrouter_api_key.strip():
         return "openrouter"
     if config.hf_token.strip():
         return "huggingface"
+    if config.aws_region.strip():
+        return "bedrock"
     return None
 
 
@@ -31,6 +39,8 @@ def resolve_chat_provider(*, config: Settings | None = None) -> ChatProvider:
         return openrouter_provider
     if provider_name == "huggingface":
         return huggingface_provider
+    if provider_name == "bedrock":
+        return bedrock_chat_provider
     raise_ai_unavailable()
 
 
