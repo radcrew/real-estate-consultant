@@ -114,17 +114,21 @@ async def set_property_embedding(
     )
 
 
-async def list_property_ids_needing_embedding(
+async def list_properties_needing_embedding(
     session: AsyncSession,
     *,
     model: str,
-    limit: int = 500,
-) -> list[UUID]:
-    """Ids with no embedding, or one produced by a superseded model."""
+    limit: int = 100,
+) -> list[dict[str, Any]]:
+    """Rows with no embedding, or one produced by a superseded model.
+
+    Returns full rows rather than ids because the caller has to rebuild the listing
+    text to embed it; fetching ids first would only add a round trip per batch.
+    """
     if limit <= 0:
         return []
     query = (
-        select(PropertyRow.id)
+        select(PropertyRow)
         .where(
             or_(
                 PropertyRow.embedding.is_(None),
@@ -135,7 +139,7 @@ async def list_property_ids_needing_embedding(
         .limit(limit)
     )
     result = await session.execute(query)
-    return list(result.scalars().all())
+    return [property_row_to_search_dict(row) for row in result.scalars().all()]
 
 
 async def list_similar_by_embedding(

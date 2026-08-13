@@ -20,7 +20,11 @@ from app.llm.providers.base import ChatProvider, EmbeddingsProvider
 from app.llm.providers.bedrock_chat import bedrock_chat_provider
 from app.llm.providers.bedrock_embeddings import bedrock_embeddings_provider
 from app.llm.providers.chat import resolve_chat_provider
-from app.llm.providers.embeddings import resolve_embeddings_provider
+from app.llm.providers.embeddings import (
+    resolve_embeddings_provider,
+    resolve_embeddings_provider_name,
+)
+from app.llm.providers.exceptions import raise_embeddings_unavailable
 from app.llm.providers.huggingface import huggingface_provider
 from app.llm.providers.openrouter import openrouter_provider
 from app.utils.exceptions import raise_service_unavailable
@@ -49,6 +53,13 @@ EMBEDDINGS_PROVIDERS: dict[str, EmbeddingsProvider] = {
     "huggingface": huggingface_provider,
     "openrouter": openrouter_provider,
     "bedrock": bedrock_embeddings_provider,
+}
+
+# Which Settings field names the model for each provider, for embedding provenance.
+EMBEDDING_MODEL_SETTINGS: dict[str, str] = {
+    "bedrock": "bedrock_embedding_model",
+    "huggingface": "hf_embedding_model",
+    "openrouter": "openrouter_embedding_model",
 }
 
 TASK_ROUTE_SETTINGS: dict[LlmTask, str] = {
@@ -103,13 +114,33 @@ def resolve_chat_provider_for_task(
     return _pinned(CHAT_PROVIDERS, name, setting=setting)
 
 
+def resolve_embeddings_route_name(*, config: Settings) -> str:
+    """Return the pinned embeddings provider name, or ``"auto"``."""
+    return str(config.llm_route_embeddings or AUTO_ROUTE).strip().lower() or AUTO_ROUTE
+
+
 def resolve_embeddings_provider_for_route(
     *,
     config: Settings | None = None,
 ) -> EmbeddingsProvider:
     """Return the embeddings provider, honouring ``llm_route_embeddings`` or auto."""
     active_config = config or app_settings
-    name = str(active_config.llm_route_embeddings or AUTO_ROUTE).strip().lower() or AUTO_ROUTE
+    name = resolve_embeddings_route_name(config=active_config)
     if name == AUTO_ROUTE:
         return resolve_embeddings_provider(config=active_config)
     return _pinned(EMBEDDINGS_PROVIDERS, name, setting="llm_route_embeddings")
+
+
+def resolve_embeddings_model_id(*, config: Settings | None = None) -> str:
+    """Return ``provider:model`` for the active embeddings route.
+
+    Stored beside each vector so rows produced by a superseded model stay findable —
+    embeddings are only comparable against others from the same model.
+    """
+    active_config = config or app_settings
+    name = resolve_embeddings_route_name(config=active_config)
+    if name == AUTO_ROUTE:
+        name = resolve_embeddings_provider_name(config=active_config) or ""
+    if name not in EMBEDDING_MODEL_SETTINGS:
+        raise_embeddings_unavailable()
+    return f"{name}:{getattr(active_config, EMBEDDING_MODEL_SETTINGS[name])}"

@@ -11,7 +11,7 @@ from fastapi import HTTPException
 
 from app.db.property_row import EMBEDDING_DIMENSIONS
 from app.repositories.properties import (
-    list_property_ids_needing_embedding,
+    list_properties_needing_embedding,
     list_similar_by_embedding,
     set_property_embedding,
 )
@@ -88,19 +88,25 @@ class TestSetPropertyEmbedding:
         assert "embedded_at" in compiled
 
 
-class TestListPropertyIdsNeedingEmbedding:
+class TestListPropertiesNeedingEmbedding:
     async def test_zero_limit_short_circuits(self):
         session = _session_returning([])
-        assert await list_property_ids_needing_embedding(session, model="m", limit=0) == []
+        assert await list_properties_needing_embedding(session, model="m", limit=0) == []
         session.execute.assert_not_awaited()
 
     async def test_selects_null_or_superseded_model(self):
-        ids = [uuid4(), uuid4()]
-        session = _session_returning(ids)
-        assert await list_property_ids_needing_embedding(session, model="m") == ids
+        session = _session_returning([_row(city="Dallas")])
+        rows = await list_properties_needing_embedding(session, model="m")
+        assert [row["city"] for row in rows] == ["Dallas"]
         compiled = str(session.execute.await_args.args[0])
         assert "embedding IS NULL" in compiled
         assert "IS DISTINCT FROM" in compiled
+
+    async def test_returns_rows_not_ids(self):
+        """The caller rebuilds listing text, so ids alone would force a second query."""
+        session = _session_returning([_row()])
+        rows = await list_properties_needing_embedding(session, model="m")
+        assert "description" in rows[0]
 
 
 class TestListSimilarByEmbedding:
