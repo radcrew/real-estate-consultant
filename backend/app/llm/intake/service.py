@@ -21,6 +21,7 @@ from app.llm.providers.prompts import (
     OPENING_QUESTION_OPTIONS_HINT,
     OPENING_QUESTION_SYSTEM_PROMPT_BASE,
 )
+from app.llm.providers.routing import LlmTask
 from app.repositories.questions import map_question_to_model
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.schemas.llm_intake_parse import LlmOpeningQuestionOutput, LlmParseModelOutput
@@ -67,6 +68,7 @@ async def parse_user_input(
         response_format=LlmParseModelOutput,
         temperature=0.1,
         max_tokens=800,
+        task=LlmTask.INTAKE_PARSE,
     )
     return _build_intake_parse_result(
         parsed_output=parsed_output,
@@ -105,6 +107,7 @@ async def generate_opening_question(
         response_format=LlmOpeningQuestionOutput,
         temperature=0.35,
         max_tokens=200,
+        task=LlmTask.OPENING_QUESTION,
     )
     text = response_output.text
     if not text:

@@ -52,6 +52,10 @@ async def embed(
     texts: list[str],
     config: Settings | None = None,
 ) -> list[list[float]]:
-    """Embed texts via the configured provider (Hugging Face preferred when both keys set)."""
-    provider = resolve_embeddings_provider(config=config)
+    """Embed texts via the routed provider, honouring ``llm_route_embeddings``."""
+    # Imported here, not at module scope: routing imports this module for its "auto"
+    # fallback, so a top-level import would be circular.
+    from app.llm.providers.routing import resolve_embeddings_provider_for_route
+
+    provider = resolve_embeddings_provider_for_route(config=config)
     return await provider.embed(texts=texts)

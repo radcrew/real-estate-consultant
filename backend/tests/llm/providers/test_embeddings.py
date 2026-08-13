@@ -14,6 +14,7 @@ from app.llm.providers.embeddings import (
 )
 from app.llm.providers.huggingface import huggingface_provider
 from app.llm.providers.openrouter import openrouter_provider
+from app.llm.providers.routing import AUTO_ROUTE
 
 
 def _config(
@@ -22,12 +23,13 @@ def _config(
     hf_token: str = "",
     aws_region: str = "",
 ) -> MagicMock:
-    # Every credential must be set explicitly: a bare MagicMock attribute is truthy,
-    # so an unset field would look configured and quietly select the wrong provider.
+    # Every field must be set explicitly: a bare MagicMock attribute is truthy, so an
+    # unset credential would look configured and an unset route would look pinned.
     mock = MagicMock()
     mock.openrouter_api_key = openrouter_api_key
     mock.hf_token = hf_token
     mock.aws_region = aws_region
+    mock.llm_route_embeddings = AUTO_ROUTE
     return mock
 
 
@@ -84,7 +86,7 @@ class TestEmbed:
         vectors = [[0.1, 0.2], [0.3, 0.4]]
         config = _config(hf_token="hf-key")
         with patch(
-            "app.llm.providers.embeddings.resolve_embeddings_provider",
+            "app.llm.providers.routing.resolve_embeddings_provider_for_route",
             return_value=MagicMock(embed=AsyncMock(return_value=vectors)),
         ) as mock_resolve:
             result = await embed(texts=["a", "b"], config=config)

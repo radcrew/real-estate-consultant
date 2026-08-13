@@ -8,6 +8,7 @@ from app.llm.outreach.exceptions import raise_outreach_email_empty
 from app.llm.outreach.prompts import OUTREACH_EMAIL_SYSTEM_PROMPT, build_outreach_user_message
 from app.llm.outreach.schema import OutreachDraftEmailLLM
 from app.llm.providers.chat import generate_structured_output
+from app.llm.providers.routing import LlmTask
 
 
 async def generate_broker_outreach_draft(
@@ -31,6 +32,7 @@ async def generate_broker_outreach_draft(
         response_format=OutreachDraftEmailLLM,
         temperature=0.35,
         max_tokens=2048,
+        task=LlmTask.OUTREACH_DRAFT,
     )
     text = parsed.draft_email.strip()
     if not text:

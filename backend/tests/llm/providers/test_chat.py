@@ -15,6 +15,7 @@ from app.llm.providers.chat import (
 )
 from app.llm.providers.huggingface import huggingface_provider
 from app.llm.providers.openrouter import openrouter_provider
+from app.llm.providers.routing import AUTO_ROUTE, TASK_ROUTE_SETTINGS, LlmTask
 
 
 class _Schema(BaseModel):
@@ -27,12 +28,15 @@ def _config(
     hf_token: str = "",
     aws_region: str = "",
 ) -> MagicMock:
-    # Every credential must be set explicitly: a bare MagicMock attribute is truthy,
-    # so an unset field would look configured and quietly select the wrong provider.
+    # Every field must be set explicitly: a bare MagicMock attribute is truthy, so an
+    # unset credential would look configured and an unset route would look pinned.
     mock = MagicMock()
     mock.openrouter_api_key = openrouter_api_key
     mock.hf_token = hf_token
     mock.aws_region = aws_region
+    mock.llm_route_default = AUTO_ROUTE
+    for setting in TASK_ROUTE_SETTINGS.values():
+        setattr(mock, setting, AUTO_ROUTE)
     return mock
 
 
@@ -93,7 +97,7 @@ class TestGenerateStructuredOutput:
         parsed = _Schema(text="ok")
         config = _config(openrouter_api_key="or-key")
         with patch(
-            "app.llm.providers.chat.resolve_chat_provider",
+            "app.llm.providers.routing.resolve_chat_provider_for_task",
             return_value=MagicMock(
                 generate_structured_output=AsyncMock(return_value=parsed),
             ),
@@ -105,8 +109,27 @@ class TestGenerateStructuredOutput:
                 max_tokens=50,
                 config=config,
             )
-        mock_resolve.assert_called_once_with(config=config)
+        mock_resolve.assert_called_once_with(task=None, config=config)
         assert result.text == "ok"
+
+    async def test_forwards_task_to_the_router(self):
+        parsed = _Schema(text="ok")
+        config = _config(openrouter_api_key="or-key")
+        with patch(
+            "app.llm.providers.routing.resolve_chat_provider_for_task",
+            return_value=MagicMock(
+                generate_structured_output=AsyncMock(return_value=parsed),
+            ),
+        ) as mock_resolve:
+            await generate_structured_output(
+                messages=[{"role": "user", "content": "hi"}],
+                response_format=_Schema,
+                temperature=0.1,
+                max_tokens=50,
+                config=config,
+                task=LlmTask.INTAKE_PARSE,
+            )
+        mock_resolve.assert_called_once_with(task=LlmTask.INTAKE_PARSE, config=config)
 
     async def test_raises_ai_unavailable_without_keys(self):
         config = _config()
