@@ -92,7 +92,7 @@ Smart Chat, intake parsing, fit explanations, and outreach drafts all call one c
 
 Optional tuning: `OPENROUTER_CHAT_MODEL`, `OPENROUTER_BASE_URL`, `HF_MODEL`, `HF_BASE_URL`, and per-provider cost telemetry vars (see `.env.example`). Hugging Face chat uses JSON-object responses validated locally (avoids flaky grammar-constrained structured outputs on the Inference Providers router).
 
-### Embeddings (OpenRouter + Hugging Face)
+### Embeddings (Bedrock + OpenRouter + Hugging Face)
 
 `app.llm.providers.embeddings` uses a **separate** priority from chat so both keys can be set with chat on OpenRouter and embeddings on Hugging Face:
 
@@ -100,11 +100,29 @@ Optional tuning: `OPENROUTER_CHAT_MODEL`, `OPENROUTER_BASE_URL`, `HF_MODEL`, `HF
 |----------|---------------------|
 | `HF_TOKEN` | **Hugging Face** (wins even if `OPENROUTER_API_KEY` is also set) |
 | `OPENROUTER_API_KEY` only | **OpenRouter** |
-| neither | **503** with `"Embeddings unavailable"` |
+| `AWS_REGION` only | **Bedrock** — checked last, so a configured region never displaces a working provider |
+| none | **503** with `"Embeddings unavailable"` |
 
-Models: `HF_EMBEDDING_MODEL` (default `sentence-transformers/all-MiniLM-L6-v2`), `OPENROUTER_EMBEDDING_MODEL` (default `openai/text-embedding-3-small`). Hugging Face embeddings use the Inference Providers **feature-extraction** pipeline (the OpenAI-compatible `…/v1` router is chat-only).
+`LLM_ROUTE_EMBEDDINGS` overrides that order (`bedrock` / `huggingface` / `openrouter`, default `auto`). Because Bedrock is checked last, **an explicit pin is the only way to select it while `HF_TOKEN` is set**.
 
-**First consumer:** `GET /api/v1/listings/{property_id}/similar` — loads a small candidate pool (same state/city/type preferred), embeds seed + candidates via `embed()`, ranks by cosine similarity, returns scores on the same 0–100 scale as search `match_score`. Requires an embeddings key (`HF_TOKEN` preferred). No stored vectors / pgvector yet.
+Models: `BEDROCK_EMBEDDING_MODEL` (default `cohere.embed-english-v3`), `HF_EMBEDDING_MODEL` (default `sentence-transformers/all-MiniLM-L6-v2`), `OPENROUTER_EMBEDDING_MODEL` (default `openai/text-embedding-3-small`). Hugging Face embeddings use the Inference Providers **feature-extraction** pipeline (the OpenAI-compatible `…/v1` router is chat-only).
+
+### Listing embeddings (pgvector)
+
+`public.properties.embedding` is a **`vector(1024)`** column with an HNSW cosine index (migration `20260813_properties_embedding.sql`). Listings are embedded **once**, not per request.
+
+⚠️ The width is fixed at 1024 for Cohere Embed v3, so **writing embeddings requires `LLM_ROUTE_EMBEDDINGS=bedrock`** — the 384-dim Hugging Face default cannot populate the column, and a mismatch fails loudly rather than corrupting it.
+
+Populate and keep current:
+
+```bash
+python scripts/backfill_embeddings.py                 # drain the backlog
+python scripts/backfill_embeddings.py --max-batches 2 # bounded run
+```
+
+It selects rows with no vector *or* one from a superseded model, so new listings and a model change are the same case. Each batch commits before the next is selected, so an interrupted run resumes. `.github/workflows/embed-listings.yml` runs it every 30 minutes; listings are written by the ingestion microservice, which has no LLM providers, so embedding is a pull schedule rather than part of the ingest path.
+
+**Consumer:** `GET /api/v1/listings/{property_id}/similar` — embeds **only the seed**, then runs an indexed k-NN query scoped to the seed's state (widening once if that returns short), returning scores on the same 0–100 scale as search `match_score`. Rows without an embedding are excluded, so run the backfill before relying on it.
 
 ## Dataset
 
