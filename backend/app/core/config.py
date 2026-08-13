@@ -86,6 +86,19 @@ class Settings(BaseSettings):
     bedrock_input_cost_per_1m: float = 0.0
     bedrock_output_cost_per_1m: float = 0.0
 
+    # Per-call-site provider routing (see app/llm/providers/routing.py). "auto" keeps the
+    # key-presence order in providers/chat.py, so routing is opt-in and metered providers
+    # are never selected by accident. Any other value pins that path to one provider.
+    llm_route_intake_parse: str = "auto"
+    llm_route_opening_question: str = "auto"
+    llm_route_fit_explanation: str = "auto"
+    llm_route_outreach_draft: str = "auto"
+    llm_route_default: str = "auto"
+    # Embeddings has a single call site, so one pin rather than a per-task table. An
+    # explicit pin is the only way to reach Bedrock while HF_TOKEN is set, since
+    # key-presence order deliberately checks Bedrock last.
+    llm_route_embeddings: str = "auto"
+
     log_level: str = "INFO"
 
     # SolarWinds Observability bulk HTTP log ingestion. Leave blank to disable.
