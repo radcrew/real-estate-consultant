@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import case, func, literal, or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.property_row import EMBEDDING_DIMENSIONS, PropertyRow
@@ -80,58 +81,6 @@ async def get_property_by_id(session: AsyncSession, property_id: UUID) -> dict[s
     return property_row_to_search_dict(row)
 
 
-async def list_similar_candidate_rows(
-    session: AsyncSession,
-    *,
-    seed_id: UUID,
-    state: str | None,
-    city: str | None,
-    property_type: str | None,
-    limit: int = 40,
-) -> list[dict[str, Any]]:
-    """Load a bounded candidate pool for embedding similarity ranking.
-
-    Prefers same state / city / property_type as the seed listing, then fills with
-    other rows. Excludes the seed id. Ranking by embedding cosine happens in Python.
-    """
-    if limit <= 0:
-        return []
-
-    state_key = state.strip().lower() if isinstance(state, str) and state.strip() else None
-    city_key = city.strip().lower() if isinstance(city, str) and city.strip() else None
-    type_key = (
-        property_type.strip().lower()
-        if isinstance(property_type, str) and property_type.strip()
-        else None
-    )
-
-    preference = literal(0)
-    if state_key:
-        preference = preference + case(
-            (func.lower(func.coalesce(PropertyRow.state, "")) == state_key, 4),
-            else_=0,
-        )
-    if city_key:
-        preference = preference + case(
-            (func.lower(func.coalesce(PropertyRow.city, "")) == city_key, 2),
-            else_=0,
-        )
-    if type_key:
-        preference = preference + case(
-            (func.lower(func.coalesce(PropertyRow.property_type, "")) == type_key, 1),
-            else_=0,
-        )
-
-    query = (
-        select(PropertyRow)
-        .where(PropertyRow.id != seed_id)
-        .order_by(preference.desc(), PropertyRow.id)
-        .limit(limit)
-    )
-    result = await session.execute(query)
-    return [property_row_to_search_dict(row) for row in result.scalars().all()]
-
-
 def _require_embedding_width(embedding: list[float]) -> None:
     """Reject a wrong-width vector loudly.
 
@@ -197,13 +146,15 @@ async def list_similar_by_embedding(
     state: str | None = None,
     city: str | None = None,
     property_type: str | None = None,
+    exclude_ids: Collection[UUID] | None = None,
     limit: int = 6,
 ) -> list[tuple[dict[str, Any], float]]:
     """Nearest neighbours by cosine distance, as ``(row, similarity 0–1)``.
 
     Any filter left as ``None`` is not applied, so the caller decides how tightly to
-    scope locality. Rows without an embedding are excluded — they would otherwise sort
-    arbitrarily rather than being absent.
+    scope locality. ``exclude_ids`` lets a caller widen its filters and top up without
+    repeating rows it already has. Rows without an embedding are excluded — they would
+    otherwise sort arbitrarily rather than being absent.
     """
     if limit <= 0:
         return []
@@ -214,6 +165,8 @@ async def list_similar_by_embedding(
         PropertyRow.id != seed_id,
         PropertyRow.embedding.is_not(None),
     ]
+    if exclude_ids:
+        conditions.append(PropertyRow.id.not_in(list(exclude_ids)))
     for column, value in (
         (PropertyRow.state, state),
         (PropertyRow.city, city),

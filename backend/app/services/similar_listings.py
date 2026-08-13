@@ -1,4 +1,4 @@
-"""Similar-listings orchestration: embed seed + candidates, rank by cosine similarity."""
+"""Similar-listings orchestration: embed the seed, rank by indexed cosine distance."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.similarity import cosine_similarity, similarity_to_match_score
+from app.domain.similarity import similarity_to_match_score
 from app.llm.fit.prompts import format_listing_block_for_fit
 from app.llm.providers.embeddings import embed
-from app.repositories.properties import get_property_by_id, list_similar_candidate_rows
+from app.repositories.properties import get_property_by_id, list_similar_by_embedding
 
 DEFAULT_RESULT_LIMIT = 6
-DEFAULT_CANDIDATE_POOL = 40
+MAX_RESULT_LIMIT = 20
 
 
 async def find_similar_listings(
@@ -21,9 +21,12 @@ async def find_similar_listings(
     property_id: UUID,
     *,
     limit: int = DEFAULT_RESULT_LIMIT,
-    candidate_pool: int = DEFAULT_CANDIDATE_POOL,
 ) -> list[tuple[dict[str, Any], float]] | None:
     """Return ranked similar listings as ``(row, match_score 0–100)``, or ``None`` if seed missing.
+
+    Listings are embedded once at ingest, so only the seed is embedded here — one
+    provider call regardless of how many candidates exist. Ranking is an indexed k-NN
+    query over the whole corpus rather than a Python scan of a pre-filtered pool.
 
     Raises the embeddings provider's HTTP errors when no LLM keys are configured.
     """
@@ -31,36 +34,34 @@ async def find_similar_listings(
     if seed is None:
         return None
 
-    result_limit = max(0, min(limit, 20))
-    pool_limit = max(result_limit, min(candidate_pool, 100))
+    result_limit = max(0, min(limit, MAX_RESULT_LIMIT))
     if result_limit == 0:
         return []
 
-    candidates = await list_similar_candidate_rows(
+    vectors = await embed(texts=[format_listing_block_for_fit(seed)])
+    if not vectors:
+        return []
+    seed_vector = vectors[0]
+
+    state = seed.get("state") if isinstance(seed.get("state"), str) else None
+    ranked = await list_similar_by_embedding(
         session,
         seed_id=property_id,
-        state=seed.get("state") if isinstance(seed.get("state"), str) else None,
-        city=seed.get("city") if isinstance(seed.get("city"), str) else None,
-        property_type=(
-            seed.get("property_type") if isinstance(seed.get("property_type"), str) else None
-        ),
-        limit=pool_limit,
+        embedding=seed_vector,
+        state=state,
+        limit=result_limit,
     )
-    if not candidates:
-        return []
 
-    texts = [format_listing_block_for_fit(seed)] + [
-        format_listing_block_for_fit(row) for row in candidates
-    ]
-    vectors = await embed(texts=texts)
-    if len(vectors) != len(texts):
-        return []
+    # Sparse region: the previous implementation preferred same-state rows but filled the
+    # pool from elsewhere rather than returning short, so widen once to keep result counts
+    # the same. Same-state matches still rank first, because they were selected first.
+    if state and len(ranked) < result_limit:
+        ranked += await list_similar_by_embedding(
+            session,
+            seed_id=property_id,
+            embedding=seed_vector,
+            exclude_ids=[row["id"] for row, _ in ranked],
+            limit=result_limit - len(ranked),
+        )
 
-    seed_vector = vectors[0]
-    ranked: list[tuple[dict[str, Any], float]] = []
-    for row, vector in zip(candidates, vectors[1:], strict=True):
-        score = similarity_to_match_score(cosine_similarity(seed_vector, vector))
-        ranked.append((row, score))
-
-    ranked.sort(key=lambda item: (-item[1], str(item[0].get("id", ""))))
-    return ranked[:result_limit]
+    return [(row, similarity_to_match_score(similarity)) for row, similarity in ranked]
