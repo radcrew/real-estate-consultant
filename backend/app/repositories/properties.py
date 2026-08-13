@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import case, func, literal, select
+from sqlalchemy import case, func, literal, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.property_row import PropertyRow
+from app.db.property_row import EMBEDDING_DIMENSIONS, PropertyRow
 from app.domain.search_sql import (
     component_score_exprs,
     match_score_expr,
@@ -17,6 +17,7 @@ from app.domain.search_sql import (
 )
 from app.repositories.questions import list_question_key_metadata
 from app.schemas.search import CriteriaFieldItem
+from app.utils.exceptions import raise_bad_gateway
 from supabase import AsyncClient
 
 
@@ -129,6 +130,110 @@ async def list_similar_candidate_rows(
     )
     result = await session.execute(query)
     return [property_row_to_search_dict(row) for row in result.scalars().all()]
+
+
+def _require_embedding_width(embedding: list[float]) -> None:
+    """Reject a wrong-width vector loudly.
+
+    The column is fixed at ``EMBEDDING_DIMENSIONS`` and every stored vector must come
+    from the same model, so a mismatch means the embeddings route is pointed at a model
+    this schema cannot hold — not something to coerce or silently skip.
+    """
+    if len(embedding) != EMBEDDING_DIMENSIONS:
+        raise_bad_gateway(
+            "The embedding model does not match the configured vector size.",
+        )
+
+
+async def set_property_embedding(
+    session: AsyncSession,
+    *,
+    property_id: UUID,
+    embedding: list[float],
+    model: str,
+) -> None:
+    """Store a listing's embedding, recording which model produced it."""
+    _require_embedding_width(embedding)
+    await session.execute(
+        update(PropertyRow)
+        .where(PropertyRow.id == property_id)
+        .values(
+            embedding=embedding,
+            embedding_model=model,
+            embedded_at=func.now(),
+        )
+    )
+
+
+async def list_property_ids_needing_embedding(
+    session: AsyncSession,
+    *,
+    model: str,
+    limit: int = 500,
+) -> list[UUID]:
+    """Ids with no embedding, or one produced by a superseded model."""
+    if limit <= 0:
+        return []
+    query = (
+        select(PropertyRow.id)
+        .where(
+            or_(
+                PropertyRow.embedding.is_(None),
+                PropertyRow.embedding_model.is_distinct_from(model),
+            )
+        )
+        .order_by(PropertyRow.id)
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    return list(result.scalars().all())
+
+
+async def list_similar_by_embedding(
+    session: AsyncSession,
+    *,
+    seed_id: UUID,
+    embedding: list[float],
+    state: str | None = None,
+    city: str | None = None,
+    property_type: str | None = None,
+    limit: int = 6,
+) -> list[tuple[dict[str, Any], float]]:
+    """Nearest neighbours by cosine distance, as ``(row, similarity 0–1)``.
+
+    Any filter left as ``None`` is not applied, so the caller decides how tightly to
+    scope locality. Rows without an embedding are excluded — they would otherwise sort
+    arbitrarily rather than being absent.
+    """
+    if limit <= 0:
+        return []
+    _require_embedding_width(embedding)
+
+    distance = PropertyRow.embedding.cosine_distance(embedding).label("distance")
+    conditions = [
+        PropertyRow.id != seed_id,
+        PropertyRow.embedding.is_not(None),
+    ]
+    for column, value in (
+        (PropertyRow.state, state),
+        (PropertyRow.city, city),
+        (PropertyRow.property_type, property_type),
+    ):
+        if isinstance(value, str) and value.strip():
+            conditions.append(func.lower(func.coalesce(column, "")) == value.strip().lower())
+
+    query = (
+        select(PropertyRow, distance)
+        .where(*conditions)
+        .order_by(distance.asc(), PropertyRow.id)
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    return [
+        # Cosine distance is 1 - cosine similarity; the caller scores on similarity.
+        (property_row_to_search_dict(row), 1.0 - float(value or 0.0))
+        for row, value in result.all()
+    ]
 
 
 async def get_property_match_breakdown(
