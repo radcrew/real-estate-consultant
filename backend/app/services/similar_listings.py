@@ -54,7 +54,7 @@ async def find_similar_listings(
 
     # Sparse region: the previous implementation preferred same-state rows but filled the
     # pool from elsewhere rather than returning short, so widen once to keep result counts
-    # the same. Same-state matches still rank first, because they were selected first.
+    # the same.
     if state and len(ranked) < result_limit:
         ranked += await list_similar_by_embedding(
             session,
@@ -64,4 +64,9 @@ async def find_similar_listings(
             limit=result_limit - len(ranked),
         )
 
-    return [(row, similarity_to_match_score(similarity)) for row, similarity in ranked]
+    scored = [(row, similarity_to_match_score(similarity)) for row, similarity in ranked]
+    # State scopes which rows are eligible, not how they rank: the two queries are each
+    # sorted, but concatenating them can put a weaker in-state match above a stronger
+    # out-of-state one. Sort by score so the list a user sees never goes back up.
+    scored.sort(key=lambda item: (-item[1], str(item[0].get("id", ""))))
+    return scored

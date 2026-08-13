@@ -163,6 +163,38 @@ class TestFindSimilarListings:
         assert result is not None
         assert [row["id"] for row, _ in result] == [in_state, out_of_state]
 
+    async def test_widened_results_are_sorted_by_score(self):
+        """Concatenating two sorted queries can put a weaker in-state match on top."""
+        seed_id = uuid4()
+        weak_in_state, strong_out_of_state = uuid4(), uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
+            ),
+            patch(
+                "app.services.similar_listings.embed",
+                new_callable=AsyncMock,
+                return_value=[[0.1, 0.2]],
+            ),
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+                side_effect=[
+                    [(_row(weak_in_state), 0.40)],
+                    [(_row(strong_out_of_state, state="OH"), 0.95)],
+                ],
+            ),
+        ):
+            result = await find_similar_listings(db, seed_id, limit=2)
+
+        assert result is not None
+        assert [row["id"] for row, _ in result] == [strong_out_of_state, weak_in_state]
+        scores = [score for _, score in result]
+        assert scores == sorted(scores, reverse=True)
+
     async def test_does_not_widen_when_full(self):
         seed_id = uuid4()
         db = AsyncMock()

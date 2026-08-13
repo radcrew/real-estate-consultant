@@ -247,8 +247,8 @@ less headroom on unusual input than a large model.
 │ Qwen 0.5B ││ claude-    │  │ llama-3.1- ││ MiniLM    │ │ cohere.embed-    │
 │ CPU, GGUF ││ sonnet-5   │  │ 8b         ││ 384-dim   │ │ english-v3       │
 └───────────┘└────────────┘  └────────────┘└───────────┘ └──────────────────┘
- INTAKE PARSE  built, not      3 GENERAL     current       EMBEDDINGS
-   (phase E)    routed          PATHS        embeddings     (phase D)
+ INTAKE PARSE  built, not      3 GENERAL     current       built, needs
+  (phase D)     routed          PATHS        embeddings     the route (C)
 ```
 
 ### New/changed files
@@ -263,8 +263,13 @@ less headroom on unusual input than a large model.
 | `app/llm/providers/routing.py` — `LlmTask`, per-task resolution | ✅ step 6 |
 | `app/llm/{intake,fit,outreach}/service.py` — `task=` kwarg | ✅ step 7 |
 | Fallback + circuit breaker (§3.3) | deferred — see below |
-| `app/repositories/properties.py` — vector upsert + k-NN query | phase B |
-| `infra/qwen-lambda/` — Dockerfile, handler, model, grammars | phase E |
+| `supabase/migrations/20260813_properties_embedding.sql` — pgvector column + HNSW | ✅ phase B |
+| `app/db/property_row.py` — `embedding`, `embedding_model`, `embedded_at` | ✅ phase B |
+| `app/repositories/properties.py` — write + k-NN + pending-row helpers | ✅ phase B |
+| `app/services/similar_listings.py` — rewritten for k-NN | ✅ phase B |
+| `app/services/listing_embeddings.py` + `scripts/backfill_embeddings.py` | ✅ phase B |
+| `.github/workflows/embed-listings.yml` — 30-minute schedule | ✅ phase B |
+| `infra/qwen-lambda/` — Dockerfile, handler, model, grammars | phase D |
 
 ## 5. Hosting Qwen 0.5B on Lambda
 
@@ -573,21 +578,29 @@ What this means concretely:
 
 ### 13.1 The Lambda inventory
 
-| Function | Trigger | Job | Phase |
-|---|---|---|---|
-| `listing-ingest` | S3 `ObjectCreated` on `raw-listings/` | Normalise feed → upsert Postgres row → enqueue embed | B |
-| `embed-worker` | SQS | Bedrock Cohere v3 → write vector to pgvector | B |
-| `batch-manifest-builder` | EventBridge (nightly) | Pending listings → JSONL → S3 → `CreateModelInvocationJob` | B |
-| `batch-result-loader` | EventBridge (job completion) | Read S3 results → write vectors | B |
-| **`qwen-inference`** | `lambda:Invoke` from the API | **Run the 0.5B, return grammar-constrained JSON** | E |
-| `qwen-warmer` | EventBridge, every 5 min | Keep one environment warm (§5.4) | E |
+> **Only the Qwen functions are actually planned.** Phase B shipped embedding as a
+> GitHub Actions pull schedule (§15), so none of the ingest Lambdas below were built —
+> they would have duplicated the ingestion microservice. They stay recorded because they
+> are the right shape *if* ingestion moves onto AWS, not because anything is pending.
 
-All within the free tier. Two constraints:
+| Function | Trigger | Job | Status |
+|---|---|---|---|
+| **`qwen-inference`** | `lambda:Invoke` from the API | **Run the 0.5B, return grammar-constrained JSON** | phase D |
+| `qwen-warmer` | EventBridge, every 5 min | Keep one environment warm (§5.4) | phase D |
+| `listing-ingest` | S3 `ObjectCreated` on `raw-listings/` | Normalise feed → upsert row → enqueue embed | not built — §15 |
+| `embed-worker` | SQS | Bedrock Cohere v3 → write vector | not built — §15 |
+| `batch-manifest-builder` | EventBridge (nightly) | Pending listings → JSONL → S3 → `CreateModelInvocationJob` | not built |
+| `batch-result-loader` | EventBridge (job completion) | Read S3 results → write vectors | not built |
+
+All within the free tier. Two constraints that apply if the queue-driven shape is ever adopted:
 
 - **Cap event-source concurrency** on `embed-worker` so Lambda's willingness to scale cannot
   outrun the Bedrock quota.
 - **Idempotency keys** (a unique column in Postgres, or DynamoDB's free tier). SQS redelivery is
   normal; without a dedupe check a retry burns a second Bedrock call for a result you already have.
+
+The pull schedule sidesteps both: it re-selects rows by state rather than consuming a queue, so
+a re-run cannot double-charge, and concurrency is one job.
 
 ## 14. Queue and backpressure
 
@@ -631,37 +644,43 @@ capped event-source concurrency; idempotency keys.
 **Target:** embed each listing **once at ingest**; at query time embed only the seed.
 
 ```
-INGEST  (off the request path — runs once per listing, ever)
+INGEST  (off the request path — runs once per listing, ever)   ✅ implemented
 
-┌────────────────┐  ObjectCreated  ┌────────────────────┐
-│ S3             │────────────────▶│ Lambda             │
-│ raw-listings/  │                 │ listing-ingest     │
-└────────────────┘                 └─────────┬──────────┘
-                                             │ normalise, upsert
-                                             ▼
-                                   ┌────────────────────┐
-                                   │ Supabase Postgres  │
-                                   │ listing row        │
-                                   └─────────┬──────────┘
-                                             │ enqueue embed job
-                                             ▼
-                                   ┌────────────────────┐
-                                   │ SQS                │
-                                   └─────────┬──────────┘
-                                             ▼
-                                   ┌────────────────────┐  InvokeModel  ┌──────────┐
-                                   │ Lambda             │──────────────▶│ Bedrock  │
-                                   │ embed-worker       │◀──────────────│ cohere-v3│
-                                   └─────────┬──────────┘  1024-dim vec └──────────┘
-                                             ▼
-                                   ┌──────────────────────────────────┐
-                                   │ properties.embedding             │
-                                   │ vector(1024) + HNSW index        │
-                                   │ — same Postgres, no new service  │
-                                   └──────────────────────────────────┘
+┌────────────────────────┐  upsert   ┌────────────────────────┐
+│ ingestion microservice │──────────▶│ Supabase Postgres      │
+│ (PostgREST, no LLM)    │           │ properties row         │
+└────────────────────────┘           └───────────┬────────────┘
+                                                 │ selected by
+                                                 │ embedding IS NULL
+                                                 │ OR model superseded
+┌────────────────────────┐  every     ┌──────────▼─────────────┐
+│ GitHub Actions         │  30 min    │ backfill_listing_      │
+│ embed-listings.yml     │───────────▶│ embeddings()           │
+└────────────────────────┘            └──────────┬─────────────┘
+                                                 │ embed(texts=[...])
+                                                 ▼
+                                      ┌────────────────────────┐
+                                      │ Bedrock cohere-v3      │
+                                      │ 1024-dim vectors       │
+                                      └──────────┬─────────────┘
+                                                 ▼
+                                      ┌──────────────────────────────────┐
+                                      │ properties.embedding             │
+                                      │ vector(1024) + HNSW index        │
+                                      │ — same Postgres, no new service  │
+                                      └──────────────────────────────────┘
 
-  Backfill: EventBridge ─▶ batch-manifest-builder ─▶ S3 ─▶ Bedrock BATCH
-                             ─▶ S3 results ─▶ batch-result-loader ─▶ Postgres
+  **Pull, not push.** Listings are written by the ingestion microservice, which has no
+  LLM providers; embedding there would duplicate the provider layer, routing and AWS
+  deps into a second deployable. The backfill already selects rows with no vector *or*
+  one from a superseded model, so "new listing" and "model changed" are the same case
+  and no ingest-path change is needed. The workflow runs the script against the database
+  rather than calling a trigger endpoint: no new public surface, and a real backlog would
+  exceed the serverless function timeout.
+
+  The S3 → Lambda → SQS → embed-worker pipeline sketched in §13.1 is the shape this takes
+  *if* ingestion itself moves onto AWS. It is not needed for the pull schedule, and the
+  30-minute window is a product decision, not a technical limit.
 
 
 QUERY  (request path — one embedding call, regardless of corpus size)
@@ -678,6 +697,18 @@ QUERY  (request path — one embedding call, regardless of corpus size)
 | Embedding calls per request | up to **101** | **1** |
 | Similarity | Python, over a 40–100 row pool | HNSW index, over the whole corpus |
 | Quality | capped by the pre-filtered pool | true nearest neighbours corpus-wide |
+
+**Two behaviours worth knowing when reading the implementation:**
+
+- **State scopes eligibility, not rank.** The seed's state filters which rows can appear; the
+  final list is sorted by score. Concatenating the scoped query with the widening query would
+  otherwise put a weaker in-state match above a stronger out-of-state one, and a score column
+  that goes back down then up reads as a bug to users.
+- ⚠️ **Filtered HNSW can under-return.** pgvector scans `hnsw.ef_search` index candidates and
+  *then* applies the `WHERE`, so a filtered query can return fewer rows than actually match —
+  here that surfaces as the widening path firing when it shouldn't. Raise `hnsw.ef_search`
+  (default 40) or enable `hnsw.iterative_scan` on pgvector ≥ 0.8 if results look short in a
+  dense state. It is a property of the index, not the data.
 
 The quality gain is not incidental: `DEFAULT_CANDIDATE_POOL = 40` means the true nearest neighbour
 may never enter the ranking at all.
@@ -796,11 +827,16 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 
 | Phase | Work | Cost |
 |---|---|---|
-| **A — Routing layer** ← *steps 1–7* | Bedrock providers, `routing.py`, `LlmTask`, `task=` on 4 call sites, fallback + breaker. Every route still OpenRouter/HF | $0 |
-| **B — Ingest-time embeddings** | `vector(1024)` column + HNSW, repository upsert/k-NN, ingest Lambda, SQS, backfill, rewrite `find_similar_listings` | $0 |
-| **C — Bedrock embeddings** | Route embeddings to Cohere v3 | cents |
-| **D — Qwen on Lambda** | Container image, GBNF grammars, `qwen_lambda.py`, warmer, memory tuning; route `intake_parse` | $0 |
+| ✅ **A — Routing layer** | Bedrock chat + embeddings providers, `routing.py`, `LlmTask`, `task=` on 4 call sites. Every route still `auto`. Fallback deferred (§3.3) | $0 |
+| ✅ **B — Ingest-time embeddings** | `vector(1024)` column + HNSW, repository write/k-NN helpers, `find_similar_listings` rewritten, batched backfill + script, 30-minute workflow | $0 |
+| **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
+| **D — Qwen on Lambda** | Container image, GBNF grammars, `qwen_lambda.py`, warmer, memory tuning; route `intake_parse`. Ships with the fallback + circuit breaker (§3.3) | $0 |
 | **E — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
+
+**Phase C is a deploy step, not a development step**, and it gates B: until embeddings are
+routed to Bedrock there are no vectors, and `find_similar_listings` excludes rows without one.
+Order of operations on first deploy: apply the migration → set the route → run the backfill →
+verify similar-listings.
 
 **A and B are free and account for most of the value.** They are worth completing even if C, D and
 E never happen.
