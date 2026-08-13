@@ -42,6 +42,8 @@ from pipeline.paths import EVAL_DATASET_PATH, PHRASINGS_PATH
 ASK = (
     "List {n} different words or short phrases a commercial real-estate client might use "
     "when they mean a {option} property. Everyday wording, not jargon. "
+    "Include single words, not only two-word phrases. "
+    "Do not use the word '{option}' itself in any answer. "
     "One per line, no numbering, no explanation."
 )
 CHECK = "which of these is closest to {phrase}?\n{options}\njust gimme answer, no need to explain"
@@ -162,7 +164,16 @@ async def main_async(argv: list[str] | None = None) -> int:
         proposed = await propose(client, args.model, option, args.per_option)
         # An option word is not a phrasing for itself, and a candidate claimed by two
         # options is ambiguous — both would put a wrong label on a training example.
-        candidates = [p for p in proposed if p not in options]
+        # A candidate is dropped when it *contains* an option word, not merely when it
+        # equals one. "retail plaza" and "office space" passed the equality test and were
+        # 7 of 16 retail phrasings and 16 of 21 office ones -- every one of them putting
+        # the gold word straight into the message, which is the copying this file exists
+        # to break. They also crowded out the real synonyms: "shop" round-trips to retail
+        # correctly but was never proposed, and production sent "a shop in Amsterdam".
+        candidates = [
+            p for p in proposed
+            if not any(re.search(rf"\b{re.escape(o)}\b", p) for o in options)
+        ]
         # A phrasing the eval already scores turns that turn into a recall check.
         if leaked := [p for p in candidates if reaches_eval(p, held_out)]:
             print(f"  {option:<12} holding out {leaked}: scored by a property-synonym turn")

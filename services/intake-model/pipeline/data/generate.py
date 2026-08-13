@@ -100,6 +100,39 @@ TYPE_TEMPLATES = [
     "we need {types} space", "{types} please", "looking for {types}",
     "something {types}", "{types} would work",
 ]
+
+# Article forms. Nothing used to put an article in front of the type noun, so "I am
+# finding a shop which is located in Amsterdam" was structurally unseen: v6 read "shop"
+# correctly on its own and dropped the field entirely once the same word sat in a longer
+# sentence. The relative clause matters as much as the article -- a type followed by
+# "which"/"that" never occurred either.
+TYPE_TEMPLATES_ARTICLE = [
+    "{a} {types}", "I am finding {a} {types}", "we want {a} {types}",
+    "{a} {types} which suits us", "{a} {types} that would work",
+]
+
+
+def _article(text: str) -> str:
+    """"an" before a vowel sound, near enough for generated text.
+
+    Naive on purpose: the alternative is a pronunciation dictionary for five templates.
+    """
+    return "an" if text[:1].lower() in "aeiou" else "a"
+
+
+def _type_templates(words: str, options: list[str]) -> list[str]:
+    """Article forms only where an article reads correctly.
+
+    "a shop" and "a warehouse" are what a client writes. "a land", "a specialty" and "a
+    office or flex" are not: the option words are mass or adjectival nouns, and a
+    multi-select rendering already carries its own conjunction. Restricting the article
+    to a single phrasing buys the structural coverage without the ungrammatical text.
+    """
+    if words.lower() in options or " or " in words or "," in words:
+        return TYPE_TEMPLATES
+    return TYPE_TEMPLATES + TYPE_TEMPLATES_ARTICLE
+
+
 # A refusal and a piece of noise both produce empty ``extracted``; the only signal
 # separating them is phrasing. The first pass used 14 refusal strings and the model
 # learned the strings, not the concept - it answered four of ten eval refusals by
@@ -730,7 +763,8 @@ def _field_fragment(
         return gold, random.choice(LOCATION_TEMPLATES).format(place=place)
     if key == "property_type":
         picked, words = _type_words(property_types, phrasings)
-        return picked, random.choice(TYPE_TEMPLATES).format(types=words)
+        template = random.choice(_type_templates(words, property_types))
+        return picked, template.format(types=words, a=_article(words))
     if key == "price":
         bounds, phrase = _range_phrase(PRICE_NUMBERS)
         return bounds, random.choice([f"budget {phrase}", phrase, f"we can spend {phrase}"])
