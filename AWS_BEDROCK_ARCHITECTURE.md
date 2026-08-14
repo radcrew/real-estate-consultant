@@ -949,8 +949,14 @@ Two details worth pinning:
   filtered on `status = 'queued'`. A redelivered message whose job already ran matches no row, and
   the worker drops it instead of paying for a second provider call.
 - **`attempts` increments in a trigger**, not in the worker. PostgREST cannot express
-  `attempts = attempts + 1`, and a read-then-write from the consumer races concurrent redelivery.
-  Counting the `queued → running` transition server-side keeps it exact.
+  `attempts = attempts + 1`, and a read-then-write from the consumer races concurrent redelivery —
+  two consumers would both read N and both write N+1. Counting the `queued → running` transition
+  server-side keeps it exact.
+- **A claimed job needs a way out.** The claim gate means a worker killed mid-turn — Lambda
+  timeout, OOM — leaves a row stuck in `running` that redelivery can no longer rescue, because the
+  conditional update no longer matches. Without a sweeper the client waits out its whole timeout on
+  a job that is already dead, so `expire_stale_running_jobs` fails those rows once they stop being
+  touched. This was not in the original §14.1 design; the claim gate implies it.
 
 Rows are written **before** the SQS publish. A row with no message is visible and retryable; a
 message with no row is undiagnosable when the consumer picks it up.
@@ -987,7 +993,8 @@ existing test suite need no queue, and no test is rewritten to accommodate one.
 
 | File | Change |
 |---|---|
-| `supabase/migrations/*_intake_jobs.sql` | new — table, RLS, indexes, `attempts` trigger |
+| `supabase/migrations/20260814_intake_jobs.sql` | ✅ table, RLS, indexes, `attempts` trigger |
+| `app/repositories/intake_jobs.py` | ✅ create / get / claim / complete / fail / count-active / expire-stale |
 | `app/services/intake_llm.py` | new — `run_llm_intake_turn()`, extracted from the endpoint |
 | `app/clients/sqs.py` | new — `ChatJobQueue`, boto3 via `anyio.to_thread` per `bedrock_embeddings` |
 | `app/repositories/intake_jobs.py` | new — create / get / claim / complete / fail |
@@ -1215,7 +1222,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
 | **D — Qwen 0.5B intake on Lambda** | ✅ **code complete**: `qwen_lambda.py` (contract, retry-once, error mapping, breaker), `circuit_breaker.py`, `infra/qwen-lambda/` image with build-time GBNF and HF fetch, schema export + drift test, 62 tests. Remaining is deployment only: **supply the weights** (§23.1 — fine-tune vs base undecided), build/push, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
 | **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
-| **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1) — per-address + per-session windows on both LLM routes, 24 tests. Remaining: `intake_jobs` migration, pipeline extraction, `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook | $0 — SQS free to 1M/mo |
+| **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1), ✅ `intake_jobs` migration + repository (claim gate, `attempts` trigger, stale-claim sweeper), 41 tests. Remaining: pipeline extraction, `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook | $0 — SQS free to 1M/mo |
 | **G — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
 
 **Phase C is a deploy step, not a development step**, and it gates B: until embeddings are routed
