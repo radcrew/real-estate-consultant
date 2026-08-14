@@ -19,6 +19,7 @@ from app.core.config import settings as app_settings
 from app.llm.providers.base import ChatProvider, EmbeddingsProvider
 from app.llm.providers.bedrock_chat import bedrock_chat_provider
 from app.llm.providers.bedrock_embeddings import bedrock_embeddings_provider
+from app.llm.providers.bedrock_qwen_chat import bedrock_qwen_chat_provider
 from app.llm.providers.chat import resolve_chat_provider
 from app.llm.providers.embeddings import (
     resolve_embeddings_provider,
@@ -47,6 +48,9 @@ CHAT_PROVIDERS: dict[str, ChatProvider] = {
     "openrouter": openrouter_provider,
     "huggingface": huggingface_provider,
     "bedrock": bedrock_chat_provider,
+    # Pin-only: key presence cannot distinguish "bedrock" from "bedrock_qwen", so an
+    # explicit route is the only way to reach the Converse-API provider.
+    "bedrock_qwen": bedrock_qwen_chat_provider,
 }
 
 EMBEDDINGS_PROVIDERS: dict[str, EmbeddingsProvider] = {

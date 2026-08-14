@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from app.llm.providers.bedrock_chat import bedrock_chat_provider
 from app.llm.providers.bedrock_embeddings import bedrock_embeddings_provider
+from app.llm.providers.bedrock_qwen_chat import bedrock_qwen_chat_provider
 from app.llm.providers.huggingface import huggingface_provider
 from app.llm.providers.openrouter import openrouter_provider
 from app.llm.providers.routing import (
@@ -73,11 +74,32 @@ class TestResolveChatProviderForTask:
             ("openrouter", openrouter_provider),
             ("huggingface", huggingface_provider),
             ("bedrock", bedrock_chat_provider),
+            ("bedrock_qwen", bedrock_qwen_chat_provider),
         ],
     )
     def test_each_pin_selects_its_provider(self, pin, expected):
         config = _config(intake_parse=pin)
         assert resolve_chat_provider_for_task(task=LlmTask.INTAKE_PARSE, config=config) is expected
+
+    def test_bedrock_and_bedrock_qwen_are_distinct_providers(self):
+        """Different SDKs: the Anthropic client cannot call a Qwen model."""
+        config = _config(outreach_draft="bedrock_qwen", fit_explanation="bedrock")
+        assert (
+            resolve_chat_provider_for_task(task=LlmTask.OUTREACH_DRAFT, config=config)
+            is bedrock_qwen_chat_provider
+        )
+        assert (
+            resolve_chat_provider_for_task(task=LlmTask.FIT_EXPLANATION, config=config)
+            is bedrock_chat_provider
+        )
+
+    def test_auto_never_selects_bedrock_qwen(self):
+        """Key presence cannot tell the two Bedrock providers apart, so a pin is required."""
+        config = _config(aws_region="us-east-1")
+        assert (
+            resolve_chat_provider_for_task(task=LlmTask.OUTREACH_DRAFT, config=config)
+            is bedrock_chat_provider
+        )
 
     def test_tasks_route_independently(self):
         """The whole point: one call site on a fine-tune, another on a general model."""

@@ -305,7 +305,8 @@ they get the ordinary §8 error mapping and no special machinery.
 | `app/llm/providers/{chat,embeddings}.py` — add `"bedrock"`, route the facades | ✅ steps 5, 7 |
 | `app/llm/providers/routing.py` — `LlmTask`, per-task resolution | ✅ step 6 |
 | `app/llm/{intake,fit,outreach}/service.py` — `task=` kwarg | ✅ step 7 |
-| `app/llm/providers/bedrock_qwen_chat.py` — `BedrockQwenChatProvider` (Converse API) | phase E |
+| `app/llm/providers/bedrock_qwen_chat.py` — `BedrockQwenChatProvider` (Converse API) | ✅ phase E |
+| `backend/.env.example` — AWS, Bedrock, and route settings documented | ✅ phase C |
 | Retry + circuit breaker (§3.3) | deferred — see below |
 | `supabase/migrations/20260813_properties_embedding.sql` — pgvector column + HNSW | ✅ phase B |
 | `app/db/property_row.py` — `embedding`, `embedding_model`, `embedded_at` | ✅ phase B |
@@ -656,6 +657,7 @@ Every provider takes an injectable client, so no network access is required.
 | `test_routing::*` | ✅ 19 test functions (more collected via parametrize) — per-task pins, fall-through to default, auto, unknown-pin raises, table coverage |
 | `test_bedrock_chat::*` | ✅ 16 tests — system split, temperature dropped, thinking off, stop-reason mapping, error mapping |
 | `test_bedrock_embeddings::*` | ✅ 18 tests — batching, **input order preserved**, lazy client, botocore error mapping |
+| `test_bedrock_qwen_chat::*` | ✅ 22 tests — forced tool call, **temperature forwarded**, thinking flag on/off, missing/foreign tool call, refusal and botocore error mapping, lazy client |
 | `test_exceptions::test_user_facing_copy_does_not_vary_by_provider` | ✅ copy pinned across providers |
 | `test_chat::test_forwards_task_to_the_router` | ✅ a dropped `task=` kwarg fails loudly |
 | `test_routing::test_infra_error_triggers_retry` | deferred with §3.3 — retry same function only, never another provider |
@@ -1158,7 +1160,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | ✅ **B — Ingest-time embeddings** | `vector(1024)` column + HNSW, repository write/k-NN helpers, `find_similar_listings` rewritten, batched backfill + script, 30-minute workflow | $0 |
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
 | **D — Qwen 0.5B intake on Lambda** | `infra/qwen-lambda/` image, GBNF grammars, `qwen_lambda.py`, memory tuning; route `intake_parse=qwen`. Ships with the retry + circuit breaker (§3.3 — no cross-family fallback) | $0 |
-| **E — Outreach on Bedrock Qwen3-32B** | `BedrockQwenChatProvider` (Converse, forced tool call), `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen`, IAM grant, region check | per-token |
+| **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
 | **F — Intake turns through SQS** | `intake_jobs` migration, pipeline extraction, `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook, **admission control on the enqueue endpoint — blocker, see §14.1** | $0 — SQS free to 1M/mo |
 | **G — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
 

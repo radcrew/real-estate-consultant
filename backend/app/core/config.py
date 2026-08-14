@@ -86,6 +86,16 @@ class Settings(BaseSettings):
     bedrock_input_cost_per_1m: float = 0.0
     bedrock_output_cost_per_1m: float = 0.0
 
+    # Qwen chat runs on the Converse API, which is vendor-neutral: the Anthropic SDK
+    # behind bedrock_chat cannot call non-Anthropic models. Converse IDs are versioned.
+    bedrock_qwen_chat_model: str = "qwen.qwen3-32b-v1:0"
+    # Qwen3 is a hybrid-thinking family, and thinking is billed against maxTokens for no
+    # benefit on a structured draft. The switch is model-revision specific, so set this
+    # false to omit the field entirely if a deployed revision rejects it.
+    bedrock_qwen_disable_thinking: bool = True
+    bedrock_qwen_input_cost_per_1m: float = 0.0
+    bedrock_qwen_output_cost_per_1m: float = 0.0
+
     # Per-call-site provider routing (see app/llm/providers/routing.py). "auto" keeps the
     # key-presence order in providers/chat.py, so routing is opt-in and metered providers
     # are never selected by accident. Any other value pins that path to one provider.
