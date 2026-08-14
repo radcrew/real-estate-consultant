@@ -344,7 +344,9 @@ infra/qwen-lambda/
 ├── Dockerfile           # FROM public.ecr.aws/lambda/python:3.12
 ├── handler.py           # model loaded at module scope, reused across warm invocations
 ├── build_grammars.py    # JSON Schema → GBNF, run during the build
+├── fetch_model.py       # pull the GGUF from Hugging Face, before the build
 ├── requirements.txt     # llama-cpp-python
+├── requirements-build.txt
 ├── schemas/             # JSON Schemas exported from the Pydantic models
 │   └── LlmParseModelOutput.json
 ├── grammars/            # produced by the build from schemas/ — not committed

@@ -7,23 +7,41 @@ payload contract are tested together in `backend/tests/infra/test_qwen_handler.p
 Free tier is perpetual — 1M requests and 400,000 GB-seconds a month — so at roughly
 3 GB × 2 s per call this is about 65,000 calls/month at no cost.
 
-## 1. Put the weights in place
+## 1. Fetch the weights
 
+```bash
+cd infra/qwen-lambda
+pip install -r requirements-build.txt
+python fetch_model.py --repo-id <org>/<model>            # add --filename for multi-quant repos
 ```
-infra/qwen-lambda/model/qwen.gguf
+
+This lands `model/qwen.gguf`. The GGUF is never committed (see `.gitignore`); the image
+digest is what versions it. Fetching happens here rather than inside the build because a
+Hugging Face token passed as a build arg stays readable in the image layers — export
+`HF_TOKEN` instead, and it never reaches the image.
+
+**If the repository holds safetensors rather than GGUF** — the usual case for a
+fine-tune published in Hugging Face format — convert once, locally:
+
+```bash
+git clone https://github.com/ggerganov/llama.cpp
+pip install -r llama.cpp/requirements/requirements-convert_hf_to_gguf.txt
+huggingface-cli download <org>/<model> --local-dir ./hf-model
+python llama.cpp/convert_hf_to_gguf.py ./hf-model --outfile model/qwen.gguf --outtype q8_0
 ```
 
-The GGUF is never committed (see `.gitignore`); the image digest is what versions it.
+`fetch_model.py` prints these steps rather than guessing when it finds no GGUF.
 
-**Which weights** is an open decision. The plan assumes a Qwen2.5-0.5B *fine-tuned on
-criteria extraction*; no such artifact is in this repo. Base `Qwen2.5-0.5B-Instruct`
-will run and — because generation is grammar-constrained — will always return valid
-JSON, but a 0.5B that has not seen this task will fill it in noticeably worse. Decide
-before trusting the numbers in the architecture doc's §12 and §20.
+**Which weights** still matters for quality. Generation is grammar-constrained, so *any*
+Qwen2.5-0.5B returns structurally valid JSON — the grammar cannot be violated. What a
+fine-tune buys is the JSON being *right*: base `Qwen2.5-0.5B-Instruct` has never seen
+this extraction task and will populate fields worse, especially on unusual phrasing.
+Treat the architecture doc's §12 and §20 numbers as unverified until measured on the
+weights actually deployed.
 
-Quantisation is also unmeasured. `Q8_0` is the conservative starting point; `Q4_K_M`
-roughly halves the image and speeds generation at some accuracy cost. Benchmark both
-against real intake prompts (architecture doc §23.1).
+Quantisation is also unmeasured. `Q8_0` is the conservative default; `Q4_K_M` roughly
+halves image size and speeds generation at some accuracy cost — and a 0.5B has less
+headroom to lose than a large model. Benchmark both on real intake prompts (§23.1).
 
 ## 2. Regenerate the schemas if a model changed
 
