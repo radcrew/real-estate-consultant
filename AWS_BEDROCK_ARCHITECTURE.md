@@ -8,6 +8,12 @@ Author: engineering
 > **Qwen 0.5B fine-tuned for one task**, which runs on CPU. A later revision assumed a full AWS
 > runtime migration; this one **deliberately stays on Vercel and avoids every service with a
 > standing monthly cost** (§21). Filename kept so existing links resolve.
+>
+> **This revision moves to a Qwen-first chat plan:** Qwen2.5-0.5B (fine-tuned) is the **only**
+> intake parser — no cross-family fallback; outreach drafting moves to **Qwen3-32B on Bedrock**
+> (serverless, Converse API). Embeddings **stay on Bedrock `cohere.embed-english-v3`** — a
+> Lambda-hosted Qwen3-Embedding-0.6B was considered and rejected (§6.1 records the comparison).
+> The Sonnet chat provider stays built but unrouted.
 
 ---
 
@@ -15,13 +21,15 @@ Author: engineering
 
 | Workload | Runs on | Standing cost |
 |---|---|---|
-| **Criteria extraction** from free-text input (intake parse) | **Qwen 0.5B on AWS Lambda (CPU)** | **$0** — perpetual free tier |
-| **Embeddings** | **Bedrock** `cohere.embed-english-v3` | **~cents/month** after §15 |
+| **Criteria extraction** from free-text input (intake parse) | **Qwen2.5-0.5B fine-tune on AWS Lambda (CPU)** — the *only* model for this task | **$0** — perpetual free tier |
+| **Embeddings** | **Bedrock** `cohere.embed-english-v3`, 1024-dim | **~cents/month** after §15 |
+| **Outreach draft** | **Bedrock `qwen.qwen3-32b`** via the Converse API | pay-per-token, low $/mo |
 | **Vector search** | **pgvector in the existing Supabase Postgres** | **$0** |
-| **General chat** — opening question, fit, outreach | **OpenRouter** (today's provider) | ~$0 |
-| **Fallback** when Qwen fails | Bedrock, or OpenRouter | pay-per-use, rarely hit |
+| **General chat** — opening question, fit | **OpenRouter** (today's provider) | ~$0 |
+| **Fallback** when the Qwen Lambda fails | retry once, then degrade — **no cross-family fallback** (§3.3) | $0 |
 | **Bulk/backfill** embedding jobs | **Bedrock batch inference** (S3 in/out) | one-off, ~50% rate |
 | **Guardrails** on input/output | **Bedrock `ApplyGuardrail`** | per text unit, opt-in |
+| **Intake turn dispatch** | **SQS FIFO → `chat-intake-worker` Lambda**, result over SSE (§14.1) | **$0** — free to 1M msg/mo |
 | **API tier** | **Vercel** (unchanged) | current bill |
 
 ### Deliberately not using
@@ -35,40 +43,54 @@ rejected forever — §21 records what would justify each.
 | **Fargate + ALB** | Vercel already runs the API | ~$40/mo |
 | **NAT Gateway** | No VPC ⇒ no NAT. Lambda runs outside a VPC and reaches AWS APIs over IAM-authenticated public endpoints | ~$32/mo + per-GB |
 | **ElastiCache** | In-process and Postgres substitutes are adequate at this volume (§16) | ~$15/mo after the 12-month tier |
-| **Bedrock chat (Sonnet 5)** | OpenRouter already serves these three paths | ~$30/mo |
+| **Bedrock chat (Sonnet 5)** | OpenRouter serves opening question + fit; outreach routes to Bedrock **Qwen3-32B** instead. Provider stays built, unrouted | ~$30/mo |
+| **Qwen3-Embedding-0.6B on Lambda** | Considered for family purity; rejected — saves cents while adding a second container deployable, request-path cold starts, and a quantization-quality unknown (§6.1) | $0, but real ops cost |
+| **Bedrock Marketplace / SageMaker endpoint for Qwen3-Embedding** | The only *managed* route to a Qwen embedding model is a provisioned endpoint billed per-hour — exactly the standing cost this design forbids | ~$100s/mo |
 | **SageMaker** | Lambda's free tier is perpetual; SageMaker's is a 2-month trial | few $/mo |
 
 ### The picture
 
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                          REAL ESTATE CONSULTANT                              │
-│                                                                              │
-│   ┌────────────┐            ┌──────────────────────────────────┐             │
-│   │  Next.js   │───────────▶│   FastAPI backend  (Vercel)      │             │
-│   │  (Vercel)  │            │      providers/routing.py        │             │
-│   └────────────┘            └───┬──────────────┬───────────┬───┘             │
-│                                 │              │           │                 │
-│            ┌────────────────────┘              │           └──────────┐      │
-│            ▼                                   ▼                      ▼      │
-│  ┌───────────────────────┐   ┌───────────────────────┐   ┌──────────────────┐│
-│  │   A W S   L A M B D A │   │     B E D R O C K     │   │    SUPABASE      ││
-│  │ ┌───────────────────┐ │   │ ┌───────────────────┐ │   │ ┌──────────────┐ ││
-│  │ │ qwen-inference    │ │   │ │ cohere.embed-v3   │ │   │ │ Postgres     │ ││
-│  │ │ Qwen 0.5B, CPU    │ │   │ │ embeddings        │ │   │ │ + pgvector   │ ││
-│  │ │ container (ECR)   │ │   │ ├───────────────────┤ │   │ │              │ ││
-│  │ │ grammar JSON      │ │   │ │ Guardrails        │ │   │ │ listings +   │ ││
-│  │ ├───────────────────┤ │   │ ├───────────────────┤ │   │ │ vectors      │ ││
-│  │ │ listing-ingest    │ │   │ │ batch inference   │ │   │ └──────────────┘ ││
-│  │ │ embed-worker      │ │   │ └───────────────────┘ │   │                  ││
-│  │ └───────────────────┘ │   │                       │   │ existing bill    ││
-│  │  free tier · no VPC   │   │  cents/month          │   └──────────────────┘│
-│  └───────────────────────┘   └───────────────────────┘                       │
-│                                                                              │
-│         ┌──────────────────┐   general chat (opening question, fit,          │
-│         │   OPENROUTER     │◀── outreach) stays here — already ~free         │
-│         └──────────────────┘                                                 │
-└──────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    FE["Next.js<br/>Vercel"]
+    API["FastAPI backend · Vercel<br/>providers/routing.py"]
+
+    FE --> API
+
+    subgraph LAMBDA["AWS LAMBDA — free tier, no VPC"]
+        QI["qwen-inference<br/>Qwen2.5-0.5B FT · CPU container · ECR<br/>grammar-constrained JSON"]
+        CIW["chat-intake-worker<br/>§14.1"]
+    end
+
+    subgraph BEDROCK["BEDROCK — pay-per-use"]
+        QW32["qwen.qwen3-32b<br/>outreach drafts · Converse API"]
+        EMB["cohere.embed-v3<br/>embeddings · 1024-dim"]
+        GR["Guardrails"]
+        BATCH["batch inference"]
+    end
+
+    subgraph SUPA["SUPABASE — existing bill"]
+        PG[("Postgres + pgvector<br/>listings + vectors")]
+        JOBS[("intake_jobs")]
+    end
+
+    OR["OPENROUTER<br/>opening question, fit · already ~free"]
+
+    Q[["SQS chat-intake.fifo"]]
+
+    API -->|intake parse| Q
+    Q --> CIW
+    CIW -->|routed provider| QI
+    CIW -->|result| JOBS
+    JOBS -.->|SSE| API
+
+    API -->|opening question, fit| OR
+    API -->|outreach draft| QW32
+    API -->|embed seed at query time| EMB
+    API -->|reads| PG
+
+    GHA["GitHub Actions<br/>embed-listings.yml · 30 min"] -->|backfill pending rows| EMB
+    GHA --> PG
 ```
 
 ### Two tiers
@@ -76,7 +98,7 @@ rejected forever — §21 records what would justify each.
 | Tier | What | When |
 |---|---|---|
 | **Part I** (§1–§10) | Routing + Bedrock providers + the Qwen Lambda, behind the existing protocol seam | Now |
-| **Part II** (§11–§22) | Ingest-time embeddings, queueing, observability — all within the free tier | Next |
+| **Part II** (§11–§22) | Ingest-time embeddings, queueing (§14.1 — the intake path moves behind SQS), observability — all within the free tier | Next |
 
 ---
 
@@ -84,8 +106,10 @@ rejected forever — §21 records what would justify each.
 
 ## 1. Goals
 
-- Serve the fine-tuned Qwen 0.5B for criteria extraction, on CPU, inside the Lambda free tier.
-- Use Bedrock where it is nearly free (embeddings) or uniquely useful (guardrails, batch).
+- Serve the fine-tuned Qwen2.5-0.5B for criteria extraction, on CPU, inside the Lambda free tier —
+  it is the **only** model for that task.
+- Use Bedrock where it is nearly free (Cohere embeddings), where a bigger Qwen is worth paying per
+  token (Qwen3-32B for outreach), or where it is uniquely useful (guardrails, batch).
 - Route **per call site**, so cost is opted into per path rather than discovered on a bill.
 - Keep OpenRouter/HF as the default for everything not explicitly moved.
 
@@ -118,19 +142,27 @@ The fine-tune covers **one** task. Everything else stays where it is.
 
 | Call site | Code | Route | Standing cost |
 |---|---|---|---|
-| **Intake parse** | `llm/intake/service.py:62` | **Qwen 0.5B (Lambda)** | $0 |
-| Opening question | `llm/intake/service.py:100` | OpenRouter | ~$0 |
+| **Intake parse** | `llm/intake/service.py:63` | **Qwen2.5-0.5B FT (Lambda)** — only model, no substitution | $0 |
+| Opening question | `llm/intake/service.py:102` | OpenRouter | ~$0 |
 | Fit explanation | `llm/fit/service.py` | OpenRouter | ~$0 |
-| Outreach draft | `llm/outreach/service.py` | OpenRouter | ~$0 |
-| Embeddings | `services/similar_listings.py:55` | **Bedrock Cohere v3** | cents |
+| **Outreach draft** | `llm/outreach/service.py` | **Bedrock `qwen.qwen3-32b`** | per-token |
+| **Embeddings** | `services/similar_listings.py:41`, `services/listing_embeddings.py:47` | **Bedrock Cohere v3** | cents |
 
 A 0.5B fine-tuned on one task can beat a general 8B *at that task* while being ~16× smaller —
 that is the point. It will not transfer to the other three, and asking it to is the fastest way
-to conclude the fine-tune "doesn't work."
+to conclude the fine-tune "doesn't work." The converse also holds: intake parse routes to the
+fine-tune and **nothing else** — a general model does not know the extraction format the
+fine-tune was trained on, so substituting one on failure trades a visible error for a silently
+wrong parse (§3.3).
 
-**Bedrock chat is built but not routed.** `BedrockChatProvider` exists (§6.2) and can take any of
-the three general paths by changing one env var — worth roughly $30/month if the quality proves
-worth it. Until then it costs nothing to have.
+Outreach is the one general path worth a bigger model: it writes prose a user sends to a real
+agent, so quality is directly visible. Qwen3-32B on Bedrock is serverless pay-per-token — no
+standing cost, and it keeps the whole plan in one model family.
+
+**One provider is built but not routed.** `BedrockChatProvider` (Sonnet 5, §6.2) remains in the
+registry as a one-env-var escape hatch; it costs nothing to keep. Note that it **cannot** serve
+the Qwen3-32B route — it is built on the Anthropic SDK, which only speaks to Anthropic models.
+Outreach needs the new `BedrockQwenChatProvider` (§6.2).
 
 ### 3.2 Implementation
 
@@ -142,24 +174,29 @@ class LlmTask(StrEnum):
     FIT_EXPLANATION  = "fit_explanation"
     OUTREACH_DRAFT   = "outreach_draft"
 
-def resolve_chat_provider(*, task: LlmTask | None, config: Settings) -> ChatProvider:
+def resolve_chat_provider_for_task(*, task: LlmTask | None = None,
+                                   config: Settings | None = None) -> ChatProvider:
     """Route by task, falling back to `llm_route_default`, then to key-presence order."""
 ```
+
+(`resolve_chat_provider` itself stays in `chat.py` doing key-presence only; the task-aware
+resolver wraps it.)
 
 One env var per task — routing changes are a redeploy, never a code change. **Defaults keep every
 paid path off:**
 
 ```python
-llm_route_intake_parse:     str = "auto"   # → "qwen" once that branch merges
-llm_route_opening_question: str = "auto"
-llm_route_fit_explanation:  str = "auto"
-llm_route_outreach_draft:   str = "auto"
-llm_route_embeddings:       str = "auto"   # → "bedrock" in phase C
+llm_route_intake_parse:     str = "auto"   # → "qwen" in phase D (Qwen2.5-0.5B Lambda)
+llm_route_opening_question: str = "auto"   # stays OpenRouter via auto
+llm_route_fit_explanation:  str = "auto"   # stays OpenRouter via auto
+llm_route_outreach_draft:   str = "auto"   # → "bedrock_qwen" in phase E (Qwen3-32B)
+llm_route_embeddings:       str = "auto"   # → "bedrock" in phase C (Cohere v3)
 llm_route_default:          str = "auto"
 ```
 
 `"auto"` defers to the key-presence order in `providers/chat.py`, which checks Bedrock **last**
-(§8). An earlier draft defaulted these to `"openrouter"`; that was wrong — it would break any
+(`chat.py:21-34` states the rationale: a metered provider must never silently displace a working
+free one). An earlier draft defaulted these to `"openrouter"`; that was wrong — it would break any
 deployment configured with only `HF_TOKEN`. `"auto"` gets the same "no metered path by accident"
 outcome while keeping the change a genuine no-op.
 
@@ -168,7 +205,8 @@ and logs the bad value rather than falling back, so a typo cannot quietly send t
 provider you did not choose.
 
 `llm_route_embeddings` is not decorative: key-presence checks Bedrock last, so while `HF_TOKEN`
-is set an explicit pin is the *only* way to reach Bedrock embeddings.
+is set an explicit pin is the *only* way to reach Bedrock embeddings. The same holds for
+`"bedrock_qwen"` on outreach.
 
 Call sites gain one keyword argument:
 
@@ -189,30 +227,32 @@ function body, and `LlmTask` is imported under `TYPE_CHECKING` so the annotation
 The alternative — extracting the key-presence resolvers into a third module — is more churn for
 the same result; revisit only if the cycle grows.
 
-### 3.3 Fallback — deferred until the Qwen branch
+### 3.3 Failure handling — retry, then degrade. No cross-family fallback
 
-> **Not implemented, deliberately.** Its purpose is protecting against a self-hosted model with
-> no vendor SLA — but every current route is OpenRouter, HF, or Bedrock, all managed. Drawing the
-> retryable/non-retryable line correctly needs the Qwen provider's real exceptions, so building it
-> now would mean guessing at a failure taxonomy that does not exist yet. It belongs in the same
-> change as `QwenLambdaProvider`.
+> **Decision (this revision): intake parse uses only the Qwen2.5-0.5B fine-tune.** Earlier drafts
+> planned a fallback to Bedrock or OpenRouter when the Qwen Lambda failed. That is now ruled out:
+> a general model was never trained on the extraction schema, so a "fallback parse" is a silently
+> different parse — worse than an honest error the user can retry. What remains is *retry and
+> degrade*, built in the same change as `QwenLambdaProvider`.
 
-When it is built, the design below stands. Note it needs one prerequisite the current code does
-not have: **infrastructure failures are not distinguishable from content failures by status code
-alone** — `raise_bedrock_api_error` and `raise_bedrock_completion_parse_failed` both produce 502.
-Expect to introduce a marker (a `ProviderUnavailable` subclass, or an explicit retryable flag on
-the raisers) before the catch clause can be written honestly.
-
-Fallback matters because the primary is a self-hosted model with no vendor SLA, and a 0.5B has
-less headroom on unusual input than a large model.
-
-- Trigger on **infrastructure failure only** — Lambda invoke error, timeout, throttle, breaker
-  open. **Never** on a validation failure or refusal; that just buys the same bad answer twice.
-- One attempt, no chaining.
-- Log `fallback_used=true` with the reason and alarm on the rate. A silent fallback running for a
+- On **infrastructure failure** — Lambda invoke error, timeout, throttle — retry **once** against
+  the same function. Never retry a validation failure or refusal; that buys the same bad answer
+  twice.
+- If the retry fails: on the queued path (§14.1) the job goes back to `queued` and SQS redelivery
+  is the retry budget; on the sync path the endpoint degrades gracefully — the user's text is
+  preserved and they are asked to resend.
+- **Infrastructure failures must be distinguishable from content failures.** Today
+  `raise_bedrock_api_error` and `raise_bedrock_completion_parse_failed` both produce 502; a
+  retryable marker (a `ProviderUnavailable` subclass, or a flag on the raisers) is a prerequisite
+  for writing the retry clause honestly — and §14.1's worker classification reuses it.
+- Log `retry_used=true` with the reason and alarm on the rate. A silent retry loop running for a
   week is how you discover the Qwen function has been broken since Tuesday.
-- **Circuit breaker in-process** (per Vercel instance) rather than ElastiCache — see §16. Less
-  precise than a shared breaker, adequate at this volume, and free.
+- **Circuit breaker in-process** (per Vercel instance) rather than ElastiCache — see §16. When the
+  breaker is open, fail fast with the degrade path rather than queueing invocations that will
+  time out.
+
+Outreach (Bedrock Qwen3-32B) and the OpenRouter paths are managed services with their own SLAs;
+they get the ordinary §8 error mapping and no special machinery.
 
 ## 4. Target architecture
 
@@ -231,24 +271,27 @@ less headroom on unusual input than a large model.
 │         │ providers/chat.py                │   │ providers/embeddings.py    ││
 │         │ providers/routing.py             │   └──────────────┬─────────────┘│
 │         │  • per-task table       §3.1     │                  │              │
-│         │  • fallback on infra error §3.3  │                  │              │
+│         │  • retry on infra error   §3.3   │                  │              │
 │         │  • in-process circuit breaker    │                  │              │
 │         └────────────────┬─────────────────┘                  │              │
 └──────────────────────────┼────────────────────────────────────┼──────────────┘
      ┌──────────┬──────────┴────────┬─────────────┐             │
      ▼          ▼                   ▼             ▼             ▼
 ┌───────────┐┌────────────┐  ┌────────────┐┌───────────┐ ┌──────────────────┐
-│ QwenLambda││ BedrockChat│  │ OpenRouter ││HuggingFace│ │ BedrockEmbeddings│
-│ Provider  ││ Provider   │  │  Provider  ││ Provider  │ │ Provider         │
+│ QwenLambda││ BedrockQwen│  │ OpenRouter ││HuggingFace│ │ BedrockEmbeddings│
+│ Provider  ││ChatProvider│  │  Provider  ││ Provider  │ │ Provider         │
 ├───────────┤├────────────┤  ├────────────┤├───────────┤ ├──────────────────┤
-│ boto3     ││ anthropic  │  │ openai SDK ││openai SDK │ │ boto3            │
-│ lambda    ││ SDK Mantle │  │            ││           │ │ bedrock-runtime  │
+│ boto3     ││ boto3      │  │ openai SDK ││openai SDK │ │ boto3            │
+│ lambda    ││ Converse   │  │            ││           │ │ bedrock-runtime  │
 ├───────────┤├────────────┤  ├────────────┤├───────────┤ ├──────────────────┤
-│ Qwen 0.5B ││ claude-    │  │ llama-3.1- ││ MiniLM    │ │ cohere.embed-    │
-│ CPU, GGUF ││ sonnet-5   │  │ 8b         ││ 384-dim   │ │ english-v3       │
+│ Qwen2.5-  ││ qwen.      │  │ llama-3.1- ││ MiniLM    │ │ cohere.embed-    │
+│ 0.5B GGUF ││ qwen3-32b  │  │ 8b         ││ 384-dim   │ │ english-v3       │
 └───────────┘└────────────┘  └────────────┘└───────────┘ └──────────────────┘
- INTAKE PARSE  built, not      3 GENERAL     current       built, needs
-  (phase D)     routed          PATHS        embeddings     the route (C)
+ INTAKE PARSE  OUTREACH       OPENING Q,     current       EMBEDDINGS
+  (phase D)    (phase E)      FIT            fallback      (phase C)
+
+ (BedrockChatProvider · Sonnet 5 stays registered but unrouted — an escape
+  hatch, not part of the plan.)
 ```
 
 ### New/changed files
@@ -262,7 +305,8 @@ less headroom on unusual input than a large model.
 | `app/llm/providers/{chat,embeddings}.py` — add `"bedrock"`, route the facades | ✅ steps 5, 7 |
 | `app/llm/providers/routing.py` — `LlmTask`, per-task resolution | ✅ step 6 |
 | `app/llm/{intake,fit,outreach}/service.py` — `task=` kwarg | ✅ step 7 |
-| Fallback + circuit breaker (§3.3) | deferred — see below |
+| `app/llm/providers/bedrock_qwen_chat.py` — `BedrockQwenChatProvider` (Converse API) | phase E |
+| Retry + circuit breaker (§3.3) | deferred — see below |
 | `supabase/migrations/20260813_properties_embedding.sql` — pgvector column + HNSW | ✅ phase B |
 | `app/db/property_row.py` — `embedding`, `embedding_model`, `embedded_at` | ✅ phase B |
 | `app/repositories/properties.py` — write + k-NN + pending-row helpers | ✅ phase B |
@@ -360,50 +404,81 @@ class QwenLambdaProvider:
 - Invoke over IAM rather than a Function URL — no public endpoint to secure.
 - Reuse `split_system_prompt` from `bedrock_chat.py`.
 
-## 6. Bedrock — the parts worth paying for
+## 6. The paid models — Cohere embeddings, Qwen3-32B outreach
 
 ### 6.1 Embeddings — `cohere.embed-english-v3`
 
-`bedrock-runtime` `InvokeModel`, versioned model IDs.
+`bedrock-runtime` `InvokeModel`, versioned model IDs. `BedrockEmbeddingsProvider` is already
+built and tested; phase C routes it.
 
-| Candidate | Dims | Batch/call | Fit |
-|---|---|---|---|
-| **`cohere.embed-english-v3`** | 1024 | ~96 | ✅ recommended |
-| `cohere.embed-multilingual-v3` | 1024 | ~96 | ✅ if non-English listings appear |
-| `amazon.titan-embed-text-v2:0` | 1024 | **1** | ⚠️ needs fan-out |
+**Decision record — why not Qwen3-Embedding-0.6B on Lambda.** A self-hosted Qwen embedder was
+considered (family purity with the rest of this plan, $0 on the free tier) and rejected:
 
-Cost after §15 is roughly **$0.00002 per search** — the cheapest meaningful upgrade available
-(384-dim MiniLM → 1024-dim Cohere v3).
+| | Cohere v3 (Bedrock) | Qwen3-Embedding-0.6B (Lambda CPU) |
+|---|---|---|
+| Dimensions | 1024 | 1024 native — either fits `vector(1024)` |
+| Quality | strong, served at full precision | benchmark-comparable at full precision, but a GGUF quant on CPU erodes an unvalidated amount — and embedding degradation is *silent* (worse neighbours, no error) |
+| Query-path latency | managed, no cold starts | a cold start adds seconds to similar-listings, a user-facing read |
+| Cost | ~$0.00002/search — cents/month | $0 |
+| Code | **zero** — provider exists with 18 tests | second container image, new provider, warmer, quant tuning |
+| Backfill | ~96 texts/call + batch API at ~50% rate | CPU-bound, slow wall-clock |
 
-Implementation: chunk to `bedrock_embedding_batch_size` (96); **preserve order** —
-`similar_listings.py:61` zips vectors positionally against candidate rows, so reordering silently
-mis-scores every listing; assert `len(vectors) == len(texts)`.
+Cents per month do not pay for a second deployable plus a silent-quality risk on the one path
+where wrongness is invisible. Embeddings are also the least Qwen-specific choice here — nothing
+downstream cares what produced the vectors. If non-English listings appear,
+`cohere.embed-multilingual-v3` (same dims, same API) is the swap — at the price of a corpus
+re-embed, since vectors from different models are never comparable (`embedding_model` provenance
+exists exactly for this). §21 keeps Qwen3-Embedding as a recorded alternative with its trigger.
 
-⚠️ **The boto3 client must be built lazily.** Unlike `AsyncAnthropicBedrockMantle`, which
-constructs fine with a blank region (and merely yields an unusable URL), `boto3.client()` *raises*
-— `ValueError` for `""`, `NoRegionError` for `None`. An eager module-level client would therefore
-fail at import on every machine where `AWS_REGION` is unset, including CI. The provider builds it
-on first use, behind the region guard, and two tests pin that.
+Implementation notes: chunk to `bedrock_embedding_batch_size` (96); **preserve order** —
+the backfill (`listing_embeddings.py:47-54`) zips vectors positionally against listing rows and
+hard-fails on a count mismatch, so a provider that reorders or drops silently mis-assigns every
+vector; assert `len(vectors) == len(texts)` inside the provider too. (The query path embeds only
+the seed — one text — so ordering bites the backfill, not the search.) Cohere v3 requires an
+`input_type`; this is *symmetric* similarity (the query is itself a listing), so use
+`search_document` on **both** sides — mixing types produces valid but mutually miscalibrated
+vectors that no test will catch.
 
-### 6.2 Chat — built, not routed
+⚠️ **boto3 clients must be built lazily** (applies to every boto3-backed provider here).
+`boto3.client()` *raises* on a blank region — `ValueError` for `""`, `NoRegionError` for `None` —
+so an eager module-level client fails at import wherever `AWS_REGION` is unset, including CI.
+Build on first use behind the region guard; tests pin it.
 
-`BedrockChatProvider` (implemented, step 3) via `AsyncAnthropicBedrockMantle`. Model IDs carry an
-`anthropic.` prefix and no date suffix. Four adaptations, all inside the provider:
+### 6.2 Outreach chat — `qwen.qwen3-32b` via the Converse API
 
-**(a) `system` is a top-level parameter**, not a message — `split_system_prompt` handles it.
+Bedrock serves the Qwen3 chat family serverless, pay-per-token. Qwen3-32B (dense) is the fit for
+outreach prose — the Coder variants and the 235B MoE are the wrong tool. **Check region
+availability before phase E**: the Qwen3 models launched in a subset of regions, and the region
+is shared with everything else in this document.
 
-**(b) `temperature` is dropped.** Claude 4.7+ rejects it; Sonnet 5 rejects non-default values.
+This needs a **new provider, `BedrockQwenChatProvider`** — the existing `BedrockChatProvider`
+is built on the Anthropic SDK and can only call Anthropic models. Design points:
 
-**(c) Structured output via `messages.parse(output_format=...)`** — the SDK generates the schema
-and validates client-side, so no hand-written normaliser is needed.
+**(a) boto3 `bedrock-runtime` `converse`**, wrapped in `anyio.to_thread.run_sync` — the same
+pattern as `bedrock_embeddings.py`, and the same lazy-client rule.
 
-**(d) Thinking off** (`bedrock_disable_thinking`). Adaptive thinking counts against `max_tokens`,
-and callers size it at 800/200 for models without thinking.
+**(b) Structured output via a forced tool call.** Converse has no `messages.parse`. Define one
+tool whose input schema is `response_format.model_json_schema()`, force it with
+`toolChoice: {"tool": ...}`, and `model_validate` the returned `toolUse` input. On
+`ValidationError`: one retry, then the §8 parse-failure error.
+
+**(c) `temperature` is honoured** — unlike the Anthropic path, which drops it. Routing is
+per-task precisely so these asymmetries stay inside providers.
+
+**(d) Thinking off.** Qwen3 is a hybrid-thinking family; for a structured outreach draft,
+thinking burns `max_tokens` for no benefit. Disable it via `additionalModelRequestFields` (and
+verify against the deployed model — the switch is model-revision-specific).
+
+**(e) `system` as a top-level parameter** — reuse `split_system_prompt`.
+
+`BedrockChatProvider` (Sonnet 5) stays registered but unrouted, as before — an escape hatch if
+Qwen3-32B's outreach quality disappoints, at ~$30/mo.
 
 ### 6.3 Batch inference
 
-S3 JSONL in, S3 out, ~half the on-demand rate, separate quota pool. Used for the §15 embedding
-backfill and nightly re-embedding. One-off cost, no standing charge.
+S3 JSONL in, S3 out, ~half the on-demand rate, separate quota pool. An option for the initial §15
+embedding backfill if the corpus is large; the 30-minute pull schedule covers steady state either
+way. One-off cost, no standing charge.
 
 ### 6.4 Guardrails
 
@@ -422,13 +497,38 @@ As implemented in step 1:
 # so are not repeated in Settings.
 aws_region: str = ""
 
-bedrock_chat_model: str = "anthropic.claude-sonnet-5"
+bedrock_chat_model: str = "anthropic.claude-sonnet-5"   # escape hatch, unrouted
 bedrock_effort: str = "low"
 bedrock_disable_thinking: bool = True
-bedrock_embedding_model: str = "cohere.embed-english-v3"
+bedrock_embedding_model: str = "cohere.embed-english-v3"  # routed in phase C
 bedrock_embedding_batch_size: int = 96
 bedrock_input_cost_per_1m: float = 0.0
 bedrock_output_cost_per_1m: float = 0.0
+```
+
+Added by this revision (phases D–E):
+
+```python
+# Outreach chat on Bedrock (Converse API). Versioned ID, qwen. prefix.
+bedrock_qwen_chat_model: str = "qwen.qwen3-32b-v1:0"
+bedrock_qwen_disable_thinking: bool = True
+
+# Intake-parse Lambda. Empty name disables the provider (503 via §8),
+# mirroring how a missing region behaves.
+qwen_inference_function_name: str = ""      # Qwen2.5-0.5B FT — intake parse
+```
+
+Planned by §14.1 (phase F — **not yet in `config.py`**):
+
+```python
+# FIFO queue carrying LLM intake turns to the Lambda consumer. Empty disables queueing
+# and the endpoint runs the turn inline — which is what local dev and the test suite do.
+sqs_chat_queue_url: str = ""
+# How long an enqueued turn may sit unresolved before the SSE stream gives up. Must exceed
+# visibility timeout x maxReceiveCount (180s x 3 = 540s), or a job still legitimately
+# retrying looks dead to the client while SQS is still entitled to redeliver it.
+chat_job_timeout_seconds: float = 600.0
+chat_job_poll_interval_seconds: float = 0.75
 ```
 
 > Deviation from earlier drafts: `aws_access_key_id` / `aws_secret_access_key` /
@@ -451,13 +551,46 @@ invoking a far more expensive model:
     { "Effect": "Allow", "Action": ["bedrock:InvokeModel"],
       "Resource": [
         "arn:aws:bedrock:<region>::foundation-model/cohere.embed-english-v3",
-        "arn:aws:bedrock:<region>::foundation-model/anthropic.claude-sonnet-5"
+        "arn:aws:bedrock:<region>::foundation-model/qwen.qwen3-32b-v1:0"
       ] },
+    { "Effect": "Allow", "Action": ["lambda:InvokeFunction"],
+      "Resource": "arn:aws:lambda:<region>:<acct>:function:qwen-inference-prod" },
+    { "Effect": "Allow", "Action": ["sqs:SendMessage"],
+      "Resource": "arn:aws:sqs:<region>:<acct>:chat-intake.fifo" }
+  ]
+}
+```
+
+The escape-hatch model (Sonnet 5) is **not** in the policy — least privilege means a route flip
+to it is an IAM change too, which is the point: no config typo can invoke a model that was never
+granted.
+
+The **API** role sends only. The `chat-intake-worker` **execution** role is separate and gets the
+receive side plus its own invoke rights — the API has no reason to consume the queue, and
+splitting them means a compromised Vercel key cannot drain pending turns. Intake turns run on the
+Qwen inference Lambda, so the worker invokes that, not Bedrock:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow",
+      "Action": ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"],
+      "Resource": "arn:aws:sqs:<region>:<acct>:chat-intake.fifo" },
     { "Effect": "Allow", "Action": ["lambda:InvokeFunction"],
       "Resource": "arn:aws:lambda:<region>:<acct>:function:qwen-inference-prod" }
   ]
 }
 ```
+
+Queue settings that are not defaults and matter:
+
+| Setting | Value | Why |
+|---|---|---|
+| Queue type | **FIFO**, high-throughput mode | per-session ordering (§14.1); dedupe on `job_id` |
+| `visibilityTimeout` | **180s** | must exceed `BR_READ_TIMEOUT` (75s) plus retries, or a still-running turn is redelivered |
+| `maxReceiveCount` | **3** → DLQ | bounded redelivery; alarm on DLQ depth |
+| Event source concurrency | **capped** | Lambda scaling must not outrun the Bedrock quota (§13.1) |
 
 ### Dependencies
 
@@ -488,6 +621,13 @@ Implemented in step 2.
 | `ValidationError` on the reply | `raise_bedrock_completion_parse_failed` | 502 |
 | `stop_reason == "refusal"` | `raise_bedrock_structured_refusal` | 502 |
 | `stop_reason == "max_tokens"` | `raise_bedrock_structured_reply_incomplete` | 502 |
+| SQS `SendMessage` fails (§14.1) | `raise_service_unavailable` | 503 |
+| Unknown/foreign `job_id` (§14.1) | `raise_intake_job_not_found` | 404 |
+
+§14.1 reuses this table's *classification* — retryable (503/504) vs terminal (502) — but not
+only its rows: the worker also touches OpenRouter for the next-question generation, so the
+OpenRouter/HF raisers need the same retryable/terminal assignment before the worker's catch
+clauses can be written (see §14.1).
 
 Chat and embeddings reach Bedrock through different SDKs, so `BedrockTimeout` and
 `BedrockCallFailure` union both. User-facing copy is identical across providers — pinned by a test.
@@ -498,10 +638,10 @@ Keep the `llm_call` record compatible with `openrouter.py:89-101` so SolarWinds 
 existing dashboards survive:
 
 ```
-provider="qwen"|"bedrock"|"openrouter", model=..., task="intake_parse",
-outcome=..., duration_ms=..., prompt_tokens=..., completion_tokens=...,
-total_tokens=..., cache_read_input_tokens=..., estimated_cost_usd=...,
-fallback_used=false, model_version="qwen-ft-2026-01"
+provider="qwen"|"bedrock_qwen"|"bedrock"|"openrouter", model=...,
+task="intake_parse", outcome=..., duration_ms=..., prompt_tokens=...,
+completion_tokens=..., total_tokens=..., cache_read_input_tokens=...,
+estimated_cost_usd=..., retry_used=false, model_version="qwen-ft-2026-01"
 ```
 
 `task` and `model_version` are what let you answer "did the retrain regress intake parsing?"
@@ -513,12 +653,12 @@ Every provider takes an injectable client, so no network access is required.
 
 | Test | Asserts |
 |---|---|
-| `test_routing::*` | ✅ 21 tests — per-task pins, fall-through to default, auto, unknown-pin raises, table coverage |
+| `test_routing::*` | ✅ 19 test functions (more collected via parametrize) — per-task pins, fall-through to default, auto, unknown-pin raises, table coverage |
 | `test_bedrock_chat::*` | ✅ 16 tests — system split, temperature dropped, thinking off, stop-reason mapping, error mapping |
 | `test_bedrock_embeddings::*` | ✅ 18 tests — batching, **input order preserved**, lazy client, botocore error mapping |
 | `test_exceptions::test_user_facing_copy_does_not_vary_by_provider` | ✅ copy pinned across providers |
 | `test_chat::test_forwards_task_to_the_router` | ✅ a dropped `task=` kwarg fails loudly |
-| `test_routing::test_infra_error_triggers_fallback` | deferred with §3.3 |
+| `test_routing::test_infra_error_triggers_retry` | deferred with §3.3 — retry same function only, never another provider |
 | `test_qwen_lambda::test_temperature_forwarded` | Qwen **does** get `temperature` |
 
 ⚠️ **A trap that bit three times.** Test config helpers build a bare `MagicMock`, whose unset
@@ -530,6 +670,19 @@ Plus a **grammar conformance test in the Lambda image build**: generate N output
 model under the grammar and assert every one validates. That is the check that catches a schema
 change silently breaking §5.3.
 
+§14.1 adds three tests that are worth naming, because each pins a decision that is invisible in
+the code and easy to regress:
+
+| Test | Pins |
+|---|---|
+| second delivery of a claimed job is a no-op | the conditional `queued → running` claim — the only thing standing between redelivery and a double provider charge |
+| queue-disabled mode returns the same `202` contract | that no test or local dev needs a queue, so the fallback path cannot silently rot |
+| transient raisers requeue, terminal raisers do not | the §8 classification the worker depends on |
+
+Ordering itself is **not** unit-testable — it is a FIFO queue guarantee, not application logic. What
+the tests can pin is that the publisher always sets `MessageGroupId` to the session id; if that
+assertion ever goes green on a null group, ordering is gone and nothing else would notice.
+
 ---
 
 # Part II — Scaling within the free tier
@@ -539,7 +692,7 @@ change silently breaking §5.3.
 | Limitation today | Consequence |
 |---|---|
 | `find_similar_listings` embeds up to **101 texts per request** | Re-embeds the same listings forever; cost and latency scale with pool size |
-| No queue | A slow provider call becomes a user-visible 5xx |
+| No queue on the intake path | A slow provider call becomes a user-visible 5xx **and loses the user's typed answer** — addressed by §14.1 |
 | No caching | Every identical prompt pays full price |
 
 **§15 is the highest-impact item in this document and costs nothing.** Note what is *not* on this
@@ -578,70 +731,236 @@ What this means concretely:
 
 ### 13.1 The Lambda inventory
 
-> **Only the Qwen functions are actually planned.** Phase B shipped embedding as a
-> GitHub Actions pull schedule (§15), so none of the ingest Lambdas below were built —
-> they would have duplicated the ingestion microservice. They stay recorded because they
-> are the right shape *if* ingestion moves onto AWS, not because anything is pending.
+> **The Qwen functions and `chat-intake-worker` are the planned ones.** Phase B shipped
+> embedding as a GitHub Actions pull schedule (§15), so none of the *ingest* Lambdas below
+> were built — they would have duplicated the ingestion microservice. They stay recorded
+> because they are the right shape *if* ingestion moves onto AWS, not because anything is
+> pending. `chat-intake-worker` is different: it is on the critical path for §14.1 and is
+> the first function here that must actually exist for a user-facing flow to work.
 
 | Function | Trigger | Job | Status |
 |---|---|---|---|
-| **`qwen-inference`** | `lambda:Invoke` from the API | **Run the 0.5B, return grammar-constrained JSON** | phase D |
+| **`qwen-inference`** | `lambda:Invoke` from the API / worker | **Run the 0.5B FT, return grammar-constrained JSON** | phase D |
 | `qwen-warmer` | EventBridge, every 5 min | Keep one environment warm (§5.4) | phase D |
+| **`chat-intake-worker`** | SQS `chat-intake.fifo` | **Run one intake turn, write the result to `intake_jobs`** | phase F — §14.1 |
 | `listing-ingest` | S3 `ObjectCreated` on `raw-listings/` | Normalise feed → upsert row → enqueue embed | not built — §15 |
 | `embed-worker` | SQS | Bedrock Cohere v3 → write vector | not built — §15 |
 | `batch-manifest-builder` | EventBridge (nightly) | Pending listings → JSONL → S3 → `CreateModelInvocationJob` | not built |
 | `batch-result-loader` | EventBridge (job completion) | Read S3 results → write vectors | not built |
 
-All within the free tier. Two constraints that apply if the queue-driven shape is ever adopted:
+All within the free tier. Two constraints apply to every queue-driven function here — and, with
+§14.1, they stop being hypothetical:
 
-- **Cap event-source concurrency** on `embed-worker` so Lambda's willingness to scale cannot
-  outrun the Bedrock quota.
-- **Idempotency keys** (a unique column in Postgres, or DynamoDB's free tier). SQS redelivery is
-  normal; without a dedupe check a retry burns a second Bedrock call for a result you already have.
+- **Cap event-source concurrency** so Lambda's willingness to scale cannot outrun the provider
+  quota. Uncapped, the queue's only effect under load is to deliver the overload faster.
+- **Idempotency keys.** SQS redelivery is normal; without a dedupe check a retry burns a second
+  provider call for a result you already have. §14.1 uses the `intake_jobs` row and its
+  conditional `queued → running` claim; the ingest path would need its own.
 
-The pull schedule sidesteps both: it re-selects rows by state rather than consuming a queue, so
-a re-run cannot double-charge, and concurrency is one job.
+The embedding pull schedule sidesteps both: it re-selects rows by state rather than consuming a
+queue, so a re-run cannot double-charge, and concurrency is one job. That escape hatch is not
+available to intake, which is why §14.1 has to solve both properly.
 
 ## 14. Queue and backpressure
 
 SQS is free to 1M requests/month — comfortably beyond current volume.
 
-```
-        Vercel (Next.js frontend + FastAPI backend)
-                            │
-        ┌───────────────────┼────────────────────┬─────────────────┐
-        ▼                   ▼                    ▼                 ▼
-┌───────────────┐  ┌─────────────────┐  ┌───────────────┐ ┌────────────────┐
-│ Lambda        │  │ Bedrock         │  │ OpenRouter    │ │ Supabase       │
-│ qwen-         │  │ cohere-v3       │  │ llama-3.1-8b  │ │ Postgres       │
-│ inference     │  │ Guardrails      │  │ (3 chat paths)│ │ + pgvector     │
-└───────────────┘  │ batch           │  └───────────────┘ └────────────────┘
-                   └─────────────────┘                             ▲
-        ┌───────────────────────────────────────────────┐          │
-        │  S3 raw-listings/ ─▶ Lambda listing-ingest    │──────────┘
-        │           └─▶ SQS ─▶ Lambda embed-worker ─────┼──▶ Bedrock
-        │                        └─▶ DLQ (alarmed)      │
-        └───────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    FE["Next.js frontend"]
+    API["FastAPI backend · Vercel"]
+
+    FE -->|POST answers/llm| API
+    API -->|202 + job_id| FE
+
+    subgraph QUEUED["Interactive · QUEUED — intake parse"]
+        direction LR
+        Q[["SQS chat-intake.fifo<br/>MessageGroupId = session_id<br/>MessageDeduplicationId = job_id"]]
+        CIW["Lambda<br/>chat-intake-worker<br/>capped concurrency"]
+        DLQ1[["DLQ · alarmed"]]
+        Q --> CIW
+        Q -.->|after 3 receives| DLQ1
+    end
+
+    subgraph SYNC["Interactive · SYNC — opening question, fit, outreach"]
+        direction LR
+        PROV["OpenRouter · Bedrock qwen3-32b<br/>(worker routes intake to qwen-inference λ)<br/>bounded retry §3.3 → degrade"]
+    end
+
+    subgraph DEFERRED["DEFERRED — embedding ingest and backfill"]
+        direction LR
+        S3[("S3 raw-listings/")] --> LIN["Lambda<br/>listing-ingest"]
+        LIN --> ESQS[["SQS"]]
+        ESQS --> EW["Lambda<br/>embed-worker"]
+        ESQS -.-> DLQ2[["DLQ · alarmed"]]
+    end
+
+    JOBS[("intake_jobs")]
+    PG[("Supabase Postgres<br/>+ pgvector")]
+    BR["Bedrock<br/>cohere-v3"]
+
+    API ==>|enqueue| Q
+    CIW --> PROV
+    CIW -->|result / error| JOBS
+    JOBS -.->|SSE frames, poll fallback| API
+
+    API --> PROV
+
+    EW --> BR
+    EW --> PG
 ```
 
 | Class | Path | Under pressure |
 |---|---|---|
-| **Interactive** — intake parse, opening question | Sync → Qwen Lambda / OpenRouter | Bounded retry; then fallback (§3.3); then degrade |
+| **Interactive, queued** — intake parse | SQS FIFO → Lambda → provider; client reads the result over SSE | Backlog absorbs the burst. Visible as latency, not as a 5xx |
+| **Interactive, sync** — opening question, fit, outreach | Sync → OpenRouter / Bedrock Qwen3-32B | Bounded retry (§3.3); then degrade |
 | **Deferred** — embedding ingest and backfill | SQS → Lambda → Bedrock | Queued. No user impact |
-
-Fit explanation and outreach draft stay synchronous for now — moving them behind SQS needs a
-job-status endpoint and client polling, which is real product work. §21 records the trigger.
 
 Mechanics: visibility timeout > worst-case latency; `maxReceiveCount` → DLQ + CloudWatch alarm;
 capped event-source concurrency; idempotency keys.
 
+Fit explanation and outreach draft stay synchronous. They are one-shot generations with no shared
+mutable state, so they gain far less from queueing than intake does and would each need their own
+job surface. §21 keeps the trigger.
+
+### 14.1 Intake turns through SQS
+
+**Reversal.** Earlier drafts of this section kept every interactive path synchronous. Intake parse
+is now queued. What changed is not the capacity argument — §12 still holds, and a queue adds
+buffering rather than throughput — but the failure mode: a provider stall on the intake path
+currently surfaces as a 5xx mid-conversation, and the user's typed answer is lost. A durable job
+row makes the turn survivable and gives redelivery something to be idempotent against.
+
+Be clear about what this does **not** buy. It does not raise the Bedrock quota, it does not make a
+slow turn fast, and under sustained overload it converts a fast rejection into a growing wait.
+The queue protects the *user's input*; admission control protects the *provider*. They solve
+different problems and neither substitutes for the other.
+
+⚠️ **Admission control does not exist yet on this path — that is a phase F blocker, not a nice-to-
+have.** An earlier draft claimed the existing `ApiKeyRateLimiter` protects the provider; the audit
+found that limiter guards only MCP API-key routes (`core/deps.py:37`). The actual endpoint
+(`answers/llm.py:34`) has **no rate limit and no session-ownership check** — anyone holding a
+session UUID can trigger a paid model call. Today that costs a 5xx under abuse; behind a queue it
+becomes unbounded spend, because every anonymous POST durably enqueues a job the worker will
+faithfully pay for. Phase F therefore ships with: a per-session and per-IP rate limit on the
+enqueue endpoint, verification that the caller owns the intake session, and a cap on queued jobs
+per session (one in-flight turn per session is the natural limit — FIFO ordering already implies
+it).
+
+#### The contract
+
+`POST /intake-sessions/{id}/answers/llm` stops returning the turn result:
+
+| | Before | After |
+|---|---|---|
+| `POST .../answers/llm` | `200 SubmitLlmIntakeInputResponse` | `202 {job_id, status}` |
+| Result delivery | the same response | SSE `GET .../jobs/{job_id}/stream` |
+| Fallback | — | `GET .../jobs/{job_id}` poll, if the stream drops |
+
+The SSE stream is the primary channel and polling is the fallback, not the reverse: a dropped
+EventSource with no fallback strands a job that has already been paid for.
+
+#### FIFO, not standard — the one non-negotiable
+
+`save_intake_criteria` merges each turn into the session's accumulated criteria. Two turns for one
+session processed concurrently, or out of order, silently overwrite each other's extractions — the
+user answers a question and watches the answer disappear.
+
+So: **FIFO queue, `MessageGroupId = session_id`.** Ordering is guaranteed within a group, and
+groups are independent, so different sessions still process fully in parallel — the ordering
+guarantee costs no throughput that matters here. `MessageDeduplicationId = job_id` makes a retried
+publish inside the 5-minute window a no-op.
+
+Ceiling: FIFO in high-throughput mode does ~3,000 msg/s with batching (~70M/day (roughly)), well
+past the ~500 req/s §12 derives from Lambda concurrency. FIFO is not the binding constraint.
+
+#### `public.intake_jobs`
+
+One row per turn. It is the result store *and* the idempotency ledger — §13.1 already requires the
+latter for any queue-driven path, and SQS at-least-once delivery makes it mandatory rather than
+prudent.
+
+| Column | Note |
+|---|---|
+| `id`, `session_id` | `session_id` scopes reads, so a job id alone cannot read across sessions |
+| `status` | `queued` → `running` → `succeeded` \| `failed` |
+| `input` | the user's text, so a redrive can replay the turn |
+| `result jsonb` | the `SubmitLlmIntakeInputResponse` payload |
+| `error`, `attempts` | `attempts` surfaces a redelivery loop before the DLQ does |
+
+Two details worth pinning:
+
+- **The claim is the idempotency gate.** The worker moves `queued → running` with the update
+  filtered on `status = 'queued'`. A redelivered message whose job already ran matches no row, and
+  the worker drops it instead of paying for a second provider call.
+- **`attempts` increments in a trigger**, not in the worker. PostgREST cannot express
+  `attempts = attempts + 1`, and a read-then-write from the consumer races concurrent redelivery.
+  Counting the `queued → running` transition server-side keeps it exact.
+
+Rows are written **before** the SQS publish. A row with no message is visible and retryable; a
+message with no row is undiagnosable when the consumer picks it up.
+
+#### The worker
+
+`chat-intake-worker` consumes the FIFO queue and calls the same pipeline the endpoint used to run
+inline — extracted to `app/services/intake_llm.py` so it imports nothing FastAPI-specific.
+
+Failure classification decides redelivery, and getting it backwards is expensive in both
+directions:
+
+| Fault | Job lands on | Why |
+|---|---|---|
+| Throttling, timeout (503/504 raisers) | back to `queued` | transient; let redelivery retry it |
+| Refusal, parse failure, incomplete reply | `failed` | deterministic; redelivery burns quota re-earning the same error |
+
+⚠️ The classification must cover **every provider the turn touches, not just §8's Bedrock
+raisers**: an intake turn runs the parse on the Qwen Lambda *and* generates the next question via
+OpenRouter (`service.py:102`), so the OpenRouter/HF raisers (`raise_ai_unavailable` and friends)
+need retryable/terminal assignments too — and the worker bundle needs the OpenRouter key in its
+environment, which the packaging list below must include.
+
+The handler reports **partial batch failures** (`batchItemFailures`) so one poison message does not
+redrive its whole batch.
+
+#### Queue-disabled mode
+
+An empty `SQS_CHAT_QUEUE_URL` runs the turn inline and writes a terminal job row. The client
+contract is byte-identical either way — still `202`, still a job to follow — so local dev and the
+existing test suite need no queue, and no test is rewritten to accommodate one.
+
+#### Where the code lands
+
+| File | Change |
+|---|---|
+| `supabase/migrations/*_intake_jobs.sql` | new — table, RLS, indexes, `attempts` trigger |
+| `app/services/intake_llm.py` | new — `run_llm_intake_turn()`, extracted from the endpoint |
+| `app/clients/sqs.py` | new — `ChatJobQueue`, boto3 via `anyio.to_thread` per `bedrock_embeddings` |
+| `app/repositories/intake_jobs.py` | new — create / get / claim / complete / fail |
+| `app/workers/chat_job_worker.py` | new — the Lambda handler |
+| `app/api/.../answers/llm.py` | POST becomes insert + enqueue + `202`, behind **session-ownership check + per-session/per-IP rate limit** (the phase F blocker above) |
+| `app/api/.../answers/jobs.py` | new — SSE stream + poll endpoints |
+| `app/schemas/intake_sessions.py` | `EnqueuedLlmIntakeJobResponse`, `IntakeJobStatusResponse` |
+| `frontend/services/intake-sessions.ts` | `enqueueLlmInput`, `subscribeToJob` |
+| `frontend/hooks/use-intake-job.ts` | new — EventSource lifecycle, polling fallback on `onerror` |
+| `frontend/components/search/wizard/modes/llm/panels/chat/index.tsx` | `handleSend` holds its optimistic message until the job resolves |
+
+#### The cost this choice carries
+
+The consumer cannot live on Vercel — there is no long-lived process to run a receive loop, and §13
+pins the API tier there. Lambda is therefore the only shape available without reopening §13, and
+it means **packaging a second deployable**: `app/llm`, `app/services`, `app/repositories`,
+`app/domain`, `app/schemas` plus boto3, anthropic and supabase. Provider configuration and the
+Supabase service-role key now have to exist in two places, and drift between them is a new failure
+mode that did not exist before this section.
+
 ## 15. Vector search on pgvector — the biggest win, for $0
 
-**Today:** every similar-listings request embeds the seed plus up to 100 candidates
-(`similar_listings.py:52-55`), then computes cosine similarity in Python
-(`app/domain/similarity.py`). The same listings are re-embedded on every request, forever.
+**Before phase B:** every similar-listings request embedded the seed plus up to 100 candidates,
+then computed cosine similarity in Python (`app/domain/similarity.py`). The same listings were
+re-embedded on every request, forever.
 
-**Target:** embed each listing **once at ingest**; at query time embed only the seed.
+**Now (phase B ✅):** each listing is embedded **once at ingest**; at query time only the seed is
+embedded (`similar_listings.py:41`) — one provider call regardless of corpus size.
 
 ```
 INGEST  (off the request path — runs once per listing, ever)   ✅ implemented
@@ -722,9 +1041,10 @@ speculative. Put the upsert and k-NN query in `app/repositories/properties.py` a
 existing `list_similar_candidate_rows`, matching how the rest of the codebase is organised. Extract
 a protocol only if a second store ever appears.
 
-**Migration:** add a `vector(1024)` column and an HNSW index, then backfill through Bedrock batch
-(§6.3). Dimension is fixed by the model; changing it later means a full re-index, so treat that
-choice as durable.
+**Migration:** the `vector(1024)` column and HNSW index shipped in phase B, and Cohere v3's
+1024 dims fit it unchanged; the backfill runs through the existing pull schedule (or Bedrock
+batch, §6.3, if the corpus warrants it). Dimension is fixed by the model; changing it later
+means a new column and a full re-index, so treat the choice as durable.
 
 ## 16. Caching without ElastiCache
 
@@ -782,12 +1102,15 @@ CloudWatch Logs is free to 5 GB/month ingest — adequate, with retention set.
 - **Skip X-Ray and Firehose/Athena for now** — both add cost for observability the current volume
   does not need.
 
-Alarms that matter: **`fallback_used` rate**, Qwen p99 duration and cold-start rate, Lambda
+Alarms that matter: **`retry_used` rate**, Qwen p99 duration and cold-start rate, Lambda
 throttles, SQS depth and DLQ depth, Bedrock error rate.
 
 **Abuse control:** per-tenant budgets enforced in application code — the defence against one
 account or a compromised key consuming the Bedrock budget. Pure application logic; nothing in AWS
-does it for you, and it costs nothing to add.
+does it for you, and it costs nothing to add. Note this is the *second* layer: the first —
+rate limiting and ownership checks on the intake endpoint itself — does not exist yet and is a
+phase F blocker (§14.1); budgets cap the damage a legitimate account can do, admission control
+stops anonymous traffic from spending anything at all.
 
 ## 20. Cost summary
 
@@ -796,18 +1119,20 @@ does it for you, and it costs nothing to add.
 | Lambda (`qwen-inference` + workers + warmer) | **$0** — perpetual free tier |
 | SQS | **$0** — perpetual free tier |
 | pgvector | **$0** — existing Supabase |
+| Bedrock embeddings (Cohere v3) | **cents** — ~$0.00002/search after §15 |
+| Bedrock `qwen.qwen3-32b` (outreach) | **low $** — pay-per-token, volume-bound |
 | CloudWatch Logs | **~$0** — 5 GB free |
 | S3 | **cents** |
 | ECR | **~$0.10–0.20** |
-| Bedrock embeddings | **cents** — ~$0.00002/search after §15 |
-| OpenRouter (3 chat paths) | current bill, ~$0 |
-| **Total added** | **under ~$1/month** |
+| OpenRouter (opening question, fit) | current bill, ~$0 |
+| **Total added** | **a few $/month, all usage-based — no standing charges** |
 
-One-off: the embedding backfill through Bedrock batch, priced by corpus size at ~50% of on-demand.
+One-off: the embedding backfill, through the pull schedule or Bedrock batch (~50% of on-demand),
+priced by corpus size.
 
 Largest savings levers, already applied: ingest-time embeddings (§15), pgvector over OpenSearch
-(§15), Vercel over Fargate+NAT (§13), in-process caching over ElastiCache (§16), and keeping the
-three general chat paths on OpenRouter (§3.1).
+(§15), Vercel over Fargate+NAT (§13), in-process caching over ElastiCache (§16), and keeping
+opening question + fit on OpenRouter (§3.1).
 
 ## 21. Deferred decisions and their triggers
 
@@ -818,8 +1143,10 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | **OpenSearch Serverless** | ~$350–700/mo floor | pgvector HNSW maintenance degrades write throughput on the primary, **or** hybrid keyword+vector search becomes a product requirement |
 | **Fargate + ALB + NAT** | ~$70/mo | Vercel's function timeout or bundle limit blocks a needed feature, **or** you want the 0.5B in-process to remove a network hop |
 | **ElastiCache** | ~$15/mo | Per-instance circuit breakers cause visible flapping, **or** a shared rate limiter becomes necessary for per-tenant budgets |
-| **Bedrock chat (Sonnet 5)** | ~$30/mo | OpenRouter output quality on fit/outreach measurably hurts conversion |
-| **Fit/outreach behind SQS** | $0 infra, real product work | p95 latency on those endpoints becomes a complaint |
+| **Bedrock chat (Sonnet 5)** | ~$30/mo | Qwen3-32B outreach quality, or OpenRouter quality on opening/fit, measurably hurts conversion |
+| **Qwen3-Embedding-0.6B on Lambda** | $0 + a second deployable + full re-embed | Embedding spend becomes a real line item, or an offline/air-gapped requirement appears — vectors from different models never mix, so this is a corpus re-embed, not a flag flip (§6.1) |
+| **Fit/outreach behind SQS** | $0 infra, real product work | p95 latency on those endpoints becomes a complaint. Intake already moved (§14.1); these did not, because they are one-shot generations with no shared mutable state |
+| **Polling-only instead of SSE** | negative — it is cheaper | Held-open SSE connections on Vercel become a visible line item (§14.1) |
 | **X-Ray, Firehose/Athena** | usage-based | Debugging a latency problem that CloudWatch cannot explain |
 | **Multi-region** | doubles most line items | A stated availability SLO |
 
@@ -827,19 +1154,27 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 
 | Phase | Work | Cost |
 |---|---|---|
-| ✅ **A — Routing layer** | Bedrock chat + embeddings providers, `routing.py`, `LlmTask`, `task=` on 4 call sites. Every route still `auto`. Fallback deferred (§3.3) | $0 |
+| ✅ **A — Routing layer** | Bedrock chat + embeddings providers, `routing.py`, `LlmTask`, `task=` on 4 call sites. Every route still `auto` | $0 |
 | ✅ **B — Ingest-time embeddings** | `vector(1024)` column + HNSW, repository write/k-NN helpers, `find_similar_listings` rewritten, batched backfill + script, 30-minute workflow | $0 |
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
-| **D — Qwen on Lambda** | Container image, GBNF grammars, `qwen_lambda.py`, warmer, memory tuning; route `intake_parse`. Ships with the fallback + circuit breaker (§3.3) | $0 |
-| **E — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
+| **D — Qwen 0.5B intake on Lambda** | `infra/qwen-lambda/` image, GBNF grammars, `qwen_lambda.py`, memory tuning; route `intake_parse=qwen`. Ships with the retry + circuit breaker (§3.3 — no cross-family fallback) | $0 |
+| **E — Outreach on Bedrock Qwen3-32B** | `BedrockQwenChatProvider` (Converse, forced tool call), `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen`, IAM grant, region check | per-token |
+| **F — Intake turns through SQS** | `intake_jobs` migration, pipeline extraction, `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook, **admission control on the enqueue endpoint — blocker, see §14.1** | $0 — SQS free to 1M/mo |
+| **G — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
 
-**Phase C is a deploy step, not a development step**, and it gates B: until embeddings are
-routed to Bedrock there are no vectors, and `find_similar_listings` excludes rows without one.
-Order of operations on first deploy: apply the migration → set the route → run the backfill →
-verify similar-listings.
+**Phase C is a deploy step, not a development step**, and it gates B: until embeddings are routed
+to Bedrock there are no vectors, and `find_similar_listings` excludes rows without one. Order of
+operations on first deploy: apply the migration → set the route → run the backfill → verify
+similar-listings.
 
-**A and B are free and account for most of the value.** They are worth completing even if C, D and
-E never happen.
+**A and B are free and account for most of the value**, and C costs cents; D and E are
+independent of each other and of C.
+
+**F is independent of C–E** — it changes how an intake turn is dispatched, not which provider runs
+it, so it works against whatever `llm_route_intake_parse` currently resolves to. It is also the
+only phase that changes a client-facing contract, so it is the one that cannot ship backend-first.
+Sequence it after the frontend job hook is merged behind the queue-disabled default, then set
+`SQS_CHAT_QUEUE_URL` to switch dispatch on.
 
 ## 23. Open questions
 
@@ -847,8 +1182,22 @@ E never happen.
    intake prompt? Every number in §12 and §20 follows from this. Benchmark before phase D.
 2. **Does the grammar path hold?** (§5.3) The single largest technical risk. Prove it against the
    real schemas early.
-3. **Retrain promotion gate** — a golden set in `eval/golden-sets/` and a pass threshold, so
+3. **Qwen3-32B region availability and Converse structured output** — confirm `qwen.qwen3-32b`
+   is servable in the chosen region, that thinking can be disabled there, and that the forced
+   tool call (§6.2) yields schema-valid outreach drafts at an acceptable rate. Benchmark before
+   phase E.
+4. **Retrain promotion gate** — a golden set in `eval/golden-sets/` and a pass threshold, so
    `model_version` telemetry (§9) has something to gate on.
-4. **Cold start tolerance** — is a few-second p99 on the first request after idle acceptable?
-5. **Listing corpus size** — decides whether pgvector HNSW is comfortable and when §21's OpenSearch
+5. **Cold start tolerance** — is a few-second p99 on the first request after idle acceptable?
+6. **Listing corpus size** — decides whether pgvector HNSW is comfortable and when §21's OpenSearch
    trigger might fire.
+7. **What does queueing intake do to perceived latency?** (§14.1) The turn now costs an enqueue, a
+   Lambda cold start, and an SSE round trip on top of the provider call. If that is materially
+   worse than today's synchronous path at p50, the queue is buying durability at a price the user
+   feels on every message. Measure before phase F ships to anyone.
+8. **SSE cost and connection ceiling on Vercel** — held-open connections bill for wall-clock and
+   are capped by function duration. Unknown whether the fallback is the exception or the norm under
+   real traffic; §21 records polling-only as the retreat.
+9. **Does `chat-intake-worker` justify a second deployable?** It duplicates provider config and the
+   Supabase service-role key into a Lambda bundle (§14.1). If that drift becomes a recurring
+   incident source, §21's Fargate row is the alternative that collapses it back to one runtime.
