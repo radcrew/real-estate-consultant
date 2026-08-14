@@ -849,8 +849,25 @@ def _connected_sentence(pieces: dict[str, str]) -> str | None:
         return None
     head = f"{random.choice(SENTENCE_OPENERS)}{pieces['property_type']}"
     head += f"{random.choice(TYPE_SUFFIXES)} in {pieces['location']}"
-    # Size before price reads more naturally than the reverse ("5,000 sqft, under $2M").
+    # Both orders, evenly. This was a fixed ``("size_sqft", "price")`` tuple, on the
+    # grounds that size first reads more naturally -- and that made the reverse order
+    # unlearnable in this shape. Every woven sentence in the set stated size before price,
+    # so a woven message stating price first put its size clause exactly where the model
+    # had only ever seen the sentence end. "I am gonna find a shop which is located in TX,
+    # costs more than $1M, size is larger than 1000sqft" returned no size at all, 8 runs
+    # out of 8; the same sentence with those two clauses swapped returned it 8 out of 8.
+    #
+    # The comma-joined form does emit both orders -- `random.sample` picks the keys in a
+    # random order -- which is why the set as a whole looked balanced enough at 122 to 55.
+    # It is balanced *across* shapes, not within this one, and the model conditions on the
+    # shape: naming the place mid-sentence is what the woven form teaches, and inside it
+    # price-then-size never occurred.
+    #
+    # Same defect as the DIRECTION wordings above, and kept symmetric for the same reason:
+    # a shape the generator never emits is not learned as rare, it is learned as impossible.
     tail = [pieces[key] for key in ("size_sqft", "price") if key in pieces]
+    if len(tail) == 2 and random.random() < 0.5:
+        tail.reverse()
     return head + "".join(_attach(part, first=i == 0) for i, part in enumerate(tail))
 
 

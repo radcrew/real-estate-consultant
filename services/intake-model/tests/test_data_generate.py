@@ -31,6 +31,7 @@ from pipeline.data.generate import (
     SQYD_UNITS,
     STATES,
     _bare_answer,
+    _connected_sentence,
     _field_fragment,
     _fmt_money,
     _next_question_key,
@@ -216,6 +217,33 @@ class TestMultiFieldShape:
                 if canonical == location and alias.lower() in text
             ]
             assert resolves, f"gold {location!r} is in neither form of {example['user_input']!r}"
+
+    def test_a_woven_sentence_states_price_before_size_about_half_the_time(self):
+        """The size clause has to be reachable after the price clause, not only before it.
+
+        ``_connected_sentence`` used a fixed ("size_sqft", "price") order, so no woven
+        sentence ever stated price first. v6 returned no size at all for "I am gonna find
+        a shop which is located in TX, costs more than $1M, size is larger than 1000sqft"
+        on 8 runs of 8, and returned it on 8 of 8 once those two clauses were swapped.
+
+        Asserted on ``_connected_sentence`` rather than on written examples because the
+        two clauses are matched by position here, and a full message carries distractors
+        and bare figures that a positional check would misread.
+        """
+        random.seed(11)
+        pieces = {
+            "property_type": "retail",
+            "location": "Dallas",
+            "size_sqft": "more than 1,000 sqft",
+            "price": "more than $1M",
+        }
+        orders = collections.Counter()
+        for _ in range(400):
+            text = _connected_sentence(pieces)
+            assert text is not None
+            orders["size-first" if text.index("sqft") < text.index("$1M") else "price-first"] += 1
+        price_first = orders["price-first"] / sum(orders.values())
+        assert 0.4 <= price_first <= 0.6, f"price first in {price_first:.1%} of woven sentences"
 
     def test_a_bound_never_runs_into_the_place_or_another_bound(self):
         """"Denver, CO 45k sqft" and "59,500 sqft lower than $125k" both shipped once.
