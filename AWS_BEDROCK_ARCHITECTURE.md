@@ -315,7 +315,8 @@ they get the ordinary §8 error mapping and no special machinery.
 | `app/services/listing_embeddings.py` + `scripts/backfill_embeddings.py` | ✅ phase B |
 | `.github/workflows/embed-listings.yml` — 30-minute schedule | ✅ phase B |
 | `app/llm/providers/qwen_lambda.py` — `QwenLambdaProvider`, retry (§3.3) | ✅ phase D |
-| `infra/qwen-lambda/` — Dockerfile, handler, model, grammars | phase D |
+| `infra/qwen-lambda/` — Dockerfile, handler, grammar build, README | ✅ phase D — weights still to supply |
+| `backend/scripts/export_qwen_schemas.py` + drift test | ✅ phase D |
 | Circuit breaker (§3.3) | phase D — not yet built |
 
 ## 5. Hosting Qwen 0.5B on Lambda
@@ -340,12 +341,20 @@ cold-start download, no EFS mount.
 
 ```
 infra/qwen-lambda/
-├── Dockerfile          # FROM public.ecr.aws/lambda/python:3.12
-├── handler.py          # load once at module scope, reuse across warm invocations
-├── model/
-│   └── qwen-0.5b-ft.Q8_0.gguf
-└── schemas/            # pre-compiled GBNF grammars per output schema
+├── Dockerfile           # FROM public.ecr.aws/lambda/python:3.12
+├── handler.py           # model loaded at module scope, reused across warm invocations
+├── build_grammars.py    # JSON Schema → GBNF, run during the build
+├── requirements.txt     # llama-cpp-python
+├── schemas/             # JSON Schemas exported from the Pydantic models
+│   └── LlmParseModelOutput.json
+├── grammars/            # produced by the build from schemas/ — not committed
+└── model/
+    └── qwen.gguf        # not committed; the image digest versions it
 ```
+
+The schemas are exported by `backend/scripts/export_qwen_schemas.py`, keeping the
+Pydantic model the single source of truth, and a backend test fails if the committed
+copy drifts from it (§10).
 
 **Runtime: `llama.cpp` (via `llama-cpp-python`) with a GGUF quant** — smallest image, `mmap`
 weight loading, and native GBNF grammar support, which §5.3 depends on.
@@ -360,10 +369,19 @@ impossible rather than unlikely.
 Pydantic model  ──▶  JSON Schema  ──▶  GBNF grammar  ──▶  llama.cpp sampler
 ```
 
-- Generate the grammar at **build time** and bake it into the image; the schema only changes when
-  you deploy.
+- Generate the grammar at **build time** and bake it into the image; `LlmParseModelOutput` only
+  changes when you deploy.
+- ⚠️ **The grammar constrains the envelope, not the answers.** There are two schemas on this path,
+  and only one is static. `LlmParseModelOutput` — the five top-level fields — is a fixed Pydantic
+  model, so it can be compiled into a grammar. The *per-question* schema that
+  `build_intake_response_schema` renders is built from the `questions` table at request time and
+  goes into the **prompt text** only. `extracted` therefore stays an open object in the grammar;
+  the backend filters its keys against the questions that actually exist. Closing it would mean a
+  grammar that silently drops answers whenever a question is added to the database.
 - Still call `model_validate_json`. The grammar guarantees *shape*, not *sense*.
-- On `ValidationError`: one retry, then fall back (§3.3).
+- On `ValidationError`: fail (§8's parse-failure raiser). **Do not retry** — the decoder was
+  already constrained, so a second attempt re-earns the same error at full cost. Retry is for
+  infrastructure failures only (§3.3).
 
 Do not ship this relying on prompt instructions alone. It will pass testing and fail in production
 on the inputs that matter.
@@ -676,9 +694,12 @@ attributes are truthy — so an unset credential looks configured and an unset r
 Every `_config` helper now sets all credentials *and* all route settings explicitly. Any new
 `Settings` field read during resolution must be added to those helpers.
 
+| `test_qwen_handler::*` | ✅ 13 tests — the image handler's half of the payload contract, `llama_cpp` stubbed. Both sides of the contract break the same suite |
+| `test_qwen_schema_export::*` | ✅ 5 tests — the committed JSON Schema still matches the Pydantic model, and `extracted` stays open |
+
 Plus a **grammar conformance test in the Lambda image build**: generate N outputs from the real
-model under the grammar and assert every one validates. That is the check that catches a schema
-change silently breaking §5.3.
+model under the grammar and assert every one validates. Still to do — it needs the weights. The
+export drift test above covers the schema half of that risk without them.
 
 §14.1 adds three tests that are worth naming, because each pins a decision that is invisible in
 the code and easy to regress:
@@ -1167,7 +1188,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | ✅ **A — Routing layer** | Bedrock chat + embeddings providers, `routing.py`, `LlmTask`, `task=` on 4 call sites. Every route still `auto` | $0 |
 | ✅ **B — Ingest-time embeddings** | `vector(1024)` column + HNSW, repository write/k-NN helpers, `find_similar_listings` rewritten, batched backfill + script, 30-minute workflow | $0 |
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
-| **D — Qwen 0.5B intake on Lambda** | ✅ backend half: `qwen_lambda.py` with the payload contract, retry-once, and error mapping; `"qwen"` registered pin-only; 22 tests. Remaining: `infra/qwen-lambda/` image + GBNF grammars, circuit breaker, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
+| **D — Qwen 0.5B intake on Lambda** | ✅ code: `qwen_lambda.py` (contract, retry-once, error mapping), `infra/qwen-lambda/` image with build-time GBNF, schema export + drift test, 40 tests. Remaining: **supply the weights** (§23.1 — fine-tune vs base is undecided), build/push, circuit breaker, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
 | **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
 | **F — Intake turns through SQS** | `intake_jobs` migration, pipeline extraction, `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook, **admission control on the enqueue endpoint — blocker, see §14.1** | $0 — SQS free to 1M/mo |
 | **G — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
