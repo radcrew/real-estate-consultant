@@ -175,6 +175,15 @@ def raise_qwen_rate_limited(*, cause: QwenCallFailure) -> NoReturn:
     )
 
 
+def raise_qwen_circuit_open() -> NoReturn:
+    """Recent invocations kept failing, so this one is refused without being attempted.
+
+    Deliberately indistinguishable from being throttled: to the caller both mean "not
+    now, try again", and a 503 is what the queued path (§14.1) classifies as retryable.
+    """
+    raise_service_unavailable("The AI service is busy right now. Please try again in a moment.")
+
+
 def raise_qwen_request_timeout(*, cause: QwenCallFailure) -> NoReturn:
     raise_gateway_timeout("Timed out while calling the Qwen inference function.", cause=cause)
 

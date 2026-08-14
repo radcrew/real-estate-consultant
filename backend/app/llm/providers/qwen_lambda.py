@@ -35,12 +35,15 @@ import anyio.to_thread
 import boto3
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
+from fastapi import HTTPException
 from pydantic import ValidationError
 
+from app.core.circuit_breaker import CircuitBreaker
 from app.core.config import Settings, settings
 from app.llm.providers.base import StructuredOutputT
 from app.llm.providers.exceptions import (
     raise_qwen_access_denied,
+    raise_qwen_circuit_open,
     raise_qwen_completion_parse_failed,
     raise_qwen_function_error,
     raise_qwen_invoke_failed,
@@ -68,6 +71,12 @@ SERVICE_CODES = frozenset({"ServiceException", "EC2ThrottledException"})
 
 RETRYABLE_CODES = THROTTLING_CODES | TIMEOUT_CODES | SERVICE_CODES
 
+# Consecutive infrastructure failures before the breaker opens, and how long it then
+# refuses calls. Long enough that a restarting environment is not hammered by traffic
+# that would time out anyway; short enough that recovery is not user-visible for long.
+QWEN_BREAKER_THRESHOLD = 5
+QWEN_BREAKER_RESET_SECONDS = 30.0
+
 logger = logging.getLogger(__name__)
 
 
@@ -90,9 +99,19 @@ def is_transient(exc: ClientError | BotoCoreError) -> bool:
 class QwenLambdaProvider:
     """Provider client for the fine-tuned Qwen2.5-0.5B function."""
 
-    def __init__(self, *, settings: Settings, client: Any | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        settings: Settings,
+        client: Any | None = None,
+        breaker: CircuitBreaker | None = None,
+    ) -> None:
         self.settings = settings
         self._client = client
+        self._breaker = breaker or CircuitBreaker(
+            failure_threshold=QWEN_BREAKER_THRESHOLD,
+            reset_after_seconds=QWEN_BREAKER_RESET_SECONDS,
+        )
 
     @property
     def client(self) -> Any:
@@ -228,8 +247,21 @@ class QwenLambdaProvider:
             max_tokens=max_tokens,
         )
 
+        if not self._breaker.allow():
+            # Fail fast rather than queue an invocation that recent evidence says will
+            # time out — the wait would be paid by the user and buy nothing.
+            self._log_call(outcome="circuit_open", duration_ms=0.0)
+            raise_qwen_circuit_open()
+
         start = time.perf_counter()
-        raw, retry_used = await self._invoke_with_retry(payload, start=start)
+        try:
+            raw, retry_used = await self._invoke_with_retry(payload, start=start)
+        except HTTPException:
+            self._breaker.record_failure()
+            raise
+        # Recorded before parsing: a reply that arrived and then failed validation proves
+        # the function is healthy, so content errors must never trip the breaker.
+        self._breaker.record_success()
         duration_ms = (time.perf_counter() - start) * 1000
 
         usage = raw.get("usage") if isinstance(raw.get("usage"), dict) else None

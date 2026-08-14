@@ -10,6 +10,7 @@ from botocore.exceptions import ClientError, ConnectTimeoutError, ParamValidatio
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 
+from app.core.circuit_breaker import CircuitBreaker
 from app.llm.providers.qwen_lambda import QwenLambdaProvider, is_transient
 
 
@@ -22,6 +23,7 @@ def _make_provider(
     aws_region: str = "us-east-1",
     function_name: str = "qwen-inference-prod",
     client: object | None = None,
+    breaker: CircuitBreaker | None = None,
 ):
     mock_settings = MagicMock()
     mock_settings.aws_region = aws_region
@@ -30,6 +32,8 @@ def _make_provider(
     return QwenLambdaProvider(
         settings=mock_settings,
         client=MagicMock() if client is None else client,
+        # A threshold high enough that the other tests never trip it by accident.
+        breaker=breaker or CircuitBreaker(failure_threshold=50, reset_after_seconds=30.0),
     )
 
 
@@ -225,3 +229,69 @@ class TestQwenLambdaProvider:
         with pytest.raises(HTTPException) as info:
             await _generate(provider)
         assert info.value.status_code == 502
+
+
+class TestCircuitBreakerIntegration:
+    def _provider_with_breaker(self, threshold: int = 2):
+        breaker = CircuitBreaker(failure_threshold=threshold, reset_after_seconds=30.0)
+        return _make_provider(breaker=breaker), breaker
+
+    async def test_infrastructure_failures_open_the_breaker(self):
+        provider, breaker = self._provider_with_breaker(threshold=2)
+        provider.client.invoke.side_effect = _client_error("AccessDeniedException")
+        for _ in range(2):
+            with pytest.raises(HTTPException):
+                await _generate(provider)
+        assert breaker.is_open
+
+    async def test_open_breaker_fails_fast_without_invoking(self):
+        """The point of the breaker: stop paying for calls that will fail anyway."""
+        provider, breaker = self._provider_with_breaker(threshold=1)
+        provider.client.invoke.side_effect = _client_error("AccessDeniedException")
+        with pytest.raises(HTTPException):
+            await _generate(provider)
+        provider.client.invoke.reset_mock()
+        provider.client.invoke.side_effect = None
+
+        with pytest.raises(HTTPException) as info:
+            await _generate(provider)
+        assert info.value.status_code == 503
+        provider.client.invoke.assert_not_called()
+
+    async def test_content_failures_never_open_the_breaker(self):
+        """A reply that arrived and failed validation proves the function is up."""
+        provider, breaker = self._provider_with_breaker(threshold=2)
+        # A fresh payload per call: the response body is a stream, and reusing a spent
+        # one would exercise the unreadable-payload path instead of a schema violation.
+        provider.client.invoke.side_effect = lambda **_: _reply(text='{"text": ""}')
+        for _ in range(5):
+            with pytest.raises(HTTPException):
+                await _generate(provider)
+        assert not breaker.is_open
+        assert provider.client.invoke.call_count == 5
+
+    async def test_a_success_resets_the_failure_count(self):
+        provider, breaker = self._provider_with_breaker(threshold=2)
+        provider.client.invoke.side_effect = [
+            _client_error("AccessDeniedException"),
+            _reply(),
+            _client_error("AccessDeniedException"),
+        ]
+        with pytest.raises(HTTPException):
+            await _generate(provider)
+        await _generate(provider)
+        with pytest.raises(HTTPException):
+            await _generate(provider)
+        assert not breaker.is_open
+
+    async def test_function_errors_count_as_infrastructure_failures(self):
+        """A handler crashing on every invoke is exactly what the breaker is for."""
+        provider, breaker = self._provider_with_breaker(threshold=2)
+        provider.client.invoke.return_value = {
+            "FunctionError": "Unhandled",
+            "Payload": io.BytesIO(b'{"errorMessage": "OOM"}'),
+        }
+        for _ in range(2):
+            with pytest.raises(HTTPException):
+                await _generate(provider)
+        assert breaker.is_open

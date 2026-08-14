@@ -26,6 +26,7 @@ from app.llm.providers.exceptions import (
     raise_hf_structured_reply_incomplete,
     raise_openrouter_api_key_not_configured,
     raise_qwen_access_denied,
+    raise_qwen_circuit_open,
     raise_qwen_completion_parse_failed,
     raise_qwen_function_error,
     raise_qwen_invoke_failed,
@@ -202,6 +203,15 @@ class TestQwenProviderExceptions:
         with pytest.raises(HTTPException) as info:
             raise_qwen_request_timeout(cause=ReadTimeoutError(endpoint_url="https://lambda"))
         assert info.value.status_code == 504
+
+    def test_circuit_open_is_indistinguishable_from_being_throttled(self):
+        """Both mean "not now"; both must classify as retryable on the queued path."""
+        with pytest.raises(HTTPException) as open_info:
+            raise_qwen_circuit_open()
+        with pytest.raises(HTTPException) as busy_info:
+            raise_qwen_rate_limited(cause=_client_error("TooManyRequestsException"))
+        assert open_info.value.status_code == busy_info.value.status_code == 503
+        assert open_info.value.detail == busy_info.value.detail
 
     def test_invoke_failed_raises_502(self):
         with pytest.raises(HTTPException) as info:

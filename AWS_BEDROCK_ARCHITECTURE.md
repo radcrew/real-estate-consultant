@@ -249,7 +249,11 @@ the same result; revisit only if the cycle grows.
   week is how you discover the Qwen function has been broken since Tuesday.
 - **Circuit breaker in-process** (per Vercel instance) rather than ElastiCache — see §16. When the
   breaker is open, fail fast with the degrade path rather than queueing invocations that will
-  time out.
+  time out. It opens on 5 consecutive infrastructure failures and admits one probe per 30s
+  window; a successful probe closes it, a failed one costs another window. **Only invoke-path
+  failures count** — a reply that arrived and then failed validation proves the function is up,
+  so content errors must never take a working service offline. An open breaker raises the same
+  503 as throttling, which is what makes it retryable on the queued path (§14.1).
 
 Outreach (Bedrock Qwen3-32B) and the OpenRouter paths are managed services with their own SLAs;
 they get the ordinary §8 error mapping and no special machinery.
@@ -317,7 +321,7 @@ they get the ordinary §8 error mapping and no special machinery.
 | `app/llm/providers/qwen_lambda.py` — `QwenLambdaProvider`, retry (§3.3) | ✅ phase D |
 | `infra/qwen-lambda/` — Dockerfile, handler, grammar build, README | ✅ phase D — weights still to supply |
 | `backend/scripts/export_qwen_schemas.py` + drift test | ✅ phase D |
-| Circuit breaker (§3.3) | phase D — not yet built |
+| `app/core/circuit_breaker.py` — in-process breaker (§3.3, §16) | ✅ phase D |
 
 ## 5. Hosting Qwen 0.5B on Lambda
 
@@ -1084,7 +1088,7 @@ means a new column and a full re-index, so treat the choice as durable.
 | Layer | Where | Cost |
 |---|---|---|
 | **Opening-question cache** | Postgres table keyed by question row + prompt hash | $0 |
-| **Circuit breaker state** (§3.3) | In-process per instance | $0 |
+| **Circuit breaker state** (§3.3) | ✅ In-process per instance — `app/core/circuit_breaker.py` | $0 |
 | **Bedrock prompt caching** | `cache_control` on stable prefixes, if Bedrock chat is ever routed | $0 |
 | CloudFront / edge cache | Vercel already provides it | included |
 
@@ -1190,7 +1194,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | ✅ **A — Routing layer** | Bedrock chat + embeddings providers, `routing.py`, `LlmTask`, `task=` on 4 call sites. Every route still `auto` | $0 |
 | ✅ **B — Ingest-time embeddings** | `vector(1024)` column + HNSW, repository write/k-NN helpers, `find_similar_listings` rewritten, batched backfill + script, 30-minute workflow | $0 |
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
-| **D — Qwen 0.5B intake on Lambda** | ✅ code: `qwen_lambda.py` (contract, retry-once, error mapping), `infra/qwen-lambda/` image with build-time GBNF, schema export + drift test, 40 tests. Remaining: **supply the weights** (§23.1 — fine-tune vs base is undecided), build/push, circuit breaker, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
+| **D — Qwen 0.5B intake on Lambda** | ✅ **code complete**: `qwen_lambda.py` (contract, retry-once, error mapping, breaker), `circuit_breaker.py`, `infra/qwen-lambda/` image with build-time GBNF and HF fetch, schema export + drift test, 62 tests. Remaining is deployment only: **supply the weights** (§23.1 — fine-tune vs base undecided), build/push, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
 | **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
 | **F — Intake turns through SQS** | `intake_jobs` migration, pipeline extraction, `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook, **admission control on the enqueue endpoint — blocker, see §14.1** | $0 — SQS free to 1M/mo |
 | **G — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
