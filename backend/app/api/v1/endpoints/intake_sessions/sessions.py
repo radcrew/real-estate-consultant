@@ -12,6 +12,7 @@ from app.api.v1.endpoints.intake_sessions.exceptions import (
     raise_intake_endpoint_no_questions_configured,
 )
 from app.core.deps import CurrentUser, SupabaseSdkDep
+from app.core.intake_admission import AdmitIntakeSessionCreation
 from app.domain.intake_validation import compute_current_index, has_answer
 from app.llm import (
     INTAKE_OPENING_MESSAGE,
@@ -44,6 +45,9 @@ router = APIRouter()
     "/",
     status_code=status.HTTP_201_CREATED,
     response_model=CreateIntakeSessionResponse,
+    # Metered in llm mode only: that path runs the opening-question model, so a session
+    # is not free to create. Guided mode calls no provider and stays unthrottled.
+    dependencies=[AdmitIntakeSessionCreation],
 )
 async def create_intake_session(
     client: SupabaseSdkDep,

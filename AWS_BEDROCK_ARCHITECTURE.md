@@ -873,16 +873,34 @@ slow turn fast, and under sustained overload it converts a fast rejection into a
 The queue protects the *user's input*; admission control protects the *provider*. They solve
 different problems and neither substitutes for the other.
 
-⚠️ **Admission control does not exist yet on this path — that is a phase F blocker, not a nice-to-
-have.** An earlier draft claimed the existing `ApiKeyRateLimiter` protects the provider; the audit
-found that limiter guards only MCP API-key routes (`core/deps.py:37`). The actual endpoint
-(`answers/llm.py:34`) has **no rate limit and no session-ownership check** — anyone holding a
-session UUID can trigger a paid model call. Today that costs a 5xx under abuse; behind a queue it
-becomes unbounded spend, because every anonymous POST durably enqueues a job the worker will
-faithfully pay for. Phase F therefore ships with: a per-session and per-IP rate limit on the
-enqueue endpoint, verification that the caller owns the intake session, and a cap on queued jobs
-per session (one in-flight turn per session is the natural limit — FIFO ordering already implies
-it).
+✅ **Admission control shipped first, before any queue** (`app/core/intake_admission.py`). An
+earlier draft claimed the existing `ApiKeyRateLimiter` protects the provider; the audit found that
+limiter guards only MCP API-key routes (`core/deps.py:37`), leaving both LLM-backed intake routes
+unmetered. Today that costs a burst of provider calls; behind a queue it would cost more, because
+every accepted request becomes a durable job the worker will faithfully pay for — the backlog keeps
+spending after the flood stops. This is what keeps the queue a buffer rather than an amplifier.
+
+**Correction to the audit:** it called for "verify the caller owns the intake session". There is no
+such check to write. `create_intake_session_row` writes no user id and `search_profile_id` is null
+until completion, so **intake sessions are anonymous by design** and the session UUID *is* the
+credential. Adding ownership would mean requiring sign-up before the conversation, a product change
+rather than a security fix. What exists instead:
+
+| Control | Scope | Why |
+|---|---|---|
+| Per-address window (60/min) | both LLM intake routes | Sessions are free to mint, so a per-session limit alone is no defence — the caller just starts another. This is the real ceiling |
+| Per-session window (12/min) | turns only | Paces one conversation; a human types far slower |
+| Metered at **session creation** too | `?mode=llm` only | Broader than the audit noted: creating an llm session runs the opening-question model, so a session is not free either. Guided mode calls no provider and stays unthrottled |
+
+Two known limits, both deliberate. The windows are **per process**, so the effective ceiling scales
+with instance count — the same trade §16 accepts for the circuit breaker, and the failure mode is a
+caller getting somewhat more than their share rather than an unbounded amount. And the address is
+read from `X-Forwarded-For`, which is only trustworthy because the platform overwrites it; exposed
+without a trusted proxy, that limit becomes advisory while the per-session one does not.
+
+Still to come with the jobs table: a **cap on in-flight turns per session** (one is the natural
+limit — FIFO ordering per `MessageGroupId` already implies it), which needs somewhere to count and
+so lands with `intake_jobs`.
 
 #### The contract
 
@@ -974,7 +992,9 @@ existing test suite need no queue, and no test is rewritten to accommodate one.
 | `app/clients/sqs.py` | new — `ChatJobQueue`, boto3 via `anyio.to_thread` per `bedrock_embeddings` |
 | `app/repositories/intake_jobs.py` | new — create / get / claim / complete / fail |
 | `app/workers/chat_job_worker.py` | new — the Lambda handler |
-| `app/api/.../answers/llm.py` | POST becomes insert + enqueue + `202`, behind **session-ownership check + per-session/per-IP rate limit** (the phase F blocker above) |
+| `app/core/intake_admission.py` | ✅ new — per-address and per-session windows on both LLM intake routes |
+| `app/core/rate_limit.py` | ✅ `ApiKeyRateLimiter` generalised to `SlidingWindowRateLimiter` (alias kept) |
+| `app/api/.../answers/llm.py` | ✅ admission dependency wired; POST still to become insert + enqueue + `202` |
 | `app/api/.../answers/jobs.py` | new — SSE stream + poll endpoints |
 | `app/schemas/intake_sessions.py` | `EnqueuedLlmIntakeJobResponse`, `IntakeJobStatusResponse` |
 | `frontend/services/intake-sessions.ts` | `enqueueLlmInput`, `subscribeToJob` |
@@ -1145,9 +1165,8 @@ throttles, SQS depth and DLQ depth, Bedrock error rate.
 **Abuse control:** per-tenant budgets enforced in application code — the defence against one
 account or a compromised key consuming the Bedrock budget. Pure application logic; nothing in AWS
 does it for you, and it costs nothing to add. Note this is the *second* layer: the first —
-rate limiting and ownership checks on the intake endpoint itself — does not exist yet and is a
-phase F blocker (§14.1); budgets cap the damage a legitimate account can do, admission control
-stops anonymous traffic from spending anything at all.
+admission control on the anonymous intake routes — now exists (§14.1). Budgets cap what a
+identified account can spend; admission control bounds traffic that has no identity to bill.
 
 ## 20. Cost summary
 
@@ -1196,7 +1215,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
 | **D — Qwen 0.5B intake on Lambda** | ✅ **code complete**: `qwen_lambda.py` (contract, retry-once, error mapping, breaker), `circuit_breaker.py`, `infra/qwen-lambda/` image with build-time GBNF and HF fetch, schema export + drift test, 62 tests. Remaining is deployment only: **supply the weights** (§23.1 — fine-tune vs base undecided), build/push, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
 | **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
-| **F — Intake turns through SQS** | `intake_jobs` migration, pipeline extraction, `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook, **admission control on the enqueue endpoint — blocker, see §14.1** | $0 — SQS free to 1M/mo |
+| **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1) — per-address + per-session windows on both LLM routes, 24 tests. Remaining: `intake_jobs` migration, pipeline extraction, `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook | $0 — SQS free to 1M/mo |
 | **G — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
 
 **Phase C is a deploy step, not a development step**, and it gates B: until embeddings are routed

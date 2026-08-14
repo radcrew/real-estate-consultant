@@ -79,3 +79,57 @@ class TestSubmitLlmAnswer:
             json={},
         )
         assert r.status_code == 422
+
+
+class TestAdmissionControl:
+    async def test_exhausted_budget_returns_429_without_calling_the_model(
+        self, client, monkeypatch
+    ):
+        """Wiring test: the endpoint is anonymous, so the limiter is the only gate.
+
+        Asserting the provider was never reached is the part that matters — a 429 that
+        still ran the model would protect nothing.
+        """
+        from app.core import intake_admission as module
+        from app.core.intake_admission import IntakeAdmissionControl
+
+        monkeypatch.setattr(
+            module,
+            "intake_admission",
+            IntakeAdmissionControl(ip_per_minute=1, session_per_minute=1),
+        )
+
+        endpoint = "app.api.v1.endpoints.intake_sessions.answers.llm"
+        parse = AsyncMock(return_value=_LLM_RESULT)
+        with (
+            patch(
+                f"{endpoint}.get_intake_session_row",
+                new_callable=AsyncMock,
+                return_value=_SESSION_ROW,
+            ),
+            patch(
+                f"{endpoint}.list_intake_questions",
+                new_callable=AsyncMock,
+                return_value=_QUESTIONS,
+            ),
+            patch(f"{endpoint}.parse_user_input", parse),
+            patch(
+                f"{endpoint}.save_intake_criteria",
+                new_callable=AsyncMock,
+                return_value=_SESSION_ROW,
+            ),
+            patch(f"{endpoint}.resolve_next_intake_question", return_value=None),
+        ):
+            first = await client.post(
+                f"/api/v1/intake-sessions/{_SESSION_UUID}/answers/llm",
+                json={"input": "warehouse in Austin"},
+            )
+            second = await client.post(
+                f"/api/v1/intake-sessions/{_SESSION_UUID}/answers/llm",
+                json={"input": "actually, Dallas"},
+            )
+
+        assert first.status_code == 200
+        assert second.status_code == 429
+        assert second.headers["retry-after"] == "60"
+        assert parse.await_count == 1

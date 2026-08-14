@@ -132,6 +132,13 @@ class Settings(BaseSettings):
     # Per-key sliding-window limit for MCP API key auth (single process).
     mcp_api_key_rate_limit_per_minute: int = 120
 
+    # Admission control for the anonymous, LLM-backed intake routes (see
+    # core/intake_admission.py). Sessions cost money per request and carry no identity,
+    # so the address budget is the real ceiling; the session budget only paces one
+    # conversation. Both are per process, so the effective limit scales with instances.
+    intake_ip_rate_limit_per_minute: int = 60
+    intake_session_rate_limit_per_minute: int = 12
+
     # Populated automatically by Vercel; set manually for other hosts.
     git_sha: str = Field(
         default="", validation_alias=AliasChoices("GIT_SHA", "VERCEL_GIT_COMMIT_SHA")

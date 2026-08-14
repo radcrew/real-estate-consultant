@@ -1,4 +1,4 @@
-"""In-process sliding-window rate limit for MCP API keys."""
+"""In-process sliding-window rate limiting (single process)."""
 
 from __future__ import annotations
 
@@ -8,8 +8,14 @@ from threading import Lock
 from uuid import UUID
 
 
-class ApiKeyRateLimiter:
-    """Simple per-key limiter (single process / local server)."""
+class SlidingWindowRateLimiter:
+    """Simple per-key limiter (single process / local server).
+
+    State is per process, so on a serverless host the effective ceiling is this limit
+    times the number of live instances. That is accepted deliberately: a shared limiter
+    needs Redis, and the cost of being approximate here is a caller occasionally getting
+    a little more than their share — not an unbounded one.
+    """
 
     def __init__(self, *, max_calls: int, window_seconds: float) -> None:
         self._max_calls = max_calls
@@ -29,3 +35,7 @@ class ApiKeyRateLimiter:
                 return False
             bucket.append(now)
             return True
+
+
+# Historical name: this started as the MCP API-key limiter before intake needed one too.
+ApiKeyRateLimiter = SlidingWindowRateLimiter

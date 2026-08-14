@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from app.core.deps import SupabaseSdkDep
+from app.core.intake_admission import AdmitIntakeLlmTurn
 from app.domain.intake_criteria import normalize_merged_criteria
 from app.domain.intake_validation import compute_current_index
 from app.llm import (
@@ -30,6 +31,9 @@ router = APIRouter()
 @router.post(
     "/llm",
     response_model=SubmitLlmIntakeInputResponse,
+    # Anonymous and metered per request: without this, one caller can spend the provider
+    # budget unattended — and once turns are queued, keep spending from the backlog.
+    dependencies=[AdmitIntakeLlmTurn],
 )
 async def submit_llm_intake_input(
     session_id: UUID,
