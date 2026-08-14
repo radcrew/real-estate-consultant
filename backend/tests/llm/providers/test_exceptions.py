@@ -25,6 +25,14 @@ from app.llm.providers.exceptions import (
     raise_hf_structured_refusal,
     raise_hf_structured_reply_incomplete,
     raise_openrouter_api_key_not_configured,
+    raise_qwen_access_denied,
+    raise_qwen_completion_parse_failed,
+    raise_qwen_function_error,
+    raise_qwen_invoke_failed,
+    raise_qwen_not_configured,
+    raise_qwen_rate_limited,
+    raise_qwen_request_timeout,
+    raise_qwen_structured_reply_incomplete,
 )
 
 
@@ -156,6 +164,15 @@ class TestBedrockProviderExceptions:
                 lambda: raise_hf_structured_refusal(refusal="no"),
                 lambda: raise_bedrock_structured_refusal(refusal="no"),
             ),
+            (raise_hf_structured_reply_incomplete, raise_qwen_structured_reply_incomplete),
+            (
+                lambda: raise_hf_openai_error(cause=OpenAIError("x")),
+                lambda: raise_qwen_invoke_failed(cause=_client_error("ServiceException")),
+            ),
+            (
+                lambda: raise_hf_completion_parse_failed(cause=_make_validation_error()),
+                lambda: raise_qwen_completion_parse_failed(cause=_make_validation_error()),
+            ),
         ]
         for hf_raiser, bedrock_raiser in pairs:
             with pytest.raises(HTTPException) as hf_info:
@@ -163,3 +180,46 @@ class TestBedrockProviderExceptions:
             with pytest.raises(HTTPException) as bedrock_info:
                 bedrock_raiser()
             assert hf_info.value.detail == bedrock_info.value.detail
+
+
+class TestQwenProviderExceptions:
+    def test_not_configured_raises_503(self):
+        with pytest.raises(HTTPException) as info:
+            raise_qwen_not_configured()
+        assert info.value.status_code == 503
+
+    def test_access_denied_raises_503(self):
+        with pytest.raises(HTTPException) as info:
+            raise_qwen_access_denied(cause=_client_error("AccessDeniedException"))
+        assert info.value.status_code == 503
+
+    def test_rate_limited_raises_503(self):
+        with pytest.raises(HTTPException) as info:
+            raise_qwen_rate_limited(cause=_client_error("TooManyRequestsException"))
+        assert info.value.status_code == 503
+
+    def test_request_timeout_raises_504(self):
+        with pytest.raises(HTTPException) as info:
+            raise_qwen_request_timeout(cause=ReadTimeoutError(endpoint_url="https://lambda"))
+        assert info.value.status_code == 504
+
+    def test_invoke_failed_raises_502(self):
+        with pytest.raises(HTTPException) as info:
+            raise_qwen_invoke_failed(cause=_client_error("ServiceException"))
+        assert info.value.status_code == 502
+
+    def test_function_error_raises_502(self):
+        """A handler that raised comes back as HTTP 200 with FunctionError set."""
+        with pytest.raises(HTTPException) as info:
+            raise_qwen_function_error()
+        assert info.value.status_code == 502
+
+    def test_completion_parse_failed_raises_502(self):
+        with pytest.raises(HTTPException) as info:
+            raise_qwen_completion_parse_failed(cause=_make_validation_error())
+        assert info.value.status_code == 502
+
+    def test_structured_reply_incomplete_raises_502(self):
+        with pytest.raises(HTTPException) as info:
+            raise_qwen_structured_reply_incomplete()
+        assert info.value.status_code == 502

@@ -28,6 +28,7 @@ from app.llm.providers.embeddings import (
 from app.llm.providers.exceptions import raise_embeddings_unavailable
 from app.llm.providers.huggingface import huggingface_provider
 from app.llm.providers.openrouter import openrouter_provider
+from app.llm.providers.qwen_lambda import qwen_lambda_provider
 from app.utils.exceptions import raise_service_unavailable
 
 AUTO_ROUTE = "auto"
@@ -51,6 +52,9 @@ CHAT_PROVIDERS: dict[str, ChatProvider] = {
     # Pin-only: key presence cannot distinguish "bedrock" from "bedrock_qwen", so an
     # explicit route is the only way to reach the Converse-API provider.
     "bedrock_qwen": bedrock_qwen_chat_provider,
+    # Pin-only for the same reason, and serves intake parse alone: the fine-tune knows
+    # one task's schema and nothing else.
+    "qwen": qwen_lambda_provider,
 }
 
 EMBEDDINGS_PROVIDERS: dict[str, EmbeddingsProvider] = {

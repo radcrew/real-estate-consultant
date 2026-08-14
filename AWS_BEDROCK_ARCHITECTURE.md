@@ -314,7 +314,9 @@ they get the ordinary §8 error mapping and no special machinery.
 | `app/services/similar_listings.py` — rewritten for k-NN | ✅ phase B |
 | `app/services/listing_embeddings.py` + `scripts/backfill_embeddings.py` | ✅ phase B |
 | `.github/workflows/embed-listings.yml` — 30-minute schedule | ✅ phase B |
+| `app/llm/providers/qwen_lambda.py` — `QwenLambdaProvider`, retry (§3.3) | ✅ phase D |
 | `infra/qwen-lambda/` — Dockerfile, handler, model, grammars | phase D |
+| Circuit breaker (§3.3) | phase D — not yet built |
 
 ## 5. Hosting Qwen 0.5B on Lambda
 
@@ -403,7 +405,13 @@ class QwenLambdaProvider:
   precisely why routing is per-task.
 - boto3 is synchronous → `anyio.to_thread.run_sync` (via Starlette, no new dependency).
 - Invoke over IAM rather than a Function URL — no public endpoint to secure.
-- Reuse `split_system_prompt` from `bedrock_chat.py`.
+- **`messages` is sent whole, system turn included** — a deviation from an earlier draft that
+  reused `split_system_prompt`. The GGUF chat template renders roles itself, so splitting the
+  system prompt out would only oblige the handler to reassemble it.
+- ⚠️ **`FunctionError` must be checked.** A handler that raises still returns HTTP 200, with the
+  stack trace as the payload. Skip the check and that trace reaches `model_validate_json`, where
+  it surfaces as a parse failure — sending the retry logic after a content bug that is really an
+  infrastructure one.
 
 ## 6. The paid models — Cohere embeddings, Qwen3-32B outreach
 
@@ -661,7 +669,7 @@ Every provider takes an injectable client, so no network access is required.
 | `test_exceptions::test_user_facing_copy_does_not_vary_by_provider` | ✅ copy pinned across providers |
 | `test_chat::test_forwards_task_to_the_router` | ✅ a dropped `task=` kwarg fails loudly |
 | `test_routing::test_infra_error_triggers_retry` | deferred with §3.3 — retry same function only, never another provider |
-| `test_qwen_lambda::test_temperature_forwarded` | Qwen **does** get `temperature` |
+| `test_qwen_lambda::*` | ✅ 22 tests — payload contract, **`temperature` forwarded**, `FunctionError` caught before parsing, retry once on transient / never on content, error mapping |
 
 ⚠️ **A trap that bit three times.** Test config helpers build a bare `MagicMock`, whose unset
 attributes are truthy — so an unset credential looks configured and an unset route looks pinned.
@@ -1159,7 +1167,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | ✅ **A — Routing layer** | Bedrock chat + embeddings providers, `routing.py`, `LlmTask`, `task=` on 4 call sites. Every route still `auto` | $0 |
 | ✅ **B — Ingest-time embeddings** | `vector(1024)` column + HNSW, repository write/k-NN helpers, `find_similar_listings` rewritten, batched backfill + script, 30-minute workflow | $0 |
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
-| **D — Qwen 0.5B intake on Lambda** | `infra/qwen-lambda/` image, GBNF grammars, `qwen_lambda.py`, memory tuning; route `intake_parse=qwen`. Ships with the retry + circuit breaker (§3.3 — no cross-family fallback) | $0 |
+| **D — Qwen 0.5B intake on Lambda** | ✅ backend half: `qwen_lambda.py` with the payload contract, retry-once, and error mapping; `"qwen"` registered pin-only; 22 tests. Remaining: `infra/qwen-lambda/` image + GBNF grammars, circuit breaker, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
 | **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
 | **F — Intake turns through SQS** | `intake_jobs` migration, pipeline extraction, `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook, **admission control on the enqueue endpoint — blocker, see §14.1** | $0 — SQS free to 1M/mo |
 | **G — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |

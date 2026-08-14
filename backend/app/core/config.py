@@ -96,6 +96,13 @@ class Settings(BaseSettings):
     bedrock_qwen_input_cost_per_1m: float = 0.0
     bedrock_qwen_output_cost_per_1m: float = 0.0
 
+    # The fine-tuned Qwen2.5-0.5B criteria extractor, self-hosted on Lambda and invoked
+    # over IAM. An empty name disables the provider the same way a blank region does.
+    qwen_inference_function_name: str = ""
+    # Recorded on every llm_call, so "did the retrain regress intake parsing?" is a
+    # dashboard question rather than a deploy.
+    qwen_model_version: str = ""
+
     # Per-call-site provider routing (see app/llm/providers/routing.py). "auto" keeps the
     # key-presence order in providers/chat.py, so routing is opt-in and metered providers
     # are never selected by accident. Any other value pins that path to one provider.

@@ -11,6 +11,7 @@ from app.llm.providers.bedrock_embeddings import bedrock_embeddings_provider
 from app.llm.providers.bedrock_qwen_chat import bedrock_qwen_chat_provider
 from app.llm.providers.huggingface import huggingface_provider
 from app.llm.providers.openrouter import openrouter_provider
+from app.llm.providers.qwen_lambda import qwen_lambda_provider
 from app.llm.providers.routing import (
     AUTO_ROUTE,
     TASK_ROUTE_SETTINGS,
@@ -75,6 +76,7 @@ class TestResolveChatProviderForTask:
             ("huggingface", huggingface_provider),
             ("bedrock", bedrock_chat_provider),
             ("bedrock_qwen", bedrock_qwen_chat_provider),
+            ("qwen", qwen_lambda_provider),
         ],
     )
     def test_each_pin_selects_its_provider(self, pin, expected):
@@ -91,6 +93,26 @@ class TestResolveChatProviderForTask:
         assert (
             resolve_chat_provider_for_task(task=LlmTask.FIT_EXPLANATION, config=config)
             is bedrock_chat_provider
+        )
+
+    def test_intake_parse_pins_to_qwen_while_other_paths_stay_put(self):
+        """The routing table's whole purpose: the fine-tune serves one call site only."""
+        config = _config(openrouter_api_key="or-key", intake_parse="qwen")
+        assert (
+            resolve_chat_provider_for_task(task=LlmTask.INTAKE_PARSE, config=config)
+            is qwen_lambda_provider
+        )
+        assert (
+            resolve_chat_provider_for_task(task=LlmTask.OPENING_QUESTION, config=config)
+            is openrouter_provider
+        )
+
+    def test_auto_never_selects_qwen(self):
+        """No credential implies a self-hosted function, so only a pin can reach it."""
+        config = _config(aws_region="us-east-1", openrouter_api_key="or-key")
+        assert (
+            resolve_chat_provider_for_task(task=LlmTask.INTAKE_PARSE, config=config)
+            is openrouter_provider
         )
 
     def test_auto_never_selects_bedrock_qwen(self):
