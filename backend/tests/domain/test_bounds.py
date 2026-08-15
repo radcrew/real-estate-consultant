@@ -227,16 +227,21 @@ class TestMagnitudeCorrection:
         ) == {"price": {"max": 30000000}, "size_sqft": {"min": 2000, "max": 2000}}
 
     def test_two_candidates_mean_the_message_cannot_say(self):
-        """Both 300 and 30000000 share the digits "3", so neither is chosen.
+        """Both $30M and $300M share the digits "3", so neither is chosen.
 
         The model's own answer then stands, per the rule above: a bound matching no figure
         at all is left alone rather than dropped, because the model may have normalised
         something the parser cannot read. So this message stays wrong -- deliberately.
         Guessing between two candidates would turn it wrong in a *different* way, and one
         of those two errors is recoverable by asking again.
+
+        Both figures have to be money for the message to be genuinely ambiguous. This case
+        was "300 sqft minimum, budget up to $30M" until the unit told the two apart --
+        ``TestEvidenceInvariant.test_the_unit_resolves_what_the_digits_alone_cannot`` now
+        holds that message, and resolves it.
         """
         assert correct_bound_direction(
-            {"price": {"max": 3000000}}, "300 sqft minimum, budget up to $30M"
+            {"price": {"max": 3000000}}, "between $30M and $300M"
         ) == {"price": {"max": 3000000}}
 
     def test_a_resized_bound_still_takes_its_own_comparator(self):
@@ -272,14 +277,10 @@ class TestEvidenceInvariant:
     questionnaire; a field wrongly filled in is never asked, and silently filters the
     search.
 
-    ``xfail(strict=True)`` marks behaviour this suite specifies and the code does not yet
-    have, so implementing it turns these green and an accidental pass is itself a
-    failure. Unmarked cases already hold and must keep holding.
+    These were written as ``xfail(strict=True)`` one commit ahead of the implementation,
+    so the fix was measured rather than asserted.
     """
 
-    UNSUPPORTED = "the figure carries a unit this field cannot be measured in"
-
-    @pytest.mark.xfail(strict=True, reason=UNSUPPORTED)
     def test_the_reported_message_states_no_budget(self):
         """The exact production regression, pinned.
 
@@ -292,42 +293,37 @@ class TestEvidenceInvariant:
             "Chicago for lease, with at least 20 dock doors.",
         ) == {"size_sqft": {"min": 100000}}
 
-    @pytest.mark.xfail(strict=True, reason=UNSUPPORTED)
     def test_a_size_figure_alone_is_not_a_budget(self):
         assert correct_bound_direction(
             {"size_sqft": {"max": 100000}, "price": {"max": 100000}},
             "100k sqft warehouse",
         ) == {"size_sqft": {"max": 100000}}
 
-    @pytest.mark.xfail(strict=True, reason=UNSUPPORTED)
     def test_a_budget_figure_alone_is_not_a_size(self):
         assert correct_bound_direction(
             {"price": {"max": 2000000}, "size_sqft": {"max": 2000000}},
             "warehouse under $2M",
         ) == {"price": {"max": 2000000}}
 
-    @pytest.mark.xfail(strict=True, reason=UNSUPPORTED)
     def test_a_counted_thing_is_not_a_measurement(self):
         """"3 floors" is a storey count. It was read as a size in production."""
         assert correct_bound_direction(
             {"size_sqft": {"max": 3}}, "office in Boise, 3 floors"
         ) == {}
 
-    @pytest.mark.xfail(strict=True, reason=UNSUPPORTED)
     def test_a_clear_height_is_not_a_size(self):
         """Feet, not square feet -- a length the questionnaire does not ask about."""
         assert correct_bound_direction(
             {"size_sqft": {"max": 32}}, "warehouse in Chicago with 32ft clear height"
         ) == {}
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="the unit disambiguates two candidates that share significant digits; "
-               "TestMagnitudeCorrection.test_two_candidates_mean_the_message_cannot_say "
-               "documents today's behaviour and is superseded by this",
-    )
     def test_the_unit_resolves_what_the_digits_alone_cannot(self):
-        """300 and 30000000 share the digits "3", but only one of them is money."""
+        """300 and 30000000 share the digits "3", but only one of them is money.
+
+        This message used to be the example under
+        ``TestMagnitudeCorrection.test_two_candidates_mean_the_message_cannot_say``, which
+        now holds a pair the unit genuinely cannot separate.
+        """
         assert correct_bound_direction(
             {"price": {"max": 3000000}}, "300 sqft minimum, budget up to $30M"
         ) == {"price": {"max": 30000000}}
@@ -371,3 +367,15 @@ class TestEvidenceInvariant:
         assert correct_bound_direction(
             {"price": {"max": 3000000}}, "$300k deposit, budget up to $30M"
         ) == {"price": {"max": 3000000}}
+
+    def test_a_figure_claimed_by_one_bound_cannot_resize_another(self):
+        """One figure, two bounds: 100 is the min, so it is not the mis-sized max.
+
+        Without this the evidence check would leave a single area-shaped candidate beside
+        an invented ``max`` and store a 100x error where the old ambiguity used to protect
+        it. ``TestCorrectBoundDirection.test_each_figure_takes_its_own_comparator`` is the
+        same case reached from the other side.
+        """
+        assert correct_bound_direction(
+            {"size_sqft": {"min": 100, "max": 10000}}, "size is bigger than 100sqft"
+        ) == {"size_sqft": {"min": 100}}

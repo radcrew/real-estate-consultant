@@ -1,22 +1,31 @@
-"""Correct min/max direction on range criteria using the message's own comparator.
+"""Rebuild range criteria from the figures, comparators and units the message contains.
 
-Which side of a range a figure belongs to is stated by a comparator, and reading a
-comparator is exact — it does not need a language model. The tuned intake model gets it
-wrong on wordings absent from its training set, in both directions: ``lower than $2M``
-comes back as ``{"min": 2000000}`` and ``just shy of 8,000 sqft`` as ``{"min": 8000}``.
+Which side of a range a figure belongs to is stated by a comparator, and which field a
+figure belongs to is stated by its unit. Reading either is exact — it does not need a
+language model. The tuned intake model gets both wrong on wordings absent from its
+training set: ``lower than $2M`` comes back as ``{"min": 2000000}``, ``just shy of 8,000
+sqft`` as ``{"min": 8000}``, and ``a 100k sqft warehouse`` as a *budget* of 100000
+alongside the size, because 100000 is genuinely in the message.
 
 So the model keeps the parts that are genuinely hard — noticing a budget was mentioned,
-reading ``$2M`` as ``2000000`` — and this decides the side.
+reading ``$2M`` as ``2000000`` — and this decides the side and the owner. The invariant
+being enforced is::
 
-The correction is deliberately timid. It fires only when the message states exactly one
-direction and the model emitted exactly one bound; anything else is returned untouched,
-because a wrong correction is worse than the model's own answer.
+    FINAL_VALUE(field) requires EVIDENCE(field, user_message)
+
+where evidence for a range field is a figure whose unit fits it.
+
+The correction is deliberately timid, and one-directional where it is not sure: a field
+left unanswered is asked again by the questionnaire, whereas a field wrongly filled in is
+never asked and silently filters the search. So silence in the message means the model's
+own answer stands, and only a figure the message positively assigns elsewhere is taken as
+grounds to drop one.
 """
 
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, NamedTuple
 
 # Ordered: negations, then multi-word forms, then single words. ``re`` scans left to
 # right, so a negation starting earlier in the string consumes the comparator nested
@@ -93,13 +102,76 @@ _NUMBER_RE = re.compile(
 _MAX_COMPARATOR_GAP = 24
 
 
+# What a figure is measured in, read from the text immediately after it. This is what
+# separates "100k sqft" from "$100k": the digits are identical and the unit is not.
+#
+# Order matters twice. Area comes before length because "sqft" has "ft" nested inside it,
+# and "32ft clear height" is a length while "100k sqft" is an area. Within a kind, longer
+# forms come first for the same reason.
+#
+# A figure whose unit is absent is left unclassified rather than guessed at. "budget up to
+# 100k" says nothing after the figure, and an unclassified figure is evidence for any
+# field — the message gave no grounds to rule one out, so the model's reading is the only
+# reading available.
+_UNIT_KINDS: list[tuple[str, str]] = [
+    (r"sq(?:uare)?\s*\.?\s*(?:ft|feet|foot)\b", "area"),
+    (r"sq(?:uare)?\s*\.?\s*(?:metres?|meters?|m)\b", "area"),
+    (r"sq(?:uare)?\s*\.?\s*(?:yards?|yds?)\b", "area"),
+    (r"(?:sqft|sqm|sf)\b", "area"),
+    (r"(?:yards?|yds?|acres?)\b", "area"),
+    (r"(?:dollars?|usd|bucks)\b", "money"),
+    (r"(?:ft|feet|foot|metres?|meters?|inch(?:es)?)\b", "length"),
+    (r"(?:dock\s+)?doors?\b", "count"),
+    (r"(?:loading\s+)?(?:bays?|docks?)\b", "count"),
+    (r"(?:parking\s+)?spaces?\b", "count"),
+    (r"(?:freight\s+)?(?:lifts?|elevators?)\b", "count"),
+    (r"(?:floors?|stor(?:ey|y|ie)s?|units?|suites?|offices?|rooms?|desks?|seats?)\b",
+     "count"),
+    (r"(?:%|(?:percent|pct)\b)", "share"),
+    (r"(?:years?|months?|weeks?|days?|miles?|minutes?)\b", "term"),
+]
+_UNIT_RE = re.compile(
+    r"\s*(?:"
+    + "|".join(f"(?P<u{index}>{pattern})" for index, (pattern, _) in enumerate(_UNIT_KINDS))
+    + r")",
+    re.IGNORECASE,
+)
+_UNIT_GROUP_KIND = {f"u{index}": kind for index, (_, kind) in enumerate(_UNIT_KINDS)}
+
+# The unit a field is measured in. A field absent here accepts any figure, so growing the
+# questionnaire cannot silently start dropping values — ``questions.json`` has exactly two
+# range fields today, and a third would arrive unrestricted until it is listed.
+_FIELD_KINDS = {"price": "money", "size_sqft": "area"}
+
+
+class _Figure(NamedTuple):
+    """One figure in the message: what it says, which way, and what it measures."""
+
+    value: float
+    side: str | None
+    kind: str | None
+
+
 def bound_sides_in(text: str) -> set[str]:
     """Return the bound directions the message states — a subset of ``{"min", "max"}``."""
     return {_GROUP_SIDE[match.lastgroup] for match in _BOUND_RE.finditer(text or "")}
 
 
-def _numbers_in(text: str) -> list[tuple[int, int, float]]:
-    found: list[tuple[int, int, float]] = []
+def _kind_of(text: str, match: re.Match[str]) -> str | None:
+    """What a matched figure is measured in, or ``None`` if the message does not say.
+
+    Money is written in front of the figure and every other unit behind it, so the "$" is
+    read from the span ``_NUMBER_RE`` consumed ahead of the digits and the rest from the
+    text immediately following the match.
+    """
+    if "$" in text[match.start():match.start("num")]:
+        return "money"
+    unit = _UNIT_RE.match(text, match.end())
+    return _UNIT_GROUP_KIND[unit.lastgroup] if unit else None
+
+
+def _numbers_in(text: str) -> list[tuple[int, int, float, str | None]]:
+    found: list[tuple[int, int, float, str | None]] = []
     for match in _NUMBER_RE.finditer(text):
         try:
             value = float(match.group("num").replace(",", ""))
@@ -107,12 +179,12 @@ def _numbers_in(text: str) -> list[tuple[int, int, float]]:
             continue
         if suffix := match.group("suffix"):
             value *= _MULTIPLIERS[suffix.lower()]
-        found.append((match.start("num"), match.end(), value))
+        found.append((match.start("num"), match.end(), value, _kind_of(text, match)))
     return found
 
 
-def numbers_with_direction(text: str) -> list[tuple[float, str | None]]:
-    """Pair every figure in the message with the comparator that governs it.
+def numbers_with_direction(text: str) -> list[_Figure]:
+    """Pair every figure in the message with the comparator and unit that govern it.
 
     A whole-message reading cannot answer "lower than $2M, bigger than 100 sqft" — it
     sees both directions and can say nothing about either. Each figure takes the nearest
@@ -125,8 +197,8 @@ def numbers_with_direction(text: str) -> list[tuple[float, str | None]]:
         for match in _BOUND_RE.finditer(text or "")
     ]
 
-    paired: list[tuple[float, str | None]] = []
-    for index, (start, end, value) in enumerate(numbers):
+    paired: list[_Figure] = []
+    for index, (start, end, value, kind) in enumerate(numbers):
         previous_end = numbers[index - 1][1] if index else 0
         next_start = numbers[index + 1][0] if index + 1 < len(numbers) else len(text)
 
@@ -144,7 +216,7 @@ def numbers_with_direction(text: str) -> list[tuple[float, str | None]]:
                 continue
             if gap <= _MAX_COMPARATOR_GAP and (best_gap is None or gap < best_gap):
                 best_side, best_gap = side, gap
-        paired.append((value, best_side))
+        paired.append(_Figure(value, best_side, kind))
     return paired
 
 
@@ -161,7 +233,36 @@ def _significant_digits(value: float) -> str:
     return text.strip("0") or "0"
 
 
-def _rescaled(bound: float, figures: list[tuple[float, str | None]]):
+def _fits(figure: _Figure, kind: str | None) -> bool:
+    """Whether ``figure`` can be evidence for a field measured in ``kind``.
+
+    Silence on either side permits: a field with no declared unit takes any figure, and a
+    figure with no unit is available to any field.
+    """
+    return kind is None or figure.kind is None or figure.kind == kind
+
+
+def _claimed(stated: dict[str, Any], figures: list[_Figure]) -> set[float]:
+    """Figure values some stated bound already matches exactly.
+
+    A figure spoken for by one bound is not also the mis-sized original of another. "size
+    is bigger than 100sqft" with ``{"min": 100, "max": 10000}`` holds one figure and two
+    bounds, and 100 belongs to the bound that matches it outright — which is what keeps
+    the invented 10,000 from being "corrected" to the 100 standing right beside it.
+    """
+    values = {figure.value for figure in figures}
+    claimed = set()
+    for bound in stated.values():
+        try:
+            numeric = float(bound)
+        except (TypeError, ValueError):
+            continue
+        if numeric in values:
+            claimed.add(numeric)
+    return claimed
+
+
+def _rescaled(bound: float, figures: list[_Figure], kind: str | None, claimed: set[float]):
     """A message figure differing from ``bound`` only in magnitude, nearest one first.
 
     The 0.5B reads a large budget correctly and then writes it short. Measured on the
@@ -174,68 +275,102 @@ def _rescaled(bound: float, figures: list[tuple[float, str | None]]):
 
     **Exactly one candidate, or nothing.** Two figures sharing a bound's digits mean the
     message cannot say which was mis-sized, and guessing turns a dropped field into a
-    wrong one. "costs less than $1M, size is bigger than 100sqft" is the case: the model
-    invents ``size_sqft.max = 10000``, whose digits match both 1000000 and 100, and the
-    invented bound has to stay droppable. Nearest-wins picked one of the two and stored a
-    10,000x error.
+    wrong one. "between $30M and $300M" is the case: a bound of 3,000,000 has the digits
+    of both, both are money, and neither is spoken for. Nearest-wins picked one and stored
+    a 100x error.
+
+    A candidate must also be measured in this field's unit and not already claimed by
+    another bound, which is what leaves "costs less than $1M, size is bigger than 100sqft"
+    with no candidate at all for its invented ``size_sqft.max = 10000``: 1,000,000 is
+    money and 100 is already the min.
     """
     digits = _significant_digits(bound)
     if not digits:
         return None
-    candidates = [f for f in figures if f[0] != bound and _significant_digits(f[0]) == digits]
+    candidates = [
+        figure for figure in figures
+        if figure.value != bound
+        and figure.value not in claimed
+        and _fits(figure, kind)
+        and _significant_digits(figure.value) == digits
+    ]
     return candidates[0] if len(candidates) == 1 else None
 
 
-def _correct_one(value: dict[str, Any], figures: list[tuple[float, str | None]]) -> dict[str, Any]:
-    """Rebuild one range value from the figures the message actually contains."""
+def _correct_one(
+    value: dict[str, Any], figures: list[_Figure], kind: str | None
+) -> dict[str, Any] | None:
+    """Rebuild one range value from the figures the message actually contains.
+
+    Returns ``None`` when every stated bound belongs to a different field, so the caller
+    can drop the key rather than store an empty range.
+    """
     stated = {side: value[side] for side in ("min", "max") if value.get(side) is not None}
     if not stated:
         return value
 
+    claimed = _claimed(stated, figures)
     rebuilt: dict[str, Any] = {}
-    matched_any = False
+    ruled_out = False
     for side, bound in stated.items():
         try:
             numeric = float(bound)
         except (TypeError, ValueError):
             rebuilt[side] = bound
-            matched_any = True
             continue
-        match = next((f for f in figures if f[0] == numeric), None)
+        match = next(
+            (f for f in figures if f.value == numeric and _fits(f, kind)), None
+        )
         if match is None:
+            if any(f.value == numeric for f in figures):
+                # The figure is in the message, measured in something this field cannot
+                # be measured in — "100k sqft" is not a budget. That is evidence against
+                # the bound rather than silence about it, so it does not get the benefit
+                # of the doubt the next branch gives.
+                ruled_out = True
+                continue
             # Before calling it invented: the same digits at another magnitude means the
             # model read the figure and mis-sized it, and the message settles the size.
-            match = _rescaled(numeric, figures)
+            match = _rescaled(numeric, figures, kind, claimed)
             if match is None:
                 continue  # no figure in the message supports this bound: invented
-            bound = int(match[0]) if float(match[0]).is_integer() else match[0]
-        matched_any = True
-        rebuilt[match[1] or side] = bound
+            bound = int(match.value) if float(match.value).is_integer() else match.value
+        rebuilt[match.side or side] = bound
 
-    # Nothing matched at all — the model may have normalised a figure this cannot parse
-    # ("half a million"), so its answer stands.
-    return rebuilt if matched_any and rebuilt else value
+    if rebuilt:
+        return rebuilt
+    # Nothing matched. Either the message assigned every bound elsewhere, and the field is
+    # unanswered — or it said nothing this can parse ("half a million") and the model's
+    # own answer stands.
+    return None if ruled_out else value
 
 
 def correct_bound_direction(extracted: dict[str, Any], user_input: str) -> dict[str, Any]:
-    """Put each range bound on the side its own figure's comparator indicates.
+    """Put each range bound on the side, and in the field, its own figure indicates.
 
-    Two failures, one cause. The model puts a stated bound on the wrong side ("lower than
-    $2M" → ``{"min": 2000000}``), and it invents the opposite bound to fill the shape
-    ("less than $1M" → ``{"min": 0, "max": 1000000}``). Both are settled by asking which
-    figure in the message each bound came from.
+    Three failures, one cause. The model puts a stated bound on the wrong side ("lower
+    than $2M" → ``{"min": 2000000}``), it invents the opposite bound to fill the shape
+    ("less than $1M" → ``{"min": 0, "max": 1000000}``), and it reuses one figure for a
+    second field the message never mentioned ("100k sqft" → a budget of 100000 as well as
+    a size). All three are settled by asking which figure in the message each bound came
+    from, and what that figure measures.
 
     A bound whose value appears nowhere in the message was not stated, so it is dropped.
-    A bound whose figure carries a comparator moves to that side. If no bound matches any
-    figure the value is returned untouched, so an unparseable figure costs coverage
-    rather than correctness.
+    A bound matching a figure measured in another field's unit belongs to that other
+    field, so it is dropped and the key with it. A bound whose figure carries a comparator
+    moves to that side. If no bound matches any figure the value is returned untouched, so
+    an unparseable figure costs coverage rather than correctness.
     """
     figures = numbers_with_direction(user_input)
     if not figures:
         return extracted
 
-    corrected = dict(extracted)
+    corrected: dict[str, Any] = {}
     for key, value in extracted.items():
-        if isinstance(value, dict):
-            corrected[key] = _correct_one(value, figures)
+        if not isinstance(value, dict):
+            corrected[key] = value
+            continue
+        rebuilt = _correct_one(value, figures, _FIELD_KINDS.get(key))
+        if rebuilt is not None:
+            corrected[key] = rebuilt
     return corrected
