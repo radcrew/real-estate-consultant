@@ -12,6 +12,7 @@ from app.repositories.intake_jobs import (
     complete_intake_job,
     count_active_intake_jobs,
     create_intake_job,
+    expire_abandoned_queued_jobs,
     expire_stale_running_jobs,
     fail_intake_job,
     get_intake_job_row,
@@ -164,3 +165,26 @@ class TestExpireStaleRunningJobs:
         table = client.table.return_value
         table.eq.assert_called_once_with("status", "running")
         table.lt.assert_called_once_with("updated_at", cutoff.isoformat())
+
+
+class TestExpireAbandonedQueuedJobs:
+    async def test_fails_jobs_nothing_ever_picked_up(self):
+        """A queued row counts against the in-flight cap, so one that is never claimed
+        locks the session permanently — reachable by a failed publish, a worker that is
+        down, or a message that exhausted maxReceiveCount into the DLQ."""
+        cutoff = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+        client = make_supabase_client([_JOB_ROW])
+        rows = await expire_abandoned_queued_jobs(client, older_than=cutoff)
+        assert rows == [_JOB_ROW]
+        table = client.table.return_value
+        table.eq.assert_called_once_with("status", "queued")
+        table.lt.assert_called_once_with("updated_at", cutoff.isoformat())
+
+    async def test_it_is_terminal_not_a_requeue(self):
+        """Requeuing would recreate the state it exists to clear."""
+        client = make_supabase_client([_JOB_ROW])
+        await expire_abandoned_queued_jobs(
+            client, older_than=datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+        )
+        payload = client.table.return_value.update.call_args.args[0]
+        assert payload["status"] == "failed"

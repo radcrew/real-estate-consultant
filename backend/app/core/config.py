@@ -164,6 +164,11 @@ class Settings(BaseSettings):
     # treated as dead. Must exceed the worker's function timeout, or a turn that is
     # still running gets expired out from under it.
     chat_job_stale_after_seconds: float = 300.0
+    # Jobs never picked up at all. Must sit well past visibility timeout x
+    # maxReceiveCount (180s x 3 = 540s): a job being legitimately redelivered waits in
+    # `queued` between attempts, and expiring it there would cancel work SQS still
+    # intends to deliver.
+    chat_job_abandoned_after_seconds: float = 900.0
     # Unfinished turns allowed per session. One is the natural limit: FIFO ordering per
     # session already serialises them, so a second in flight only queues behind the first
     # while giving an abuser a cheap way to multiply work per session.

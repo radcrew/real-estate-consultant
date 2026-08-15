@@ -68,6 +68,11 @@ def _enter(
             return_value=active_jobs,
         ),
         patch(f"{_ENDPOINT}.expire_stale_running_jobs", new_callable=AsyncMock, return_value=[]),
+        patch(
+            f"{_ENDPOINT}.expire_abandoned_queued_jobs",
+            new_callable=AsyncMock,
+            return_value=[],
+        ),
         patch(f"{_ENDPOINT}.create_intake_job", new_callable=AsyncMock, return_value=_JOB_ROW),
         patch(f"{_ENDPOINT}.claim_intake_job", new_callable=AsyncMock, return_value=_JOB_ROW),
         patch(f"{_ENDPOINT}.chat_job_queue", queue),
@@ -145,15 +150,32 @@ class TestEnqueue:
         alone it holds the session's only slot, locking the user out of their own
         conversation — so the sweep has to run before the count, not after."""
         order: list[str] = []
-        expire = AsyncMock(side_effect=lambda *a, **k: order.append("sweep") or [])
+        expire_running = AsyncMock(side_effect=lambda *a, **k: order.append("running") or [])
+        expire_queued = AsyncMock(side_effect=lambda *a, **k: order.append("queued") or [])
         count = AsyncMock(side_effect=lambda *a, **k: order.append("count") or 0)
         with ExitStack() as stack:
             _enter(stack, queue_enabled=True)
-            stack.enter_context(patch(f"{_ENDPOINT}.expire_stale_running_jobs", expire))
+            stack.enter_context(patch(f"{_ENDPOINT}.expire_stale_running_jobs", expire_running))
+            stack.enter_context(
+                patch(f"{_ENDPOINT}.expire_abandoned_queued_jobs", expire_queued)
+            )
             stack.enter_context(patch(f"{_ENDPOINT}.count_active_intake_jobs", count))
             r = await _post(client)
         assert r.status_code == 202
-        assert order == ["sweep", "count"]
+        # Both unfinished states are swept: the in-flight cap counts queued and running
+        # alike, so clearing only one still leaves the session lockable.
+        assert order == ["running", "queued", "count"]
+
+    async def test_the_queued_sweep_allows_for_redelivery(self):
+        """A job being legitimately retried waits in `queued` between deliveries, so its
+        window has to sit past visibility timeout x maxReceiveCount (180s x 3)."""
+        from app.core.config import settings as live_settings
+
+        assert live_settings.chat_job_abandoned_after_seconds > 540
+        assert (
+            live_settings.chat_job_abandoned_after_seconds
+            > live_settings.chat_job_stale_after_seconds
+        )
 
 
 class TestQueueDisabled:

@@ -17,6 +17,7 @@ from app.repositories.intake_jobs import (
     claim_intake_job,
     count_active_intake_jobs,
     create_intake_job,
+    expire_abandoned_queued_jobs,
     expire_stale_running_jobs,
 )
 from app.repositories.intake_sessions import get_intake_session_row
@@ -53,13 +54,20 @@ async def submit_llm_intake_input(
     # the insert below.
     await get_intake_session_row(client, session_id)
 
-    # Swept here because this is where a dead row does its damage: a job left `running`
-    # by a killed worker holds the session's in-flight slot, and the claim gate means
-    # redelivery can never finish it — so without this the user is locked out of their
-    # own conversation permanently.
+    # Swept here because this is where a dead row does its damage: an unfinished job
+    # holds the session's in-flight slot, so one that nothing will ever complete locks
+    # the user out of their own conversation permanently. Both unfinished states can get
+    # stuck, for different reasons and on different timescales — `running` when a worker
+    # is killed mid-turn (the claim gate stops redelivery from rescuing it), `queued`
+    # when nothing ever picks the job up.
+    now = datetime.now(UTC)
     await expire_stale_running_jobs(
         client,
-        older_than=datetime.now(UTC) - timedelta(seconds=settings.chat_job_stale_after_seconds),
+        older_than=now - timedelta(seconds=settings.chat_job_stale_after_seconds),
+    )
+    await expire_abandoned_queued_jobs(
+        client,
+        older_than=now - timedelta(seconds=settings.chat_job_abandoned_after_seconds),
     )
 
     active = await count_active_intake_jobs(client, session_id=session_id)

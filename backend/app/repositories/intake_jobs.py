@@ -159,3 +159,32 @@ async def expire_stale_running_jobs(
         .execute(),
     )
     return as_row_list(result.data)
+
+
+async def expire_abandoned_queued_jobs(
+    client: AsyncClient,
+    *,
+    older_than: datetime,
+) -> list[dict[str, Any]]:
+    """Fail jobs still ``queued`` since before ``older_than`` — nothing will run them.
+
+    A queued row counts against the session's in-flight cap, so one that is never picked
+    up locks the user out of their own conversation permanently. Three ways to get there,
+    one of them by design: a failed SQS publish deliberately leaves the row behind, a
+    worker that is down never claims it, and a message that exhausts ``maxReceiveCount``
+    goes to the DLQ while its row stays put.
+
+    ``older_than`` must be well past ``visibilityTimeout x maxReceiveCount``. A job being
+    legitimately retried sits in ``queued`` between deliveries, and expiring it there
+    would cancel work SQS is still going to hand over. ``updated_at`` moves on every
+    status change, so a job that is actively cycling keeps looking fresh — only one that
+    nothing has touched at all ages out.
+    """
+    result = await execute_db_safe(
+        client.table("intake_jobs")
+        .update({"status": "failed", "error": "This message was never picked up."})
+        .eq("status", "queued")
+        .lt("updated_at", older_than.astimezone(UTC).isoformat())
+        .execute(),
+    )
+    return as_row_list(result.data)
