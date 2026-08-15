@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 
 from app.core.config import settings
 from app.core.deps import SupabaseSdkDep
+from app.core.intake_admission import AdmitIntakeJobStream
 from app.repositories.intake_jobs import get_intake_job_row
 from app.schemas.intake_sessions import IntakeJobStatusResponse
 from supabase import AsyncClient
@@ -90,7 +91,12 @@ async def get_intake_job(
     return job_status_payload(row)
 
 
-@router.get("/{job_id}/stream")
+@router.get(
+    "/{job_id}/stream",
+    # Each open stream holds a function and polls the database until it ends, so this is
+    # metered where the plain read below is not.
+    dependencies=[AdmitIntakeJobStream],
+)
 async def stream_intake_job(
     session_id: UUID,
     job_id: UUID,

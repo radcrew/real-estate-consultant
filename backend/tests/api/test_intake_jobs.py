@@ -137,6 +137,55 @@ class TestStreamEndpoint:
         assert r.headers["cache-control"] == "no-cache"
 
 
+class TestStreamAdmission:
+    async def test_an_exhausted_budget_refuses_the_stream(self, client, monkeypatch):
+        """Wiring test. Streams are anonymous and each holds a serverless function, so
+        without this one valid job id could be opened without limit."""
+        from app.core import intake_admission as module
+        from app.core.intake_admission import IntakeAdmissionControl
+
+        monkeypatch.setattr(
+            module,
+            "intake_admission",
+            IntakeAdmissionControl(ip_per_minute=1, session_per_minute=10),
+        )
+        with (
+            patch(
+                f"{_JOBS}.get_intake_job_row",
+                new_callable=AsyncMock,
+                return_value=_row("succeeded", result=_TURN_RESULT),
+            ),
+            patch(f"{_JOBS}.settings") as cfg,
+        ):
+            cfg.chat_job_timeout_seconds = 5.0
+            cfg.chat_job_poll_interval_seconds = 0.0
+            url = f"/api/v1/intake-sessions/{_SESSION_UUID}/jobs/{_JOB_UUID}/stream"
+            first = await client.get(url)
+            second = await client.get(url)
+        assert first.status_code == 200
+        assert second.status_code == 429
+
+    async def test_polling_stays_unmetered(self, client, monkeypatch):
+        """It runs once a second by design, so any budget tight enough to protect the
+        stream would break the fallback that exists for when the stream fails."""
+        from app.core import intake_admission as module
+        from app.core.intake_admission import IntakeAdmissionControl
+
+        monkeypatch.setattr(
+            module,
+            "intake_admission",
+            IntakeAdmissionControl(ip_per_minute=1, session_per_minute=1),
+        )
+        with patch(
+            f"{_JOBS}.get_intake_job_row",
+            new_callable=AsyncMock,
+            return_value=_row("running"),
+        ):
+            url = f"/api/v1/intake-sessions/{_SESSION_UUID}/jobs/{_JOB_UUID}"
+            for _ in range(4):
+                assert (await client.get(url)).status_code == 200
+
+
 class TestJobEventStream:
     async def test_stops_on_a_terminal_status(self):
         get_row = AsyncMock(return_value=_row("failed", error="nope"))

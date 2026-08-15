@@ -111,5 +111,23 @@ def admit_intake_llm_turn(request: Request, session_id: UUID) -> None:
     intake_admission.check_turn(address=client_ip(request), session_id=session_id)
 
 
+def admit_intake_job_stream(request: Request) -> None:
+    """Meter *opening* a job stream, which is not free the way a plain read is.
+
+    An SSE response holds a serverless function for as long as it runs and queries the
+    database on every tick, so concurrent streams consume the platform's concurrency
+    rather than just its bandwidth. Admission on the enqueue route does not cover this:
+    one legitimate job id can be streamed any number of times.
+
+    Deliberately shares the address budget with turn submission instead of getting its
+    own. A client opens one stream per turn, so the two together are two calls per turn
+    against a per-minute allowance — nowhere near a human conversation, and one number to
+    reason about rather than two. The *polling* fallback is left unmetered: it runs once
+    a second by design, so any budget tight enough to matter here would break it.
+    """
+    intake_admission.check_entry(address=client_ip(request))
+
+
 AdmitIntakeSessionCreation = Depends(admit_intake_session_creation)
 AdmitIntakeLlmTurn = Depends(admit_intake_llm_turn)
+AdmitIntakeJobStream = Depends(admit_intake_job_stream)
