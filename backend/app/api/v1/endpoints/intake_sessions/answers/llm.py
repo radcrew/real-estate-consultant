@@ -6,10 +6,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, status
 
+from app.clients.bedrock_guardrail import bedrock_guardrail
 from app.clients.sqs import chat_job_queue
 from app.core.config import settings
 from app.core.deps import SupabaseSdkDep
 from app.core.intake_admission import AdmitIntakeLlmTurn
+from app.llm.providers.exceptions import raise_guardrail_blocked
 from app.repositories.intake_jobs import (
     claim_intake_job,
     count_active_intake_jobs,
@@ -55,9 +57,16 @@ async def submit_llm_intake_input(
             "Still working on your last message. Please wait for it to finish.",
         )
 
+    # Screened *before* the row is written, not inside the turn: the job row persists the
+    # user's text, so redacting later would mean the unscreened version had already been
+    # stored — and every downstream reader (the worker, a redrive) replays what is here.
+    screened = await bedrock_guardrail.screen(body.input, source="INPUT")
+    if screened.blocked:
+        raise_guardrail_blocked()
+
     # Written before the publish: a row with no message is visible and redrivable, while
     # a message with no row is undiagnosable when the consumer picks it up.
-    job = await create_intake_job(client, session_id=session_id, user_input=body.input)
+    job = await create_intake_job(client, session_id=session_id, user_input=screened.text)
     job_id = UUID(str(job["id"]))
 
     if chat_job_queue.enabled:
@@ -73,7 +82,8 @@ async def submit_llm_intake_input(
         client,
         job_id=job_id,
         session_id=session_id,
-        user_input=body.input,
+        # The screened text, matching what the row holds and what the worker would replay.
+        user_input=screened.text,
         # Nothing would redeliver it, so a transient fault must still end the job rather
         # than stranding it as queued forever.
         allow_retry=False,

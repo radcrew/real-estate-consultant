@@ -518,7 +518,21 @@ way. One-off cost, no standing charge.
 `ApplyGuardrail` evaluates text standalone, so one policy screens **both** the Qwen and Bedrock
 paths. For a product collecting budget and personal circumstances in free text, PII redaction is
 the one Bedrock feature that is genuinely hard to build yourself. Priced per text unit — opt in
-when there is a launch date, not before.
+when there is a launch date, not before, which is why an empty `BEDROCK_GUARDRAIL_ID` makes
+screening a pass-through.
+
+✅ Implemented in `app/clients/bedrock_guardrail.py`. Three decisions worth recording:
+
+- **Screening runs before the job row is written**, not inside the turn. The row persists the
+  user's text and is what the worker replays, so redacting later would mean the raw version had
+  already been stored — and stored is exactly where §18 says this data must not accumulate
+  unscreened.
+- **It fails closed by default.** A screening control that silently stops screening is worse than
+  an error: the PII it exists to catch reaches storage with nothing recording the gap.
+  `BEDROCK_GUARDRAIL_FAIL_OPEN=true` trades that for availability as a deliberate choice.
+- **Blocked ≠ masked.** Masking is the feature working, so the redacted text is kept and the turn
+  proceeds; a blocked verdict refuses the turn with a 422 that does not name the rule that fired,
+  since naming it tells someone probing the filter exactly what to rephrase.
 
 ## 7. Configuration and IAM
 
@@ -1019,6 +1033,7 @@ strand the turn forever with the client polling work nobody will run. `execute_c
 | `app/repositories/intake_jobs.py` | ✅ create / get / claim / complete / fail / count-active / expire-stale |
 | `app/services/intake_llm.py` | ✅ `run_llm_intake_turn()`, extracted from the endpoint |
 | `app/clients/sqs.py` | ✅ `ChatJobQueue`, boto3 via `anyio.to_thread` per `bedrock_embeddings` |
+| `app/clients/bedrock_guardrail.py` | ✅ phase G — screens intake text before it is stored |
 | `app/repositories/intake_jobs.py` | new — create / get / claim / complete / fail |
 | `app/workers/chat_job_worker.py` | ✅ the Lambda handler |
 | `app/core/intake_admission.py` | ✅ new — per-address and per-session windows on both LLM intake routes |
@@ -1251,7 +1266,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | **D — Qwen 0.5B intake on Lambda** | ✅ **code complete**: `qwen_lambda.py` (contract, retry-once, error mapping, breaker), `circuit_breaker.py`, `infra/qwen-lambda/` image with build-time GBNF and HF fetch, schema export + drift test, 62 tests. Remaining is deployment only: **supply the weights** (§23.1 — fine-tune vs base undecided), build/push, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
 | **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
 | **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1), ✅ `intake_jobs` migration + repository (claim gate, `attempts` trigger, stale-claim sweeper), ✅ pipeline extracted to `intake_llm.py`, ✅ `ChatJobQueue` publisher, ✅ `chat-intake-worker` handler (claim gate, failure classification, FIFO-safe partial batches), ✅ `202` + poll + SSE endpoints with the in-flight cap, ✅ frontend service + `use-intake-job` hook + chat panel, ✅ `infra/chat-intake-worker/` image + runbook. **Code complete — 132 tests.** Remaining is deployment: create the queue and DLQ, push the image, wire the capped event source, then set `SQS_CHAT_QUEUE_URL` | $0 — SQS free to 1M/mo |
-| **G — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
+| **G — Guardrails** | ✅ code: `BedrockGuardrail`, input screened before the durable write, optional output screening, fail-closed default, 24 tests. Remaining: author the policy in the Bedrock console and set `BEDROCK_GUARDRAIL_ID` | per text unit |
 
 **Phase C is a deploy step, not a development step**, and it gates B: until embeddings are routed
 to Bedrock there are no vectors, and `find_similar_listings` excludes rows without one. Order of

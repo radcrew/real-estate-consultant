@@ -13,7 +13,13 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.services.intake_llm import question_titles_for, run_llm_intake_turn
+from app.clients.bedrock_guardrail import GuardrailOutcome
+from app.schemas.intake_sessions import IntakeSessionFirstQuestion
+from app.services.intake_llm import (
+    question_titles_for,
+    run_llm_intake_turn,
+    screen_generated_question,
+)
 
 _SERVICE = "app.services.intake_llm"
 _SESSION_ID = uuid4()
@@ -69,6 +75,51 @@ def _enter(stack, *, session_row=None, llm_result=None, save=None, parse=None):
     ):
         stack.enter_context(item)
     return parse_mock, save_mock
+
+
+class TestScreenGeneratedQuestion:
+    async def test_off_by_default(self):
+        """It doubles the per-turn guardrail cost for template-driven text."""
+        question = IntakeSessionFirstQuestion(key="k", title="T", text="What size?", type="text")
+        guardrail = MagicMock()
+        with ExitStack() as stack:
+            stack.enter_context(patch(f"{_SERVICE}.bedrock_guardrail", guardrail))
+            cfg = stack.enter_context(patch(f"{_SERVICE}.settings"))
+            cfg.bedrock_guardrail_screen_output = False
+            assert await screen_generated_question(question) is question
+        guardrail.screen.assert_not_called()
+
+    async def test_masked_text_replaces_the_question(self):
+        question = IntakeSessionFirstQuestion(
+            key="k", title="T", text="Near 1 Main St?", type="text"
+        )
+        guardrail = MagicMock()
+        guardrail.screen = AsyncMock(
+            return_value=GuardrailOutcome(text="Near {PII}?", blocked=False)
+        )
+        with ExitStack() as stack:
+            stack.enter_context(patch(f"{_SERVICE}.bedrock_guardrail", guardrail))
+            cfg = stack.enter_context(patch(f"{_SERVICE}.settings"))
+            cfg.bedrock_guardrail_screen_output = True
+            screened = await screen_generated_question(question)
+        assert screened is not None
+        assert screened.text == "Near {PII}?"
+
+    async def test_a_blocked_question_falls_back_to_no_text(self):
+        """The client already handles this by showing the question row's own wording."""
+        question = IntakeSessionFirstQuestion(key="k", title="T", text="bad", type="text")
+        guardrail = MagicMock()
+        guardrail.screen = AsyncMock(return_value=GuardrailOutcome(text="bad", blocked=True))
+        with ExitStack() as stack:
+            stack.enter_context(patch(f"{_SERVICE}.bedrock_guardrail", guardrail))
+            cfg = stack.enter_context(patch(f"{_SERVICE}.settings"))
+            cfg.bedrock_guardrail_screen_output = True
+            screened = await screen_generated_question(question)
+        assert screened is not None
+        assert screened.text == ""
+
+    async def test_no_question_is_left_alone(self):
+        assert await screen_generated_question(None) is None
 
 
 class TestQuestionTitlesFor:

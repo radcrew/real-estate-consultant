@@ -14,6 +14,7 @@ from app.utils.exceptions import (
     raise_bad_gateway,
     raise_gateway_timeout,
     raise_service_unavailable,
+    raise_unprocessable_entity,
 )
 
 # Bedrock is reached through two SDKs: the Anthropic SDK for chat (Messages API) and
@@ -151,6 +152,26 @@ def raise_bedrock_structured_reply_incomplete() -> NoReturn:
     raise_bad_gateway(
         "The assistant's reply didn't come through completely. "
         "Please try again in a moment.",
+    )
+
+
+def raise_guardrail_blocked() -> NoReturn:
+    """Policy refused the text. Deliberately vague about which rule fired.
+
+    Naming the rule tells someone probing the filter exactly what to rephrase, and the
+    honest guidance for a legitimate user is the same either way.
+    """
+    raise_unprocessable_entity(
+        "That message can't be processed. Please rephrase it without sensitive personal "
+        "details.",
+    )
+
+
+def raise_guardrail_unavailable(*, cause: BedrockCallFailure) -> NoReturn:
+    """Screening could not run, and the configuration says not to proceed unscreened."""
+    raise_service_unavailable(
+        "We couldn't check that message right now. Please try again in a moment.",
+        cause=cause,
     )
 
 

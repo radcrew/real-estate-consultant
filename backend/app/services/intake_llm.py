@@ -17,14 +17,41 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
+from app.clients.bedrock_guardrail import bedrock_guardrail
+from app.core.config import settings
 from app.domain.intake_criteria import normalize_merged_criteria
 from app.domain.intake_validation import compute_current_index
 from app.llm import parse_user_input, resolve_next_intake_question
 from app.llm.intake.service import SKIPPED_FIELDS_KEY
 from app.repositories.intake_sessions import get_intake_session_row, save_intake_criteria
 from app.repositories.questions import list_intake_questions
-from app.schemas.intake_sessions import SubmitLlmIntakeInputResponse
+from app.schemas.intake_sessions import (
+    IntakeSessionFirstQuestion,
+    SubmitLlmIntakeInputResponse,
+)
 from supabase import AsyncClient
+
+
+async def screen_generated_question(
+    next_question: IntakeSessionFirstQuestion | None,
+) -> IntakeSessionFirstQuestion | None:
+    """Screen the model-authored question before it is shown back to the user.
+
+    Off by default (``BEDROCK_GUARDRAIL_SCREEN_OUTPUT``): it doubles the per-turn
+    guardrail cost, and this text is template-driven rather than free-form, so it carries
+    much less than the user's own message. A blocked question falls back to no text,
+    which the client already handles by showing the question row's configured wording.
+    """
+    if not settings.bedrock_guardrail_screen_output or next_question is None:
+        return next_question
+    text = (next_question.text or "").strip()
+    if not text:
+        return next_question
+
+    screened = await bedrock_guardrail.screen(text, source="OUTPUT")
+    if screened.blocked:
+        return next_question.model_copy(update={"text": ""})
+    return next_question.model_copy(update={"text": screened.text})
 
 
 def question_titles_for(questions: list[dict[str, Any]]) -> dict[str, str]:
@@ -63,10 +90,12 @@ async def run_llm_intake_turn(
     missing_fields = llm_result["missing_fields"]
     is_complete = bool(llm_result["is_complete"])
 
-    next_question = resolve_next_intake_question(
-        questions,
-        llm_result["next_question"],
-        missing_fields,
+    next_question = await screen_generated_question(
+        resolve_next_intake_question(
+            questions,
+            llm_result["next_question"],
+            missing_fields,
+        )
     )
     current_index = compute_current_index(questions, merged_criteria)
 

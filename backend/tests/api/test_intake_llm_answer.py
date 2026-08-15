@@ -11,6 +11,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import HTTPException
 
+from app.clients.bedrock_guardrail import GuardrailOutcome
+
 _SESSION_UUID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 _JOB_UUID = "11111111-2222-3333-4444-555555555555"
 
@@ -40,11 +42,17 @@ def _enter(
     queue_enabled: bool = False,
     turn=None,
     publish=None,
+    screen=None,
 ):
     """Patch the endpoint's collaborators, leaving its own decisions under test."""
     queue = MagicMock()
     queue.enabled = queue_enabled
     queue.publish = publish or AsyncMock(return_value="msg-1")
+    guardrail = MagicMock()
+    guardrail.screen = screen or AsyncMock(
+        side_effect=lambda text, **_: GuardrailOutcome(text=text, blocked=False)
+    )
+    stack.enter_context(patch(f"{_ENDPOINT}.bedrock_guardrail", guardrail))
     run = turn or AsyncMock(return_value=_turn_response())
     complete = AsyncMock(return_value={})
     fail = AsyncMock(return_value={})
@@ -153,6 +161,37 @@ class TestQueueDisabled:
         assert r.status_code == 202
         assert r.json()["status"] == "failed"
         assert fail.await_args.kwargs["retryable"] is False
+
+
+class TestGuardrail:
+    async def test_the_stored_text_is_the_screened_one(self, client):
+        """Screening has to precede the write: the row is what the worker replays, so
+        redacting later would mean the raw text had already been persisted."""
+        create = AsyncMock(return_value=_JOB_ROW)
+        screen = AsyncMock(return_value=GuardrailOutcome(text="my address is {PII}", blocked=False))
+        with ExitStack() as stack:
+            _enter(stack, queue_enabled=True, screen=screen)
+            stack.enter_context(patch(f"{_ENDPOINT}.create_intake_job", create))
+            r = await _post(client, "my address is 1 Main St")
+        assert r.status_code == 202
+        assert create.await_args.kwargs["user_input"] == "my address is {PII}"
+
+    async def test_blocked_text_is_refused_before_a_job_exists(self, client):
+        create = AsyncMock(return_value=_JOB_ROW)
+        screen = AsyncMock(return_value=GuardrailOutcome(text="disallowed", blocked=True))
+        with ExitStack() as stack:
+            _enter(stack, queue_enabled=True, screen=screen)
+            stack.enter_context(patch(f"{_ENDPOINT}.create_intake_job", create))
+            r = await _post(client, "disallowed")
+        assert r.status_code == 422
+        create.assert_not_awaited()
+
+    async def test_the_inline_path_runs_the_screened_text_too(self, client):
+        screen = AsyncMock(return_value=GuardrailOutcome(text="redacted", blocked=False))
+        with ExitStack() as stack:
+            _, run, _, _ = _enter(stack, queue_enabled=False, screen=screen)
+            await _post(client, "my address is 1 Main St")
+        assert run.await_args.kwargs["user_input"] == "redacted"
 
 
 class TestValidation:

@@ -96,6 +96,17 @@ class Settings(BaseSettings):
     bedrock_qwen_input_cost_per_1m: float = 0.0
     bedrock_qwen_output_cost_per_1m: float = 0.0
 
+    # Bedrock Guardrails screening for intake free text (app/clients/bedrock_guardrail.py).
+    # Priced per text unit, so an empty id disables it and screening passes through.
+    bedrock_guardrail_id: str = ""
+    bedrock_guardrail_version: str = "DRAFT"
+    # Screen the assistant's generated question as well as the user's message. Doubles
+    # the per-turn cost; the question is template-driven, so the risk it carries is lower.
+    bedrock_guardrail_screen_output: bool = False
+    # On a guardrail outage, prefer availability over screening. False (the default)
+    # refuses the turn rather than storing text nothing checked.
+    bedrock_guardrail_fail_open: bool = False
+
     # The fine-tuned Qwen2.5-0.5B criteria extractor, self-hosted on Lambda and invoked
     # over IAM. An empty name disables the provider the same way a blank region does.
     qwen_inference_function_name: str = ""
