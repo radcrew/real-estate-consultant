@@ -105,6 +105,12 @@ class SubmitLlmIntakeInputResponse(BaseModel):
     current_index: int
     total_questions: int
     missing_fields: list[str]
+    # Both were built by the service and passed here, but were never declared — Pydantic
+    # dropped them silently, so the side panel's missing-field labels have always fallen
+    # back to raw keys. Declared now, with defaults so an older stored job result still
+    # loads.
+    skipped_fields: list[str] = Field(default_factory=list)
+    question_titles: dict[str, str] = Field(default_factory=dict)
     next_question: IntakeSessionFirstQuestion | None = None
     is_complete: bool
 

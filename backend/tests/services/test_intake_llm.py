@@ -98,6 +98,19 @@ class TestRunLlmIntakeTurn:
         assert response.total_questions == 2
         assert response.is_complete is False
 
+    async def test_question_titles_reach_the_client(self):
+        """The side panel labels missing fields with these; undeclared, they vanished."""
+        with ExitStack() as stack:
+            _enter(stack)
+            response = await run_llm_intake_turn(
+                MagicMock(), session_id=_SESSION_ID, user_input="warehouse"
+            )
+        assert response.question_titles == {
+            "location": "Location",
+            "property_type": "Property Type",
+        }
+        assert response.skipped_fields == ["budget"]
+
     async def test_skipped_fields_bookkeeping_stays_out_of_the_criteria(self):
         """It is persisted so the model stops asking, not because the user chose it."""
         with ExitStack() as stack:
