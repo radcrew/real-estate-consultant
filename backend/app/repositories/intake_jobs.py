@@ -174,11 +174,16 @@ async def expire_abandoned_queued_jobs(
     worker that is down never claims it, and a message that exhausts ``maxReceiveCount``
     goes to the DLQ while its row stays put.
 
-    ``older_than`` must be well past ``visibilityTimeout x maxReceiveCount``. A job being
-    legitimately retried sits in ``queued`` between deliveries, and expiring it there
-    would cancel work SQS is still going to hand over. ``updated_at`` moves on every
-    status change, so a job that is actively cycling keeps looking fresh — only one that
-    nothing has touched at all ages out.
+    ``older_than`` measures *untouched* time: ``updated_at`` moves on every status
+    change, so a job cycling through redelivery keeps refreshing it and only one nothing
+    has touched at all ages out. The bar is a single visibility timeout — the gap between
+    attempts — not the whole redelivery span.
+
+    Expiring early is safe rather than destructive, because the claim gate filters on
+    ``status = 'queued'``: a message delivered after this ran matches no row and is
+    dropped. Waiting longer is the riskier option — the turn could complete into a row
+    nobody is watching, and the user, having already given up and resent, would get two
+    turns merged into one session.
     """
     result = await execute_db_safe(
         client.table("intake_jobs")
