@@ -67,6 +67,37 @@ GENERIC_PHRASINGS = frozenset({
     "shopping district", "mall entrance", "workspace",
 })
 
+# Square feet per unit of area, keyed by the user's wording with punctuation and spaces
+# removed, so "sq. yd", "sq yd" and "sqyd" are one entry.
+#
+# The conversion itself is the model's job and it does it well. This table is here so the
+# *answer* can be explained: someone who typed "100k yard" and is shown 900,000 sq ft has
+# no way to tell a correct conversion from a bug, and telling them nothing is how a
+# working feature reads as a broken one.
+#
+# Units already in square feet map to 1.0 and are listed rather than omitted — a missing
+# key would be indistinguishable from an unrecognised unit, and silence is the answer for
+# both, for different reasons.
+SQFT_PER: dict[str, float] = {
+    "sqft": 1.0, "sqfeet": 1.0, "sqfoot": 1.0, "squarefeet": 1.0, "squarefoot": 1.0,
+    "squareft": 1.0, "sf": 1.0,
+    "yard": 9.0, "yards": 9.0, "yd": 9.0, "yds": 9.0,
+    "sqyard": 9.0, "sqyards": 9.0, "sqyd": 9.0, "sqyds": 9.0,
+    "squareyard": 9.0, "squareyards": 9.0,
+    "sqm": 10.7639, "sqmetre": 10.7639, "sqmetres": 10.7639,
+    "sqmeter": 10.7639, "sqmeters": 10.7639,
+    "squarem": 10.7639, "squaremetre": 10.7639, "squaremetres": 10.7639,
+    "squaremeter": 10.7639, "squaremeters": 10.7639,
+    "acre": 43560.0, "acres": 43560.0,
+}
+
+# How to name a unit back to the person who used it, once its spelling has been folded.
+UNIT_NAMES: dict[float, str] = {
+    9.0: "square yard",
+    10.7639: "square metre",
+    43560.0: "acre",
+}
+
 # Postal abbreviations, so "TX" in the message supports "Texas" in the answer and the
 # other way round. The model expands an abbreviation it was given far more often than it
 # contracts a name, but both directions cost the same to allow.

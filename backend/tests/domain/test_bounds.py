@@ -379,3 +379,67 @@ class TestEvidenceInvariant:
         assert correct_bound_direction(
             {"size_sqft": {"min": 100, "max": 10000}}, "size is bigger than 100sqft"
         ) == {"size_sqft": {"min": 100}}
+
+
+class TestUnitConversion:
+    """A size the user gave in yards, metres or acres, in the square feet search uses.
+
+    The model is supposed to do this and mostly does -- "1500 yard" comes back as 13,500.
+    It does not always. "I need a 100k yard farm" comes back as 100,000, which is the
+    figure with the unit thrown away, and the search then runs at a ninth of the area
+    asked for with nothing on screen to say so.
+
+    The rule is narrow on purpose: it fires only when the stored bound *is* the figure the
+    message states. A conversion the model already made matches no figure in the message
+    and never reaches it.
+    """
+
+    def test_the_reported_message_is_converted(self):
+        assert correct_bound_direction(
+            {"size_sqft": {"min": 100000}}, "I need a 100k yard farm"
+        ) == {"size_sqft": {"min": 900000}}
+
+    def test_a_conversion_the_model_already_made_is_untouched(self):
+        """13,500 appears nowhere in "1500 yard", so nothing here can claim it."""
+        value = {"size_sqft": {"min": 13500, "max": 13500}}
+        assert correct_bound_direction(value, "1500 yard") == value
+
+    def test_the_same_message_unconverted_is_converted(self):
+        """The other half of the pair above: same message, the model kept the raw yards."""
+        assert correct_bound_direction(
+            {"size_sqft": {"min": 1500, "max": 1500}}, "1500 yard"
+        ) == {"size_sqft": {"min": 13500, "max": 13500}}
+
+    @pytest.mark.parametrize(("message", "emitted", "expected"), [
+        ("5 acres of land", 5, 217800),
+        ("2,000 sq yd retail", 2000, 18000),
+        ("800 square yards", 800, 7200),
+    ])
+    def test_every_convertible_unit(self, message, emitted, expected):
+        assert correct_bound_direction(
+            {"size_sqft": {"max": emitted}}, message
+        ) == {"size_sqft": {"max": expected}}
+
+    def test_a_metric_conversion_keeps_its_fraction(self):
+        """1,500 x 10.7639 is not a whole number and rounding it away is a real error."""
+        assert correct_bound_direction(
+            {"size_sqft": {"max": 1500}}, "under 1500 sq metres"
+        ) == {"size_sqft": {"max": 16145.85}}
+
+    def test_square_feet_are_not_converted(self):
+        value = {"size_sqft": {"max": 5000}}
+        assert correct_bound_direction(value, "under 5000 sqft") == value
+
+    def test_a_budget_is_never_converted(self):
+        """"$1M" is money, and money has no square feet in it."""
+        value = {"price": {"max": 1000000}}
+        assert correct_bound_direction(value, "under $1M") == value
+
+    def test_a_converted_bound_still_takes_its_comparator(self):
+        assert correct_bound_direction(
+            {"size_sqft": {"max": 1500}}, "nothing below 1500 yard"
+        ) == {"size_sqft": {"min": 13500}}
+
+    def test_a_converted_bound_is_an_integer(self):
+        result = correct_bound_direction({"size_sqft": {"max": 1500}}, "1500 yard")
+        assert isinstance(result["size_sqft"]["max"], int)

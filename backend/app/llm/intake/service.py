@@ -13,6 +13,7 @@ from app.domain.intake_criteria import (
     apply_criteria_filters,
     merge_criteria,
 )
+from app.domain.intake_notes import explain_extraction
 from app.domain.intake_next_question import (
     first_question_row_in_missing,
     pending_question_key,
@@ -253,6 +254,12 @@ def _build_intake_parse_result(
         - (set(merged_criteria) - unconfirmed),
     )
 
+    # What the system did to the user's own words. Every transformation below is correct
+    # and none is obvious from the result alone: someone who typed "100k yard" and is
+    # shown 900,000 sq ft cannot tell a right answer from a bug, and "You're all set!"
+    # reads as the system having ignored them.
+    notes = explain_extraction(user_input, parsed_output.extracted, extracted, questions)
+
     unconfirmed_fields = sorted(unconfirmed & set(required_fields) - set(skipped_fields))
     missing_fields = merge_missing_fields(
         merged_criteria=merged_criteria,
@@ -274,6 +281,7 @@ def _build_intake_parse_result(
         "missing_fields": missing_fields,
         "skipped_fields": skipped_fields,
         "unconfirmed_fields": unconfirmed_fields,
+        "notes": notes,
         # The reply before the filters. Kept alongside ``extracted`` so a logged turn can
         # say whether the model or a filter is what changed between two runs.
         "model_output": parsed_output.model_dump(),

@@ -98,6 +98,17 @@ export type CreateLlmIntakeSessionResponse = {
   next_question: LlmNextQuestion | null;
 };
 
+/**
+ * What the system did to the user's own words on this turn: a unit converted, a figure
+ * that belongs to a different field, a bound the wording moved. Absent on an ordinary
+ * turn, which is most of them.
+ */
+export type LlmCriteriaNote = {
+  field: string;
+  kind: "converted" | "reassigned" | "moved" | "resized";
+  message: string;
+};
+
 export type LlmInputResponse = {
   mode: "llm";
   extracted: LlmExtracted;
@@ -107,6 +118,8 @@ export type LlmInputResponse = {
   missing_fields: string[];
   skipped_fields: string[];
   question_titles: Record<string, string>;
+  unconfirmed_fields?: string[];
+  notes?: LlmCriteriaNote[];
   next_question: LlmNextQuestion | null;
   is_complete: boolean;
 };

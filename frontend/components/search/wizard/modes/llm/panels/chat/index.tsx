@@ -86,12 +86,19 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
       });
       onLlmSuccess(data);
 
+      // What the system did to their words comes before what it wants next. Someone who
+      // typed "100k yard" and is shown 900,000 sq ft cannot tell a correct conversion
+      // from a bug, and "You're all set!" on its own reads as having been ignored.
+      const explanations = (data.notes ?? []).map((n) => n.message).filter(Boolean);
+
       const followUp = data.next_question?.text?.trim();
-      const assistantReply =
-        followUp ||
-        (data.missing_fields.length === 0
+      const closing =
+        data.missing_fields.length === 0
           ? "You're all set! You can start searching properties now, or tell me if you'd like to update anything."
-          : "");
+          : "";
+      const assistantReply = [...explanations, followUp || closing]
+        .filter(Boolean)
+        .join("\n\n");
 
       if (assistantReply) {
         setMessages((m) => [

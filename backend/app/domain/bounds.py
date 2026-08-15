@@ -27,6 +27,8 @@ from __future__ import annotations
 import re
 from typing import Any, NamedTuple
 
+from app.domain.intake_vocabulary import SQFT_PER
+
 # Ordered: negations, then multi-word forms, then single words. ``re`` scans left to
 # right, so a negation starting earlier in the string consumes the comparator nested
 # inside it — "no less than" is a lower bound despite containing "less than", and
@@ -143,13 +145,24 @@ _UNIT_GROUP_KIND = {f"u{index}": kind for index, (_, kind) in enumerate(_UNIT_KI
 # range fields today, and a third would arrive unrestricted until it is listed.
 _FIELD_KINDS = {"price": "money", "size_sqft": "area"}
 
+# Unit spellings are compared with punctuation and spacing removed: "sq. yd", "sq yd"
+# and "sqyd" are one key in ``SQFT_PER``.
+_NOT_ALNUM = re.compile(r"[^a-z0-9]")
+
 
 class _Figure(NamedTuple):
-    """One figure in the message: what it says, which way, and what it measures."""
+    """One figure in the message: what it says, which way, and what it measures.
+
+    ``unit`` is the wording the user actually used — "yard", "square metres", "sqft" —
+    where ``kind`` is only the family it belongs to. Both are needed: ``kind`` decides
+    which field may hold the figure, and ``unit`` is what lets the answer explain itself
+    to the person who typed it, who wrote yards and is being shown square feet.
+    """
 
     value: float
     side: str | None
     kind: str | None
+    unit: str | None = None
 
 
 def bound_sides_in(text: str) -> set[str]:
@@ -157,21 +170,23 @@ def bound_sides_in(text: str) -> set[str]:
     return {_GROUP_SIDE[match.lastgroup] for match in _BOUND_RE.finditer(text or "")}
 
 
-def _kind_of(text: str, match: re.Match[str]) -> str | None:
-    """What a matched figure is measured in, or ``None`` if the message does not say.
+def _measure_of(text: str, match: re.Match[str]) -> tuple[str | None, str | None]:
+    """What a matched figure is measured in: its family, and the user's own wording.
 
     Money is written in front of the figure and every other unit behind it, so the "$" is
     read from the span ``_NUMBER_RE`` consumed ahead of the digits and the rest from the
     text immediately following the match.
     """
     if "$" in text[match.start():match.start("num")]:
-        return "money"
+        return "money", "$"
     unit = _UNIT_RE.match(text, match.end())
-    return _UNIT_GROUP_KIND[unit.lastgroup] if unit else None
+    if unit is None:
+        return None, None
+    return _UNIT_GROUP_KIND[unit.lastgroup], unit.group(unit.lastgroup)
 
 
-def _numbers_in(text: str) -> list[tuple[int, int, float, str | None]]:
-    found: list[tuple[int, int, float, str | None]] = []
+def _numbers_in(text: str) -> list[tuple[int, int, float, str | None, str | None]]:
+    found: list[tuple[int, int, float, str | None, str | None]] = []
     for match in _NUMBER_RE.finditer(text):
         try:
             value = float(match.group("num").replace(",", ""))
@@ -179,7 +194,8 @@ def _numbers_in(text: str) -> list[tuple[int, int, float, str | None]]:
             continue
         if suffix := match.group("suffix"):
             value *= _MULTIPLIERS[suffix.lower()]
-        found.append((match.start("num"), match.end(), value, _kind_of(text, match)))
+        kind, unit = _measure_of(text, match)
+        found.append((match.start("num"), match.end(), value, kind, unit))
     return found
 
 
@@ -198,7 +214,7 @@ def numbers_with_direction(text: str) -> list[_Figure]:
     ]
 
     paired: list[_Figure] = []
-    for index, (start, end, value, kind) in enumerate(numbers):
+    for index, (start, end, value, kind, unit) in enumerate(numbers):
         previous_end = numbers[index - 1][1] if index else 0
         next_start = numbers[index + 1][0] if index + 1 < len(numbers) else len(text)
 
@@ -216,7 +232,7 @@ def numbers_with_direction(text: str) -> list[_Figure]:
                 continue
             if gap <= _MAX_COMPARATOR_GAP and (best_gap is None or gap < best_gap):
                 best_side, best_gap = side, gap
-        paired.append(_Figure(value, best_side, kind))
+        paired.append(_Figure(value, best_side, kind, unit))
     return paired
 
 
@@ -260,6 +276,33 @@ def _claimed(stated: dict[str, Any], figures: list[_Figure]) -> set[float]:
         if numeric in values:
             claimed.add(numeric)
     return claimed
+
+
+def _converted(bound: Any, figure: _Figure, kind: str | None) -> Any:
+    """A size stated in yards, metres or acres, in the square feet the field stores.
+
+    The model is supposed to do this and mostly does — "1500 yard" comes back as 13,500.
+    It does not always: "I need a 100k yard farm" comes back as 100,000, which is the
+    figure the user typed with the unit thrown away, and the search then runs at a ninth
+    of the area they asked for with nothing on screen to say so.
+
+    It fires only when the stored bound *is* the raw figure, so a conversion the model
+    already made is untouched — 13,500 matches no figure in "1500 yard" and never reaches
+    here. Multiplying by nine is arithmetic, not judgement, and belongs on this side.
+    """
+    if kind != "area" or not figure.unit:
+        return bound
+    factor = SQFT_PER.get(_NOT_ALNUM.sub("", figure.unit.lower()))
+    if not factor or factor == 1.0:
+        return bound
+    converted = float(bound) * factor
+    return int(converted) if converted.is_integer() else round(converted, 2)
+
+
+def same_significant_digits(one: float, other: float) -> bool:
+    """Whether two values differ only in magnitude — 3,000,000 against 30,000,000."""
+    digits = _significant_digits(one)
+    return bool(digits) and digits == _significant_digits(other)
 
 
 def _rescaled(bound: float, figures: list[_Figure], kind: str | None, claimed: set[float]):
@@ -335,7 +378,9 @@ def _correct_one(
             if match is None:
                 continue  # no figure in the message supports this bound: invented
             bound = int(match.value) if float(match.value).is_integer() else match.value
-        rebuilt[match.side or side] = bound
+        # The bound is the figure as typed. If the user typed a unit this field is not
+        # measured in, it still needs converting -- see ``_converted``.
+        rebuilt[match.side or side] = _converted(bound, match, kind)
 
     if rebuilt:
         return rebuilt
