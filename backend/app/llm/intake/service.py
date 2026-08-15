@@ -13,6 +13,7 @@ from app.domain.intake_criteria import (
     drop_placeholder_values,
     drop_self_describing_values,
     drop_unconfigured_choices,
+    drop_unevidenced_values,
     merge_criteria,
 )
 from app.domain.intake_next_question import (
@@ -231,6 +232,10 @@ def _build_intake_parse_result(
     extracted = drop_placeholder_values(extracted)
     extracted = drop_self_describing_values(extracted, questions)
     extracted = drop_unconfigured_choices(extracted, questions)
+    # The three filters above validate against the schema and never read the message, so
+    # a valid option word invented from nothing passes all of them. This one asks the
+    # message. It runs after canonicalisation so it compares stored spellings.
+    extracted = drop_unevidenced_values(extracted, questions, user_input, current_criteria)
     # The model reads the figure reliably and the comparator unreliably, so the side a
     # lone bound sits on is decided here from the message itself. No-op unless the
     # message states one direction and the model chose the other.

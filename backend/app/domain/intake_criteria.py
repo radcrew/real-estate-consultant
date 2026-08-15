@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from typing import Any
 
+from app.domain.intake_vocabulary import (
+    GENERIC_PHRASINGS,
+    GEO_STOPWORDS,
+    STATE_ABBREVIATIONS,
+    TYPE_PHRASINGS,
+)
 from app.utils.values import clean_str_or_none
 
 _LOCATION_TYPES = frozenset({"location", "geo", "address"})
@@ -392,6 +399,171 @@ def drop_unconfigured_choices(
             cleaned[key] = canonical
 
     return cleaned
+
+
+_WORD_CHARS = re.compile(r"[^\w\s]+")
+
+
+def _folded(text: str) -> str:
+    """Case, punctuation and spacing removed, so "St. Louis" and "St Louis" compare."""
+    return " ".join(_WORD_CHARS.sub(" ", text).casefold().split())
+
+
+def _says(phrase: str, message: str) -> bool:
+    """Whether ``message`` (already folded) contains ``phrase``, also folded, as words."""
+    if not phrase:
+        return False
+    return re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", message) is not None
+
+
+# Both sides of every comparison are folded, and the tables are folded once here rather
+# than per call. Skipping this silently broke the hyphenated wordings — "high-rise
+# residence" cannot match a message whose punctuation has been stripped to "high rise
+# residence", so a correct multifamily was dropped whenever some other type was named.
+_FOLDED_TYPE_PHRASINGS: dict[str, tuple[str, ...]] = {
+    option: tuple(_folded(phrasing) for phrasing in phrasings)
+    for option, phrasings in TYPE_PHRASINGS.items()
+}
+_FOLDED_GENERIC_PHRASINGS = frozenset(_folded(phrasing) for phrasing in GENERIC_PHRASINGS)
+
+
+def _location_evidence(value: str, message: str) -> bool:
+    """Whether the message names the place the answer claims.
+
+    A location is copied out of the message, not reasoned to, so the words should still be
+    there. Four ways of being there, from strictest down: the whole comma-part ("Austin"
+    out of "Austin, Texas"), a postal abbreviation of it ("TX" for "Texas"), the initials
+    of a multi-word part ("SF" for "San Francisco"), or any one distinctive word of it.
+
+    Any *one* part suffices, because expanding what the user gave is the model doing its
+    job — "Austin" answered as "Austin, Texas" is right, and only "Austin" is in the text.
+    """
+    for part in (p.strip() for p in value.split(",")):
+        folded = _folded(part)
+        if not folded:
+            continue
+        if _says(folded, message):
+            return True
+        if abbreviation := STATE_ABBREVIATIONS.get(folded):
+            if _says(abbreviation, message):
+                return True
+        if folded in STATE_ABBREVIATIONS.values():
+            if any(_says(name, message)
+                   for name, code in STATE_ABBREVIATIONS.items() if code == folded):
+                return True
+        words = folded.split()
+        if len(words) > 1 and _says("".join(word[0] for word in words), message):
+            return True
+        if any(_says(word, message)
+               for word in words if len(word) > 2 and word not in GEO_STOPWORDS):
+            return True
+    return False
+
+
+def _type_support(message: str) -> tuple[set[str], bool]:
+    """Types the message names, and whether it names any type at all.
+
+    The second half is what keeps this honest. "a depot for our trucks" is industrial and
+    "a boutique on the high street" is retail, and neither word is in any table we have —
+    the model reaches those by generalising, which is the entire reason it is there. So
+    when the message speaks no type vocabulary the answer is left alone: silence about the
+    vocabulary is not evidence against the type.
+
+    Generic phrasings support a type without triggering the check; see
+    ``GENERIC_PHRASINGS``.
+    """
+    supported = {
+        option for option, phrasings in _FOLDED_TYPE_PHRASINGS.items()
+        if _says(option, message) or any(_says(p, message) for p in phrasings)
+    }
+    named = any(
+        _says(option, message)
+        or any(_says(p, message) for p in phrasings if p not in _FOLDED_GENERIC_PHRASINGS)
+        for option, phrasings in _FOLDED_TYPE_PHRASINGS.items()
+    )
+    return supported, named
+
+
+def drop_unevidenced_values(
+    extracted: dict[str, Any],
+    questions: list[dict[str, Any]],
+    user_input: str,
+    current_criteria: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Remove answers the message contains no evidence for.
+
+    The three filters above validate against the *schema* — is this a placeholder, is it
+    describing the field, is it a configured option? None of them reads the message, so a
+    perfectly valid option word invented from nothing passes all three. Measured in
+    production, three runs of three: "at least 20 dock doors" came back as
+    ``property_type: ["industrial"]``, which is a configured choice, is not a placeholder,
+    and does not name its own field. The user was then never asked which type they wanted.
+
+    The invariant is the one ``bounds`` enforces for numbers::
+
+        FINAL_VALUE(field) requires EVIDENCE(field, user_message)
+
+    What counts as evidence differs by field, and the two here are not alike:
+
+    * a **location** is copied, so its words should be in the message;
+    * a **property type** is *interpreted* — "a depot for our trucks" is industrial —
+      so a missing word proves nothing. The check only fires when the message names some
+      type, and then removes the types it does not name. That catches the answer carrying
+      a second type nobody asked for while leaving every generalisation intact.
+
+    A value already in ``current_criteria`` is never dropped: an earlier turn is evidence
+    too, and a multi-select replaces wholesale on merge, so removing a carried-forward type
+    from "Add flex to that as well" would delete the type the session already held.
+    """
+    message = _folded(user_input or "")
+    if not message:
+        return extracted
+
+    carried = current_criteria or {}
+    rows_by_key = {row["key"]: row for row in questions if isinstance(row.get("key"), str)}
+    supported_types, names_a_type = _type_support(message)
+
+    cleaned: dict[str, Any] = {}
+    for key, value in extracted.items():
+        row = rows_by_key.get(key)
+        if row is None:
+            cleaned[key] = value
+            continue
+
+        qtype = row.get("type")
+        qtype = qtype.strip().lower() if isinstance(qtype, str) else "text"
+        held = carried.get(key)
+
+        if qtype in _LOCATION_TYPES and isinstance(value, str) and value.strip():
+            if value.strip() == (held.strip() if isinstance(held, str) else None):
+                cleaned[key] = value
+            elif _location_evidence(value, message):
+                cleaned[key] = value
+            continue
+
+        if names_a_type and qtype in _MULTI_SELECT_TYPES and _is_type_question(row):
+            already = {item.casefold() for item in _normalize_multi_select(held)}
+            kept = [
+                item for item in _normalize_multi_select(value)
+                if item.casefold() in supported_types or item.casefold() in already
+            ]
+            if kept:
+                cleaned[key] = kept
+            continue
+
+        cleaned[key] = value
+    return cleaned
+
+
+def _is_type_question(row: dict[str, Any]) -> bool:
+    """Whether this question's choices are the property types ``TYPE_PHRASINGS`` describes.
+
+    Matched on the configured values rather than the key name, so a questionnaire offering
+    something else — building class, tenure — simply does not get the check instead of
+    being measured against a vocabulary that says nothing about it.
+    """
+    configured = {value.casefold() for value in _choice_aliases(row).values()}
+    return bool(configured) and configured <= set(TYPE_PHRASINGS)
 
 
 def normalize_merged_criteria(
