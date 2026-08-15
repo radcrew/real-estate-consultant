@@ -175,6 +175,17 @@ def raise_guardrail_unavailable(*, cause: BedrockCallFailure) -> NoReturn:
     )
 
 
+def raise_guardrail_misconfigured() -> NoReturn:
+    """A guardrail was asked for but cannot be reached — no region to call.
+
+    Same copy as an outage on purpose: a user gains nothing from learning which setting
+    is missing, and the operator gets the detail from the log instead.
+    """
+    raise_service_unavailable(
+        "We couldn't check that message right now. Please try again in a moment.",
+    )
+
+
 def raise_qwen_not_configured() -> NoReturn:
     """No region, no function name, or no function by that name to invoke."""
     raise_service_unavailable("The Qwen inference function is not configured.")

@@ -58,9 +58,25 @@ class TestDisabled:
         assert outcome == ("my budget is 2M", False)
         guardrail.client.apply_guardrail.assert_not_called()
 
-    async def test_no_region_passes_text_through(self):
+    async def test_a_policy_without_a_region_refuses_rather_than_skipping(self):
+        """The silent-bypass trap: requiring a region to consider screening "enabled"
+        would turn a blank AWS_REGION into an off switch — the operator configures a PII
+        control, nothing runs, nothing logs, and fail-open never applies because the
+        failure path is never reached."""
         guardrail = _make_guardrail(aws_region="")
-        assert not guardrail.enabled
+        assert guardrail.enabled
+        with pytest.raises(HTTPException) as info:
+            await guardrail.screen("my budget is 2M", source="INPUT")
+        assert info.value.status_code == 503
+        guardrail.client.apply_guardrail.assert_not_called()
+
+    async def test_a_missing_region_honours_fail_open(self):
+        """It is an outage-shaped condition, so the same switch governs it."""
+        guardrail = _make_guardrail(aws_region="", fail_open=True)
+        assert await guardrail.screen("my budget is 2M", source="INPUT") == (
+            "my budget is 2M",
+            False,
+        )
 
     async def test_blank_text_is_not_sent(self):
         guardrail = _make_guardrail()

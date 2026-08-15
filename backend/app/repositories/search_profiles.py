@@ -18,6 +18,16 @@ async def ensure_search_profile_access(
     search_profile_id: object,
     user_id: UUID,
 ) -> str | None:
+    """Raise 404 unless ``user_id`` owns ``search_profile_id``.
+
+    ⚠️ **A ``None`` id is permitted, not enforced.** That is intended — an intake session
+    has no profile until it completes, and there is nothing to check yet — but it means
+    the name overpromises whenever the id comes from a nullable field rather than a path
+    parameter. Passing ``session_row.get("search_profile_id")`` and reading this as an
+    ownership check is exactly the mistake that left intake sessions reachable by any
+    authenticated caller for the whole conversation; those routes now check the session's
+    own ``user_id`` first. Call this with a nullable value only as a *second* guard.
+    """
     if search_profile_id is None:
         return None
 

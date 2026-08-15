@@ -25,7 +25,10 @@ from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from app.core.config import Settings, settings
-from app.llm.providers.exceptions import raise_guardrail_unavailable
+from app.llm.providers.exceptions import (
+    raise_guardrail_misconfigured,
+    raise_guardrail_unavailable,
+)
 
 GUARDRAIL_CONNECT_TIMEOUT = 10.0
 GUARDRAIL_READ_TIMEOUT = 20.0
@@ -69,10 +72,16 @@ class BedrockGuardrail:
 
     @property
     def enabled(self) -> bool:
-        return bool(
-            self.settings.bedrock_guardrail_id.strip()
-            and self.settings.aws_region.strip()
-        )
+        """Whether screening was *asked for*.
+
+        Keyed on the policy id alone, deliberately. Requiring a region here too would
+        make a blank ``AWS_REGION`` silently turn screening off — the operator configured
+        a PII control, nothing runs, nothing logs, and ``BEDROCK_GUARDRAIL_FAIL_OPEN``
+        never applies because the failure path is never reached. A missing region is
+        something screening cannot run *through*, which is a failure to handle rather
+        than a reason to skip.
+        """
+        return bool(self.settings.bedrock_guardrail_id.strip())
 
     @property
     def client(self) -> Any:
@@ -109,6 +118,15 @@ class BedrockGuardrail:
         """
         if not self.enabled or not text.strip():
             return GuardrailOutcome(text=text, blocked=False)
+
+        if not self.settings.aws_region.strip():
+            # Screening was configured and cannot be performed. Treated like an outage
+            # rather than an off switch, so the fail-open setting governs it and the
+            # misconfiguration is visible instead of silently permissive.
+            logger.warning("guardrail_misconfigured", extra={"reason": "no_aws_region"})
+            if self.settings.bedrock_guardrail_fail_open:
+                return GuardrailOutcome(text=text, blocked=False)
+            raise_guardrail_misconfigured()
 
         try:
             response = await anyio.to_thread.run_sync(partial(self._apply, text, source))
