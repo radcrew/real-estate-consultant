@@ -137,9 +137,14 @@ automatically, and `POST /answers/llm` writes to `intake_jobs` on every request 
 first and intake is down until the table exists. There is no migration runner; apply it
 against the direct port (5432), since pgbouncer transaction mode blocks DDL.
 
-The endpoint returns **`202 {job_id, status}`** rather than the turn itself. Results
-arrive over `GET /intake-sessions/{id}/jobs/{job_id}/stream` (SSE), with
-`GET /intake-sessions/{id}/jobs/{job_id}` as the polling fallback for a dropped stream.
+The endpoint returns **`202 {job_id, status}`** rather than the turn itself. The client
+then polls `GET /intake-sessions/{id}/jobs/{job_id}` until the job settles.
+
+⚠️ **An SSE stream was built here and removed — do not re-add `EventSource`.** These
+routes are on the protected router and need a bearer token; `EventSource` cannot set
+headers, so every browser connection 401'd and fell through to polling silently. The API
+tests override `get_current_user`, so they could not have caught it. Push delivery, if
+ever wanted, needs `fetch` + `ReadableStream`.
 
 **No queue is required to run.** With `SQS_CHAT_QUEUE_URL` empty — the default, and what
 local dev and CI use — the turn runs inline and the job is already terminal when the

@@ -1,7 +1,6 @@
 import type { AxiosInstance } from "axios";
 
 import { apiClient } from "@lib/api-client";
-import { BACKEND_BASE_URL } from "@config/env";
 
 export type IntakeSessionQuestion = {
   key: string;
@@ -134,71 +133,14 @@ export type IntakeJobState = {
   error: string | null;
 };
 
-export type JobSubscription = {
-  /** Every state the job passes through, including the first frame on connect. */
-  onUpdate?: (state: IntakeJobState) => void;
-  onSettled: (state: IntakeJobState) => void;
-  /** The stream died or timed out — the caller should fall back to polling. */
-  onStreamLost: () => void;
-};
-
-export const intakeJobStreamUrl = (sessionId: string, jobId: string): string =>
-  `${BACKEND_BASE_URL}/api/v1/intake-sessions/${sessionId}/jobs/${jobId}/stream`;
-
 /**
- * Follow a job over SSE. Returns an unsubscribe function.
+ * Turns are followed by polling `getLlmJob`, not by a stream.
  *
- * These routes are anonymous, which is what makes `EventSource` usable at all — it
- * cannot send an Authorization header, so a bearer-token endpoint would need a polling
- * client instead.
+ * An `EventSource` version was built and removed: these routes require a bearer token
+ * and `EventSource` cannot set headers, so every connection 401'd. If streaming is
+ * revisited for latency, it needs `fetch` + `ReadableStream` (which can carry the
+ * header) rather than `EventSource`.
  */
-export const subscribeToJob = (
-  sessionId: string,
-  jobId: string,
-  handlers: JobSubscription,
-): (() => void) => {
-  if (typeof EventSource === "undefined") {
-    // Server-side render, or a test environment without the API. Polling covers it.
-    handlers.onStreamLost();
-    return () => {};
-  }
-
-  const source = new EventSource(intakeJobStreamUrl(sessionId, jobId));
-  let closed = false;
-  const close = () => {
-    if (closed) return;
-    closed = true;
-    source.close();
-  };
-
-  source.onmessage = (event: MessageEvent<string>) => {
-    let state: IntakeJobState;
-    try {
-      state = JSON.parse(event.data) as IntakeJobState;
-    } catch {
-      return;
-    }
-    handlers.onUpdate?.(state);
-    if (TERMINAL_JOB_STATUSES.includes(state.status)) {
-      close();
-      handlers.onSettled(state);
-    }
-  };
-
-  // The server sends this when it stops watching a job that is still running: the turn
-  // may yet finish, so it means "keep looking elsewhere", not "this failed".
-  source.addEventListener("timeout", () => {
-    close();
-    handlers.onStreamLost();
-  });
-
-  source.onerror = () => {
-    close();
-    handlers.onStreamLost();
-  };
-
-  return close;
-};
 
 export class IntakeSessionsService {
   constructor(private readonly http: AxiosInstance) {}

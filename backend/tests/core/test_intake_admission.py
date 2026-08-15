@@ -9,7 +9,6 @@ from fastapi import HTTPException, Request
 
 from app.core.intake_admission import (
     IntakeAdmissionControl,
-    admit_intake_job_stream,
     admit_intake_session_creation,
     client_ip,
 )
@@ -105,29 +104,6 @@ class TestIntakeAdmissionControl:
             admission.check_turn(address="203.0.113.9", session_id=session)
         # The address is exhausted, but the session spent only one of its two.
         admission.check_turn(address="198.51.100.7", session_id=session)
-
-
-class TestJobStreamAdmission:
-    def test_opening_streams_is_metered(self, monkeypatch):
-        """One valid job id can be streamed any number of times, and each open stream
-        holds a serverless function — so admission on the enqueue route does not cover
-        this."""
-        admission = IntakeAdmissionControl(ip_per_minute=1, session_per_minute=10)
-        monkeypatch.setattr("app.core.intake_admission.intake_admission", admission)
-        request = _request(headers={"x-forwarded-for": "203.0.113.9"})
-        admit_intake_job_stream(request)
-        with pytest.raises(HTTPException) as info:
-            admit_intake_job_stream(request)
-        assert info.value.status_code == 429
-
-    def test_it_draws_on_the_same_address_budget_as_a_turn(self, monkeypatch):
-        """Two calls per turn against one allowance, rather than two numbers to tune."""
-        admission = IntakeAdmissionControl(ip_per_minute=1, session_per_minute=10)
-        monkeypatch.setattr("app.core.intake_admission.intake_admission", admission)
-        request = _request(headers={"x-forwarded-for": "203.0.113.9"})
-        admission.check_entry(address="203.0.113.9")
-        with pytest.raises(HTTPException):
-            admit_intake_job_stream(request)
 
 
 class TestSessionCreationAdmission:

@@ -6,18 +6,16 @@ import { isAxiosError } from "axios";
 import {
   TERMINAL_JOB_STATUSES,
   intakeSessionsService,
-  subscribeToJob,
   type IntakeJobState,
   type LlmInputResponse,
 } from "@services/intake-sessions";
 
 /**
- * How long the client keeps following a turn before giving up — across the stream *and*
- * the polling that outlives it, not one connection.
+ * How long to follow a turn before giving up.
  *
  * Keep in step with the backend's `CHAT_JOB_ABANDONED_AFTER_SECONDS`, which is when it
- * releases the session's in-flight slot. Give up sooner than that and the user is told
- * their turn failed while the next attempt is still refused as "still working".
+ * releases the session's in-flight slot. Give up sooner and the user is told their turn
+ * failed while the next attempt is still refused as "still working".
  */
 const JOB_DEADLINE_MS = 600_000;
 const POLL_INTERVAL_MS = 1_000;
@@ -40,40 +38,34 @@ type UseIntakeJobResult = {
 /**
  * Submit one intake turn and resolve with its result.
  *
- * The turn is accepted durably, then followed: SSE while the connection holds, polling
- * when it does not. Polling is the fallback rather than the primary channel because a
- * dropped `EventSource` with nothing behind it strands a turn the backend has already
- * paid a model to run.
+ * The turn is accepted durably and then polled. Streaming was tried and removed: these
+ * routes require a bearer token, and `EventSource` cannot send one — see
+ * `services/intake-sessions.ts`. Polling also keeps no serverless function held open per
+ * waiting client.
  */
 export const useIntakeJob = (): UseIntakeJobResult => {
   const [isRunning, setRunning] = useState(false);
-  const cleanupRef = useRef<(() => void) | null>(null);
   const abandonedRef = useRef(false);
 
   useEffect(() => {
     return () => {
       abandonedRef.current = true;
-      cleanupRef.current?.();
     };
   }, []);
 
   const pollUntilSettled = useCallback(
     async (sessionId: string, jobId: string, deadline: number): Promise<IntakeJobState> => {
       for (;;) {
-        // Unmounting closes the stream through `cleanupRef`, but by the time polling has
-        // taken over there is nothing left for that to cancel — so this loop has to stop
-        // itself, or it keeps calling the API for the whole deadline after the user has
-        // closed the wizard.
+        // Nothing else can stop this loop, so a component that has gone away has to be
+        // noticed here — otherwise it keeps calling the API until the deadline.
         if (abandonedRef.current) throw new Error(ABANDONED);
         try {
           const state = await intakeSessionsService.getLlmJob(sessionId, jobId);
           if (isTerminal(state) || Date.now() >= deadline) return state;
         } catch (e) {
-          // This path is reached *because* the stream already failed, so the connection
-          // is known to be unreliable — treating one bad response as a dead turn would
-          // discard a message the server is very likely still processing.
-          // A 404 is the exception: the job does not exist, and asking again will not
-          // change that.
+          // One bad response is not a dead turn — the server is very likely still
+          // processing it. A 404 is the exception: the job does not exist, and asking
+          // again will not change that.
           if (isAxiosError(e) && e.response?.status === 404) throw e;
           if (Date.now() >= deadline) throw e;
         }
@@ -81,25 +73,6 @@ export const useIntakeJob = (): UseIntakeJobResult => {
       }
     },
     [],
-  );
-
-  const followJob = useCallback(
-    (sessionId: string, jobId: string, deadline: number): Promise<IntakeJobState> =>
-      new Promise<IntakeJobState>((resolve, reject) => {
-        const unsubscribe = subscribeToJob(sessionId, jobId, {
-          onSettled: (state) => {
-            cleanupRef.current = null;
-            resolve(state);
-          },
-          onStreamLost: () => {
-            cleanupRef.current = null;
-            // Not a failure: the job is very likely still running. Keep asking.
-            pollUntilSettled(sessionId, jobId, deadline).then(resolve, reject);
-          },
-        });
-        cleanupRef.current = unsubscribe;
-      }),
-    [pollUntilSettled],
   );
 
   const runTurn = useCallback(
@@ -111,12 +84,11 @@ export const useIntakeJob = (): UseIntakeJobResult => {
           mode: "llm",
         });
 
-        const deadline = Date.now() + JOB_DEADLINE_MS;
         // Deployments without a queue run the turn inside the request and hand back a
-        // finished job, so opening a stream for it would only add a round trip.
+        // finished job, so there is nothing left to wait for.
         const settled = TERMINAL_JOB_STATUSES.includes(enqueued.status)
           ? await intakeSessionsService.getLlmJob(sessionId, enqueued.job_id)
-          : await followJob(sessionId, enqueued.job_id, deadline);
+          : await pollUntilSettled(sessionId, enqueued.job_id, Date.now() + JOB_DEADLINE_MS);
 
         if (settled.status !== "succeeded" || !settled.result) {
           throw new Error(settled.error ?? GENERIC_FAILURE);
@@ -126,7 +98,7 @@ export const useIntakeJob = (): UseIntakeJobResult => {
         if (!abandonedRef.current) setRunning(false);
       }
     },
-    [followJob],
+    [pollUntilSettled],
   );
 
   return { runTurn, isRunning };
