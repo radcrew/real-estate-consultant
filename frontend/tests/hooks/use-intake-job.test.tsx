@@ -120,6 +120,31 @@ describe("useIntakeJob", () => {
     );
   });
 
+  it("stops polling when the component unmounts", async () => {
+    // Closing the stream on unmount is not enough: once polling has taken over there is
+    // no EventSource left to close, so without its own check the loop keeps calling the
+    // API for the full deadline after the user has closed the wizard.
+    mockEnqueue.mockResolvedValue({ job_id: "job-1", status: "queued" });
+    mockSubscribe.mockImplementation((_s, _j, handlers) => {
+      handlers.onStreamLost();
+      return () => {};
+    });
+    mockGetJob.mockResolvedValue({
+      job_id: "job-1", status: "running", result: null, error: null,
+    });
+
+    const { result, unmount } = renderHook(() => useIntakeJob());
+    const pending = result.current.runTurn("sess-1", "warehouse").catch(() => "stopped");
+    await waitFor(() => expect(mockGetJob).toHaveBeenCalled());
+
+    unmount();
+    await expect(pending).resolves.toBe("stopped");
+
+    const afterUnmount = mockGetJob.mock.calls.length;
+    await new Promise((r) => setTimeout(r, 1_500));
+    expect(mockGetJob.mock.calls.length).toBe(afterUnmount);
+  }, 10_000);
+
   it("closes the stream when the component unmounts mid-turn", async () => {
     const close = vi.fn();
     mockEnqueue.mockResolvedValue({ job_id: "job-1", status: "queued" });

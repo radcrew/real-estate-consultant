@@ -16,6 +16,8 @@ const JOB_DEADLINE_MS = 600_000;
 const POLL_INTERVAL_MS = 1_000;
 
 const GENERIC_FAILURE = "That message couldn't be processed. Please try again.";
+/** Rejection reason when the caller is gone; nothing is listening by then. */
+const ABANDONED = "Intake job no longer being followed.";
 
 const isTerminal = (state: IntakeJobState): boolean =>
   TERMINAL_JOB_STATUSES.includes(state.status);
@@ -51,6 +53,11 @@ export const useIntakeJob = (): UseIntakeJobResult => {
   const pollUntilSettled = useCallback(
     async (sessionId: string, jobId: string, deadline: number): Promise<IntakeJobState> => {
       for (;;) {
+        // Unmounting closes the stream through `cleanupRef`, but by the time polling has
+        // taken over there is nothing left for that to cancel — so this loop has to stop
+        // itself, or it keeps calling the API for the whole deadline after the user has
+        // closed the wizard.
+        if (abandonedRef.current) throw new Error(ABANDONED);
         try {
           const state = await intakeSessionsService.getLlmJob(sessionId, jobId);
           if (isTerminal(state) || Date.now() >= deadline) return state;
