@@ -126,6 +126,40 @@ It selects rows with no vector *or* one from a superseded model, so new listings
 
 ⚠️ **Filtered HNSW can under-return.** With a `WHERE` clause, pgvector scans `hnsw.ef_search` index candidates and *then* filters, so a query can return fewer rows than match — which here shows up as the widening path triggering when it should not. If similar-listings looks short in a state with plenty of listings, raise `hnsw.ef_search` (default 40), or enable `hnsw.iterative_scan` on pgvector ≥ 0.8. Harmless at a small corpus; check it before assuming the data is wrong.
 
+### Intake turns (`public.intake_jobs`)
+
+A turn of the LLM intake chat is stored before it runs (migration
+`20260814_intake_jobs.sql`), so a slow or failing provider costs latency rather than the
+message the user typed.
+
+⚠️ **Apply the migration before deploying the code.** The backend deploys from `main`
+automatically, and `POST /answers/llm` writes to `intake_jobs` on every request — deploy
+first and intake is down until the table exists. There is no migration runner; apply it
+against the direct port (5432), since pgbouncer transaction mode blocks DDL.
+
+The endpoint returns **`202 {job_id, status}`** rather than the turn itself. Results
+arrive over `GET /intake-sessions/{id}/jobs/{job_id}/stream` (SSE), with
+`GET /intake-sessions/{id}/jobs/{job_id}` as the polling fallback for a dropped stream.
+
+**No queue is required.** With `SQS_CHAT_QUEUE_URL` empty — the default, and what local
+dev and CI use — the turn runs inline and the job is already terminal when the `202`
+returns. The client contract is identical either way, so nothing needs a queue to work.
+Setting the variable switches dispatch to `chat-intake.fifo` and the
+[`chat-intake-worker`](../infra/chat-intake-worker/README.md) Lambda.
+
+Two behaviours worth knowing when reading the code:
+
+- **The claim is the idempotency gate.** The worker moves a job `queued → running` with
+  the update filtered on `status = 'queued'`, so a redelivered SQS message whose job
+  already ran matches no row and is dropped instead of paying for the turn twice.
+- **A session allows one turn in flight** (`INTAKE_MAX_ACTIVE_JOBS_PER_SESSION`). A
+  worker killed mid-turn would otherwise hold that slot forever, so the enqueue endpoint
+  sweeps jobs stuck in `running` past `CHAT_JOB_STALE_AFTER_SECONDS` before counting.
+
+Both LLM intake routes are anonymous and metered per address and per session
+(`INTAKE_IP_RATE_LIMIT_PER_MINUTE`, `INTAKE_SESSION_RATE_LIMIT_PER_MINUTE`) — they are
+the only unauthenticated paths that spend money per request.
+
 ## Dataset
 
 **`backend/dataset/raw-data.json`** holds the listing dataset — a **JSON array of objects** (LoopNet-style listing records). It is consumed by the **ingestion service's `loopnet-seed` connector** (`services/ingestion/app/connectors/loopnet_seed.py`), which normalizes each object into a row for Supabase **`public.properties`**. (The backend's standalone seed CLI was removed once the ingestion service took over.)
