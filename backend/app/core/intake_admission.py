@@ -1,20 +1,19 @@
 """Admission control for the LLM-backed intake endpoints.
 
-Intake sessions are deliberately anonymous — `create_intake_session_row` writes no user
-id, so anyone can start a conversation without signing up. That makes the session UUID a
-bearer capability and leaves exactly two handles to meter on: the session it claims to
-be, and the address it came from.
+These routes are authenticated and the session is owned by its creator, so this is not
+about anonymous abuse — it is about how much one account can spend per minute. Both LLM
+intake routes cost money per request: creating an LLM-mode session runs the
+opening-question model, and every turn runs the extraction model.
 
-Metering matters here more than on most endpoints because these two routes are the only
-unauthenticated paths that spend money per request: creating an LLM-mode session runs the
-opening-question model, and every turn runs the extraction model. Today an abused
-endpoint costs a burst of provider calls. Once turns are queued (§14.1) it costs more
-than that: each accepted request becomes a durable job the worker will faithfully pay
-for, so the backlog keeps spending long after the flood stops. Admission control is what
-keeps the queue a buffer rather than an amplifier.
+Metering matters more here than on most endpoints because of what queueing changes. Today
+an abused endpoint costs a burst of provider calls. Once turns are queued (§14.1) each
+accepted request becomes a durable job the worker will faithfully pay for, so the backlog
+keeps spending long after the flood stops. Admission control is what keeps the queue a
+buffer rather than an amplifier.
 
-This is a ceiling, not a bill: per-tenant budgets (§19) are the second layer, and they
-only make sense once a request has an identity to attribute spend to.
+The address window is the wider net and the session window paces one conversation. This
+is a ceiling, not a bill: per-tenant budgets (§19) are the second layer, and now that
+every session has an owner there is an identity to attribute spend to.
 """
 
 from __future__ import annotations

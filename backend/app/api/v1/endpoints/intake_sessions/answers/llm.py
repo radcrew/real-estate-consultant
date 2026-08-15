@@ -10,7 +10,7 @@ from fastapi import APIRouter, status
 from app.clients.bedrock_guardrail import bedrock_guardrail
 from app.clients.sqs import chat_job_queue
 from app.core.config import settings
-from app.core.deps import SupabaseSdkDep
+from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.core.intake_admission import AdmitIntakeLlmTurn
 from app.llm.providers.exceptions import raise_guardrail_blocked
 from app.repositories.intake_jobs import (
@@ -20,7 +20,7 @@ from app.repositories.intake_jobs import (
     expire_abandoned_queued_jobs,
     expire_stale_running_jobs,
 )
-from app.repositories.intake_sessions import get_intake_session_row
+from app.repositories.intake_sessions import get_owned_intake_session_row
 from app.schemas.intake_sessions import (
     EnqueuedLlmIntakeJobResponse,
     SubmitLlmIntakeInputRequest,
@@ -43,6 +43,7 @@ async def submit_llm_intake_input(
     session_id: UUID,
     body: SubmitLlmIntakeInputRequest,
     client: SupabaseSdkDep,
+    current_user: CurrentUser,
 ) -> EnqueuedLlmIntakeJobResponse:
     """Accept a turn and return the job to follow.
 
@@ -50,9 +51,10 @@ async def submit_llm_intake_input(
     the fallback. Returning ``202`` rather than the turn itself is what makes a provider
     stall survivable: the user's text is already durable before any model is called.
     """
-    # A missing session must 404 here rather than surfacing as a foreign-key error from
-    # the insert below.
-    await get_intake_session_row(client, session_id)
+    # Also the ownership check: a session belonging to someone else answers 404 exactly
+    # like a missing one, so a guessed id learns nothing. Doing it here keeps every later
+    # step — the sweep, the job row, the queue — working on a session the caller owns.
+    await get_owned_intake_session_row(client, session_id, user_id=UUID(current_user.id))
 
     # Swept here because this is where a dead row does its damage: an unfinished job
     # holds the session's in-flight slot, so one that nothing will ever complete locks

@@ -168,9 +168,18 @@ Two behaviours worth knowing when reading the code:
   worker killed mid-turn would otherwise hold that slot forever, so the enqueue endpoint
   sweeps jobs stuck in `running` past `CHAT_JOB_STALE_AFTER_SECONDS` before counting.
 
-Both LLM intake routes are anonymous and metered per address and per session
-(`INTAKE_IP_RATE_LIMIT_PER_MINUTE`, `INTAKE_SESSION_RATE_LIMIT_PER_MINUTE`) — they are
-the only unauthenticated paths that spend money per request.
+Sessions are owned: `intake_sessions.user_id` is set at creation and every API route
+loads them through `get_owned_intake_session_row`, so another user's session answers 404
+exactly like a missing one. The queued worker keeps the unscoped lookup — it serves no
+user request, and authorisation belongs at the API boundary.
+
+⚠️ Migration `20260815_intake_sessions_user_id.sql` leaves pre-existing rows with a NULL
+owner, which makes them unreachable. Conversations in flight at deploy time restart.
+
+Both LLM intake routes are also metered per address and per session
+(`INTAKE_IP_RATE_LIMIT_PER_MINUTE`, `INTAKE_SESSION_RATE_LIMIT_PER_MINUTE`) — they spend
+money per request, and behind the queue each accepted request becomes a job the worker
+will pay for.
 
 ## Dataset
 

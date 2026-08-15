@@ -7,6 +7,7 @@ require a bearer token and ``EventSource`` cannot send one, so every browser con
 """
 from __future__ import annotations
 
+from contextlib import ExitStack
 from unittest.mock import AsyncMock, patch
 
 from fastapi import HTTPException
@@ -34,13 +35,24 @@ def _url() -> str:
     return f"/api/v1/intake-sessions/{_SESSION_UUID}/jobs/{_JOB_UUID}"
 
 
+def _owns_session(**overrides):
+    """The caller owns the session. Scoping the job by session alone is not enough."""
+    return patch(
+        f"{_JOBS}.get_owned_intake_session_row",
+        new_callable=AsyncMock,
+        **({"return_value": {"id": _SESSION_UUID}} | overrides),
+    )
+
+
+def _job(**overrides):
+    return patch(f"{_JOBS}.get_intake_job_row", new_callable=AsyncMock, **overrides)
+
+
 class TestPollEndpoint:
     async def test_returns_the_job_state(self, client):
-        with patch(
-            f"{_JOBS}.get_intake_job_row",
-            new_callable=AsyncMock,
-            return_value=_row("succeeded", result=_TURN_RESULT),
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(_owns_session())
+            stack.enter_context(_job(return_value=_row("succeeded", result=_TURN_RESULT)))
             r = await client.get(_url())
         assert r.status_code == 200
         body = r.json()
@@ -48,27 +60,48 @@ class TestPollEndpoint:
         assert body["result"]["extracted"] == {"location": "Austin"}
 
     async def test_unknown_job_is_404(self, client):
-        with patch(
-            f"{_JOBS}.get_intake_job_row",
-            new_callable=AsyncMock,
-            side_effect=HTTPException(status_code=404, detail="Intake job not found."),
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(_owns_session())
+            stack.enter_context(
+                _job(side_effect=HTTPException(status_code=404, detail="Intake job not found."))
+            )
             r = await client.get(_url())
         assert r.status_code == 404
 
+    async def test_another_users_session_is_404_and_reads_no_job(self, client):
+        """A job's result holds the criteria extracted from someone's message, so two
+        guessed UUIDs must not be enough to read it."""
+        with ExitStack() as stack:
+            stack.enter_context(
+                _owns_session(
+                    return_value=None,
+                    side_effect=HTTPException(
+                        status_code=404, detail="Intake session not found."
+                    ),
+                )
+            )
+            job = stack.enter_context(_job(return_value=_row("succeeded")))
+            r = await client.get(_url())
+        assert r.status_code == 404
+        job.assert_not_awaited()
+
     async def test_a_failed_job_reports_its_error(self, client):
-        with patch(
-            f"{_JOBS}.get_intake_job_row",
-            new_callable=AsyncMock,
-            return_value=_row("failed", error="The assistant's reply didn't come through."),
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(_owns_session())
+            stack.enter_context(
+                _job(
+                    return_value=_row(
+                        "failed", error="The assistant's reply didn't come through."
+                    )
+                )
+            )
             r = await client.get(_url())
         assert r.json()["error"] == "The assistant's reply didn't come through."
 
     async def test_a_running_job_carries_no_result_yet(self, client):
-        with patch(
-            f"{_JOBS}.get_intake_job_row", new_callable=AsyncMock, return_value=_row("running")
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(_owns_session())
+            stack.enter_context(_job(return_value=_row("running")))
             r = await client.get(_url())
         assert r.json() == {
             "job_id": _JOB_UUID,
@@ -88,8 +121,8 @@ class TestPollEndpoint:
             "intake_admission",
             IntakeAdmissionControl(ip_per_minute=1, session_per_minute=1),
         )
-        with patch(
-            f"{_JOBS}.get_intake_job_row", new_callable=AsyncMock, return_value=_row("running")
-        ):
+        with ExitStack() as stack:
+            stack.enter_context(_owns_session())
+            stack.enter_context(_job(return_value=_row("running")))
             for _ in range(4):
                 assert (await client.get(_url())).status_code == 200

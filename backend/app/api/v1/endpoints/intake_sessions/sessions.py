@@ -20,7 +20,7 @@ from app.llm import (
 )
 from app.repositories.intake_sessions import (
     create_intake_session_row,
-    get_intake_session_row,
+    get_owned_intake_session_row,
     parse_intake_session,
 )
 from app.repositories.questions import (
@@ -51,12 +51,13 @@ router = APIRouter()
 )
 async def create_intake_session(
     client: SupabaseSdkDep,
+    current_user: CurrentUser,
     mode: Literal["llm", "guided"] = Query(
         "guided",
         description='Intake style: "guided" uses the questionnaire; "llm" returns an open prompt.',
     ),
 ) -> CreateIntakeSessionResponse:
-    created_session = await create_intake_session_row(client)
+    created_session = await create_intake_session_row(client, user_id=UUID(current_user.id))
     questions = await list_intake_questions(client)
     total_questions = len(questions)
 
@@ -116,7 +117,9 @@ async def get_intake_session(
     client: SupabaseSdkDep,
     current_user: CurrentUser,
 ) -> GetIntakeSessionResponse:
-    session_row = await get_intake_session_row(client, session_id)
+    session_row = await get_owned_intake_session_row(
+        client, session_id, user_id=UUID(current_user.id)
+    )
     await ensure_search_profile_access(
         client,
         session_row.get("search_profile_id"),

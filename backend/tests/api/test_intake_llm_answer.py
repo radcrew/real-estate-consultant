@@ -58,7 +58,7 @@ def _enter(
     fail = AsyncMock(return_value={})
     for item in (
         patch(
-            f"{_ENDPOINT}.get_intake_session_row",
+            f"{_ENDPOINT}.get_owned_intake_session_row",
             new_callable=AsyncMock,
             return_value=_SESSION_ROW,
         ),
@@ -130,7 +130,7 @@ class TestEnqueue:
             _enter(stack, queue_enabled=True)
             stack.enter_context(
                 patch(
-                    f"{_ENDPOINT}.get_intake_session_row",
+                    f"{_ENDPOINT}.get_owned_intake_session_row",
                     new_callable=AsyncMock,
                     side_effect=HTTPException(status_code=404, detail="Intake session not found."),
                 )
@@ -172,10 +172,9 @@ class TestEnqueue:
         updated_at. It must also outlast the running sweep, which answers a shorter
         question: whether a claimed turn is still being worked on.
 
-        The *ceiling* is the client's patience (`JOB_DEADLINE_MS` in the frontend) and is
-        deliberately not asserted against `chat_job_timeout_seconds`: that bounds a single
-        SSE connection, which the platform usually cuts short, and tying the sweep to it
-        would start expiring live jobs the moment someone shortened the stream.
+        The *ceiling* is the client's patience (`JOB_DEADLINE_MS` in the frontend), which
+        lives in the other codebase — so it is documented on both sides rather than
+        asserted here.
         """
         from app.core.config import settings as live_settings
 

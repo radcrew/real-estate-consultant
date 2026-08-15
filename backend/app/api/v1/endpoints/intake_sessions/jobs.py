@@ -19,8 +19,9 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from app.core.deps import SupabaseSdkDep
+from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.repositories.intake_jobs import get_intake_job_row
+from app.repositories.intake_sessions import get_owned_intake_session_row
 from app.schemas.intake_sessions import IntakeJobStatusResponse
 
 router = APIRouter()
@@ -42,12 +43,17 @@ async def get_intake_job(
     session_id: UUID,
     job_id: UUID,
     client: SupabaseSdkDep,
+    current_user: CurrentUser,
 ) -> IntakeJobStatusResponse:
     """Return one job's current state.
 
     Deliberately unmetered: the client asks about once a second while a turn runs, so any
-    budget tight enough to matter would break the delivery path itself. It is a single
-    indexed read, scoped to the session.
+    budget tight enough to matter would break the delivery path itself.
+
+    The session lookup is a second indexed read on a route polled once a second, and it
+    is worth it — a job's result carries the criteria extracted from someone's message,
+    so scoping by session alone would make two guessed UUIDs enough to read it.
     """
+    await get_owned_intake_session_row(client, session_id, user_id=UUID(current_user.id))
     row = await get_intake_job_row(client, session_id=session_id, job_id=job_id)
     return job_status_payload(row)
