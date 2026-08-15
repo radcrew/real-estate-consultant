@@ -26,6 +26,19 @@ def _row(row_id, **overrides):
     return {"id": row_id, "city": "Austin", "state": "TX", **overrides}
 
 
+def _stored_vector(value):
+    return patch(
+        "app.services.similar_listings.get_property_embedding",
+        new_callable=AsyncMock,
+        return_value=value,
+    )
+
+
+def _no_stored_vector():
+    """Seed not backfilled yet, so these exercise the embed-on-the-fly fallback."""
+    return _stored_vector(None)
+
+
 class TestFindSimilarListings:
     async def test_missing_seed_returns_none(self):
         db = AsyncMock()
@@ -46,11 +59,63 @@ class TestFindSimilarListings:
                 new_callable=AsyncMock,
                 return_value=_seed(seed_id),
             ),
+            _no_stored_vector(),
             patch("app.services.similar_listings.embed", new_callable=AsyncMock) as mock_embed,
         ):
             result = await find_similar_listings(db, seed_id, limit=0)
         assert result == []
         mock_embed.assert_not_called()
+
+    async def test_a_backfilled_seed_costs_no_provider_call(self):
+        """The seed is an ingested listing, and the backfill built its vector from the
+        same text a query would re-embed — so the stored value is the identical vector,
+        not an approximation. This endpoint is public, so re-deriving it would let the
+        caller decide how often the provider is billed."""
+        seed_id = uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
+            ),
+            _stored_vector([0.5, 0.5]),
+            patch("app.services.similar_listings.embed", new_callable=AsyncMock) as mock_embed,
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+                return_value=[(_row(uuid4()), 0.9)],
+            ) as mock_knn,
+        ):
+            await find_similar_listings(db, seed_id, limit=6)
+        mock_embed.assert_not_called()
+        assert mock_knn.await_args.kwargs["embedding"] == [0.5, 0.5]
+
+    async def test_the_lookup_is_scoped_to_the_active_model(self):
+        """Vectors from different models are not comparable, so a superseded one has to
+        be treated as absent rather than mixed into the query."""
+        seed_id = uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
+            ),
+            _no_stored_vector() as mock_lookup,
+            patch(
+                "app.services.similar_listings.embed",
+                new_callable=AsyncMock,
+                return_value=[[0.1, 0.2]],
+            ),
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            await find_similar_listings(db, seed_id, limit=6)
+        assert mock_lookup.await_args.kwargs["model"]
 
     async def test_embeds_only_the_seed(self):
         """The point of ingest-time embeddings: one call, not one per candidate."""
@@ -62,6 +127,7 @@ class TestFindSimilarListings:
                 new_callable=AsyncMock,
                 return_value=_seed(seed_id),
             ),
+            _no_stored_vector(),
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,
@@ -87,6 +153,7 @@ class TestFindSimilarListings:
                 new_callable=AsyncMock,
                 return_value=_seed(seed_id),
             ),
+            _no_stored_vector(),
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,
@@ -113,6 +180,7 @@ class TestFindSimilarListings:
                 new_callable=AsyncMock,
                 return_value=_seed(seed_id),
             ),
+            _no_stored_vector(),
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,
@@ -139,6 +207,7 @@ class TestFindSimilarListings:
                 new_callable=AsyncMock,
                 return_value=_seed(seed_id),
             ),
+            _no_stored_vector(),
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,
@@ -174,6 +243,7 @@ class TestFindSimilarListings:
                 new_callable=AsyncMock,
                 return_value=_seed(seed_id),
             ),
+            _no_stored_vector(),
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,
@@ -204,6 +274,7 @@ class TestFindSimilarListings:
                 new_callable=AsyncMock,
                 return_value=_seed(seed_id),
             ),
+            _no_stored_vector(),
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,
@@ -227,6 +298,7 @@ class TestFindSimilarListings:
                 new_callable=AsyncMock,
                 return_value=_seed(seed_id, state=None),
             ),
+            _no_stored_vector(),
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,
@@ -251,6 +323,7 @@ class TestFindSimilarListings:
                 new_callable=AsyncMock,
                 return_value=_seed(seed_id),
             ),
+            _no_stored_vector(),
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,
@@ -274,6 +347,7 @@ class TestFindSimilarListings:
                 new_callable=AsyncMock,
                 return_value=_seed(seed_id),
             ),
+            _no_stored_vector(),
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,

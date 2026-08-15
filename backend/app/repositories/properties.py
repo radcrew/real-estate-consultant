@@ -114,6 +114,37 @@ async def set_property_embedding(
     )
 
 
+async def get_property_embedding(
+    session: AsyncSession,
+    property_id: UUID,
+    *,
+    model: str,
+) -> list[float] | None:
+    """Return a listing's stored vector, if it came from ``model``.
+
+    The backfill embeds ``format_listing_block_for_fit(row)`` — the same text a query
+    would re-embed — so for a seed that is itself an ingested listing the stored vector is
+    not an approximation of the fresh one, it is the same vector. Reading it back turns
+    similar-listings into a database-only request.
+
+    ``None`` when the row has no vector yet or carries one from a superseded model:
+    vectors from different models are not comparable, so the caller has to embed rather
+    than mix them.
+    """
+    query = (
+        select(PropertyRow.embedding)
+        .where(
+            PropertyRow.id == property_id,
+            PropertyRow.embedding.is_not(None),
+            PropertyRow.embedding_model == model,
+        )
+        .limit(1)
+    )
+    result = await session.execute(query)
+    stored = result.scalar_one_or_none()
+    return list(stored) if stored is not None else None
+
+
 async def list_properties_needing_embedding(
     session: AsyncSession,
     *,

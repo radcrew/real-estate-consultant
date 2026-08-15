@@ -10,7 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.similarity import similarity_to_match_score
 from app.llm.fit.prompts import format_listing_block_for_fit
 from app.llm.providers.embeddings import embed
-from app.repositories.properties import get_property_by_id, list_similar_by_embedding
+from app.llm.providers.routing import resolve_embeddings_model_id
+from app.repositories.properties import (
+    get_property_by_id,
+    get_property_embedding,
+    list_similar_by_embedding,
+)
 
 DEFAULT_RESULT_LIMIT = 6
 MAX_RESULT_LIMIT = 20
@@ -38,10 +43,20 @@ async def find_similar_listings(
     if result_limit == 0:
         return []
 
-    vectors = await embed(texts=[format_listing_block_for_fit(seed)])
-    if not vectors:
-        return []
-    seed_vector = vectors[0]
+    # The seed is itself an ingested listing, so its vector is already stored — and the
+    # backfill built it from this exact text. Re-embedding would pay a provider per
+    # request to recompute a value the row is holding, on a public endpoint where the
+    # caller decides how often that happens.
+    seed_vector = await get_property_embedding(
+        session, property_id, model=resolve_embeddings_model_id()
+    )
+    if seed_vector is None:
+        # Not backfilled yet, or carrying a superseded model's vector. Embedding here
+        # keeps the endpoint working during a migration instead of returning nothing.
+        vectors = await embed(texts=[format_listing_block_for_fit(seed)])
+        if not vectors:
+            return []
+        seed_vector = vectors[0]
 
     state = seed.get("state") if isinstance(seed.get("state"), str) else None
     ranked = await list_similar_by_embedding(
