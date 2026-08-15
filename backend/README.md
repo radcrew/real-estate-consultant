@@ -132,10 +132,9 @@ A turn of the LLM intake chat is stored before it runs (migration
 `20260814_intake_jobs.sql`), so a slow or failing provider costs latency rather than the
 message the user typed.
 
-⚠️ **Apply the migration before deploying the code.** The backend deploys from `main`
-automatically, and `POST /answers/llm` writes to `intake_jobs` on every request — deploy
-first and intake is down until the table exists. There is no migration runner; apply it
-against the direct port (5432), since pgbouncer transaction mode blocks DDL.
+⚠️ **Apply the migration before deploying the code** (see *Migrations* below). The backend
+deploys from `main` automatically, and `POST /answers/llm` writes to `intake_jobs` on
+every request — deploy first and intake is down until the table exists.
 
 The endpoint returns **`202 {job_id, status}`** rather than the turn itself. The client
 then polls `GET /intake-sessions/{id}/jobs/{job_id}` until the job settles.
@@ -180,6 +179,30 @@ Both LLM intake routes are also metered per address and per session
 (`INTAKE_IP_RATE_LIMIT_PER_MINUTE`, `INTAKE_SESSION_RATE_LIMIT_PER_MINUTE`) — they spend
 money per request, and behind the queue each accepted request becomes a job the worker
 will pay for.
+
+## Migrations
+
+Plain SQL in `supabase/migrations`, applied in filename order and recorded in
+`public.schema_migrations` so each runs once:
+
+```bash
+python scripts/migrate.py --dry-run   # what would run
+python scripts/migrate.py             # apply it
+```
+
+Needs the **direct port (5432)** in `DATABASE_URL` — pgbouncer transaction mode rejects
+DDL, and the script refuses to start on `:6543` rather than failing partway through. Every
+migration runs in its own transaction, so an interrupted run resumes instead of restarting.
+
+Editing a migration that has already run is the way two environments quietly end up with
+different schemas, so each file's checksum is recorded and the script warns when one no
+longer matches. Write a new migration instead.
+
+**No Alembic, deliberately.** Only `properties` has a SQLAlchemy model; the rest of the
+schema is reached through PostgREST, so autogenerate — which diffs models against the
+database — would propose dropping the unmodelled tables. These migrations are also mostly
+RLS policies, triggers and extensions, which autogenerate cannot produce anyway. The
+Supabase CLI reads the same files if you later want branching or schema diffing.
 
 ## Dataset
 
