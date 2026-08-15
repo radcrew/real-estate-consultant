@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isAxiosError } from "axios";
 
 import {
   TERMINAL_JOB_STATUSES,
@@ -50,9 +51,18 @@ export const useIntakeJob = (): UseIntakeJobResult => {
   const pollUntilSettled = useCallback(
     async (sessionId: string, jobId: string, deadline: number): Promise<IntakeJobState> => {
       for (;;) {
-        const state = await intakeSessionsService.getLlmJob(sessionId, jobId);
-        if (isTerminal(state)) return state;
-        if (Date.now() >= deadline) return state;
+        try {
+          const state = await intakeSessionsService.getLlmJob(sessionId, jobId);
+          if (isTerminal(state) || Date.now() >= deadline) return state;
+        } catch (e) {
+          // This path is reached *because* the stream already failed, so the connection
+          // is known to be unreliable — treating one bad response as a dead turn would
+          // discard a message the server is very likely still processing.
+          // A 404 is the exception: the job does not exist, and asking again will not
+          // change that.
+          if (isAxiosError(e) && e.response?.status === 404) throw e;
+          if (Date.now() >= deadline) throw e;
+        }
         await sleep(POLL_INTERVAL_MS);
       }
     },

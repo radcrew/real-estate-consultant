@@ -67,6 +67,41 @@ describe("useIntakeJob", () => {
     expect(mockGetJob).toHaveBeenCalled();
   });
 
+  it("keeps polling through a failed request", async () => {
+    // Polling runs because the stream already broke, so the connection is known bad —
+    // one failed response must not discard a turn the server is still processing.
+    mockEnqueue.mockResolvedValue({ job_id: "job-1", status: "queued" });
+    mockSubscribe.mockImplementation((_s, _j, handlers) => {
+      handlers.onStreamLost();
+      return () => {};
+    });
+    mockGetJob
+      .mockRejectedValueOnce(new Error("network blip"))
+      .mockResolvedValue({ job_id: "job-1", status: "succeeded", result: RESULT, error: null });
+
+    const { result } = renderHook(() => useIntakeJob());
+    await expect(result.current.runTurn("sess-1", "warehouse")).resolves.toEqual(RESULT);
+    expect(mockGetJob).toHaveBeenCalledTimes(2);
+  }, 10_000);
+
+  it("stops immediately when the job does not exist", async () => {
+    // The one answer retrying cannot improve.
+    mockEnqueue.mockResolvedValue({ job_id: "job-1", status: "queued" });
+    mockSubscribe.mockImplementation((_s, _j, handlers) => {
+      handlers.onStreamLost();
+      return () => {};
+    });
+    const notFound = Object.assign(new Error("not found"), {
+      isAxiosError: true,
+      response: { status: 404 },
+    });
+    mockGetJob.mockRejectedValue(notFound);
+
+    const { result } = renderHook(() => useIntakeJob());
+    await expect(result.current.runTurn("sess-1", "warehouse")).rejects.toThrow();
+    expect(mockGetJob).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects with the reason the backend recorded", async () => {
     mockEnqueue.mockResolvedValue({ job_id: "job-1", status: "queued" });
     mockSubscribe.mockImplementation((_s, _j, handlers) => {
