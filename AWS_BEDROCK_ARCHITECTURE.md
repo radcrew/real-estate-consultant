@@ -1035,10 +1035,15 @@ strand the turn forever with the client polling work nobody will run. `execute_c
 
 The consumer cannot live on Vercel — there is no long-lived process to run a receive loop, and §13
 pins the API tier there. Lambda is therefore the only shape available without reopening §13, and
-it means **packaging a second deployable**: `app/llm`, `app/services`, `app/repositories`,
-`app/domain`, `app/schemas` plus boto3, anthropic and supabase. Provider configuration and the
-Supabase service-role key now have to exist in two places, and drift between them is a new failure
-mode that did not exist before this section.
+it means **packaging a second deployable** (`infra/chat-intake-worker/`). The image ships the whole
+`app` package rather than a curated subset: the worker calls the same services, repositories and
+providers, and a hand-picked file list would be one more thing to keep in step.
+
+Provider configuration and the Supabase service-role key now exist in two places, and drift between
+them is a new failure mode — a route pinned in Vercel but not in the worker means the same turn
+gets a different model depending on which path ran it. Two guards, since the failure would
+otherwise appear only at a cold start: a test asserts the Dockerfile's `CMD` resolves to a real
+callable, and another asserts every setting without a default is documented in the worker's README.
 
 ## 15. Vector search on pgvector — the biggest win, for $0
 
@@ -1245,7 +1250,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
 | **D — Qwen 0.5B intake on Lambda** | ✅ **code complete**: `qwen_lambda.py` (contract, retry-once, error mapping, breaker), `circuit_breaker.py`, `infra/qwen-lambda/` image with build-time GBNF and HF fetch, schema export + drift test, 62 tests. Remaining is deployment only: **supply the weights** (§23.1 — fine-tune vs base undecided), build/push, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
 | **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
-| **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1), ✅ `intake_jobs` migration + repository (claim gate, `attempts` trigger, stale-claim sweeper), ✅ pipeline extracted to `intake_llm.py`, ✅ `ChatJobQueue` publisher, ✅ `chat-intake-worker` handler (claim gate, failure classification, FIFO-safe partial batches), ✅ `202` + poll + SSE endpoints with the in-flight cap, ✅ frontend service + `use-intake-job` hook + chat panel. 125 tests. Remaining: worker packaging and deployment (queue, event source mapping, DLQ) | $0 — SQS free to 1M/mo |
+| **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1), ✅ `intake_jobs` migration + repository (claim gate, `attempts` trigger, stale-claim sweeper), ✅ pipeline extracted to `intake_llm.py`, ✅ `ChatJobQueue` publisher, ✅ `chat-intake-worker` handler (claim gate, failure classification, FIFO-safe partial batches), ✅ `202` + poll + SSE endpoints with the in-flight cap, ✅ frontend service + `use-intake-job` hook + chat panel, ✅ `infra/chat-intake-worker/` image + runbook. **Code complete — 132 tests.** Remaining is deployment: create the queue and DLQ, push the image, wire the capped event source, then set `SQS_CHAT_QUEUE_URL` | $0 — SQS free to 1M/mo |
 | **G — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
 
 **Phase C is a deploy step, not a development step**, and it gates B: until embeddings are routed
