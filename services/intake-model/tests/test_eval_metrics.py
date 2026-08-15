@@ -323,7 +323,10 @@ class TestDatasetIntegrity:
         for row in dataset_rows:
             assert row["id"] not in seen_ids, f"duplicate id {row['id']}"
             seen_ids.add(row["id"])
-            assert row["split"] in {"dev", "holdout"}
+            # "regression" holds turns backfilled from reported production bugs. It is a
+            # split of its own so dev and holdout keep the row counts every recorded
+            # result was measured against.
+            assert row["split"] in {"dev", "holdout", "regression"}
             assert isinstance(row["user_input"], str)
             gold = row["gold"]
             for key in gold["extracted"]:

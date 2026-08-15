@@ -13,7 +13,8 @@ from app.llm import (
     parse_user_input,
     resolve_next_intake_question,
 )
-from app.llm.intake.service import SKIPPED_FIELDS_KEY
+from app.llm.intake.service import INTAKE_PARSE_TEMPERATURE, SKIPPED_FIELDS_KEY
+from app.repositories.intake_parse_log import record_intake_parse
 from app.repositories.intake_sessions import (
     get_intake_session_row,
     save_intake_criteria,
@@ -67,6 +68,25 @@ async def submit_llm_intake_input(
     current_index = compute_current_index(questions, merged_criteria)
 
     await save_intake_criteria(client, session_id, merged_criteria)
+
+    # Keep the turn. The eval is grown from these rows, and every bug reported so far had
+    # to be reconstructed by asking the user what they had typed. Best-effort by design:
+    # the answer above is already computed, so a telemetry failure must not reach the user.
+    await record_intake_parse(
+        client,
+        session_id=session_id,
+        user_input=body.input,
+        current_criteria=current_criteria_dict,
+        # ``.get`` on the telemetry-only keys: this call exists to record the turn, and
+        # a key missing from the result must not be the thing that fails it.
+        model_output=llm_result.get("model_output", {}),
+        extracted=extracted,
+        unconfirmed_fields=llm_result.get("unconfirmed_fields", []),
+        missing_fields=missing_fields,
+        model=llm_result.get("model"),
+        temperature=INTAKE_PARSE_TEMPERATURE,
+        latency_ms=llm_result.get("latency_ms"),
+    )
 
     public_criteria = {k: v for k, v in merged_criteria.items() if k != SKIPPED_FIELDS_KEY}
     question_titles = {

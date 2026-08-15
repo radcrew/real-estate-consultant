@@ -6,6 +6,7 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
+from app.domain.bounds import correct_bound_direction, unevidenced_range_keys
 from app.domain.intake_vocabulary import (
     GENERIC_PHRASINGS,
     GEO_STOPWORDS,
@@ -605,6 +606,47 @@ def _is_type_question(row: dict[str, Any]) -> bool:
     """
     configured = {value.casefold() for value in _choice_aliases(row).values()}
     return bool(configured) and configured <= set(TYPE_PHRASINGS)
+
+
+def apply_criteria_filters(
+    extracted: dict[str, Any],
+    questions: list[dict[str, Any]],
+    user_input: str,
+    current_criteria: dict[str, Any] | None = None,
+    allowed_keys: set[str] | None = None,
+) -> tuple[dict[str, Any], set[str]]:
+    """Everything between what the model answered and what the session stores.
+
+    Keys are filtered first, then values, then evidence, then bound direction — the order
+    matters. A filler value or a choice the questionnaire does not offer has to leave the
+    field *missing* rather than answered, or the session completes on something search
+    cannot use and the question is never asked.
+
+    This exists as one function so the eval harness can score what production returns
+    rather than what the model emitted. Those two answers were the same thing until the
+    evidence checks landed; now the model can say ``price {"min": 100000}`` for "100k
+    sqft" and the user never sees it, and a number measuring only the model has stopped
+    describing the product. Two copies of this chain would drift apart on the first fix
+    that only one of them got.
+
+    Returns the criteria and the keys among them the message could not confirm — stored,
+    but not answers. See :func:`check_evidence`.
+    """
+    current = current_criteria or {}
+    if allowed_keys is not None:
+        extracted = {key: value for key, value in extracted.items() if key in allowed_keys}
+    extracted = drop_placeholder_values(extracted)
+    extracted = drop_self_describing_values(extracted, questions)
+    extracted = drop_unconfigured_choices(extracted, questions)
+    extracted, unconfirmed = check_evidence(extracted, questions, user_input, current)
+    # The model reads the figure reliably and the comparator unreliably, so the side a
+    # lone bound sits on is decided from the message itself.
+    extracted = correct_bound_direction(extracted, user_input)
+    # Only this turn's readings can be unconfirmed. One the session already carries was
+    # asked about when it arrived, and asking again every turn is how a user who keeps
+    # saying "around a million" is never allowed to finish.
+    unconfirmed |= unevidenced_range_keys(extracted, user_input) - set(current)
+    return extracted, unconfirmed
 
 
 def normalize_merged_criteria(

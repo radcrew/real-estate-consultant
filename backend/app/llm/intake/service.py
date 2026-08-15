@@ -4,16 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.config import settings
-from app.domain.bounds import correct_bound_direction, unevidenced_range_keys
 from app.domain.intake_criteria import (
-    check_evidence,
-    drop_placeholder_values,
-    drop_self_describing_values,
-    drop_unconfigured_choices,
+    apply_criteria_filters,
     merge_criteria,
 )
 from app.domain.intake_next_question import (
@@ -129,6 +126,7 @@ async def parse_user_input(
     override = settings.intake_chat_override
     model, base_url, api_key = override if override else (None, None, None)
 
+    started = time.perf_counter()
     parsed_output = await generate_structured_output(
         messages=prompt.messages,
         response_format=LlmParseModelOutput,
@@ -141,7 +139,9 @@ async def parse_user_input(
         base_url=base_url,
         api_key=api_key,
     )
-    return _build_intake_parse_result(
+    latency_ms = int((time.perf_counter() - started) * 1000)
+
+    result = _build_intake_parse_result(
         parsed_output=parsed_output,
         user_input=user_input,
         questions=questions,
@@ -150,6 +150,12 @@ async def parse_user_input(
         required_fields=prompt.required_fields,
         previously_skipped=prompt.previously_skipped,
     )
+    # For the parse log. Which model answered is recorded here rather than at the call
+    # site because only this function knows whether the intake override was in force —
+    # and a logged turn that cannot be attributed to an adapter cannot compare two.
+    result["model"] = model or settings.hf_model
+    result["latency_ms"] = latency_ms
+    return result
 
 
 async def generate_opening_question(
@@ -221,30 +227,17 @@ def _build_intake_parse_result(
     required_fields: list[str],
     previously_skipped: list[str],
 ) -> dict[str, Any]:
-    allowed_keys = set(question_keys)
-    extracted = {
-        key: value for key, value in parsed_output.extracted.items() if key in allowed_keys
-    }
-    # Keys are filtered above, values here. Both run before merge_missing_fields on
-    # purpose: a filler value, or a choice the questionnaire does not offer, must leave
-    # the field *missing* rather than answered, or the session completes on something
-    # search cannot use and the question is never asked.
-    extracted = drop_placeholder_values(extracted)
-    extracted = drop_self_describing_values(extracted, questions)
-    extracted = drop_unconfigured_choices(extracted, questions)
-    # The three filters above validate against the schema and never read the message, so
-    # a valid option word invented from nothing passes all of them. This one asks the
-    # message. It runs after canonicalisation so it compares stored spellings.
-    extracted, unconfirmed = check_evidence(extracted, questions, user_input, current_criteria)
-    # The model reads the figure reliably and the comparator unreliably, so the side a
-    # lone bound sits on is decided here from the message itself. No-op unless the
-    # message states one direction and the model chose the other.
-    extracted = correct_bound_direction(extracted, user_input)
-    # Three states, not two. A value the message neither supports nor contradicts is
-    # stored -- it is right often enough to be worth keeping -- but it does not answer the
-    # question, so the questionnaire still asks. Only this turn's readings qualify; one
-    # already carried by the session was asked about when it arrived.
-    unconfirmed |= unevidenced_range_keys(extracted, user_input) - set(current_criteria)
+    # Every check between the model's answer and what the session stores, in one place so
+    # the eval harness can score the same thing production returns. ``unconfirmed`` is the
+    # third state: values kept but unsupported by the message, which are stored and still
+    # asked about.
+    extracted, unconfirmed = apply_criteria_filters(
+        parsed_output.extracted,
+        questions,
+        user_input,
+        current_criteria,
+        allowed_keys=set(question_keys),
+    )
     merged_criteria = merge_criteria(current_criteria, extracted)
 
     # Union carries a skip forward across turns, so the user is never re-asked. Then
@@ -281,6 +274,9 @@ def _build_intake_parse_result(
         "missing_fields": missing_fields,
         "skipped_fields": skipped_fields,
         "unconfirmed_fields": unconfirmed_fields,
+        # The reply before the filters. Kept alongside ``extracted`` so a logged turn can
+        # say whether the model or a filter is what changed between two runs.
+        "model_output": parsed_output.model_dump(),
         "next_question": next_question,
         "is_complete": is_complete,
     }

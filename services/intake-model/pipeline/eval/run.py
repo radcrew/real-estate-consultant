@@ -24,6 +24,7 @@ from typing import Any
 from openai import APIStatusError, AsyncOpenAI, OpenAIError
 
 from app.core.config import settings
+from app.domain.intake_criteria import apply_criteria_filters
 from app.llm.intake.service import (
     INTAKE_PARSE_MAX_TOKENS,
     INTAKE_PARSE_TEMPERATURE,
@@ -67,6 +68,32 @@ def load_dataset(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def production_answer(
+    parsed: LlmParseModelOutput,
+    turn: dict[str, Any],
+    questions: list[dict[str, Any]],
+    question_keys: list[str],
+) -> LlmParseModelOutput:
+    """The model's reply as the intake service would leave it.
+
+    Scoring the raw reply measures the model. Scoring this measures the product. The two
+    were the same number until the evidence checks landed: the model can answer ``price
+    {"min": 100000}`` to "a 100k sqft warehouse" and the user never sees it, because
+    100000 is measured in square feet and a budget cannot be.
+
+    The filters come from ``app.domain.intake_criteria`` rather than being reimplemented
+    here, so this cannot drift into scoring a pipeline production does not run.
+    """
+    extracted, _ = apply_criteria_filters(
+        parsed.extracted,
+        questions,
+        turn["user_input"],
+        turn.get("current_criteria") or {},
+        allowed_keys=set(question_keys),
+    )
+    return parsed.model_copy(update={"extracted": extracted})
+
+
 async def run_turn(
     client: AsyncOpenAI,
     turn: dict[str, Any],
@@ -76,8 +103,13 @@ async def run_turn(
     duplicate_schema: bool,
     json_mode: bool,
     score_next_question: bool,
+    post_process: bool = False,
 ) -> tuple[TurnScore, str]:
-    """Send one turn and score the raw reply. Returns (score, raw text)."""
+    """Send one turn and score the reply. Returns (score, raw text).
+
+    ``raw_text`` is always what the model wrote, whatever ``post_process`` does to the
+    score -- the recordings are a corpus of real model mistakes and stay that way.
+    """
     prompt = build_intake_messages(
         user_input=turn["user_input"],
         current_criteria=turn.get("current_criteria") or {},
@@ -115,6 +147,8 @@ async def run_turn(
     raw_text = (completion.choices[0].message.content or "").strip()
     raw_valid, schema_valid, parsed = parse_raw_output(raw_text)
     usage = completion.usage
+    if post_process and parsed is not None:
+        parsed = production_answer(parsed, turn, questions, prompt.question_keys)
 
     score = score_turn(
         turn_id=turn["id"],
@@ -165,6 +199,7 @@ async def run_dataset(
     duplicate_schema: bool,
     json_mode: bool,
     score_next_question: bool,
+    post_process: bool = False,
 ) -> tuple[list[TurnScore], dict[str, str]]:
     semaphore = asyncio.Semaphore(max(1, concurrency))
     scores: list[TurnScore] = []
@@ -187,6 +222,7 @@ async def run_dataset(
                     duplicate_schema=duplicate_schema,
                     json_mode=json_mode,
                     score_next_question=score_next_question,
+                    post_process=post_process,
                 )
             except FatalRunError as exc:
                 aborted = str(exc)
@@ -215,7 +251,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--api-key", default=None, help="Defaults to HF_TOKEN")
     parser.add_argument("--dataset", default=str(EVAL_DATASET_PATH))
     parser.add_argument("--questions", default=str(QUESTIONS_PATH))
-    parser.add_argument("--split", choices=["dev", "holdout", "all"], default="dev")
+    parser.add_argument(
+        "--split", choices=["dev", "holdout", "regression", "all"], default="dev",
+        help="'regression' is the reported-bug turns; they are excluded from dev and "
+             "holdout so those numbers stay comparable with every row already recorded",
+    )
     parser.add_argument("--category", default=None, help="Restrict to one category")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument(
@@ -239,6 +279,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-next-question",
         action="store_true",
         help="Score next_question.key as n/a (use once the key leaves the schema)",
+    )
+    parser.add_argument(
+        "--post-process",
+        action="store_true",
+        help="Score what production returns, not what the model emitted: run the reply "
+             "through the same filters as the intake service. Off by default so numbers "
+             "stay comparable with every row already in results.md",
     )
     parser.add_argument("--out", default=None, help="Defaults to results/<label>.json")
     return parser
@@ -274,6 +321,7 @@ async def main_async(argv: list[str] | None = None) -> int:
         duplicate_schema=args.duplicate_schema,
         json_mode=not args.no_json_mode,
         score_next_question=not args.no_next_question,
+        post_process=args.post_process,
     )
     if not scores:
         return 1
@@ -293,6 +341,7 @@ async def main_async(argv: list[str] | None = None) -> int:
                 "split": args.split,
                 "duplicate_schema": args.duplicate_schema,
                 "json_mode": not args.no_json_mode,
+                "post_process": args.post_process,
                 "temperature": INTAKE_PARSE_TEMPERATURE,
                 "max_tokens": INTAKE_PARSE_MAX_TOKENS,
                 "summary": summary.__dict__,

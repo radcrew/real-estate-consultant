@@ -25,6 +25,9 @@ _LLM_RESULT = {
     "missing_fields": ["property_type"],
     "skipped_fields": [],
     "unconfirmed_fields": [],
+    "model_output": {"extracted": {"location": "Austin"}},
+    "model": "qwen2.5-0.5b-instruct-intake-v6-q4_k_m",
+    "latency_ms": 1200,
     "is_complete": False,
     "next_question": {"key": "property_type", "text": "What type?"},
 }
