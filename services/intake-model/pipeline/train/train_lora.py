@@ -25,12 +25,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import torch
 from peft import LoraConfig, get_peft_model
+from peft import __version__ as peft_version
 from torch.utils.data import Dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -38,8 +40,10 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
+from transformers import __version__ as transformers_version
 
 from pipeline.paths import MODELS_DIR, TRAIN_PATH, VAL_PATH
+from pipeline.provenance import stamp_says_data_changed, write_adapter_stamp
 
 DEFAULT_BASE = MODELS_DIR / "Qwen2.5-0.5B-Instruct"
 DEFAULT_OUT = MODELS_DIR / "lora-intake"
@@ -266,6 +270,42 @@ def main() -> int:
     model.save_pretrained(str(out_dir))
     tokenizer.save_pretrained(str(out_dir))
     print(f"\nadapter saved to {out_dir}")
+
+    # What this was trained on, beside the weights. Weights are opaque and get copied,
+    # renamed and quantized; the answer to "why is v7 worse than v6" has to travel with
+    # them. ``dataset_matches_stamp`` is the line to read first -- false means the data
+    # was regenerated after its own stamp was written, so nothing the stamp says about
+    # --count or row counts describes the file these weights actually saw.
+    stamp = write_adapter_stamp(
+        out_dir=out_dir,
+        base_model=args.base,
+        hyperparameters={
+            "rank": args.rank, "alpha": args.alpha, "dropout": args.dropout,
+            "target_modules": list(TARGET_MODULES), "lr": args.lr, "epochs": args.epochs,
+            "batch_size": args.batch_size, "grad_accum": args.grad_accum,
+            "warmup_ratio": args.warmup_ratio, "seed": args.seed, "max_len": args.max_len,
+            "max_examples": args.max_examples,
+        },
+        train_path=Path(args.train),
+        val_path=Path(args.val),
+        counts={
+            "train": len(train_set), "validation": len(val_set),
+            "truncated": train_set.truncated + val_set.truncated,
+            "prefix_mismatches": train_set.prefix_mismatches + val_set.prefix_mismatches,
+            "supervised_tokens": supervised, "total_tokens": total,
+        },
+        versions={
+            "python": sys.version.split()[0],
+            "torch": torch.__version__,
+            "transformers": transformers_version,
+            "peft": peft_version,
+        },
+    )
+    if stamp:
+        print(f"provenance written to {stamp}")
+        if stamp_says_data_changed(stamp):
+            print("WARNING the training data does not match its own provenance stamp - "
+                  "regenerate the data and retrain, or the record is wrong")
     print(
         "Next: python -m pipeline.train.merge, "
         "then pipeline.quantize.build_gguf on the merged dir."

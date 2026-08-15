@@ -1,0 +1,52 @@
+{
+  "kind": "dataset",
+  "generated_by": "pipeline.data.generate",
+  "generated_at": "2026-08-15T13:15:29+00:00",
+  "git": {
+    "commit": "2f0e1ddfb86501f11913f7b3968de5596f2daed7",
+    "branch": "feat/quantize-fine-tune-for-intake",
+    "dirty": true
+  },
+  "note": "Reconstructed by hand, not written by the generator. The r8 data these weights were trained on predates this file. Verified from the artefacts: the 2700/300 split and both hashes are read off the files, and the data was last written by commit 80e9c415. Inferred, not recorded: --count 3000 follows from 2700/(1-0.1), and --seed 17 is the default, which was never overridden on the command line. Anything absent here (shape mix, attempt and rejection counts) was not retrievable and is omitted rather than guessed.",
+  "args": {
+    "count": 3000,
+    "seed": 17,
+    "val_fraction": 0.1
+  },
+  "counts": {
+    "requested": 3000,
+    "produced": 3000,
+    "train": 2700,
+    "validation": 300
+  },
+  "inputs": {
+    "questions": {
+      "path": "services/intake-model/pipeline/eval/questions.json",
+      "sha256": "7b928b4a53c070cd684a0872e317bf5cc31eb9ca45aefd33242d02ae23d2f94f"
+    },
+    "eval_set": {
+      "path": "services/intake-model/pipeline/eval/dataset.jsonl",
+      "sha256": "9314489089844e9350832b3830a6dea9966c7d4acf650d201e967b74997b462f"
+    },
+    "phrasings": {
+      "path": "services/intake-model/pipeline/data/property_type_phrasings.json",
+      "sha256": "0da17874c32bb1a5475ecc050bab68d4ac5925cf4b27bbdf397a91b9003ab727"
+    },
+    "generator": {
+      "path": "services/intake-model/pipeline/data/generate.py",
+      "sha256": "dc68e51ded5d3292b38f0ff6d0d2c362f3ec92d967b2d3a9b2288eed9565b24f"
+    }
+  },
+  "outputs": {
+    "train": {
+      "path": "services/intake-model/pipeline/data/train.jsonl",
+      "sha256": "ca6f8370b5616ce83ff9b73aae1203845ed8cf2b562127fa39062c1a369eb294",
+      "rows": 2700
+    },
+    "validation": {
+      "path": "services/intake-model/pipeline/data/validation.jsonl",
+      "sha256": "17c9c7d5e78e33c904dce6e58376bc71b03aff298f8635ceee1ff067be3d4c97",
+      "rows": 300
+    }
+  }
+}

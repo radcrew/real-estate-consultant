@@ -42,6 +42,7 @@ from pipeline.paths import (
     TRAIN_PATH,
     VAL_PATH,
 )
+from pipeline.provenance import write_dataset_stamp
 
 # Drawn from backend/dataset/raw-data.json so the distribution matches real listings.
 CITIES = [
@@ -1255,6 +1256,38 @@ def main() -> int:
         1 for r in records
         if json.loads(r["messages"][-1]["content"])["extracted"] == {}
     )
+
+    # Written before the summary below so the numbers on screen and the numbers on disk
+    # are the same numbers. --count and --seed are the two flags that change the dataset
+    # without changing a line of code, and not recording --count cost a training cycle.
+    stamp = write_dataset_stamp(
+        out_dir=Path(args.out).parent,
+        args={
+            "count": args.count,
+            "seed": args.seed,
+            "val_fraction": args.val_fraction,
+        },
+        inputs={
+            "questions": Path(args.questions),
+            "eval_set": Path(args.eval_set),
+            "phrasings": Path(args.phrasings),
+            "generator": Path(__file__),
+        },
+        outputs={"train": Path(args.out), "validation": Path(args.val_out)},
+        counts={
+            "requested": args.count,
+            "produced": len(records),
+            "train": len(train),
+            "validation": len(val),
+            "attempts": attempts,
+            "empty_extracted": empty,
+            "shape_mix": dict(shapes),
+            "rejected": dict(rejected),
+        },
+    )
+    if stamp:
+        print(f"wrote provenance -> {stamp}")
+
     print("\nshape mix:")
     for name, count in shapes.most_common():
         print(f"  {name:<14} {count:>5}  {count / len(records):>6.1%}")
