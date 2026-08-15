@@ -179,11 +179,15 @@ class TestEnqueue:
         """
         from app.core.config import settings as live_settings
 
-        assert live_settings.chat_job_abandoned_after_seconds > 180
+        assert live_settings.chat_job_abandoned_after_seconds > 360
         assert (
             live_settings.chat_job_abandoned_after_seconds
             > live_settings.chat_job_stale_after_seconds
         )
+        # The running sweep is the last link of the timeout chain, so it has to clear the
+        # visibility timeout it sits behind (360s) — and therefore the function timeout
+        # and the worst-case provider call underneath that.
+        assert live_settings.chat_job_stale_after_seconds > 360
 
 
 class TestQueueDisabled:

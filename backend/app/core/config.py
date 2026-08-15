@@ -162,9 +162,15 @@ class Settings(BaseSettings):
     chat_job_poll_interval_seconds: float = 0.75
     # A worker killed mid-turn leaves a claimed row nobody will finish, and the claim
     # gate means redelivery cannot rescue it. Rows untouched for longer than this are
-    # treated as dead. Must exceed the worker's function timeout, or a turn that is
-    # still running gets expired out from under it.
-    chat_job_stale_after_seconds: float = 300.0
+    # treated as dead.
+    #
+    # Last link in an ordered chain, each step of which must clear the one before:
+    #   worst-case provider call < worker function timeout < queue visibility timeout
+    #   < this
+    # The provider end dominates and is larger than it looks — OpenRouter alone is a 75s
+    # read timeout with 3 retries. Set this below the function timeout and a turn still
+    # being worked on is expired out from under it.
+    chat_job_stale_after_seconds: float = 420.0
     # Jobs never picked up at all. This measures *untouched* time — the trigger moves
     # updated_at on every status change, so a job cycling through redelivery keeps
     # refreshing it and only one nothing has touched ages out. The floor is therefore a

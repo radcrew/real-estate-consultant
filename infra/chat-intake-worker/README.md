@@ -46,7 +46,7 @@ Why these values:
 | `FifoQueue` | true | Two turns of one session processed out of order overwrite each other's criteria — the user answers a question and watches the answer disappear |
 | `ContentBasedDeduplication` | false | The publisher sets `MessageDeduplicationId` to the job id explicitly; content hashing would dedupe two genuinely different turns that happen to match |
 | `FifoThroughputLimit` / `DeduplicationScope` | per message group | High-throughput mode. Ordering is only needed *within* a session, so sessions should not serialise against each other |
-| `VisibilityTimeout` | 180s | Must exceed the worst-case turn. Too low and a still-running turn is redelivered — the claim gate makes that harmless, but it wastes a receive |
+| `VisibilityTimeout` | **360s** | Must exceed the function timeout below, or a turn still being worked on is redelivered. The claim gate makes that harmless but it burns a receive, and three of those send a live turn to the DLQ |
 | `maxReceiveCount` | 3 | Bounded redelivery, then the DLQ. Alarm on DLQ depth: anything landing there is a turn a user never got |
 
 ## 2. Roles
@@ -85,7 +85,7 @@ aws lambda create-function \
   --code ImageUri=$REPO:<tag> \
   --role arn:aws:iam::$ACCOUNT:role/chat-intake-worker-exec \
   --memory-size 1024 \
-  --timeout 120 \
+  --timeout 300 \
   --environment "Variables={$(cat <<'VARS'
 DATABASE_URL=...,SUPABASE_URL=...,SUPABASE_SERVICE_ROLE_KEY=...
 VARS
@@ -111,8 +111,22 @@ missing `AWS_REGION`) makes screening a silent pass-through, so a worker configu
 differently from Vercel would quietly stop screening what the API screens. Nothing errors;
 the frames just stop being checked.
 
-`Timeout` must be under the queue's 180s visibility timeout, or the message is
-redelivered while the first invocation is still working.
+**These timeouts form an ordered chain**, and each link must clear the one before it:
+
+```
+worst-case provider call  <  function timeout  <  visibility timeout  <  CHAT_JOB_STALE_AFTER_SECONDS
+        ~265s                      300s                 360s                        420s
+```
+
+The provider end is larger than it looks and is what sets the floor: OpenRouter alone is
+a 75s read timeout with 3 retries (~225s), plus output guardrail screening if enabled.
+Size the function timeout from *that*, not from how long a turn usually takes — a healthy
+turn is seconds, and these numbers exist for the tail.
+
+Break the ordering and the failures are quiet: a function timeout under the provider
+worst case kills live turns, which the claim gate then stops redelivery from retrying; a
+visibility timeout under the function timeout redelivers turns that are still running,
+burning receives until a live turn lands in the DLQ.
 
 ## 5. Wire the event source, with a cap
 
