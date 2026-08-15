@@ -96,7 +96,7 @@ class SubmitLlmIntakeInputRequest(BaseModel):
 
 
 class SubmitLlmIntakeInputResponse(BaseModel):
-    """Response body for ``POST /api/v1/intake-sessions/{session_id}/answers/llm``."""
+    """The turn's result. Delivered via the job, not the POST that started it."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -107,3 +107,27 @@ class SubmitLlmIntakeInputResponse(BaseModel):
     missing_fields: list[str]
     next_question: IntakeSessionFirstQuestion | None = None
     is_complete: bool
+
+
+class EnqueuedLlmIntakeJobResponse(BaseModel):
+    """``202`` body for ``POST /api/v1/intake-sessions/{session_id}/answers/llm``.
+
+    Identical whether the turn was queued or run inline: the client always follows a job,
+    so a deployment without a queue needs no different client code.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    job_id: UUID
+    status: str = Field(description="queued | running | succeeded | failed")
+
+
+class IntakeJobStatusResponse(BaseModel):
+    """A job's current state, from the poll endpoint or an SSE frame."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    job_id: UUID
+    status: str
+    result: SubmitLlmIntakeInputResponse | None = None
+    error: str | None = None

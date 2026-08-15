@@ -13,6 +13,7 @@ from app.workers import chat_job_worker
 from app.workers.chat_job_worker import group_of, parse_record, process_batch
 
 _WORKER = "app.workers.chat_job_worker"
+_SERVICE = "app.services.intake_jobs"
 _SESSION_A = uuid4()
 _SESSION_B = uuid4()
 
@@ -48,12 +49,14 @@ def _enter(
     run = AsyncMock(return_value=_turn_response()) if turn is None else turn
     complete = AsyncMock(return_value={})
     fail = AsyncMock(return_value={})
+    # The turn itself runs in the shared job service, which the endpoint's inline path
+    # also uses — patching it here keeps both callers exercising the same code.
     for item in (
         patch(f"{_WORKER}.get_client", AsyncMock(return_value=MagicMock())),
         patch(f"{_WORKER}.claim_intake_job", claim),
-        patch(f"{_WORKER}.run_llm_intake_turn", run),
-        patch(f"{_WORKER}.complete_intake_job", complete),
-        patch(f"{_WORKER}.fail_intake_job", fail),
+        patch(f"{_SERVICE}.run_llm_intake_turn", run),
+        patch(f"{_SERVICE}.complete_intake_job", complete),
+        patch(f"{_SERVICE}.fail_intake_job", fail),
     ):
         stack.enter_context(item)
     return claim, run, complete, fail

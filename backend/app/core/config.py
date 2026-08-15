@@ -143,6 +143,15 @@ class Settings(BaseSettings):
     # queueing and the endpoint runs the turn inline — which is what local dev and the
     # test suite do, so neither needs a queue to exist.
     sqs_chat_queue_url: str = ""
+    # How long an enqueued turn may sit unresolved before the SSE stream gives up. Must
+    # exceed visibility timeout x maxReceiveCount (180s x 3 = 540s), or a job still
+    # legitimately being retried looks dead to the client.
+    chat_job_timeout_seconds: float = 600.0
+    chat_job_poll_interval_seconds: float = 0.75
+    # Unfinished turns allowed per session. One is the natural limit: FIFO ordering per
+    # session already serialises them, so a second in flight only queues behind the first
+    # while giving an abuser a cheap way to multiply work per session.
+    intake_max_active_jobs_per_session: int = 1
 
     # Populated automatically by Vercel; set manually for other hosts.
     git_sha: str = Field(

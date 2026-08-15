@@ -22,20 +22,10 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from fastapi import HTTPException
-
 from app.core.supabase_sdk import get_supabase_sdk_client, init_supabase
-from app.repositories.intake_jobs import (
-    claim_intake_job,
-    complete_intake_job,
-    fail_intake_job,
-)
-from app.services.intake_llm import run_llm_intake_turn
+from app.repositories.intake_jobs import claim_intake_job
+from app.services.intake_jobs import execute_claimed_job
 from supabase import AsyncClient
-
-# The §8 raisers that mean "the provider was unreachable", as opposed to "the provider
-# answered and the answer was unusable". Only these are worth a redelivery.
-RETRYABLE_STATUS = frozenset({503, 504})
 
 logger = logging.getLogger(__name__)
 
@@ -82,38 +72,16 @@ async def process_record(client: AsyncClient, record: dict[str, Any]) -> bool:
         logger.info("chat_job_already_claimed", extra={"job_id": str(job_id)})
         return False
 
-    try:
-        response = await run_llm_intake_turn(
-            client,
-            session_id=session_id,
-            user_input=str(claimed.get("input") or ""),
-        )
-    except HTTPException as exc:
-        retryable = exc.status_code in RETRYABLE_STATUS
-        await fail_intake_job(
-            client,
-            job_id=job_id,
-            error=str(exc.detail),
-            retryable=retryable,
-        )
-        logger.warning(
-            "chat_job_failed",
-            extra={
-                "job_id": str(job_id),
-                "status_code": exc.status_code,
-                "retryable": retryable,
-            },
-        )
-        return retryable
-
-    await complete_intake_job(
+    # Shared with the endpoint's inline path, so a turn leaves the same row behind
+    # whichever ran it. Retries are allowed here because redelivery exists.
+    outcome = await execute_claimed_job(
         client,
         job_id=job_id,
-        # mode="json" so nested models and any UUID/datetime land as jsonb-safe values.
-        result_payload=response.model_dump(mode="json"),
+        session_id=session_id,
+        user_input=str(claimed.get("input") or ""),
+        allow_retry=True,
     )
-    logger.info("chat_job_succeeded", extra={"job_id": str(job_id)})
-    return False
+    return outcome.retryable
 
 
 async def process_batch(event: dict[str, Any]) -> dict[str, Any]:
