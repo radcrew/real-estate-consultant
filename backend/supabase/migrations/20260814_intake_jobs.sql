@@ -79,6 +79,12 @@ alter table public.intake_jobs enable row level security;
 -- Backend data access uses the service role and bypasses RLS; this policy is
 -- defense-in-depth if a user JWT is ever pointed at PostgREST directly. It mirrors the
 -- visibility rule on intake_sessions, so a job is readable exactly when its session is.
+--
+-- Note this grants `authenticated` only, while intake itself is anonymous. That is why
+-- clients follow a job through the API's SSE endpoint rather than Supabase Realtime,
+-- which enforces RLS and would deliver nothing to an anonymous visitor. Widening this to
+-- `anon` would let anyone holding a job id read the row directly, which is exactly what
+-- scoping reads by session is meant to prevent.
 -- No INSERT/UPDATE/DELETE for authenticated: only the API and the worker write here, and
 -- a client that could flip status to 'succeeded' could forge a turn's result.
 drop policy if exists "Users can read intake jobs for visible sessions" on public.intake_jobs;

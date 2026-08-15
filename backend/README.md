@@ -141,11 +141,18 @@ The endpoint returns **`202 {job_id, status}`** rather than the turn itself. Res
 arrive over `GET /intake-sessions/{id}/jobs/{job_id}/stream` (SSE), with
 `GET /intake-sessions/{id}/jobs/{job_id}` as the polling fallback for a dropped stream.
 
-**No queue is required.** With `SQS_CHAT_QUEUE_URL` empty — the default, and what local
-dev and CI use — the turn runs inline and the job is already terminal when the `202`
-returns. The client contract is identical either way, so nothing needs a queue to work.
-Setting the variable switches dispatch to `chat-intake.fifo` and the
+**No queue is required to run.** With `SQS_CHAT_QUEUE_URL` empty — the default, and what
+local dev and CI use — the turn runs inline and the job is already terminal when the
+`202` returns. Setting the variable switches dispatch to `chat-intake.fifo` and the
 [`chat-intake-worker`](../infra/chat-intake-worker/README.md) Lambda.
+
+⚠️ **The response shape is the same either way; the resilience is not.** Inline, the
+`202` comes back *after* the turn finishes, so the request spans the whole provider call.
+If the platform kills it first, the row survives — the user's text is safe — but the
+response never arrived, so the client never learned the `job_id` and cannot follow the
+job. The row then holds the session's in-flight slot until the stale sweep, so a retry
+meets "still working on your last message" for several minutes. Enable the queue in
+production: it is what makes a stalled provider cost latency rather than a turn.
 
 Two behaviours worth knowing when reading the code:
 
