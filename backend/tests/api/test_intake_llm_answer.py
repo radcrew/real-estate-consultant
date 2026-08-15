@@ -1,11 +1,16 @@
 """Tests for POST /intake-sessions/{id}/answers/llm."""
 from __future__ import annotations
 
+from contextlib import ExitStack
 from unittest.mock import AsyncMock, patch
 
-import pytest
+from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 
 _SESSION_UUID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+# The turn pipeline lives in the service, so that is what these patch: the endpoint is a
+# thin caller, and going through it keeps the wiring between the two covered.
+_SERVICE = "app.services.intake_llm"
 
 _SESSION_ROW = {
     "id": _SESSION_UUID,
@@ -15,8 +20,24 @@ _SESSION_ROW = {
 }
 
 _QUESTIONS = [
-    {"key": "location", "title": "Location", "text": "Where?", "type": "location", "order_index": 0, "required": False, "options": None},
-    {"key": "property_type", "title": "Property Type", "text": "What type?", "type": "multiselect", "order_index": 1, "required": False, "options": None},
+    {
+        "key": "location",
+        "title": "Location",
+        "text": "Where?",
+        "type": "location",
+        "order_index": 0,
+        "required": False,
+        "options": None,
+    },
+    {
+        "key": "property_type",
+        "title": "Property Type",
+        "text": "What type?",
+        "type": "multiselect",
+        "order_index": 1,
+        "required": False,
+        "options": None,
+    },
 ]
 
 _LLM_RESULT = {
@@ -29,22 +50,44 @@ _LLM_RESULT = {
 }
 
 
+def _enter_pipeline(stack, *, llm_result=None, next_question=None, parse=None):
+    """Patch the service's collaborators, leaving its own logic under test."""
+    patches = (
+        patch(
+            f"{_SERVICE}.get_intake_session_row",
+            new_callable=AsyncMock,
+            return_value=_SESSION_ROW,
+        ),
+        patch(
+            f"{_SERVICE}.list_intake_questions",
+            new_callable=AsyncMock,
+            return_value=_QUESTIONS,
+        ),
+        patch(
+            f"{_SERVICE}.parse_user_input",
+            parse or AsyncMock(return_value=llm_result or _LLM_RESULT),
+        ),
+        patch(
+            f"{_SERVICE}.save_intake_criteria",
+            new_callable=AsyncMock,
+            return_value=_SESSION_ROW,
+        ),
+        patch(f"{_SERVICE}.resolve_next_intake_question", return_value=next_question),
+    )
+    for item in patches:
+        stack.enter_context(item)
+
+
 class TestSubmitLlmAnswer:
     async def test_success_returns_response(self, client):
-        from app.schemas.intake_sessions import IntakeSessionFirstQuestion
         next_q = IntakeSessionFirstQuestion(
             key="property_type",
             title="Property Type",
             text="What type of property?",
             type="multiselect",
         )
-        with (
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.get_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.list_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.parse_user_input", new_callable=AsyncMock, return_value=_LLM_RESULT),
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.save_intake_criteria", new_callable=AsyncMock, return_value=_SESSION_ROW),
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.resolve_next_intake_question", return_value=next_q),
-        ):
+        with ExitStack() as stack:
+            _enter_pipeline(stack, next_question=next_q)
             r = await client.post(
                 f"/api/v1/intake-sessions/{_SESSION_UUID}/answers/llm",
                 json={"input": "I need a warehouse in Austin"},
@@ -58,13 +101,8 @@ class TestSubmitLlmAnswer:
 
     async def test_complete_session_is_marked(self, client):
         complete_result = {**_LLM_RESULT, "missing_fields": [], "is_complete": True}
-        with (
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.get_intake_session_row", new_callable=AsyncMock, return_value=_SESSION_ROW),
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.list_intake_questions", new_callable=AsyncMock, return_value=_QUESTIONS),
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.parse_user_input", new_callable=AsyncMock, return_value=complete_result),
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.save_intake_criteria", new_callable=AsyncMock, return_value=_SESSION_ROW),
-            patch("app.api.v1.endpoints.intake_sessions.answers.llm.resolve_next_intake_question", return_value=None),
-        ):
+        with ExitStack() as stack:
+            _enter_pipeline(stack, llm_result=complete_result)
             r = await client.post(
                 f"/api/v1/intake-sessions/{_SESSION_UUID}/answers/llm",
                 json={"input": "office in Dallas under 1M"},
@@ -99,27 +137,9 @@ class TestAdmissionControl:
             IntakeAdmissionControl(ip_per_minute=1, session_per_minute=1),
         )
 
-        endpoint = "app.api.v1.endpoints.intake_sessions.answers.llm"
         parse = AsyncMock(return_value=_LLM_RESULT)
-        with (
-            patch(
-                f"{endpoint}.get_intake_session_row",
-                new_callable=AsyncMock,
-                return_value=_SESSION_ROW,
-            ),
-            patch(
-                f"{endpoint}.list_intake_questions",
-                new_callable=AsyncMock,
-                return_value=_QUESTIONS,
-            ),
-            patch(f"{endpoint}.parse_user_input", parse),
-            patch(
-                f"{endpoint}.save_intake_criteria",
-                new_callable=AsyncMock,
-                return_value=_SESSION_ROW,
-            ),
-            patch(f"{endpoint}.resolve_next_intake_question", return_value=None),
-        ):
+        with ExitStack() as stack:
+            _enter_pipeline(stack, parse=parse)
             first = await client.post(
                 f"/api/v1/intake-sessions/{_SESSION_UUID}/answers/llm",
                 json={"input": "warehouse in Austin"},

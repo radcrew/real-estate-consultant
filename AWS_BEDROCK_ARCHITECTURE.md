@@ -964,7 +964,10 @@ message with no row is undiagnosable when the consumer picks it up.
 #### The worker
 
 `chat-intake-worker` consumes the FIFO queue and calls the same pipeline the endpoint used to run
-inline — extracted to `app/services/intake_llm.py` so it imports nothing FastAPI-specific.
+inline — extracted to `app/services/intake_llm.py` (✅) so it imports nothing from FastAPI's request
+machinery. Failures still surface as `HTTPException`, because the repositories and providers raise
+it; that is the point rather than a leak, since the status code *is* the retryable/terminal
+vocabulary the worker classifies on.
 
 Failure classification decides redelivery, and getting it backwards is expensive in both
 directions:
@@ -995,7 +998,7 @@ existing test suite need no queue, and no test is rewritten to accommodate one.
 |---|---|
 | `supabase/migrations/20260814_intake_jobs.sql` | ✅ table, RLS, indexes, `attempts` trigger |
 | `app/repositories/intake_jobs.py` | ✅ create / get / claim / complete / fail / count-active / expire-stale |
-| `app/services/intake_llm.py` | new — `run_llm_intake_turn()`, extracted from the endpoint |
+| `app/services/intake_llm.py` | ✅ `run_llm_intake_turn()`, extracted from the endpoint |
 | `app/clients/sqs.py` | new — `ChatJobQueue`, boto3 via `anyio.to_thread` per `bedrock_embeddings` |
 | `app/repositories/intake_jobs.py` | new — create / get / claim / complete / fail |
 | `app/workers/chat_job_worker.py` | new — the Lambda handler |
@@ -1222,7 +1225,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
 | **D — Qwen 0.5B intake on Lambda** | ✅ **code complete**: `qwen_lambda.py` (contract, retry-once, error mapping, breaker), `circuit_breaker.py`, `infra/qwen-lambda/` image with build-time GBNF and HF fetch, schema export + drift test, 62 tests. Remaining is deployment only: **supply the weights** (§23.1 — fine-tune vs base undecided), build/push, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
 | **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
-| **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1), ✅ `intake_jobs` migration + repository (claim gate, `attempts` trigger, stale-claim sweeper), 41 tests. Remaining: pipeline extraction, `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook | $0 — SQS free to 1M/mo |
+| **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1), ✅ `intake_jobs` migration + repository (claim gate, `attempts` trigger, stale-claim sweeper), ✅ pipeline extracted to `intake_llm.py`, 51 tests. Remaining: `ChatJobQueue`, `chat-intake-worker` Lambda, `202` + SSE endpoints, frontend job hook | $0 — SQS free to 1M/mo |
 | **G — Guardrails** | `ApplyGuardrail` on intake input/output before launch | per text unit |
 
 **Phase C is a deploy step, not a development step**, and it gates B: until embeddings are routed
