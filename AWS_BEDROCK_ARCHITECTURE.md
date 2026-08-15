@@ -530,9 +530,21 @@ screening a pass-through.
 - **It fails closed by default.** A screening control that silently stops screening is worse than
   an error: the PII it exists to catch reaches storage with nothing recording the gap.
   `BEDROCK_GUARDRAIL_FAIL_OPEN=true` trades that for availability as a deliberate choice.
+- ⚠️ **"Enabled" keys on the policy id alone**, not on having a usable region. Requiring both would
+  have made a blank `AWS_REGION` a silent off switch — the operator configures a PII control,
+  nothing runs, nothing logs, and the fail-closed default never applies because the failure path is
+  never reached. Easy to hit, too: the worker is a separate deployable with its own environment. A
+  configured policy with no region is now treated as an outage, so the same switch governs it and
+  the misconfiguration is loud.
 - **Blocked ≠ masked.** Masking is the feature working, so the redacted text is kept and the turn
   proceeds; a blocked verdict refuses the turn with a 422 that does not name the rule that fired,
   since naming it tells someone probing the filter exactly what to rephrase.
+- **Fail-closed applies to the input, not the generated question.** By the time the question is
+  screened the parse has already succeeded, so propagating a guardrail outage there would requeue
+  the turn on the worker — re-paying for the model call — or discard the user's message inline, to
+  protect one line of template-driven prose. That path degrades to no text and logs instead. Note
+  output screening runs *inside the turn*, so it runs on the worker too: `BEDROCK_GUARDRAIL_*` has
+  to be configured identically in both places, or one of them silently stops screening.
 
 ## 7. Configuration and IAM
 
@@ -600,6 +612,8 @@ invoking a far more expensive model:
         "arn:aws:bedrock:<region>::foundation-model/cohere.embed-english-v3",
         "arn:aws:bedrock:<region>::foundation-model/qwen.qwen3-32b-v1:0"
       ] },
+    { "Effect": "Allow", "Action": ["bedrock:ApplyGuardrail"],
+      "Resource": "arn:aws:bedrock:<region>:<acct>:guardrail/<guardrail-id>" },
     { "Effect": "Allow", "Action": ["lambda:InvokeFunction"],
       "Resource": "arn:aws:lambda:<region>:<acct>:function:qwen-inference-prod" },
     { "Effect": "Allow", "Action": ["sqs:SendMessage"],
@@ -607,6 +621,12 @@ invoking a far more expensive model:
   ]
 }
 ```
+
+⚠️ **`ApplyGuardrail` is a separate action from `InvokeModel`** and was missing from this policy
+until phase G was exercised. Note what the omission costs: screening fails closed, so a guardrail
+configured without this permission does not quietly skip — it refuses **every** intake turn with a
+503. Grant it in the same change that sets `BEDROCK_GUARDRAIL_ID`, in both the API's role and the
+worker's. Its ARN carries an account id, unlike the foundation-model ARNs above.
 
 The escape-hatch model (Sonnet 5) is **not** in the policy — least privilege means a route flip
 to it is an IAM change too, which is the point: no config typo can invoke a model that was never
@@ -635,9 +655,23 @@ Queue settings that are not defaults and matter:
 | Setting | Value | Why |
 |---|---|---|
 | Queue type | **FIFO**, high-throughput mode | per-session ordering (§14.1); dedupe on `job_id` |
-| `visibilityTimeout` | **180s** | must exceed `BR_READ_TIMEOUT` (75s) plus retries, or a still-running turn is redelivered |
+| `visibilityTimeout` | **360s** | ⚠️ This said 180s while also stating it must exceed a 75s read timeout *plus retries* — which is ~225s. The rule was right and the number contradicted it. See the timeout chain below |
 | `maxReceiveCount` | **3** → DLQ | bounded redelivery; alarm on DLQ depth |
 | Event source concurrency | **capped** | Lambda scaling must not outrun the Bedrock quota (§13.1) |
+
+**The timeouts form an ordered chain**, and every link must clear the one before it:
+
+```
+worst-case provider call  <  worker function timeout  <  visibilityTimeout  <  CHAT_JOB_STALE_AFTER_SECONDS
+        ~265s                          300s                    360s                       420s
+```
+
+The provider end sets the floor and is larger than it looks: OpenRouter alone is a 75s read timeout
+with 3 retries, before any guardrail screening. Size from the tail, not from the seconds a healthy
+turn takes. Both failure directions are quiet rather than loud — a function timeout under the
+provider worst case kills live turns that the claim gate then prevents redelivery from retrying,
+and a visibility timeout under the function timeout redelivers turns that are still running until a
+live one reaches the DLQ.
 
 ### Dependencies
 
@@ -894,17 +928,34 @@ unmetered. Today that costs a burst of provider calls; behind a queue it would c
 every accepted request becomes a durable job the worker will faithfully pay for — the backlog keeps
 spending after the flood stops. This is what keeps the queue a buffer rather than an amplifier.
 
-**Correction to the audit:** it called for "verify the caller owns the intake session". There is no
-such check to write. `create_intake_session_row` writes no user id and `search_profile_id` is null
-until completion, so **intake sessions are anonymous by design** and the session UUID *is* the
-credential. Adding ownership would mean requiring sign-up before the conversation, a product change
-rather than a security fix. What exists instead:
+**Correction, twice over.** The audit called for "verify the caller owns the intake session". A
+first pass here answered that there was no such check to write, because the row records no user —
+and that was wrong: it read the *table* and missed the *router*. `intake_sessions_router` is
+mounted under `protected`, so every one of these routes has always required a bearer token or MCP
+key. Callers were authenticated all along.
+
+The real gap was narrower and worse than "anonymous": every authenticated caller could reach every
+session by UUID. `ensure_search_profile_access`, which looks like the guard, is a **no-op while
+`search_profile_id` is null** — which it is for the entire conversation, so it protected the
+session only after the conversation it was protecting had ended. ✅ Fixed by
+`20260815_intake_sessions_user_id.sql`: sessions carry `user_id`, API routes load them through
+`get_owned_intake_session_row`, and someone else's session answers exactly like a missing one so a
+guessed id learns nothing. The worker keeps the unscoped lookup — it runs no user request, and
+authorisation belongs at the boundary.
+
+⚠️ **Rows predating the column have a NULL owner and become unreachable.** That is the deliberate
+direction: guessing an owner would hand someone's conversation to whoever asked first. Sessions are
+short-lived, so the blast radius is conversations in flight at deploy time.
+
+Metering sits on top of that and answers a different question — how much one account can spend per
+minute:
 
 | Control | Scope | Why |
 |---|---|---|
-| Per-address window (60/min) | both LLM intake routes | Sessions are free to mint, so a per-session limit alone is no defence — the caller just starts another. This is the real ceiling |
+| Per-address window (60/min) | both LLM intake routes | An account can mint sessions freely, so a per-session limit alone is no defence — it just starts another. This is the wider net |
 | Per-session window (12/min) | turns only | Paces one conversation; a human types far slower |
 | Metered at **session creation** too | `?mode=llm` only | Broader than the audit noted: creating an llm session runs the opening-question model, so a session is not free either. Guided mode calls no provider and stays unthrottled |
+| Metered at **stream open** | `GET .../jobs/{id}/stream` | An SSE response holds a serverless function until it ends and queries the database each tick, and one valid job id can be streamed without limit — so admission on the enqueue route does not cover it. Shares the address budget: a client opens one stream per turn, so both together are two calls per turn. The **polling fallback stays unmetered**, since it runs once a second by design and any budget tight enough to protect the stream would break it |
 
 Two known limits, both deliberate. The windows are **per process**, so the effective ceiling scales
 with instance count — the same trade §16 accepts for the circuit breaker, and the failure mode is a
@@ -924,11 +975,38 @@ queued work under one session id. Over the cap the endpoint answers 429 without 
 | | Before | After |
 |---|---|---|
 | `POST .../answers/llm` | `200 SubmitLlmIntakeInputResponse` | `202 {job_id, status}` |
-| Result delivery | the same response | SSE `GET .../jobs/{job_id}/stream` |
-| Fallback | — | `GET .../jobs/{job_id}` poll, if the stream drops |
+| Result delivery | the same response | `GET .../jobs/{job_id}`, polled |
 
-The SSE stream is the primary channel and polling is the fallback, not the reverse: a dropped
-EventSource with no fallback strands a job that has already been paid for.
+⚠️ **SSE was built here and removed — do not re-add `EventSource`.** Earlier drafts made the stream
+the primary channel with polling as the fallback. It cannot work on these routes: they sit on the
+**protected** router, so every request needs a bearer token, and `EventSource` cannot set headers.
+Every browser connection 401'd and fell through to polling, silently — the feature only appeared to
+work *because* the fallback existed. The test suite could not catch it either, since the API fixture
+overrides `get_current_user`, so the auth requirement was never exercised.
+
+Polling is also what §21 already listed as the cheaper option: no serverless function held open per
+waiting client, and no per-connection concurrency to meter. If push delivery is ever wanted for
+latency, it needs a transport that can carry the header — `fetch` + `ReadableStream` — not
+`EventSource`.
+
+⚠️ **Polling has to tolerate its own failures.** One bad response is not a dead turn — the server
+is very likely still processing it — and treating it as one discards the user's message.
+`use-intake-job` keeps polling to the deadline through transient errors; a `404` is the sole
+exception, since asking again cannot make the job exist.
+
+⚠️ **And it has to stop itself.** Nothing else can cancel the loop, so a component that has gone
+away must be noticed inside it, or a user who closes the wizard mid-turn leaves it calling the API
+every second until the deadline. Worth knowing at scale: a followed turn costs one request per poll
+interval for as long as it runs, so abandoned loops are not free.
+
+**Why not Supabase Realtime, which this repo already uses for job rows?** `use-ingest-job.ts`
+watches `public.jobs` over `postgres_changes`, and it would remove the polling entirely. It is the
+strongest remaining option if poll volume ever becomes the constraint — these routes *are*
+authenticated, so unlike `EventSource` the RLS check would pass. Two things to settle first: the
+`intake_jobs` policy currently grants `select` to `authenticated` **without scoping to the caller's
+own sessions** (see §14.1's ownership note), so subscribing would expose more than the API does;
+and the table has to be added to the realtime publication. Until then, polling keeps the read path
+going through `get_intake_job_row`, where the session scoping lives.
 
 #### FIFO, not standard — the one non-negotiable
 
@@ -980,6 +1058,25 @@ Two details worth pinning:
   would otherwise lock the user out of their own conversation permanently. The threshold
   (`CHAT_JOB_STALE_AFTER_SECONDS`) must exceed the worker's function timeout, or a turn that is
   still running gets expired out from under it.
+- ⚠️ **`queued` gets stuck too, and needs a longer window.** The in-flight cap counts both
+  unfinished states, so sweeping only `running` still leaves the session lockable — by a failed
+  SQS publish (which deliberately leaves the row behind), a worker that is down, or a message that
+  exhausted `maxReceiveCount` into the DLQ while its row stayed put. `expire_abandoned_queued_jobs`
+  covers it. `CHAT_JOB_ABANDONED_AFTER_SECONDS` measures *untouched* time — the trigger moves
+  `updated_at` on every status change, so a job cycling through redelivery keeps refreshing it and
+  only one nothing has touched ages out. The bar is therefore a single visibility timeout (the gap
+  between attempts), not the whole redelivery span. Expiring early is the safe direction, because
+  the claim gate drops a message delivered afterwards; waiting longer is what risks a turn
+  completing into a row nobody watches while the user, having resent, gets two turns merged into
+  one session.
+
+  The **ceiling is how long the client follows a turn** (`JOB_DEADLINE_MS` in the hook), and the
+  two must move together: release the slot later and a user told their turn failed is
+  simultaneously refused as "still working". ⚠️ That ceiling is deliberately *not*
+  `CHAT_JOB_TIMEOUT_SECONDS` — that bounds a single SSE connection, which the platform's function
+  duration usually cuts short long before, and the client keeps polling after it ends. Tying the
+  sweep to it would mean that shortening the stream to fit the platform silently starts expiring
+  live jobs seconds after they are created.
 
 Rows are written **before** the SQS publish. A row with no message is visible and retryable; a
 message with no row is undiagnosable when the consumer picks it up.
@@ -1020,13 +1117,28 @@ unsuccessfully, and the next one should still run.
 #### Queue-disabled mode
 
 An empty `SQS_CHAT_QUEUE_URL` runs the turn inline and writes a terminal job row. The client
-contract is byte-identical either way — still `202`, still a job to follow — so local dev and the
+shape is identical either way — still `202`, still a job to follow — so local dev and the
 existing test suite need no queue, and no test is rewritten to accommodate one.
 
 ⚠️ **Inline, a transient fault must still be terminal.** The worker sends 503/504 back to `queued`
 because redelivery will retry them; inline there is nothing to redeliver, so the same row would
 strand the turn forever with the client polling work nobody will run. `execute_claimed_job` takes
 `allow_retry`, and it is the only difference between the two callers.
+
+⚠️ **The shape is identical; the resilience is not.** Worth being precise, because "same contract"
+invites the reading that the queue is optional in production. Inline, the `202` is returned *after*
+the turn finishes, so the request still spans the whole provider call — and a worst-case turn
+(~265s, §7) outlives a Vercel function. When the platform kills it:
+
+- the row exists, so the user's text is safe — that much the durable write does buy;
+- but the response never arrived, so **the client never learned the `job_id`** and cannot follow
+  the job it is holding;
+- and the row sits `running`, holding the session's in-flight slot until the sweep, so a retry
+  meets "still working on your last message" for several minutes.
+
+The queue is what turns a stalled provider into latency instead of a lost turn: with it, the `202`
+returns before any model runs. Queue-disabled is the right default for local development and CI —
+neither should need infrastructure — but it is a convenience, not a deployment posture.
 
 #### Where the code lands
 
@@ -1041,7 +1153,7 @@ strand the turn forever with the client polling work nobody will run. `execute_c
 | `app/workers/chat_job_worker.py` | ✅ the Lambda handler |
 | `app/core/intake_admission.py` | ✅ new — per-address and per-session windows on both LLM intake routes |
 | `app/core/rate_limit.py` | ✅ `ApiKeyRateLimiter` generalised to `SlidingWindowRateLimiter` (alias kept) |
-| `app/api/.../answers/llm.py` | ✅ admission dependency wired; POST still to become insert + enqueue + `202` |
+| `app/api/.../answers/llm.py` | ✅ admission, guardrail screen, stale sweep, insert + enqueue + `202` |
 | `app/api/.../intake_sessions/jobs.py` | ✅ SSE stream + poll endpoints |
 | `app/services/intake_jobs.py` | ✅ shared claimed-job runner — inline and worker leave the same row |
 | `app/schemas/intake_sessions.py` | ✅ `EnqueuedLlmIntakeJobResponse`, `IntakeJobStatusResponse` |
@@ -1112,7 +1224,7 @@ INGEST  (off the request path — runs once per listing, ever)   ✅ implemented
   30-minute window is a product decision, not a technical limit.
 
 
-QUERY  (request path — one embedding call, regardless of corpus size)
+QUERY  (request path — usually **no** embedding call at all)
 
 ┌────────────┐   ┌────────────────┐   ┌──────────────────────────────────────┐
 │ seed       │──▶│ 1 embed call   │──▶│ pgvector k-NN                        │
@@ -1121,9 +1233,18 @@ QUERY  (request path — one embedding call, regardless of corpus size)
                                       └──────────────────────────────────────┘
 ```
 
+✅ **And the seed's own vector is read back, not recomputed.** The plan assumed one embedding call
+per query. There is none: the seed is itself an ingested listing, and the backfill built its vector
+from `format_listing_block_for_fit` — the exact text a query would re-embed — so the stored value is
+the same vector rather than an approximation of it. That matters beyond latency, because
+`GET /listings/{id}/similar` is **public and unauthenticated**: paying a provider to re-derive a
+value the row already holds lets the caller decide how often you are billed, and a crawler walking
+listing pages would do it unprompted. A seed with no vector, or one from a superseded model, still
+embeds on the fly so the endpoint keeps working mid-migration.
+
 | | Today | With ingest-time embeddings |
 |---|---|---|
-| Embedding calls per request | up to **101** | **1** |
+| Embedding calls per request | up to **101** | **0** (1 only for an unembedded seed) |
 | Similarity | Python, over a 40–100 row pool | HNSW index, over the whole corpus |
 | Quality | capped by the pre-filtered pool | true nearest neighbours corpus-wide |
 
@@ -1268,7 +1389,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
 | **D — Qwen 0.5B intake on Lambda** | ✅ **code complete**: `qwen_lambda.py` (contract, retry-once, error mapping, breaker), `circuit_breaker.py`, `infra/qwen-lambda/` image with build-time GBNF and HF fetch, schema export + drift test, 62 tests. Remaining is deployment only: **supply the weights** (§23.1 — fine-tune vs base undecided), build/push, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
 | **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
-| **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1), ✅ `intake_jobs` migration + repository (claim gate, `attempts` trigger, stale-claim sweeper), ✅ pipeline extracted to `intake_llm.py`, ✅ `ChatJobQueue` publisher, ✅ `chat-intake-worker` handler (claim gate, failure classification, FIFO-safe partial batches), ✅ `202` + poll + SSE endpoints with the in-flight cap, ✅ frontend service + `use-intake-job` hook + chat panel, ✅ `infra/chat-intake-worker/` image + runbook. **Code complete — 132 tests.** Remaining is deployment: create the queue and DLQ, push the image, wire the capped event source, then set `SQS_CHAT_QUEUE_URL` | $0 — SQS free to 1M/mo |
+| **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1), ✅ `intake_jobs` migration + repository (claim gate, `attempts` trigger, stale-claim sweeper), ✅ pipeline extracted to `intake_llm.py`, ✅ `ChatJobQueue` publisher, ✅ `chat-intake-worker` handler (claim gate, failure classification, FIFO-safe partial batches), ✅ `202` + poll + SSE endpoints with the in-flight cap, ✅ frontend service + `use-intake-job` hook + chat panel, ✅ `infra/chat-intake-worker/` image + runbook. **Code complete — 132 tests.** Deployment, **in this order**: apply `20260814_intake_jobs.sql` *before* the code ships — the endpoint writes to that table on every request and Vercel deploys from `main` automatically, so the reverse order takes intake down until the table exists. The queue itself is optional and comes after: DLQ, image, capped event source, then `SQS_CHAT_QUEUE_URL` | $0 — SQS free to 1M/mo |
 | **G — Guardrails** | ✅ code: `BedrockGuardrail`, input screened before the durable write, optional output screening, fail-closed default, 24 tests. Remaining: author the policy in the Bedrock console and set `BEDROCK_GUARDRAIL_ID` | per text unit |
 
 **Phase C is a deploy step, not a development step**, and it gates B: until embeddings are routed
@@ -1280,10 +1401,53 @@ similar-listings.
 independent of each other and of C.
 
 **F is independent of C–E** — it changes how an intake turn is dispatched, not which provider runs
-it, so it works against whatever `llm_route_intake_parse` currently resolves to. It is also the
-only phase that changes a client-facing contract, so it is the one that cannot ship backend-first.
-Sequence it after the frontend job hook is merged behind the queue-disabled default, then set
-`SQS_CHAT_QUEUE_URL` to switch dispatch on.
+it, so it works against whatever `llm_route_intake_parse` currently resolves to.
+
+### 22.1 Deployment checklist
+
+Everything below is an action outside the code. The ordering is not cosmetic: each numbered
+constraint here is one that fails quietly if inverted.
+
+**0 — Ship the branch.** Two constraints, both hard:
+
+- ⚠️ **Apply both migrations before the code deploys.** `20260814_intake_jobs.sql` and
+  `20260815_intake_sessions_user_id.sql`, via `python scripts/migrate.py`. The backend auto-deploys
+  from `main`. Reverse the order and intake is down until the tables exist — the endpoint writes a
+  job row on every request. Apply against the direct port (5432); pgbouncer transaction mode blocks
+  DDL.
+- ⚠️ **Backend and frontend merge together.** The `202` contract change is client-facing.
+- Expect: intake conversations in flight at deploy time restart, because sessions predating
+  `user_id` have a NULL owner and are unreachable by design.
+
+**1 — Phase C, embeddings** (gates similar-listings; nothing returns until it is done):
+enable Cohere Embed v3 in the Bedrock console → set `AWS_REGION`, credentials and
+`LLM_ROUTE_EMBEDDINGS=bedrock` **in Vercel *and* GitHub secrets** → run
+`scripts/backfill_embeddings.py` → verify similar-listings returns rows.
+Set it in only one place and listings get 1024-dim vectors while the query path still asks for
+384-dim ones.
+
+**2 — Phase E, outreach** (independent): confirm `qwen.qwen3-32b-v1:0` is servable in your region
+→ add the IAM grant → smoke-test the forced tool call (§23.3) → set
+`LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen`.
+
+**3 — Phase D, intake parser** (independent; needs the model artifact): settle fine-tune vs base
+(§23.1) → `infra/qwen-lambda/` fetch, build, push → create the function and warmer → IAM grant →
+set `QWEN_INFERENCE_FUNCTION_NAME` and `LLM_ROUTE_INTAKE_PARSE=qwen`.
+
+**4 — Phase F, queueing** (optional; the product works without it, see the resilience note in
+§14.1): create `chat-intake.fifo` + DLQ with the timeout chain from §7 → push the worker image →
+create the function with its environment → event source mapping with
+`ReportBatchItemFailures` and a concurrency cap → set `SQS_CHAT_QUEUE_URL` in Vercel.
+⚠️ The worker's `LLM_ROUTE_*` pins must match Vercel's, or the same turn gets a different model
+depending on which path ran it.
+
+**5 — Phase G, guardrails** (before launch): author the policy → set `BEDROCK_GUARDRAIL_ID`
+**in both Vercel and the worker**. Output screening runs inside the turn, so it runs in both places.
+
+**Rollback** is per step: clear the variable. `SQS_CHAT_QUEUE_URL` returns dispatch to inline,
+`LLM_ROUTE_*` returns a path to its previous provider, `BEDROCK_GUARDRAIL_ID` disables screening.
+The two migrations are the exception — they are additive, but the `user_id` ownership check is live
+as soon as the code is.
 
 ## 23. Open questions
 

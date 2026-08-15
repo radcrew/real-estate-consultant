@@ -63,6 +63,27 @@ the architecture doc §7 has the policy documents.
 
 ## 3. Build and push
 
+**CI does this** — `.github/workflows/chat-intake-worker.yml` builds and pushes on every
+change to `backend/**`. That is not just convenience: this image contains a copy of the
+backend, so a hand-built one goes stale the moment someone edits a service, and a worker
+running last week's pipeline against this week's rows is a bug nobody thinks to look for.
+
+One-time setup:
+
+1. Create the ECR repository — console → **ECR** → *Create repository* → private → name
+   `chat-intake-worker`
+2. Add repository secrets — GitHub → *Settings* → *Secrets and variables* → *Actions*:
+   `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+3. Push to `main`, or run the workflow manually from the Actions tab
+
+The credentials need `ecr:*` on that repository plus `lambda:UpdateFunctionCode` on the
+function. Until the function exists the workflow stops after pushing and prints the image
+URI to create it from — the function needs a role and an environment a build job has no
+business inventing.
+
+<details>
+<summary>Building locally instead (needs Docker + the AWS CLI)</summary>
+
 ```bash
 REPO=$ACCOUNT.dkr.ecr.$AWS_REGION.amazonaws.com/chat-intake-worker
 aws ecr create-repository --repository-name chat-intake-worker --region $AWS_REGION
@@ -75,6 +96,8 @@ docker build --platform linux/amd64 \
   -t $REPO:$(git rev-parse --short HEAD) backend
 docker push $REPO:$(git rev-parse --short HEAD)
 ```
+
+</details>
 
 ## 4. Create the function
 

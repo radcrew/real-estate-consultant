@@ -1,0 +1,101 @@
+# Builds the queued intake worker and ships it to Lambda.
+#
+# The worker runs the same turn pipeline as the API (app/services/intake_jobs.py), so its
+# image has to be rebuilt whenever backend code changes — doing that by hand is how the
+# two deployables drift apart. This does it on every push that touches backend/.
+#
+# Required GitHub secrets:
+#   AWS_REGION              — must match the queue's region
+#   AWS_ACCESS_KEY_ID       — needs ecr:* on the repository below, and
+#   AWS_SECRET_ACCESS_KEY     lambda:UpdateFunctionCode on the function
+#
+# Without them the job exits cleanly rather than failing, so a fork or a clone with no AWS
+# setup does not get a red tick.
+name: Chat intake worker
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "infra/chat-intake-worker/**"
+      - ".github/workflows/chat-intake-worker.yml"
+
+env:
+  ECR_REPOSITORY: chat-intake-worker
+  FUNCTION_NAME: chat-intake-worker-prod
+
+jobs:
+  build-and-deploy:
+    name: Build image and update the function
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check AWS configuration
+        id: config
+        run: |
+          if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ] || [ -z "${{ secrets.AWS_REGION }}" ]; then
+            echo "AWS secrets are not set — skipping."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials
+        if: steps.config.outputs.configured == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        if: steps.config.outputs.configured == 'true'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push
+        if: steps.config.outputs.configured == 'true'
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          set -euo pipefail
+          IMAGE="$REGISTRY/${ECR_REPOSITORY}:${GITHUB_SHA::7}"
+
+          # Build context is backend/, not the repo root — the Dockerfile copies
+          # requirements.txt and app/ from there.
+          docker build \
+            --platform linux/amd64 \
+            -f infra/chat-intake-worker/Dockerfile \
+            -t "$IMAGE" \
+            backend
+
+          docker push "$IMAGE"
+          echo "uri=$IMAGE" >> "$GITHUB_OUTPUT"
+
+      - name: Update the Lambda function
+        if: steps.config.outputs.configured == 'true'
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
+        run: |
+          set -euo pipefail
+          # The function is created once by hand: it needs an execution role and an
+          # environment this workflow has no business inventing. Until it exists, pushing
+          # the image is the whole job — so say what to do rather than failing.
+          if ! aws lambda get-function --function-name "$FUNCTION_NAME" >/dev/null 2>&1; then
+            echo "Function $FUNCTION_NAME does not exist yet."
+            echo "Create it from this image, then re-run:"
+            echo "  $IMAGE_URI"
+            exit 0
+          fi
+
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --image-uri "$IMAGE_URI" \
+            --publish >/dev/null
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+          echo "Deployed $IMAGE_URI"
