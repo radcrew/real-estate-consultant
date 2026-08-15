@@ -56,7 +56,7 @@ class TestUnitConversion:
         assert _explain("a warehouse under 5000 sqft", {"size_sqft": {"max": 5000}}) == []
 
     def test_a_rounded_metric_conversion_is_still_recognised(self):
-        """1,500 x 10.7639 is 16,145.85, and the model stores a whole number."""
+        """1,500 x 10.763910 is 16,145.87, and a whole number is stored."""
         assert _kinds(_explain("1500 sq m", {"size_sqft": {"max": 16146}})) == ["converted"]
 
     def test_a_size_that_is_not_the_conversion_is_not_claimed_to_be(self):
@@ -150,3 +150,36 @@ class TestQuiet:
             {"size_sqft": {"min": 100000}},
         )
         assert "size sqft" in notes[0]["message"]
+
+
+class TestLargeAreaUnits:
+    """The reported message: "I need 3sq kilometers farm in New Mexico."
+
+    Square kilometres, hectares and square miles were in no table, so the figure was
+    unclassified and kept as typed -- a 32,291,731 sq ft farm recorded as three.
+    """
+
+    def test_square_kilometres_are_explained(self):
+        notes = _explain(
+            "I need 3sq kilometers farm in New Mexico.",
+            {"size_sqft": {"min": 32291731}},
+        )
+        assert _kinds(notes) == ["converted"]
+        message = notes[0]["message"]
+        assert "3 square kilometres" in message
+        assert "32,291,731 sq ft" in message
+
+    @pytest.mark.parametrize(("message", "stored", "expected"), [
+        ("3 sq km farm", 32291731, "square kilometres"),
+        ("5 hectares", 538196, "hectares"),
+        ("2 sq miles", 55756800, "square miles"),
+        ("a 3 km2 site", 32291731, "square kilometres"),
+    ])
+    def test_each_large_unit_names_itself(self, message, stored, expected):
+        notes = _explain(message, {"size_sqft": {"max": stored}})
+        assert _kinds(notes) == ["converted"]
+        assert expected in notes[0]["message"]
+
+    def test_a_distance_is_not_reported_as_a_conversion(self):
+        """"20 km from downtown" is how far, not how big."""
+        assert _explain("a warehouse 20 km from downtown", {"size_sqft": {"max": 20}}) == []

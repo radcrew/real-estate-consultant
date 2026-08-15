@@ -32,7 +32,7 @@ import re
 from typing import Any
 
 from app.domain.bounds import _FIELD_KINDS, numbers_with_direction, same_significant_digits
-from app.domain.intake_vocabulary import SQFT_PER, UNIT_NAMES
+from app.domain.intake_vocabulary import AREA_UNITS
 
 # Relative slack when checking a conversion. Square metres are 10.7639 sq ft and the model
 # rounds the product, so an exact comparison would reject every metric conversion.
@@ -87,9 +87,10 @@ def _conversion_notes(figures, criteria) -> list[dict[str, str]]:
     for figure in figures:
         if figure.kind != "area" or not figure.unit:
             continue
-        factor = SQFT_PER.get(_compact(figure.unit))
-        if not factor or factor == 1.0:
+        entry = AREA_UNITS.get(_compact(figure.unit))
+        if entry is None or entry[0] == 1.0:
             continue  # already square feet, or a unit this cannot convert
+        factor, name = entry
         converted = figure.value * factor
         tolerance = max(1.0, converted * _CONVERSION_TOLERANCE)
         if not any(abs(bound - converted) <= tolerance for bound in stored.values()):
@@ -97,13 +98,13 @@ def _conversion_notes(figures, criteria) -> list[dict[str, str]]:
         if (figure.value, factor) in seen:
             continue
         seen.add((figure.value, factor))
-        name = UNIT_NAMES.get(factor, "unit")
         plural = f"{name}s" if not name.endswith("s") else name
         notes.append(_note(
             _SIZE_FIELD, "converted",
             f"You gave the size as {_number(figure.value)} {plural}. "
             f"Search works in square feet, so I recorded "
-            f"{_number(round(converted))} sq ft ({_number(factor)} sq ft per {name}).",
+            f"{_number(round(converted))} sq ft "
+            f"({_number(round(factor, 2))} sq ft per {name}).",
         ))
     return notes
 

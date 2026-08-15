@@ -7,7 +7,11 @@ one, so a change that breaks these is a change that breaks a case we know occurs
 
 import pytest
 
-from app.domain.bounds import bound_sides_in, correct_bound_direction
+from app.domain.bounds import (
+    bound_sides_in,
+    correct_bound_direction,
+    unevidenced_range_keys,
+)
 
 
 class TestBoundSidesIn:
@@ -410,25 +414,51 @@ class TestUnitConversion:
             {"size_sqft": {"min": 1500, "max": 1500}}, "1500 yard"
         ) == {"size_sqft": {"min": 13500, "max": 13500}}
 
+    def test_the_reported_square_kilometre_message(self):
+        """"I need 3sq kilometers farm in New Mexico." stored a size of 3.
+
+        Square kilometres were in no table at all, so the figure was unclassified and
+        kept as typed -- a 32,291,731 sq ft farm recorded as three square feet.
+        """
+        assert correct_bound_direction(
+            {"size_sqft": {"min": 3}}, "I need 3sq kilometers farm in New Mexico."
+        ) == {"size_sqft": {"min": 32291731}}
+
     @pytest.mark.parametrize(("message", "emitted", "expected"), [
         ("5 acres of land", 5, 217800),
         ("2,000 sq yd retail", 2000, 18000),
         ("800 square yards", 800, 7200),
+        ("3 sq km farm", 3, 32291731),
+        ("2 square kilometres", 2, 21527821),
+        ("a 3 km2 site", 3, 32291731),
+        ("5 hectares", 5, 538196),
+        ("a 40 ha estate", 40, 4305564),
+        ("2 sq miles", 2, 55756800),
     ])
     def test_every_convertible_unit(self, message, emitted, expected):
         assert correct_bound_direction(
             {"size_sqft": {"max": emitted}}, message
         ) == {"size_sqft": {"max": expected}}
 
-    def test_a_metric_conversion_keeps_its_fraction(self):
-        """1,500 x 10.7639 is not a whole number and rounding it away is a real error."""
+    def test_a_metric_conversion_rounds_to_whole_square_feet(self):
+        """1,500 x 10.763910 is 16,145.87. Nobody searches to a fraction of a square
+        foot, and a stored 16,145.87 reads as a defect beside the 16,146 the explanation
+        quotes. The *factor* keeps its precision -- 10.76 would lose 36 sq ft on a
+        10,000 sq m site -- and only the result is rounded."""
         assert correct_bound_direction(
             {"size_sqft": {"max": 1500}}, "under 1500 sq metres"
-        ) == {"size_sqft": {"max": 16145.85}}
+        ) == {"size_sqft": {"max": 16146}}
 
     def test_square_feet_are_not_converted(self):
         value = {"size_sqft": {"max": 5000}}
         assert correct_bound_direction(value, "under 5000 sqft") == value
+
+    def test_a_distance_is_not_an_area(self):
+        """"20 km from downtown" is how far, not how big. Before kilometres were listed
+        it was unclassified, which made it available to the size field."""
+        assert correct_bound_direction(
+            {"size_sqft": {"max": 20}}, "a warehouse 20 km from downtown"
+        ) == {}
 
     def test_a_budget_is_never_converted(self):
         """"$1M" is money, and money has no square feet in it."""
@@ -443,3 +473,33 @@ class TestUnitConversion:
     def test_a_converted_bound_is_an_integer(self):
         result = correct_bound_direction({"size_sqft": {"max": 1500}}, "1500 yard")
         assert isinstance(result["size_sqft"]["max"], int)
+
+
+class TestEvidenceAfterConversion:
+    """A converted bound is evidenced by the figure it was converted *from*.
+
+    32,291,731 appears nowhere in "3sq kilometers". Treating that as unsupported would
+    put the size back in ``missing_fields`` and ask the user for a figure that had just
+    been worked out correctly from the one they gave.
+    """
+
+    @pytest.mark.parametrize(("message", "emitted"), [
+        ("I need 3sq kilometers farm in New Mexico.", {"min": 300000}),
+        ("I need a 100k yard farm", {"min": 100000}),
+        ("under 1500 sq metres", {"max": 1500}),
+        ("5 acres of land", {"max": 5}),
+    ])
+    def test_a_converted_size_counts_as_answered(self, message, emitted):
+        corrected = correct_bound_direction({"size_sqft": emitted}, message)
+        assert unevidenced_range_keys(corrected, message) == set()
+
+    def test_a_size_in_square_feet_still_counts_as_answered(self):
+        corrected = correct_bound_direction({"size_sqft": {"max": 5000}}, "under 5000 sqft")
+        assert unevidenced_range_keys(corrected, "under 5000 sqft") == set()
+
+    def test_a_figure_related_to_nothing_in_the_message_is_still_unconfirmed(self):
+        """"a 5 hectare site" with an emitted 45,000: neither 5 nor 538,196, so the
+        model invented it and the questionnaire should ask again."""
+        message = "a 5 hectare site in Denver"
+        corrected = correct_bound_direction({"size_sqft": {"max": 45000}}, message)
+        assert unevidenced_range_keys(corrected, message) == {"size_sqft"}

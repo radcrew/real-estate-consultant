@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from typing import Any, NamedTuple
 
-from app.domain.intake_vocabulary import SQFT_PER
+from app.domain.intake_vocabulary import AREA_UNITS
 
 # Ordered: negations, then multi-word forms, then single words. ``re`` scans left to
 # right, so a negation starting earlier in the string consumes the comparator nested
@@ -117,12 +117,20 @@ _MAX_COMPARATOR_GAP = 24
 # reading available.
 _UNIT_KINDS: list[tuple[str, str]] = [
     (r"sq(?:uare)?\s*\.?\s*(?:ft|feet|foot)\b", "area"),
+    # Kilometres before metres: "sq km" must not be read as the "m" of square metres, and
+    # "3sq kilometers" stored as a bare 3 is how a 32,291,731 sq ft farm became three.
+    (r"sq(?:uare)?\s*\.?\s*(?:kilometres?|kilometers?|kms?)\b", "area"),
+    (r"(?:sqkm|km\s*2)\b", "area"),
     (r"sq(?:uare)?\s*\.?\s*(?:metres?|meters?|m)\b", "area"),
     (r"sq(?:uare)?\s*\.?\s*(?:yards?|yds?)\b", "area"),
+    (r"sq(?:uare)?\s*\.?\s*(?:miles?|mi)\b", "area"),
     (r"(?:sqft|sqm|sf)\b", "area"),
-    (r"(?:yards?|yds?|acres?)\b", "area"),
+    (r"(?:yards?|yds?|acres?|hectares?|ha)\b", "area"),
     (r"(?:dollars?|usd|bucks)\b", "money"),
-    (r"(?:ft|feet|foot|metres?|meters?|inch(?:es)?)\b", "length"),
+    # Bare kilometres are a distance, not an area — "20 km from downtown" must not be
+    # available to the size field the way an unclassified figure would be.
+    (r"(?:ft|feet|foot|metres?|meters?|kilometres?|kilometers?|kms?|inch(?:es)?)\b",
+     "length"),
     (r"(?:dock\s+)?doors?\b", "count"),
     (r"(?:loading\s+)?(?:bays?|docks?)\b", "count"),
     (r"(?:parking\s+)?spaces?\b", "count"),
@@ -145,8 +153,8 @@ _UNIT_GROUP_KIND = {f"u{index}": kind for index, (_, kind) in enumerate(_UNIT_KI
 # range fields today, and a third would arrive unrestricted until it is listed.
 _FIELD_KINDS = {"price": "money", "size_sqft": "area"}
 
-# Unit spellings are compared with punctuation and spacing removed: "sq. yd", "sq yd"
-# and "sqyd" are one key in ``SQFT_PER``.
+# Unit spellings are compared with punctuation and spacing removed: "sq. km", "sq km"
+# and "sqkm" are one key in ``AREA_UNITS``.
 _NOT_ALNUM = re.compile(r"[^a-z0-9]")
 
 
@@ -292,11 +300,12 @@ def _converted(bound: Any, figure: _Figure, kind: str | None) -> Any:
     """
     if kind != "area" or not figure.unit:
         return bound
-    factor = SQFT_PER.get(_NOT_ALNUM.sub("", figure.unit.lower()))
-    if not factor or factor == 1.0:
+    entry = AREA_UNITS.get(_NOT_ALNUM.sub("", figure.unit.lower()))
+    if entry is None or entry[0] == 1.0:
         return bound
-    converted = float(bound) * factor
-    return int(converted) if converted.is_integer() else round(converted, 2)
+    # Whole square feet. Nobody searches to a fraction of one, and a stored 16,145.85
+    # reads as a defect on screen next to the 16,146 the explanation quotes.
+    return round(float(bound) * entry[0])
 
 
 def same_significant_digits(one: float, other: float) -> bool:
@@ -422,7 +431,16 @@ def unevidenced_range_keys(extracted: dict[str, Any], user_input: str) -> set[st
             except (TypeError, ValueError):
                 unevidenced.add(key)
                 break
-            if not any(f.value == numeric and _fits(f, kind) for f in figures):
+            # A converted bound is evidenced by the figure it was converted *from*.
+            # 32,291,731 appears nowhere in "3sq kilometers", and treating that as
+            # unsupported would ask the user for a size that had just been worked out
+            # correctly from the one they gave.
+            supported = any(
+                _fits(figure, kind)
+                and numeric in (figure.value, _converted(figure.value, figure, kind))
+                for figure in figures
+            )
+            if not supported:
                 unevidenced.add(key)
                 break
     return unevidenced

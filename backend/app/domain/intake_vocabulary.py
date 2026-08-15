@@ -67,35 +67,62 @@ GENERIC_PHRASINGS = frozenset({
     "shopping district", "mall entrance", "workspace",
 })
 
-# Square feet per unit of area, keyed by the user's wording with punctuation and spaces
-# removed, so "sq. yd", "sq yd" and "sqyd" are one entry.
+# Every area unit a client uses, as (square feet per unit, what to call it back to them).
+# Keyed by their wording with punctuation and spacing removed, so "sq. km", "sq km" and
+# "sqkm" are one entry.
 #
-# The conversion itself is the model's job and it does it well. This table is here so the
-# *answer* can be explained: someone who typed "100k yard" and is shown 900,000 sq ft has
-# no way to tell a correct conversion from a bug, and telling them nothing is how a
-# working feature reads as a broken one.
+# Two jobs. The model is meant to convert and mostly does, but it drops the unit on
+# wordings it has seen less of — "3sq kilometers" came back as 3 — so this is the
+# arithmetic. And it is what lets the answer be explained: someone shown 32,291,731 sq ft
+# after typing "3sq kilometers" has no way to tell a correct conversion from a bug.
 #
-# Units already in square feet map to 1.0 and are listed rather than omitted — a missing
-# key would be indistinguishable from an unrecognised unit, and silence is the answer for
-# both, for different reasons.
-SQFT_PER: dict[str, float] = {
-    "sqft": 1.0, "sqfeet": 1.0, "sqfoot": 1.0, "squarefeet": 1.0, "squarefoot": 1.0,
-    "squareft": 1.0, "sf": 1.0,
-    "yard": 9.0, "yards": 9.0, "yd": 9.0, "yds": 9.0,
-    "sqyard": 9.0, "sqyards": 9.0, "sqyd": 9.0, "sqyds": 9.0,
-    "squareyard": 9.0, "squareyards": 9.0,
-    "sqm": 10.7639, "sqmetre": 10.7639, "sqmetres": 10.7639,
-    "sqmeter": 10.7639, "sqmeters": 10.7639,
-    "squarem": 10.7639, "squaremetre": 10.7639, "squaremetres": 10.7639,
-    "squaremeter": 10.7639, "squaremeters": 10.7639,
-    "acre": 43560.0, "acres": 43560.0,
-}
+# Factors are exact where the definition is exact (9, 43560, 27878400) and full precision
+# where it is not, because rounding the *factor* is a real error even though rounding the
+# result is not: 10.76 instead of 10.763910 loses 36 sq ft on a 10,000 sq m site.
+#
+# Square feet map to 1.0 and are listed rather than omitted. A missing key would be
+# indistinguishable from an unrecognised unit, and the two need different answers: one is
+# "nothing to do", the other is "say nothing, you do not know what this is".
+_SQ_METRE = 10.763910416709722
 
-# How to name a unit back to the person who used it, once its spelling has been folded.
-UNIT_NAMES: dict[float, str] = {
-    9.0: "square yard",
-    10.7639: "square metre",
-    43560.0: "acre",
+AREA_UNITS: dict[str, tuple[float, str]] = {
+    "sqft": (1.0, "square foot"), "sqfeet": (1.0, "square foot"),
+    "sqfoot": (1.0, "square foot"), "squarefeet": (1.0, "square foot"),
+    "squarefoot": (1.0, "square foot"), "squareft": (1.0, "square foot"),
+    "sf": (1.0, "square foot"),
+
+    "yard": (9.0, "square yard"), "yards": (9.0, "square yard"),
+    "yd": (9.0, "square yard"), "yds": (9.0, "square yard"),
+    "sqyard": (9.0, "square yard"), "sqyards": (9.0, "square yard"),
+    "sqyd": (9.0, "square yard"), "sqyds": (9.0, "square yard"),
+    "squareyard": (9.0, "square yard"), "squareyards": (9.0, "square yard"),
+
+    "sqm": (_SQ_METRE, "square metre"), "sqmetre": (_SQ_METRE, "square metre"),
+    "sqmetres": (_SQ_METRE, "square metre"), "sqmeter": (_SQ_METRE, "square metre"),
+    "sqmeters": (_SQ_METRE, "square metre"), "squarem": (_SQ_METRE, "square metre"),
+    "squaremetre": (_SQ_METRE, "square metre"), "squaremetres": (_SQ_METRE, "square metre"),
+    "squaremeter": (_SQ_METRE, "square metre"), "squaremeters": (_SQ_METRE, "square metre"),
+
+    "sqkm": (_SQ_METRE * 1e6, "square kilometre"),
+    "sqkms": (_SQ_METRE * 1e6, "square kilometre"),
+    "sqkilometre": (_SQ_METRE * 1e6, "square kilometre"),
+    "sqkilometres": (_SQ_METRE * 1e6, "square kilometre"),
+    "sqkilometer": (_SQ_METRE * 1e6, "square kilometre"),
+    "sqkilometers": (_SQ_METRE * 1e6, "square kilometre"),
+    "squarekilometre": (_SQ_METRE * 1e6, "square kilometre"),
+    "squarekilometres": (_SQ_METRE * 1e6, "square kilometre"),
+    "squarekilometer": (_SQ_METRE * 1e6, "square kilometre"),
+    "squarekilometers": (_SQ_METRE * 1e6, "square kilometre"),
+    "km2": (_SQ_METRE * 1e6, "square kilometre"),
+
+    "hectare": (_SQ_METRE * 1e4, "hectare"), "hectares": (_SQ_METRE * 1e4, "hectare"),
+    "ha": (_SQ_METRE * 1e4, "hectare"),
+
+    "acre": (43560.0, "acre"), "acres": (43560.0, "acre"),
+
+    "sqmile": (27878400.0, "square mile"), "sqmiles": (27878400.0, "square mile"),
+    "sqmi": (27878400.0, "square mile"),
+    "squaremile": (27878400.0, "square mile"), "squaremiles": (27878400.0, "square mile"),
 }
 
 # Postal abbreviations, so "TX" in the message supports "Texas" in the answer and the
