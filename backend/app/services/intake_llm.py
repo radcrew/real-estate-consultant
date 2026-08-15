@@ -14,8 +14,11 @@ vocabulary rather than an HTTP detail leaking into the queue path.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import UUID
+
+from fastapi import HTTPException
 
 from app.clients.bedrock_guardrail import bedrock_guardrail
 from app.core.config import settings
@@ -31,6 +34,8 @@ from app.schemas.intake_sessions import (
 )
 from supabase import AsyncClient
 
+logger = logging.getLogger(__name__)
+
 
 async def screen_generated_question(
     next_question: IntakeSessionFirstQuestion | None,
@@ -41,6 +46,13 @@ async def screen_generated_question(
     guardrail cost, and this text is template-driven rather than free-form, so it carries
     much less than the user's own message. A blocked question falls back to no text,
     which the client already handles by showing the question row's configured wording.
+
+    Screening the *input* fails closed, because that text is the user's own and is about
+    to be stored. The same policy here would be disproportionate: the parse has already
+    succeeded, so letting a guardrail outage propagate would requeue the turn on the
+    worker — re-paying for the model call — or discard the user's message inline, to
+    protect one line of template-driven prose. It degrades to no text instead, which
+    costs nothing but the model's phrasing.
     """
     if not settings.bedrock_guardrail_screen_output or next_question is None:
         return next_question
@@ -48,7 +60,12 @@ async def screen_generated_question(
     if not text:
         return next_question
 
-    screened = await bedrock_guardrail.screen(text, source="OUTPUT")
+    try:
+        screened = await bedrock_guardrail.screen(text, source="OUTPUT")
+    except HTTPException:
+        logger.warning("intake_question_screening_unavailable")
+        # Screening was asked for and could not run, so the unscreened text is not shown.
+        return next_question.model_copy(update={"text": ""})
     if screened.blocked:
         return next_question.model_copy(update={"text": ""})
     return next_question.model_copy(update={"text": screened.text})

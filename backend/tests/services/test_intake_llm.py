@@ -105,6 +105,24 @@ class TestScreenGeneratedQuestion:
         assert screened is not None
         assert screened.text == "Near {PII}?"
 
+    async def test_a_guardrail_outage_does_not_fail_the_turn(self):
+        """The parse already succeeded. Propagating would requeue the turn on the worker
+        — re-paying for the model call — or discard the message inline, to protect one
+        line of template-driven prose."""
+        question = IntakeSessionFirstQuestion(key="k", title="T", text="What size?", type="text")
+        guardrail = MagicMock()
+        guardrail.screen = AsyncMock(
+            side_effect=HTTPException(status_code=503, detail="guardrail down")
+        )
+        with ExitStack() as stack:
+            stack.enter_context(patch(f"{_SERVICE}.bedrock_guardrail", guardrail))
+            cfg = stack.enter_context(patch(f"{_SERVICE}.settings"))
+            cfg.bedrock_guardrail_screen_output = True
+            screened = await screen_generated_question(question)
+        assert screened is not None
+        # Screening was asked for and could not run, so unscreened text is not shown.
+        assert screened.text == ""
+
     async def test_a_blocked_question_falls_back_to_no_text(self):
         """The client already handles this by showing the question row's own wording."""
         question = IntakeSessionFirstQuestion(key="k", title="T", text="bad", type="text")

@@ -104,6 +104,13 @@ every turn), `AWS_REGION` and the `LLM_ROUTE_*` pins, `QWEN_INFERENCE_FUNCTION_N
 **The route pins must match Vercel's**, or the same turn gets different models depending
 on which path ran it.
 
+⚠️ **`BEDROCK_GUARDRAIL_*` must match too, if you use it.** Input screening happens in the
+API before the row is written, so the worker never repeats it — but *output* screening
+runs inside the turn, which means it runs here. An unset `BEDROCK_GUARDRAIL_ID` (or a
+missing `AWS_REGION`) makes screening a silent pass-through, so a worker configured
+differently from Vercel would quietly stop screening what the API screens. Nothing errors;
+the frames just stop being checked.
+
 `Timeout` must be under the queue's 180s visibility timeout, or the message is
 redelivered while the first invocation is still working.
 
