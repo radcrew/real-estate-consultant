@@ -191,6 +191,26 @@ DISTRACTORS = [
     "somewhere quiet", "no basement", "fenced yard", "24/7 access",
     "pet friendly", "wheelchair accessible", "fibre internet",
     "we'd like it modern", "nothing too old", "something with character",
+    # Comparator-carrying requirements. Every entry above states its figure bare, so
+    # "at least" and "no less than" had only ever introduced a real bound -- and the
+    # figure they govern is the one thing that decides whether a clause is a field.
+    #
+    # INTAKE_OPENING_MESSAGE, the example the app suggests to every user, ends "with at
+    # least 20 dock doors". That clause dragged its comparator onto the size: "100k sqft
+    # industrial warehouse in Chicago" returns {"max": 100000}, correct under the bare-
+    # figure convention, while the same message plus the dock clause returned {"min":
+    # 100000} and copied the figure into `price` as well.
+    #
+    # The disambiguating signal is the noun the figure counts -- dock doors and parking
+    # spaces are not square feet -- which is the same bet "SF" and "fenced yard" already
+    # make. Both senses stay; only the ratio changes.
+    "at least 20 dock doors", "with at least 4 loading bays",
+    "no less than 10 parking spaces", "minimum 2 freight lifts",
+    "more than 50 parking spaces", "at least 24 ft clear height",
+    "32ft clear height", "at least 3 private offices",
+    # Tenure. The questionnaire asks buy-or-lease nowhere, the opening message says "for
+    # lease", and `multi-listing-price-docks` has scored "leasing," as ignorable since r2.
+    "for lease", "for sale", "leasing only", "purchase only",
 ]
 
 # Labels a user would plausibly use when naming a field they want to skip. Keyed by the
@@ -792,7 +812,11 @@ def _add_distractors(text: str) -> str:
     """
     if not text:
         return text
-    extras = random.sample(DISTRACTORS, random.choice([1, 1, 2]))
+    # Up to three. The cap was two, and the message that prompted this states three --
+    # "32ft clear height", "for lease" and "at least 20 dock doors" around one size, one
+    # type and one place. A message carrying more unmapped clauses than any training
+    # example is where the model starts assigning them to fields.
+    extras = random.sample(DISTRACTORS, random.choices([1, 2, 3], weights=[55, 30, 15])[0])
     parts = [text, *extras]
     if random.random() < 0.4:
         random.shuffle(parts)

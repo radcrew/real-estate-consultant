@@ -512,6 +512,51 @@ class TestRealWorldMessageForms:
         for e in with_distractor:
             assert set(e["target"]["extracted"]) <= set(QUESTION_KEYS)
 
+    # "at least 20 dock doors" counts dock doors, not square feet. The comparator is the
+    # same word a real bound uses, so only the noun separates them.
+    COMPARATOR = re.compile(r"\b(at least|no less than|more than|minimum|up to)\b", re.I)
+
+    def test_a_distractor_may_carry_a_comparator_without_setting_a_bound(self):
+        """Every distractor used to state its figure bare, so "at least" always meant a bound.
+
+        ``INTAKE_OPENING_MESSAGE`` -- the example the app suggests to every user -- ends
+        "with at least 20 dock doors". v6 bound that comparator to the size: "100k sqft
+        industrial warehouse in Chicago" returns {"max": 100000}, and the same message
+        plus the dock clause returned {"min": 100000}, with 100000 copied into price too.
+        """
+        carriers = [d for d in DISTRACTORS if self.COMPARATOR.search(d)]
+        assert carriers, "no distractor carries a comparator; 'at least' only ever means a bound"
+
+        examples = _examples(n=1500, seed=17)
+        seen = [
+            e for e in examples
+            if any(c.lower() in e["user_input"].lower() for c in carriers)
+        ]
+        assert len(seen) >= 15, f"only {len(seen)} messages carry a comparator distractor"
+        for example in seen:
+            text = example["user_input"].lower()
+            extracted = example["target"]["extracted"]
+            for carrier in carriers:
+                if carrier.lower() not in text:
+                    continue
+                figures = {int(n) for n in re.findall(r"\d+", carrier)}
+                for key in ("price", "size_sqft"):
+                    bound = extracted.get(key)
+                    if not isinstance(bound, dict):
+                        continue
+                    assert not (figures & set(bound.values())), (
+                        f"{carrier!r} became {key}={bound} in {example['user_input']!r}"
+                    )
+
+    def test_a_message_can_carry_three_unmapped_clauses(self):
+        """The cap was two; the message that prompted this states three."""
+        examples = _examples(n=1500, seed=17)
+        counts = [
+            sum(1 for d in DISTRACTORS if d.lower() in e["user_input"].lower())
+            for e in examples
+        ]
+        assert max(counts) >= 3, f"at most {max(counts)} unmapped clauses in any message"
+
     def test_punctuation_and_casing_vary(self):
         messages = self._messages()
         assert any("!" in m for m in messages), "no exclamation marks"
