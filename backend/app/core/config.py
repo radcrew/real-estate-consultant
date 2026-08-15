@@ -139,6 +139,11 @@ class Settings(BaseSettings):
     intake_ip_rate_limit_per_minute: int = 60
     intake_session_rate_limit_per_minute: int = 12
 
+    # FIFO queue carrying LLM intake turns to the Lambda consumer. Empty disables
+    # queueing and the endpoint runs the turn inline — which is what local dev and the
+    # test suite do, so neither needs a queue to exist.
+    sqs_chat_queue_url: str = ""
+
     # Populated automatically by Vercel; set manually for other hosts.
     git_sha: str = Field(
         default="", validation_alias=AliasChoices("GIT_SHA", "VERCEL_GIT_COMMIT_SHA")
