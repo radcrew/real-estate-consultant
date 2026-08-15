@@ -67,6 +67,7 @@ def _enter(
             new_callable=AsyncMock,
             return_value=active_jobs,
         ),
+        patch(f"{_ENDPOINT}.expire_stale_running_jobs", new_callable=AsyncMock, return_value=[]),
         patch(f"{_ENDPOINT}.create_intake_job", new_callable=AsyncMock, return_value=_JOB_ROW),
         patch(f"{_ENDPOINT}.claim_intake_job", new_callable=AsyncMock, return_value=_JOB_ROW),
         patch(f"{_ENDPOINT}.chat_job_queue", queue),
@@ -138,6 +139,21 @@ class TestEnqueue:
             _enter(stack, queue_enabled=True, active_jobs=1)
             r = await _post(client)
         assert r.status_code == 429
+
+    async def test_dead_rows_are_swept_before_the_in_flight_count(self, client):
+        """A worker killed mid-turn leaves a claimed row redelivery cannot finish. Left
+        alone it holds the session's only slot, locking the user out of their own
+        conversation — so the sweep has to run before the count, not after."""
+        order: list[str] = []
+        expire = AsyncMock(side_effect=lambda *a, **k: order.append("sweep") or [])
+        count = AsyncMock(side_effect=lambda *a, **k: order.append("count") or 0)
+        with ExitStack() as stack:
+            _enter(stack, queue_enabled=True)
+            stack.enter_context(patch(f"{_ENDPOINT}.expire_stale_running_jobs", expire))
+            stack.enter_context(patch(f"{_ENDPOINT}.count_active_intake_jobs", count))
+            r = await _post(client)
+        assert r.status_code == 202
+        assert order == ["sweep", "count"]
 
 
 class TestQueueDisabled:

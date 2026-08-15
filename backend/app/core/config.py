@@ -159,6 +159,11 @@ class Settings(BaseSettings):
     # legitimately being retried looks dead to the client.
     chat_job_timeout_seconds: float = 600.0
     chat_job_poll_interval_seconds: float = 0.75
+    # A worker killed mid-turn leaves a claimed row nobody will finish, and the claim
+    # gate means redelivery cannot rescue it. Rows untouched for longer than this are
+    # treated as dead. Must exceed the worker's function timeout, or a turn that is
+    # still running gets expired out from under it.
+    chat_job_stale_after_seconds: float = 300.0
     # Unfinished turns allowed per session. One is the natural limit: FIFO ordering per
     # session already serialises them, so a second in flight only queues behind the first
     # while giving an abuser a cheap way to multiply work per session.

@@ -974,9 +974,12 @@ Two details worth pinning:
   server-side keeps it exact.
 - **A claimed job needs a way out.** The claim gate means a worker killed mid-turn — Lambda
   timeout, OOM — leaves a row stuck in `running` that redelivery can no longer rescue, because the
-  conditional update no longer matches. Without a sweeper the client waits out its whole timeout on
-  a job that is already dead, so `expire_stale_running_jobs` fails those rows once they stop being
-  touched. This was not in the original §14.1 design; the claim gate implies it.
+  conditional update no longer matches. This was not in the original §14.1 design; the claim gate
+  implies it. `expire_stale_running_jobs` runs **in the enqueue endpoint, before the in-flight
+  count** — that is where a dead row does its damage, since it holds the session's only slot and
+  would otherwise lock the user out of their own conversation permanently. The threshold
+  (`CHAT_JOB_STALE_AFTER_SECONDS`) must exceed the worker's function timeout, or a turn that is
+  still running gets expired out from under it.
 
 Rows are written **before** the SQS publish. A row with no message is visible and retryable; a
 message with no row is undiagnosable when the consumer picks it up.

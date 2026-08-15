@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from fastapi import APIRouter, status
@@ -16,6 +17,7 @@ from app.repositories.intake_jobs import (
     claim_intake_job,
     count_active_intake_jobs,
     create_intake_job,
+    expire_stale_running_jobs,
 )
 from app.repositories.intake_sessions import get_intake_session_row
 from app.schemas.intake_sessions import (
@@ -50,6 +52,15 @@ async def submit_llm_intake_input(
     # A missing session must 404 here rather than surfacing as a foreign-key error from
     # the insert below.
     await get_intake_session_row(client, session_id)
+
+    # Swept here because this is where a dead row does its damage: a job left `running`
+    # by a killed worker holds the session's in-flight slot, and the claim gate means
+    # redelivery can never finish it — so without this the user is locked out of their
+    # own conversation permanently.
+    await expire_stale_running_jobs(
+        client,
+        older_than=datetime.now(UTC) - timedelta(seconds=settings.chat_job_stale_after_seconds),
+    )
 
     active = await count_active_intake_jobs(client, session_id=session_id)
     if active >= settings.intake_max_active_jobs_per_session:
