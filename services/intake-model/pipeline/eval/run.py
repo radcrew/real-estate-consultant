@@ -42,6 +42,7 @@ from pipeline.eval.metrics import (
     score_turn,
 )
 from pipeline.paths import EVAL_DATASET_PATH, QUESTIONS_PATH, RESULTS_DIR
+from pipeline.provenance import file_digest, line_count
 
 # Aborting the whole run on these avoids burning an entire dataset against a dead key.
 FATAL_STATUS = {401, 402, 403}
@@ -339,6 +340,15 @@ async def main_async(argv: list[str] | None = None) -> int:
                 "model": args.model,
                 "base_url": args.base_url,
                 "split": args.split,
+                # Which gold this was scored against. Two runs of the same model over
+                # two dataset revisions differ by however much gold moved, and nothing
+                # in a results file used to say so: 0.5b-lora-v5-q4km-r8 and -repro
+                # differ by 7 value items with 126 of 129 replies byte-identical.
+                "dataset": {
+                    "path": str(Path(args.dataset)),
+                    "sha256": file_digest(args.dataset),
+                    "rows": line_count(args.dataset),
+                },
                 "duplicate_schema": args.duplicate_schema,
                 "json_mode": not args.no_json_mode,
                 "post_process": args.post_process,

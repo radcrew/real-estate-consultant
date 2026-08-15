@@ -209,6 +209,34 @@ describe("formatCriteriaValue", () => {
   it("falls back to JSON.stringify for unrecognized objects", () => {
     expect(formatCriteriaValue({ foo: "bar" })).toBe('{"foo":"bar"}');
   });
+
+  // NaN is this module's "no bound" marker, and it is a number that is neither null nor
+  // undefined -- so a `!= null` guard passed it through and it reached the screen as the
+  // literal string "NaN" beside fields the user had filled in.
+  it("shows an empty range as a dash, not 'NaN – NaN'", () => {
+    expect(formatCriteriaValue({ min: Number.NaN, max: Number.NaN })).toBe("—");
+  });
+
+  it("shows a NaN max as a dash, not '≤ NaN'", () => {
+    expect(formatCriteriaValue({ min: null, max: Number.NaN })).toBe("—");
+  });
+
+  it("keeps the finite half of a half-empty range", () => {
+    expect(formatCriteriaValue({ min: 100_000, max: Number.NaN })).toBe("≥ 100,000");
+    expect(formatCriteriaValue({ min: Number.NaN, max: 500_000 })).toBe("≤ 500,000");
+  });
+
+  it("shows a bare NaN as a dash", () => {
+    expect(formatCriteriaValue(Number.NaN)).toBe("—");
+  });
+
+  it("treats an empty-string bound as absent", () => {
+    expect(formatCriteriaValue({ min: "", max: 500_000 })).toBe("≤ 500,000");
+  });
+
+  it("still formats a zero bound, which is falsy but real", () => {
+    expect(formatCriteriaValue({ min: 0, max: 500_000 })).toBe("0 – 500,000");
+  });
 });
 
 // ---------------------------------------------------------------------------
