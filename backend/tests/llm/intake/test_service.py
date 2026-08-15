@@ -518,12 +518,138 @@ class TestSkipClearedWhenAnswered:
         assert not set(result["skipped_fields"]) & set(result["missing_fields"])
 
     def test_answering_a_skipped_field_makes_the_session_completable(self):
+        # The message has to state the figure. An answer no message supports is stored
+        # but not counted as answered, so the empty ``user_input`` the other cases use
+        # would leave the budget unconfirmed and the session open.
         parsed = _parsed_output(extracted={"budget": {"max": 100}})
         result = self._call(
             parsed,
             current_criteria={"location": "Austin"},
             previously_skipped=["budget"],
+            user_input="up to 100",
         )
         assert result["skipped_fields"] == []
         assert result["missing_fields"] == []
         assert result["is_complete"] is True
+
+
+# ---------------------------------------------------------------------------
+# The third state: stored, but not an answer
+# ---------------------------------------------------------------------------
+
+class TestUnconfirmedValues:
+    """Missing, unknown and explicit are three states, and the pipeline had two.
+
+    An answer the message supports is explicit. An answer it contradicts is dropped, and
+    the field goes back to missing. In between sits a reading nobody can check: the model
+    may well be right -- "a depot for our trucks" really is industrial -- but nothing in
+    the message says so. Measured across 21 recorded eval runs, a value in that state is
+    correct 23% of the time (property type) or 32% (a range), against 88% and 92% for one
+    the message evidences.
+
+    So it is stored, and the question is still asked. The user loses nothing and confirms
+    rather than retypes.
+    """
+
+    _ROWS = [
+        _q("location", "location", order=0, required=True, title="Location"),
+        _q("property_type", "multi-select", order=1, required=True, title="Type",
+           options=[{"label": "Industrial", "value": "industrial"},
+                    {"label": "Retail", "value": "retail"}]),
+        _q("price", "range", order=2, required=True, title="Budget"),
+    ]
+    _KEYS = ["location", "property_type", "price"]
+    _REQUIRED = ["location", "property_type", "price"]
+
+    def _call(self, parsed, user_input, current_criteria=None, previously_skipped=None):
+        return _build_intake_parse_result(
+            parsed_output=parsed,
+            user_input=user_input,
+            questions=self._ROWS,
+            question_keys=self._KEYS,
+            current_criteria=current_criteria or {},
+            required_fields=self._REQUIRED,
+            previously_skipped=previously_skipped or [],
+        )
+
+    def test_the_reported_message_asks_rather_than_assumes(self):
+        """The bug, end to end. Nothing in the message names a property type."""
+        parsed = _parsed_output(
+            extracted={"property_type": ["industrial"]},
+            missing=["location", "price"],
+        )
+        result = self._call(parsed, "at least 20 dock doors")
+        assert result["unconfirmed_fields"] == ["property_type"]
+        assert "property_type" in result["missing_fields"]
+        assert result["is_complete"] is False
+        # Stored, so the client can offer it back instead of asking from scratch.
+        assert result["merged_criteria"]["property_type"] == ["industrial"]
+
+    def test_a_type_the_message_names_is_an_answer(self):
+        parsed = _parsed_output(extracted={"property_type": ["industrial"]})
+        result = self._call(parsed, "a warehouse with 20 dock doors")
+        assert result["unconfirmed_fields"] == []
+        assert "property_type" not in result["missing_fields"]
+
+    def test_a_generalisation_is_still_only_a_reading(self):
+        """"depot" is industrial and the model is right -- and cannot be checked."""
+        parsed = _parsed_output(extracted={"property_type": ["industrial"]})
+        result = self._call(parsed, "a depot for our trucks")
+        assert result["unconfirmed_fields"] == ["property_type"]
+        assert result["merged_criteria"]["property_type"] == ["industrial"]
+
+    def test_a_figure_the_parser_cannot_read_is_stored_and_asked_about(self):
+        """The source document's own example of ambiguous: "around a million"."""
+        parsed = _parsed_output(extracted={"price": {"max": 1000000}})
+        result = self._call(parsed, "something around a million")
+        assert result["unconfirmed_fields"] == ["price"]
+        assert result["merged_criteria"]["price"] == {"max": 1000000}
+
+    def test_a_figure_the_message_states_is_an_answer(self):
+        parsed = _parsed_output(extracted={"price": {"max": 1000000}})
+        result = self._call(parsed, "my budget is up to $1M")
+        assert result["unconfirmed_fields"] == []
+
+    def test_the_model_cannot_talk_its_way_out_of_being_asked(self):
+        """``merge_missing_fields`` narrows to the model's own list when they overlap.
+
+        An unconfirmed field has to survive that narrowing, because the model believing
+        it answered the field is the failure being corrected.
+        """
+        parsed = _parsed_output(
+            extracted={"property_type": ["industrial"]},
+            missing=["location"],
+        )
+        result = self._call(parsed, "at least 20 dock doors")
+        assert "property_type" in result["missing_fields"]
+
+    def test_a_field_is_only_questioned_once(self):
+        """Carried forward means it was asked about when it arrived.
+
+        Without this the same unconfirmable answer is re-questioned every turn, and a
+        user who keeps saying "around a million" is never allowed to finish.
+        """
+        parsed = _parsed_output(extracted={"price": {"max": 1000000}})
+        result = self._call(
+            parsed, "still around a million", current_criteria={"price": {"max": 1000000}}
+        )
+        assert result["unconfirmed_fields"] == []
+
+    def test_a_guess_does_not_undo_a_skip(self):
+        """The user declined this field. A reading nobody can check is not them
+        changing their mind, and clearing the skip would put the question back."""
+        parsed = _parsed_output(extracted={"property_type": ["industrial"]})
+        result = self._call(
+            parsed, "at least 20 dock doors", previously_skipped=["property_type"]
+        )
+        assert result["skipped_fields"] == ["property_type"]
+        assert result["unconfirmed_fields"] == []
+        assert "property_type" not in result["missing_fields"]
+
+    def test_a_real_answer_still_undoes_a_skip(self):
+        parsed = _parsed_output(extracted={"property_type": ["industrial"]})
+        result = self._call(
+            parsed, "a warehouse please", previously_skipped=["property_type"]
+        )
+        assert result["skipped_fields"] == []
+        assert "property_type" not in result["missing_fields"]

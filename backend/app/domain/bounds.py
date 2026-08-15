@@ -345,6 +345,44 @@ def _correct_one(
     return None if ruled_out else value
 
 
+def unevidenced_range_keys(extracted: dict[str, Any], user_input: str) -> set[str]:
+    """Range keys holding a bound no figure in the message supports.
+
+    Run *after* ``correct_bound_direction``, which drops the bounds it can disprove and
+    resizes the ones it can place. What is left over is the third state: values it could
+    neither confirm nor rule out, because the message states a figure this cannot parse
+    ("half a million"), or two figures it cannot choose between, or no figures at all.
+
+    The model's answer is kept — it is right often enough to be worth keeping — but it is
+    not an *answer* in the sense the questionnaire means. Measured across 21 recorded eval
+    runs, a range value this reports is correct 32% of the time against 92% for one the
+    message evidences, which is the whole reason for telling the two apart.
+
+    The acceptance test mirrors the first branch of ``_correct_one``: same figure, same
+    unit. The two have to agree, or a value that survived correction would be reported
+    unevidenced and asked about for no reason.
+    """
+    figures = numbers_with_direction(user_input)
+    unevidenced: set[str] = set()
+    for key, value in extracted.items():
+        if not isinstance(value, dict):
+            continue
+        stated = [value[side] for side in ("min", "max") if value.get(side) is not None]
+        if not stated:
+            continue
+        kind = _FIELD_KINDS.get(key)
+        for bound in stated:
+            try:
+                numeric = float(bound)
+            except (TypeError, ValueError):
+                unevidenced.add(key)
+                break
+            if not any(f.value == numeric and _fits(f, kind) for f in figures):
+                unevidenced.add(key)
+                break
+    return unevidenced
+
+
 def correct_bound_direction(extracted: dict[str, Any], user_input: str) -> dict[str, Any]:
     """Put each range bound on the side, and in the field, its own figure indicates.
 

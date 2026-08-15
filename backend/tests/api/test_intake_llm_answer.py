@@ -24,6 +24,7 @@ _LLM_RESULT = {
     "merged_criteria": {"location": "Austin"},
     "missing_fields": ["property_type"],
     "skipped_fields": [],
+    "unconfirmed_fields": [],
     "is_complete": False,
     "next_question": {"key": "property_type", "text": "What type?"},
 }

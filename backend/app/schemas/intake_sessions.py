@@ -105,5 +105,9 @@ class SubmitLlmIntakeInputResponse(BaseModel):
     current_index: int
     total_questions: int
     missing_fields: list[str]
+    # Answered in ``criteria`` but unsupported by anything the user said, so also present
+    # in ``missing_fields``: a reading worth offering back and not worth trusting. Lets a
+    # client say "I think industrial — is that right?" instead of asking from scratch.
+    unconfirmed_fields: list[str] = []
     next_question: IntakeSessionFirstQuestion | None = None
     is_complete: bool

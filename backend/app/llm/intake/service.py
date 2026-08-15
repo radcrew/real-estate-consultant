@@ -8,12 +8,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.config import settings
-from app.domain.bounds import correct_bound_direction
+from app.domain.bounds import correct_bound_direction, unevidenced_range_keys
 from app.domain.intake_criteria import (
+    check_evidence,
     drop_placeholder_values,
     drop_self_describing_values,
     drop_unconfigured_choices,
-    drop_unevidenced_values,
     merge_criteria,
 )
 from app.domain.intake_next_question import (
@@ -235,27 +235,38 @@ def _build_intake_parse_result(
     # The three filters above validate against the schema and never read the message, so
     # a valid option word invented from nothing passes all of them. This one asks the
     # message. It runs after canonicalisation so it compares stored spellings.
-    extracted = drop_unevidenced_values(extracted, questions, user_input, current_criteria)
+    extracted, unconfirmed = check_evidence(extracted, questions, user_input, current_criteria)
     # The model reads the figure reliably and the comparator unreliably, so the side a
     # lone bound sits on is decided here from the message itself. No-op unless the
     # message states one direction and the model chose the other.
     extracted = correct_bound_direction(extracted, user_input)
+    # Three states, not two. A value the message neither supports nor contradicts is
+    # stored -- it is right often enough to be worth keeping -- but it does not answer the
+    # question, so the questionnaire still asks. Only this turn's readings qualify; one
+    # already carried by the session was asked about when it arrived.
+    unconfirmed |= unevidenced_range_keys(extracted, user_input) - set(current_criteria)
     merged_criteria = merge_criteria(current_criteria, extracted)
 
     # Union carries a skip forward across turns, so the user is never re-asked. Then
     # subtract what is answered: a field the user has since filled in is no longer
     # skipped, and without this it stays marked skipped for the life of the session.
     # A required field is answered, skipped, or missing - never two of those at once.
+    #
+    # An unconfirmed reading does not count as filling it in. The user declined to answer
+    # this field; a guess nobody can check is not them changing their mind, and clearing
+    # the skip on one would put the question back in front of them.
     skipped_fields = sorted(
         ({*previously_skipped, *parsed_output.skipped_fields} & set(required_fields))
-        - set(merged_criteria),
+        - (set(merged_criteria) - unconfirmed),
     )
 
+    unconfirmed_fields = sorted(unconfirmed & set(required_fields) - set(skipped_fields))
     missing_fields = merge_missing_fields(
         merged_criteria=merged_criteria,
         required_fields=required_fields,
         model_missing=parsed_output.missing_fields,
         skipped_fields=skipped_fields,
+        unconfirmed_fields=unconfirmed_fields,
     )
 
     if skipped_fields:
@@ -269,6 +280,7 @@ def _build_intake_parse_result(
         "merged_criteria": merged_criteria,
         "missing_fields": missing_fields,
         "skipped_fields": skipped_fields,
+        "unconfirmed_fields": unconfirmed_fields,
         "next_question": next_question,
         "is_complete": is_complete,
     }

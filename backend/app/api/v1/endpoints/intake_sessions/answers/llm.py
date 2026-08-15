@@ -81,6 +81,7 @@ async def submit_llm_intake_input(
         current_index=current_index,
         total_questions=len(questions),
         missing_fields=missing_fields,
+        unconfirmed_fields=llm_result["unconfirmed_fields"],
         skipped_fields=skipped_fields,
         question_titles=question_titles,
         next_question=next_question,
