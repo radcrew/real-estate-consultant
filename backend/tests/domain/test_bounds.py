@@ -249,3 +249,125 @@ class TestMagnitudeCorrection:
         """The model emits ints; a float here would change the stored JSON shape."""
         result = correct_bound_direction({"price": {"max": 3000000}}, "up to $30M")
         assert isinstance(result["price"]["max"], int)
+
+
+class TestEvidenceInvariant:
+    """A field may only hold a value the message contains evidence for.
+
+    ``correct_bound_direction`` matches a bound to a figure by **numeric value alone**.
+    That is enough to drop a figure the message never states, and not enough to notice
+    that the figure it matched belongs to a different field. "I need a 100k sqft
+    warehouse ... with at least 20 dock doors" returned ``price {"min": 100000}``
+    alongside the size: 100000 really is in the message, as ``100k sqft``.
+
+    The rule these pin is::
+
+        FINAL_VALUE(field) requires EVIDENCE(field, user_prompt)
+
+    where the evidence for a numeric field is a figure whose *unit* fits it -- ``sqft``
+    and ``yards`` can state a size, ``$`` and ``dollars`` a budget, and ``dock doors``,
+    ``floors`` and ``ft`` of clear height can state neither.
+
+    The dropping direction is deliberate. A field left unanswered is asked again by the
+    questionnaire; a field wrongly filled in is never asked, and silently filters the
+    search.
+
+    ``xfail(strict=True)`` marks behaviour this suite specifies and the code does not yet
+    have, so implementing it turns these green and an accidental pass is itself a
+    failure. Unmarked cases already hold and must keep holding.
+    """
+
+    UNSUPPORTED = "the figure carries a unit this field cannot be measured in"
+
+    @pytest.mark.xfail(strict=True, reason=UNSUPPORTED)
+    def test_the_reported_message_states_no_budget(self):
+        """The exact production regression, pinned.
+
+        Candidate values are the ones the served v6 actually returned, so this measures
+        the validator against a real model output rather than an imagined one.
+        """
+        assert correct_bound_direction(
+            {"size_sqft": {"min": 100000}, "price": {"min": 100000}},
+            "I need a 100k sqft industrial warehouse with 32ft clear height in "
+            "Chicago for lease, with at least 20 dock doors.",
+        ) == {"size_sqft": {"min": 100000}}
+
+    @pytest.mark.xfail(strict=True, reason=UNSUPPORTED)
+    def test_a_size_figure_alone_is_not_a_budget(self):
+        assert correct_bound_direction(
+            {"size_sqft": {"max": 100000}, "price": {"max": 100000}},
+            "100k sqft warehouse",
+        ) == {"size_sqft": {"max": 100000}}
+
+    @pytest.mark.xfail(strict=True, reason=UNSUPPORTED)
+    def test_a_budget_figure_alone_is_not_a_size(self):
+        assert correct_bound_direction(
+            {"price": {"max": 2000000}, "size_sqft": {"max": 2000000}},
+            "warehouse under $2M",
+        ) == {"price": {"max": 2000000}}
+
+    @pytest.mark.xfail(strict=True, reason=UNSUPPORTED)
+    def test_a_counted_thing_is_not_a_measurement(self):
+        """"3 floors" is a storey count. It was read as a size in production."""
+        assert correct_bound_direction(
+            {"size_sqft": {"max": 3}}, "office in Boise, 3 floors"
+        ) == {}
+
+    @pytest.mark.xfail(strict=True, reason=UNSUPPORTED)
+    def test_a_clear_height_is_not_a_size(self):
+        """Feet, not square feet -- a length the questionnaire does not ask about."""
+        assert correct_bound_direction(
+            {"size_sqft": {"max": 32}}, "warehouse in Chicago with 32ft clear height"
+        ) == {}
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason="the unit disambiguates two candidates that share significant digits; "
+               "TestMagnitudeCorrection.test_two_candidates_mean_the_message_cannot_say "
+               "documents today's behaviour and is superseded by this",
+    )
+    def test_the_unit_resolves_what_the_digits_alone_cannot(self):
+        """300 and 30000000 share the digits "3", but only one of them is money."""
+        assert correct_bound_direction(
+            {"price": {"max": 3000000}}, "300 sqft minimum, budget up to $30M"
+        ) == {"price": {"max": 30000000}}
+
+    # ---- Non-regressions. These hold today and must keep holding. -------------------
+
+    def test_both_fields_stated_are_both_kept(self):
+        assert correct_bound_direction(
+            {"size_sqft": {"max": 100000}, "price": {"max": 2000000}},
+            "100k sqft warehouse with a $2M budget",
+        ) == {"size_sqft": {"max": 100000}, "price": {"max": 2000000}}
+
+    def test_a_comparator_binds_to_the_figure_beside_it(self):
+        """"at most" governs the sqft; "at least" governs the dock doors, not the size."""
+        assert correct_bound_direction(
+            {"size_sqft": {"min": 12000}}, "at most 12,000 sqft, at least 20 dock doors"
+        ) == {"size_sqft": {"max": 12000}}
+
+    def test_a_size_lower_bound_survives(self):
+        assert correct_bound_direction(
+            {"size_sqft": {"min": 100000}}, "warehouse over 100k sqft"
+        ) == {"size_sqft": {"min": 100000}}
+
+    def test_a_bare_figure_may_still_state_a_budget(self):
+        """No unit at all, so nothing rules the field out and the model's reading holds."""
+        assert correct_bound_direction(
+            {"price": {"min": 100000}}, "budget up to 100k"
+        ) == {"price": {"max": 100000}}
+
+    def test_a_figure_the_parser_cannot_read_is_left_alone(self):
+        value = {"price": {"max": 500000}}
+        assert correct_bound_direction(value, "up to half a million") == value
+
+    def test_the_one_conversion_the_model_should_make_is_left_alone(self):
+        """1,500 square yards is 13,500 sqft. The gold figure is absent from the text."""
+        value = {"size_sqft": {"min": 13500, "max": 13500}}
+        assert correct_bound_direction(value, "1500 yard") == value
+
+    def test_two_money_figures_sharing_digits_stay_ambiguous(self):
+        """Both are budgets, so the unit cannot separate them and neither is chosen."""
+        assert correct_bound_direction(
+            {"price": {"max": 3000000}}, "$300k deposit, budget up to $30M"
+        ) == {"price": {"max": 3000000}}
