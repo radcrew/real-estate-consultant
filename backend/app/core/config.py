@@ -154,9 +154,10 @@ class Settings(BaseSettings):
     # queueing and the endpoint runs the turn inline — which is what local dev and the
     # test suite do, so neither needs a queue to exist.
     sqs_chat_queue_url: str = ""
-    # How long an enqueued turn may sit unresolved before the SSE stream gives up. Must
-    # exceed visibility timeout x maxReceiveCount (180s x 3 = 540s), or a job still
-    # legitimately being retried looks dead to the client.
+    # How long one SSE connection stays open. Not the client's overall patience: the
+    # hosting platform's function duration usually cuts the stream well before this, and
+    # the client falls back to polling either way, so this is an upper bound rather than
+    # the deadline a user experiences.
     chat_job_timeout_seconds: float = 600.0
     chat_job_poll_interval_seconds: float = 0.75
     # A worker killed mid-turn leaves a claimed row nobody will finish, and the claim
@@ -166,10 +167,16 @@ class Settings(BaseSettings):
     chat_job_stale_after_seconds: float = 300.0
     # Jobs never picked up at all. This measures *untouched* time — the trigger moves
     # updated_at on every status change, so a job cycling through redelivery keeps
-    # refreshing it and only one nothing has touched ages out. The bar is therefore a
+    # refreshing it and only one nothing has touched ages out. The floor is therefore a
     # single visibility timeout (the gap between attempts), not the whole redelivery
-    # span. Aligned with chat_job_timeout_seconds so the client is never told a turn
-    # failed and then that it is still running.
+    # span.
+    #
+    # The ceiling is how long the *client* waits before giving up, which lives in the
+    # frontend as JOB_DEADLINE_MS — keep the two in step. Set this higher and a user
+    # told their turn failed is simultaneously told it is still running; much lower and
+    # jobs are cleared while someone is still watching them. Deliberately not derived
+    # from chat_job_timeout_seconds: that bounds one SSE connection, which the platform
+    # usually cuts short anyway, and the client keeps polling long after it ends.
     chat_job_abandoned_after_seconds: float = 600.0
     # Unfinished turns allowed per session. One is the natural limit: FIFO ordering per
     # session already serialises them, so a second in flight only queues behind the first

@@ -166,22 +166,20 @@ class TestEnqueue:
         # alike, so clearing only one still leaves the session lockable.
         assert order == ["running", "queued", "count"]
 
-    async def test_the_queued_sweep_windows_are_coherent(self):
-        """Two invariants, and the second is the one that bites.
+    async def test_the_queued_sweep_clears_a_redelivery_gap(self):
+        """The window measures untouched time, so it only has to clear the gap between
+        redelivery attempts — one visibility timeout (180s) — since each attempt moves
+        updated_at. It must also outlast the running sweep, which answers a shorter
+        question: whether a claimed turn is still being worked on.
 
-        The window measures untouched time, so it need only clear a single visibility
-        timeout (180s) — the gap between redelivery attempts, since each one moves
-        updated_at. And it must not exceed the client's deadline: past that the user has
-        already been told the turn failed, so leaving the row counted against the
-        in-flight cap tells them it is still running at the same time.
+        The *ceiling* is the client's patience (`JOB_DEADLINE_MS` in the frontend) and is
+        deliberately not asserted against `chat_job_timeout_seconds`: that bounds a single
+        SSE connection, which the platform usually cuts short, and tying the sweep to it
+        would start expiring live jobs the moment someone shortened the stream.
         """
         from app.core.config import settings as live_settings
 
         assert live_settings.chat_job_abandoned_after_seconds > 180
-        assert (
-            live_settings.chat_job_abandoned_after_seconds
-            <= live_settings.chat_job_timeout_seconds
-        )
         assert (
             live_settings.chat_job_abandoned_after_seconds
             > live_settings.chat_job_stale_after_seconds

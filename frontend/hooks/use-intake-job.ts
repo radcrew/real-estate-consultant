@@ -11,7 +11,14 @@ import {
   type LlmInputResponse,
 } from "@services/intake-sessions";
 
-/** Matches the server's stream deadline, so polling outlives a dropped connection. */
+/**
+ * How long the client keeps following a turn before giving up — across the stream *and*
+ * the polling that outlives it, not one connection.
+ *
+ * Keep in step with the backend's `CHAT_JOB_ABANDONED_AFTER_SECONDS`, which is when it
+ * releases the session's in-flight slot. Give up sooner than that and the user is told
+ * their turn failed while the next attempt is still refused as "still working".
+ */
 const JOB_DEADLINE_MS = 600_000;
 const POLL_INTERVAL_MS = 1_000;
 
