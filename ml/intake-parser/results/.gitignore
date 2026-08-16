@@ -7,5 +7,6 @@
 #
 # Beware `git mv` into this directory followed by `git add -A`: the rename is staged, then
 # the blanket rule below prunes it, and previously-committed rows leave the index without
-# a deletion ever being asked for. That is how 13 rows were dropped from e6e9d9d4.
+# a deletion ever being asked for. That is how 36c23c6d dropped 13 rows from here, plus
+# `train.jsonl` and `validation.jsonl` to the same rule in `datasets/.gitignore`.
 *.json
