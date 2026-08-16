@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from pipeline.paths import LLAMA_BIN_DIR, LLAMA_SRC_DIR, MODELS_DIR, llama_exe
@@ -132,6 +133,37 @@ def quantize_flags(imatrix: Path | None) -> list[str]:
     return flags
 
 
+def _refuse_to_clobber(path: Path, force: bool) -> int | None:
+    """Exit code if ``path`` exists and may not be replaced, else ``None``.
+
+    The suffix trick below already guards one instance of this -- an imatrix build must not
+    land on the plain artifact's name, "and a results row can no longer be traced to the
+    file it was measured on". The same hazard across *retrains* was unguarded, and the file
+    name carries the version, not the run.
+
+    A retrain of v6 writes `...-v6-q4_k_m.gguf` over the v6 that a published row was
+    measured on. The adapter is a Colab download and the GGUF is a rebuild, so the
+    overwrite is silent, both files have the right name, and the only surviving evidence
+    of which one is on disk is a step count in a checkpoint nobody reads.
+
+    Rename the old artifact -- `-v6a`, `-v6-retrain` -- rather than passing ``--force``,
+    unless the file being replaced is one no row cites.
+    """
+    if force or not path.exists():
+        return None
+    stat = path.stat()
+    when = datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds")
+    print(
+        f"{path} already exists ({stat.st_size / 1e6:.0f} MB, written {when}).\n"
+        "Refusing to overwrite it: if a row in results.md cites this name, replacing the "
+        "file makes that row unverifiable and no re-run reproduces it.\n"
+        "Rename the existing artifact, choose a different --model version, or pass "
+        "--force if nothing cites it.",
+        file=sys.stderr,
+    )
+    return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
@@ -151,6 +183,12 @@ def main() -> int:
         help="Path to an imatrix.dat; also protects embedding/output tensors at Q8_0",
     )
     parser.add_argument("--skip-convert", action="store_true")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Overwrite artifacts that already exist. Off by default: a retrain under the "
+             "same version name replaces the file a published row was measured on, and no "
+             "re-run reproduces it",
+    )
     args = parser.parse_args()
 
     out_dir = Path(args.out)
@@ -165,6 +203,8 @@ def main() -> int:
     f16_path = out_dir / f"{stem}-f16.gguf"
 
     if not args.skip_convert:
+        if (clash := _refuse_to_clobber(f16_path, args.force)) is not None:
+            return clash
         model_dir = snapshot(args.model, out_dir)
         convert = ensure_convert_script(Path(args.llama_src), args.llama_tag)
         run([sys.executable, str(convert), str(model_dir),
@@ -181,6 +221,8 @@ def main() -> int:
     suffix = "-imatrix" if imatrix is not None else ""
     for kind in quant_kinds:
         target = out_dir / f"{stem}-{kind.lower()}{suffix}.gguf"
+        if (clash := _refuse_to_clobber(target, args.force)) is not None:
+            return clash
         run([str(quantize_exe), *quantize_flags(imatrix), str(f16_path), str(target), kind])
 
     print("\nArtifacts:")

@@ -172,11 +172,20 @@ def main() -> int:
     parser.add_argument("--out", default=str(DEFAULT_OUT))
     # p99 total length is 1014 tokens on the current set; 1088 clears the max with room.
     parser.add_argument("--max-len", type=int, default=1088)
-    parser.add_argument("--rank", type=int, default=8)
-    parser.add_argument("--alpha", type=int, default=16)
+    # These four match `notebooks/train.ipynb`, which is what trained every shipped
+    # adapter from v4 on. They used to be rank 8 / alpha 16 / 2 epochs -- so this script
+    # trained a different model from the notebook, and `--smoke` proved out a recipe
+    # nothing ships. The README says it plainly: "a hyperparameter that moved alongside
+    # the data confounds the comparison". A CPU path that cannot reproduce the GPU path
+    # is not a fallback, it is a third variant.
+    parser.add_argument("--rank", type=int, default=16)
+    parser.add_argument("--alpha", type=int, default=32)
     parser.add_argument("--dropout", type=float, default=0.05)
     parser.add_argument("--lr", type=float, default=2e-4)
-    parser.add_argument("--epochs", type=float, default=2.0)
+    parser.add_argument("--epochs", type=float, default=1.0)
+    # 1 x 8 against the notebook's 2 x 4. The *effective* batch is 8 either way, which is
+    # what the optimizer sees; per-device 1 is the memory choice a CPU run needs and does
+    # not change the recipe.
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--grad-accum", type=int, default=8)
     parser.add_argument("--warmup-ratio", type=float, default=0.03)
