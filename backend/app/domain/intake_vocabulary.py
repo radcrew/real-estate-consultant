@@ -7,7 +7,7 @@ added here is a visible one-line diff rather than a change inside a function.
 from __future__ import annotations
 
 # How a client names each property type, mirroring
-# ``services/intake-model/pipeline/data/property_type_phrasings.json`` — the table the
+# ``ml/intake-parser/datasets/property_type_phrasings.json`` — the table the
 # training set is generated from, so this is the vocabulary the model was actually taught.
 #
 # It is deliberately **not** extended with synonyms of our own. The model generalises well

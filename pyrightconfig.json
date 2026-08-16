@@ -25,10 +25,10 @@
       ]
     },
     {
-      "root": "services/intake-model",
+      "root": "ml/intake-parser",
       "pythonVersion": "3.11",
       "extraPaths": [
-        "services/intake-model",
+        "ml/intake-parser",
         "backend",
         "backend/.venv/Lib/site-packages"
       ]

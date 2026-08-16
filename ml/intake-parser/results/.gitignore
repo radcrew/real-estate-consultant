@@ -1,0 +1,11 @@
+# A run does not commit itself. `results.md` is the record and is deliberately not matched.
+#
+# Committing a row is therefore explicit: `git add -f results/<label>.json`. Do that for
+# any run `results.md` cites, so the per-turn `raw_output` behind a published number stays
+# readable — `tests/test_bound_correction_replay.py` replays these files, and skips itself
+# when none are present.
+#
+# Beware `git mv` into this directory followed by `git add -A`: the rename is staged, then
+# the blanket rule below prunes it, and previously-committed rows leave the index without
+# a deletion ever being asked for. That is how 13 rows were dropped from e6e9d9d4.
+*.json

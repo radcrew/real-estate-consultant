@@ -95,12 +95,12 @@ jobs:
           name: ingestion-coverage
           path: services/ingestion/coverage.json
 
-  intake-model:
-    name: Intake model
+  intake-parser:
+    name: Intake parser
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: services/intake-model
+        working-directory: ml/intake-parser
     steps:
       - uses: actions/checkout@v4
 
@@ -126,12 +126,12 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: intake-model-coverage
-          path: services/intake-model/coverage.json
+          name: intake-parser-coverage
+          path: ml/intake-parser/coverage.json
 
   comment:
     name: Post comment
-    needs: [frontend, backend, ingestion, intake-model]
+    needs: [frontend, backend, ingestion, intake-parser]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -151,8 +151,8 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: intake-model-coverage
-          path: coverage/intake-model
+          name: intake-parser-coverage
+          path: coverage/intake-parser
 
       - name: Build and post comment
         uses: actions/github-script@v7
@@ -195,19 +195,19 @@ jobs:
               core.warning(`Could not read ingestion coverage: ${e.message}`);
             }
 
-            let intakeModelPct = null;
+            let intakeParserPct = null;
             try {
-              const im = JSON.parse(fs.readFileSync('coverage/intake-model/coverage.json', 'utf8'));
-              intakeModelPct = im.totals.percent_covered;
+              const im = JSON.parse(fs.readFileSync('coverage/intake-parser/coverage.json', 'utf8'));
+              intakeParserPct = im.totals.percent_covered;
             } catch (e) {
-              core.warning(`Could not read intake-model coverage: ${e.message}`);
+              core.warning(`Could not read intake-parser coverage: ${e.message}`);
             }
 
             const rows = [
               ['Frontend', frontendPct],
               ['Backend', backendPct],
               ['Ingestion', ingestionPct],
-              ['Intake model', intakeModelPct],
+              ['Intake parser', intakeParserPct],
             ];
 
             const table = [

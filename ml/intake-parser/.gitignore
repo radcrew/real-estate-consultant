@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+.env*
+!.env.example
+dist/
+*.egg-info/
+.python-version
+
+# Generated artifacts are ignored beside the directory that holds them, so the rule is
+# visible from the directory it governs: see datasets/.gitignore and results/.gitignore.

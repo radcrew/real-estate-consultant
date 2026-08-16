@@ -24,7 +24,7 @@ dev = [
 ]
 # The training stack (torch, transformers, peft, gguf) used to be an `ml` extra here,
 # back when the offline model work lived at backend/ml. It now belongs to
-# services/intake-model, as its `train` extra. Do not reintroduce it: Vercel installs
+# ml/intake-parser, as its `train` extra. Do not reintroduce it: Vercel installs
 # from requirements.txt, and this file is the one people copy into it.
 
 [tool.pytest.ini_options]

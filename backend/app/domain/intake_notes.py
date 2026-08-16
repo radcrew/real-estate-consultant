@@ -154,6 +154,58 @@ def _reassignment_notes(figures, model_extracted, criteria, titles) -> list[dict
     return notes
 
 
+# How a field's values read in a sentence, so a range is not printed as raw JSON.
+_FIELD_UNITS = {"price": ("$", ""), "size_sqft": ("", " sq ft")}
+
+
+def _readable(field: str, value: Any) -> str | None:
+    """One field's value as a person would say it, or None if it cannot be phrased."""
+    if isinstance(value, list):
+        return ", ".join(str(item) for item in value) or None
+    if isinstance(value, str):
+        return value.strip() or None
+    bounds = _bounds(value)
+    if not bounds:
+        return None
+    prefix, suffix = _FIELD_UNITS.get(field, ("", ""))
+
+    def one(bound: float) -> str:
+        return f"{prefix}{_number(bound)}{suffix}"
+
+    low, high = bounds.get("min"), bounds.get("max")
+    if low is not None and high is not None:
+        return one(low) if low == high else f"{one(low)} to {one(high)}"
+    if low is not None:
+        return f"at least {one(low)}"
+    return f"up to {one(high)}"
+
+
+def _replacement_notes(extracted, current_criteria, titles) -> list[dict[str, str]]:
+    """A value this turn overwrote, and what it used to be.
+
+    A correction is legitimate -- "actually I was wrong, now I need 100 yard one" means
+    what it says, and the questionnaire supports changing an earlier answer. Doing it
+    without a word is what is not: a size established as 100,000 sq ft becoming 900 is a
+    111x change, and until now the only thing on screen was arithmetic about yards.
+
+    So the change is applied and stated. Silence here is the same failure as silence about
+    a conversion, one field further along.
+    """
+    notes = []
+    for field, value in extracted.items():
+        if field not in current_criteria:
+            continue  # a first answer, not a replacement
+        was, now = _readable(field, current_criteria[field]), _readable(field, value)
+        if was is None or now is None or was == now:
+            continue
+        name = titles.get(field, field.replace("_", " "))
+        notes.append(_note(
+            field, "replaced",
+            f"Your {name} was {was}; it is now {now}.",
+        ))
+    return notes
+
+
 def _correction_notes(model_extracted, criteria) -> list[dict[str, str]]:
     """A bound the wording moved to the other side, or a magnitude the message settled."""
     notes = []
@@ -188,6 +240,7 @@ def explain_extraction(
     model_extracted: dict[str, Any],
     criteria: dict[str, Any],
     questions: list[dict[str, Any]] | None = None,
+    current_criteria: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     """Plain-language notes on every transformation between the message and the criteria.
 
@@ -196,11 +249,15 @@ def explain_extraction(
 
     Returns an empty list for the ordinary case, which is most of them.
     """
+    titles = _titles(questions)
+    # A replacement is worth stating whether or not the turn contained a figure: changing
+    # the location from Chicago to Dallas is the same kind of surprise as changing a size.
+    replaced = _replacement_notes(criteria, current_criteria or {}, titles)
     figures = numbers_with_direction(user_input or "")
     if not figures:
-        return []
-    titles = _titles(questions)
+        return replaced
     return [
+        *replaced,
         *_conversion_notes(figures, criteria),
         *_reassignment_notes(figures, model_extracted, criteria, titles),
         *_correction_notes(model_extracted, criteria),

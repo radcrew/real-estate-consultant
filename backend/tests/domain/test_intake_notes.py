@@ -183,3 +183,69 @@ class TestLargeAreaUnits:
     def test_a_distance_is_not_reported_as_a_conversion(self):
         """"20 km from downtown" is how far, not how big."""
         assert _explain("a warehouse 20 km from downtown", {"size_sqft": {"max": 20}}) == []
+
+
+class TestReplacingAnEstablishedValue:
+    """The reported sequence. "100k sqft warehouse in Chicago", then the budget question,
+    then "actually I was wrong, now I need 100 yard one."
+
+    The correction is honoured -- the user said they were wrong and gave a new size, and
+    the questionnaire supports changing an earlier answer. Doing it silently is what was
+    wrong: 100,000 sq ft became 900, a 111x change, and the only thing on screen was
+    arithmetic about yards.
+    """
+
+    CURRENT = {
+        "size_sqft": {"min": 100000},
+        "property_type": ["industrial"],
+        "location": "Chicago",
+    }
+
+    def _explain_against(self, message, extracted):
+        return explain_extraction(message, extracted, extracted, QUESTIONS, self.CURRENT)
+
+    def test_the_reported_turn_states_both_the_change_and_the_conversion(self):
+        notes = self._explain_against(
+            "actually I was wrong, now I need 100 yard one.", {"size_sqft": {"min": 900}}
+        )
+        assert _kinds(notes) == ["replaced", "converted"]
+        assert notes[0]["message"] == (
+            "Your Size was at least 100,000 sq ft; it is now at least 900 sq ft."
+        )
+
+    def test_a_first_answer_is_not_a_replacement(self):
+        """The budget was never set, so answering it replaces nothing."""
+        assert self._explain_against("under $2M", {"price": {"max": 2000000}}) == []
+
+    def test_restating_the_same_value_says_nothing(self):
+        assert self._explain_against("still 100k sqft", {"size_sqft": {"min": 100000}}) == []
+
+    def test_a_location_correction_is_stated(self):
+        notes = self._explain_against("actually make it Dallas", {"location": "Dallas"})
+        assert _kinds(notes) == ["replaced"]
+        assert notes[0]["message"] == "Your Location was Chicago; it is now Dallas."
+
+    def test_adding_to_a_multi_select_is_stated(self):
+        notes = self._explain_against(
+            "add flex too", {"property_type": ["industrial", "flex"]}
+        )
+        assert "was industrial; it is now industrial, flex" in notes[0]["message"]
+
+    def test_a_replacement_is_reported_without_any_figure_in_the_message(self):
+        """A location change carries no number, and is the same kind of surprise."""
+        notes = explain_extraction(
+            "make it Dallas instead", {"location": "Dallas"}, {"location": "Dallas"},
+            QUESTIONS, self.CURRENT,
+        )
+        assert _kinds(notes) == ["replaced"]
+
+    @pytest.mark.parametrize(("field", "value", "expected"), [
+        ("price", {"max": 2000000}, "up to $2,000,000"),
+        ("price", {"min": 500000}, "at least $500,000"),
+        ("price", {"min": 500000, "max": 2000000}, "$500,000 to $2,000,000"),
+        ("size_sqft", {"min": 8000, "max": 8000}, "8,000 sq ft"),
+    ])
+    def test_a_range_is_phrased_not_printed(self, field, value, expected):
+        """A range in a sentence must not read as raw JSON."""
+        from app.domain.intake_notes import _readable
+        assert _readable(field, value) == expected

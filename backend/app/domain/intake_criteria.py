@@ -291,7 +291,7 @@ def _choice_aliases(row: dict[str, Any]) -> dict[str, str]:
     """Map every accepted spelling (casefolded) to the value that should be stored.
 
     Question rows come in two shapes and both occur in this codebase:
-    ``intake-model/pipeline/eval/questions.json`` uses plain strings
+    ``intake-parser/datasets/questions.json`` uses plain strings
     (``["Office", "Retail"]``) while the database uses
     ``[{"label": "Industrial", "value": "industrial"}]``. Reading only the string form made
     this filter a silent no-op against real data — every DB option is a dict, so nothing

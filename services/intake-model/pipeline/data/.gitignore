@@ -1,3 +1,0 @@
-*.jsonl
-# Build artifact from pipeline.data.make_phrasings -- regenerate, never edit.
-property_type_phrasings.json

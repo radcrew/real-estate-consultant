@@ -13,11 +13,11 @@ from app.domain.intake_criteria import (
     apply_criteria_filters,
     merge_criteria,
 )
-from app.domain.intake_notes import explain_extraction
 from app.domain.intake_next_question import (
     first_question_row_in_missing,
     pending_question_key,
 )
+from app.domain.intake_notes import explain_extraction
 from app.domain.intake_validation import merge_missing_fields
 from app.llm.intake.exceptions import raise_hf_opening_response_missing_text
 from app.llm.intake.schema import extract_question_keys, render_intake_response_schema
@@ -39,7 +39,7 @@ QuestionRow = dict[str, Any]
 # Reserved criteria key holding required fields the user explicitly declined to answer.
 SKIPPED_FIELDS_KEY = "_skipped_fields"
 
-# Decode settings for criteria extraction. Named so the intake-model eval harness scores
+# Decode settings for criteria extraction. Named so the intake-parser eval harness scores
 # the same decode production runs; changing one here changes both.
 INTAKE_PARSE_TEMPERATURE = 0.1
 INTAKE_PARSE_MAX_TOKENS = 800
@@ -63,7 +63,7 @@ def build_intake_messages(
 ) -> IntakePrompt:
     """Build the criteria-extraction request sent for one intake turn.
 
-    Shared with the intake-model eval harness so it cannot score a prompt production never
+    Shared with the intake-parser eval harness so it cannot score a prompt production never
     sends. Constant content (schema, rules) stays ahead of variable content (the turn
     payload) so a served prefix cache keeps hitting.
     """
@@ -258,7 +258,9 @@ def _build_intake_parse_result(
     # and none is obvious from the result alone: someone who typed "100k yard" and is
     # shown 900,000 sq ft cannot tell a right answer from a bug, and "You're all set!"
     # reads as the system having ignored them.
-    notes = explain_extraction(user_input, parsed_output.extracted, extracted, questions)
+    notes = explain_extraction(
+        user_input, parsed_output.extracted, extracted, questions, current_criteria
+    )
 
     unconfirmed_fields = sorted(unconfirmed & set(required_fields) - set(skipped_fields))
     missing_fields = merge_missing_fields(
