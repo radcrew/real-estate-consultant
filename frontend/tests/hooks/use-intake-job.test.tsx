@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { StrictMode } from "react";
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -127,6 +128,17 @@ describe("useIntakeJob", () => {
     await expect(result.current.runTurn("sess-1", "warehouse")).rejects.toThrow(
       "The assistant's reply didn't come through.",
     );
+  });
+
+  it("still works under StrictMode's double mount", async () => {
+    // Next enables StrictMode in development, which mounts, unmounts and remounts. A
+    // flag only set to true on cleanup stays true through that, so every turn aborted on
+    // its first poll — in development only, which is where the app is actually used.
+    mockEnqueue.mockResolvedValue(queued);
+    mockGetJob.mockResolvedValue(succeeded);
+
+    const { result } = renderHook(() => useIntakeJob(), { wrapper: StrictMode });
+    await expect(result.current.runTurn("sess-1", "warehouse")).resolves.toEqual(RESULT);
   });
 
   it("stops polling when the component unmounts", async () => {

@@ -61,6 +61,11 @@ export const useIntakeJob = (): UseIntakeJobResult => {
   const abandonedRef = useRef(false);
 
   useEffect(() => {
+    // Set on mount, not just cleared on unmount. StrictMode runs effects twice in
+    // development — mount, unmount, remount — so a flag only ever set to true on cleanup
+    // stays true after the simulated unmount, and every turn then aborts on its first
+    // poll. Production mounts once and never notices.
+    abandonedRef.current = false;
     return () => {
       abandonedRef.current = true;
     };
