@@ -14,6 +14,11 @@
 #   AWS_ACCESS_KEY_ID      — IAM user limited to bedrock:InvokeModel on the embedding model
 #   AWS_SECRET_ACCESS_KEY
 #   LLM_ROUTE_EMBEDDINGS   — "bedrock"; the 1024-dim column cannot hold the 384-dim HF model
+#   BEDROCK_EMBEDDING_MODEL      — region-specific. eu-north-1 has no cohere.embed-english-v3
+#                                  (the code default) and reaches v4 only through an
+#                                  inference profile: "eu.cohere.embed-v4:0".
+#   BEDROCK_EMBEDDING_DIMENSIONS — "1024" for v4, which otherwise returns 1536 and will not
+#                                  fit the column. Leave unset for v3, which rejects it.
 name: Embed listings
 
 on:
@@ -56,6 +61,8 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           LLM_ROUTE_EMBEDDINGS: ${{ secrets.LLM_ROUTE_EMBEDDINGS }}
+          BEDROCK_EMBEDDING_MODEL: ${{ secrets.BEDROCK_EMBEDDING_MODEL }}
+          BEDROCK_EMBEDDING_DIMENSIONS: ${{ secrets.BEDROCK_EMBEDDING_DIMENSIONS }}
           MAX_BATCHES: ${{ inputs.max_batches }}
         run: |
           if [ -z "$DATABASE_URL" ] || [ -z "$AWS_REGION" ]; then
