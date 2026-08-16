@@ -5,6 +5,7 @@ leaves behind does not depend on which one ran it.
 """
 from __future__ import annotations
 
+import asyncio
 from contextlib import ExitStack
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -12,7 +13,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.services.intake_jobs import execute_claimed_job
+from app.services.intake_jobs import UNEXPECTED_FAILURE, JobOutcome, execute_claimed_job
 
 _SERVICE = "app.services.intake_jobs"
 _JOB_ID = uuid4()
@@ -106,5 +107,57 @@ class TestFailureClassification:
         failing = AsyncMock(side_effect=HTTPException(status_code=502, detail="bad reply"))
         with ExitStack() as stack:
             _, complete, _ = _enter(stack, turn=failing)
+            await _execute(allow_retry=True)
+        complete.assert_not_awaited()
+
+
+class TestUnexpectedFailure:
+    """Anything not raised as an HTTPException still has to land on the row."""
+
+    async def test_it_is_recorded_rather_than_escaping(self):
+        # Escaping fails the whole Lambda invocation, so batchItemFailures never returns
+        # and every message in the batch redelivers — while this row stays `running`,
+        # where the claim gate stops redelivery from ever rescuing it.
+        crashing = AsyncMock(side_effect=RuntimeError("connection reset"))
+        with ExitStack() as stack:
+            _, _, fail = _enter(stack, turn=crashing)
+            outcome = await _execute(allow_retry=True)
+        assert outcome == JobOutcome(status="failed", retryable=False)
+        fail.assert_awaited_once()
+
+    async def test_it_is_terminal_even_where_redelivery_exists(self):
+        # Retryability is an allowlist of faults known to be transient; an error we
+        # cannot classify does not join it by default.
+        crashing = AsyncMock(side_effect=RuntimeError("connection reset"))
+        with ExitStack() as stack:
+            _, _, fail = _enter(stack, turn=crashing)
+            await _execute(allow_retry=True)
+        assert fail.await_args.kwargs["retryable"] is False
+
+    async def test_the_stored_error_says_nothing_internal(self):
+        # `error` is rendered in the chat, and an unhandled exception's text can carry
+        # connection strings, row contents or internal paths.
+        crashing = AsyncMock(side_effect=RuntimeError("postgres://user:hunter2@db:5432"))
+        with ExitStack() as stack:
+            _, _, fail = _enter(stack, turn=crashing)
+            await _execute(allow_retry=True)
+        stored = fail.await_args.kwargs["error"]
+        assert stored == UNEXPECTED_FAILURE
+        assert "hunter2" not in stored
+
+    async def test_cancellation_still_unwinds(self):
+        # BaseException, so shutdown and task cancellation must not be turned into a
+        # failed turn — the job is genuinely unfinished and the sweep should own it.
+        cancelled = AsyncMock(side_effect=asyncio.CancelledError())
+        with ExitStack() as stack:
+            _, _, fail = _enter(stack, turn=cancelled)
+            with pytest.raises(asyncio.CancelledError):
+                await _execute(allow_retry=True)
+        fail.assert_not_awaited()
+
+    async def test_a_crashed_turn_stores_no_result(self):
+        crashing = AsyncMock(side_effect=RuntimeError("connection reset"))
+        with ExitStack() as stack:
+            _, complete, _ = _enter(stack, turn=crashing)
             await _execute(allow_retry=True)
         complete.assert_not_awaited()

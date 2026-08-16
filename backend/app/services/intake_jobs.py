@@ -22,6 +22,11 @@ from supabase import AsyncClient
 # the answer was unusable". Only these are worth another delivery.
 RETRYABLE_STATUS = frozenset({503, 504})
 
+# Shown to the user when the turn died of something we did not anticipate. Deliberately
+# says nothing: ``error`` is rendered in the chat, and an unhandled exception's text can
+# carry connection strings, row contents or internal paths.
+UNEXPECTED_FAILURE = "That message couldn't be processed. Please try again."
+
 logger = logging.getLogger(__name__)
 
 
@@ -68,6 +73,27 @@ async def execute_claimed_job(
             },
         )
         return JobOutcome(status="queued" if retryable else "failed", retryable=retryable)
+    except Exception:
+        # Anything not raised as an HTTPException is a fault we did not anticipate — a
+        # driver error, a serialisation bug. Letting it escape fails the whole Lambda
+        # invocation, so `batchItemFailures` is never returned and every message in the
+        # batch redelivers, while this row stays `running` where the claim gate blocks
+        # redelivery from ever rescuing it. The turn then waits out the stale sweep for
+        # what may be a one-line bug.
+        #
+        # Terminal, not retried: retryability here is an allowlist of faults known to be
+        # transient, and an unclassifiable error does not join it by default. The user is
+        # told now instead of after the redelivery budget is spent re-earning it.
+        #
+        # `Exception`, not `BaseException`: cancellation and shutdown must still unwind.
+        await fail_intake_job(
+            client,
+            job_id=job_id,
+            error=UNEXPECTED_FAILURE,
+            retryable=False,
+        )
+        logger.exception("intake_job_crashed", extra={"job_id": str(job_id)})
+        return JobOutcome(status="failed", retryable=False)
 
     await complete_intake_job(
         client,
