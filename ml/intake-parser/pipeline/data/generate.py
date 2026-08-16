@@ -503,7 +503,6 @@ class FieldNumbers(NamedTuple):
 
     render: Callable[[int], str]  # 4200 -> "4,200 sqft"
     sample: Callable[[], int]  # draw a plausible value
-    bare_is_exact: bool  # see _range_phrase
     # The low side of a hyphenated range, where the unit belongs only on the high side:
     # "10,000-15,000 sqft". Money keeps its symbol, since "$500k-$1M" is how it is written.
     render_low: Callable[[int], str]
@@ -568,8 +567,7 @@ def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
         # stays exact -- see `_bare_answer`, where v3's max-only turned an answer of "32"
         # into a 32 sqft ceiling that every later correction stacked against.
         value = numbers.sample()
-        bounds = {"min": value, "max": value} if numbers.bare_is_exact else {"max": value}
-        return bounds, soften(numbers.render_solo(value))
+        return {"max": value}, soften(numbers.render_solo(value))
     low = numbers.sample()
     high = _range_high(low)
     if random.random() < 0.3:
@@ -589,11 +587,11 @@ def _range_phrase(numbers: FieldNumbers) -> tuple[dict[str, int], str]:
 
 
 PRICE_NUMBERS = FieldNumbers(
-    _fmt_money, _price_value, bare_is_exact=False,
+    _fmt_money, _price_value,
     render_low=_fmt_money, render_solo=_fmt_money,
 )
 SQFT_NUMBERS = FieldNumbers(
-    _fmt_sqft, _sqft_value, bare_is_exact=False,
+    _fmt_sqft, _sqft_value,
     render_low=lambda v: f"{v:,}", render_solo=_fmt_sqft_solo,
 )
 
@@ -687,7 +685,7 @@ def _type_words(
     return picked, " or ".join(words)
 
 
-def _place(names_state: bool | None = None) -> tuple[str, str]:
+def _place() -> tuple[str, str]:
     """Return (gold, the words the message uses).
 
     Four shapes, because v3 only ever produced the first two and failed on the others:
@@ -701,12 +699,14 @@ def _place(names_state: bool | None = None) -> tuple[str, str]:
     normalization ``property_type`` does for "warehouse" -> industrial: a shorter name for
     the same place, not a region invented out of nothing. The "never add a region it
     omits" rule still holds -- ``Tampa`` is never labelled ``Tampa, FL``.
+
+    Took a ``names_state`` flag that forced the first two shapes and skipped the other two.
+    All three callers used the default, so the parameter's only effect was to describe a
+    v3-era mode that nothing selects -- and it read as though the alias and state shapes
+    were optional, which is the opposite of why they exist.
     """
-    if names_state is None:
-        shape = random.choices(["city", "city_state", "alias", "state"],
-                               weights=[30, 35, 20, 15])[0]
-    else:
-        shape = "city_state" if names_state else "city"
+    shape = random.choices(["city", "city_state", "alias", "state"],
+                           weights=[30, 35, 20, 15])[0]
 
     if shape == "alias":
         alias, canonical = random.choice(list(CITY_ALIASES.items()))
@@ -1069,12 +1069,22 @@ def make_example(
             user_input = ", ".join(fragments)
 
     # Applied once, here, so every shape gets them rather than only the ones edited last.
-    # `noise` is exempt: its whole job is bare greetings and typos, and appending a
-    # requirement to "hi" would turn a say-nothing example into a say-something one.
-    if shape != "noise":
-        if extracted and random.random() < 0.22:
-            user_input = _add_distractors(user_input)
-        user_input = _rough_up(user_input)
+    #
+    # `noise` is exempt from distractors: its whole job is bare greetings and typos, and
+    # appending a requirement to "hi" would turn a say-nothing example into a say-something
+    # one. That exemption is already implied by `if extracted` -- noise always golds {} --
+    # but it is stated because the reason is not obvious from the condition.
+    #
+    # It is NOT exempt from `_rough_up`, and used to be. A `shape != "noise"` guard wrapped
+    # both, so noise was the one shape never sentence-cased, upper-cased or given a
+    # trailing "!" -- measured at 0% against 22-44% for every other shape. `skip` and
+    # `complete` also gold nothing and *were* roughened, so the set taught a surface cue
+    # that separates noise from a refusal: a capitalised message was never noise. Teaching
+    # the model to read casing instead of content is the exact failure `_rough_up` exists
+    # to prevent.
+    if extracted and random.random() < 0.22:
+        user_input = _add_distractors(user_input)
+    user_input = _rough_up(user_input)
 
     current_criteria = dict(prior)
     if skipped and shape == "carried-skip":

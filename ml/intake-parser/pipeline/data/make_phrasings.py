@@ -197,14 +197,22 @@ async def main_async(argv: list[str] | None = None) -> int:
         print(f"  {option:<12} proposed {len(proposed):>2}  kept {len(kept):>2}  {kept}")
     await client.close()
 
-    claimed: dict[str, str] = {}
+    # Two passes, because the drop has to apply to *every* claimant. A single pass that
+    # records the first and strips the second leaves the word attached to whichever option
+    # the dict happened to yield first -- so re-running could flip which label an
+    # ambiguous word teaches, and the run says "dropping 'depot'" while 'depot' stays in
+    # the file under `industrial`. The stated reason for dropping is that both labels
+    # would be wrong; keeping one of them is the outcome that reason rules out.
+    claimants: dict[str, list[str]] = {}
     for option, words in phrasings.items():
         for word in words:
-            if word in claimed:
-                print(f"  dropping {word!r}: claimed by both {claimed[word]} and {option}")
-                phrasings[option] = [w for w in phrasings[option] if w != word]
-            else:
-                claimed[word] = option
+            claimants.setdefault(word, []).append(option)
+    for word, owners in claimants.items():
+        if len(owners) < 2:
+            continue
+        print(f"  dropping {word!r}: claimed by {' and '.join(owners)}")
+        for option in owners:
+            phrasings[option] = [w for w in phrasings[option] if w != word]
 
     out = Path(args.out)
     out.write_text(json.dumps(phrasings, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")

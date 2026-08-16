@@ -287,8 +287,15 @@ class TestBareFigureConventions:
             assert not self._is_exact(bounds), bounds
 
     def test_neither_field_treats_a_bare_figure_as_exact(self):
-        assert not SQFT_NUMBERS.bare_is_exact
-        assert not PRICE_NUMBERS.bare_is_exact
+        """Asserted against behaviour now, not against a flag.
+
+        This used to read `assert not SQFT_NUMBERS.bare_is_exact` -- a field that was
+        False at both construction sites, making the `{"min": v, "max": v}` branch it
+        guarded unreachable. A test that a dead flag is still dead passes forever and
+        proves nothing about the golds it claimed to be about.
+        """
+        for field in ("size_sqft", "price"):
+            assert all(not self._is_exact(b) for b in self._bounds(field))
 
     def test_a_unitless_size_answer_is_still_exact(self):
         """The v3 exception. Without this, "32" is a 32 sqft ceiling again."""
@@ -1289,3 +1296,50 @@ class TestTheEvalGoldsFollowTheSameSizeConvention:
             "a bare size carrying a unit is a ceiling since r8, so these golds mark a "
             "correct model wrong:\n  " + "\n  ".join(offenders)
         )
+
+
+class TestNoShapeIsIdentifiableBySurfaceForm:
+    """`_rough_up` exists so casing and punctuation carry no signal. It skipped one shape.
+
+    A `shape != "noise"` guard wrapped both the distractor step and `_rough_up`. The
+    comment justified only the distractor half -- appending a requirement to "hi" would
+    make a say-nothing example say something -- and that half was already covered by
+    `if extracted`, since noise always golds {}. The guard's only real effect was to leave
+    noise the one shape never sentence-cased, upper-cased or exclaimed: measured at 0%
+    against 22-44% everywhere else. `skip` and `complete` also gold nothing and were
+    roughened, so a capitalised message was never noise, and the model could read casing
+    instead of content.
+    """
+
+    @staticmethod
+    def _looks_roughened(text: str) -> bool:
+        return bool(text[:1].isupper() or text.endswith("!") or text.isupper())
+
+    def _by_shape(self):
+        counts = collections.defaultdict(lambda: [0, 0])
+        for example in _examples(n=4000, seed=3):
+            entry = counts[example["shape"]]
+            entry[0] += 1
+            entry[1] += self._looks_roughened(example["user_input"])
+        return {shape: hits / total for shape, (total, hits) in counts.items()}
+
+    def test_noise_is_roughened_at_all(self):
+        shares = self._by_shape()
+        assert shares["noise"] > 0.05, (
+            f"noise roughened {shares['noise']:.1%} of the time; at 0% the casing of a "
+            "message tells the model it is not noise"
+        )
+
+    def test_noise_is_not_an_outlier_among_the_shapes(self):
+        """It need not match exactly -- noise messages are short, so fewer get a trailing
+        '!' -- but it must sit inside the band rather than at zero."""
+        shares = self._by_shape()
+        others = [v for k, v in shares.items() if k != "noise"]
+        assert shares["noise"] >= 0.5 * (min(others))
+
+    def test_noise_still_extracts_nothing(self):
+        """The distractor exemption is the half of the old guard that was right."""
+        for example in _examples(n=1500, seed=11):
+            if example["shape"] == "noise":
+                assert example["target"]["extracted"] == {}
+                assert example["target"]["skipped_fields"] == []

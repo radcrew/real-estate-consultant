@@ -111,12 +111,16 @@ def ensure_convert_script(src_dir: Path, tag: str) -> Path:
     return script
 
 
-def quantize_flags(kind: str, imatrix: Path | None) -> list[str]:
+def quantize_flags(imatrix: Path | None) -> list[str]:
     """Flags for one quantization rung.
 
     At P6, ``--imatrix`` plus Q8_0 embedding and output tensors is the recipe: the ~152k
     vocabulary makes those tensors a large share of the parameters, and they are the ones
     emitting exact field values. Off by default so the stock baseline stays plain.
+
+    Took a ``kind`` it never read. The rung is passed to ``llama-quantize`` as a positional
+    argument by the caller, and these flags are the same for every rung -- a parameter that
+    looks like it selects a recipe per rung, and does not, is worse than no parameter.
     """
     flags: list[str] = []
     if imatrix is not None:
@@ -177,7 +181,7 @@ def main() -> int:
     suffix = "-imatrix" if imatrix is not None else ""
     for kind in quant_kinds:
         target = out_dir / f"{stem}-{kind.lower()}{suffix}.gguf"
-        run([str(quantize_exe), *quantize_flags(kind, imatrix), str(f16_path), str(target), kind])
+        run([str(quantize_exe), *quantize_flags(imatrix), str(f16_path), str(target), kind])
 
     print("\nArtifacts:")
     for path in sorted(out_dir.glob(f"{stem}*.gguf")):

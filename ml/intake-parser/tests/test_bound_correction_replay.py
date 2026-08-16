@@ -43,9 +43,28 @@ def _matching_values(extracted: dict[str, Any], gold: dict[str, Any]) -> int:
     )
 
 
+def _as_run(path: Path) -> dict[str, Any] | None:
+    """The file as a results run, or ``None`` if it is some other JSON.
+
+    ``glob("*.json")`` takes whatever is in the directory: a coverage report, an editor
+    scratch file, half of a write that died mid-flush. ``run["turns"]`` raised KeyError on
+    all of those, failing a test about the bound corrector for a reason that has nothing
+    to do with the bound corrector.
+    """
+    try:
+        run = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+        return None
+    if not isinstance(run, dict) or not isinstance(run.get("turns"), list):
+        return None
+    return run
+
+
 def _replay(path: Path, gold_by_id: dict[str, Any]) -> tuple[int, int, list[str]]:
     """Return (turns improved, turns worsened, ids worsened) for one results file."""
-    run = json.loads(path.read_text(encoding="utf-8"))
+    run = _as_run(path)
+    if run is None:
+        return 0, 0, []
     improved, worsened, offenders = 0, 0, []
     for turn in run["turns"]:
         row = gold_by_id.get(turn["turn_id"])
@@ -73,6 +92,8 @@ def _replay(path: Path, gold_by_id: dict[str, Any]) -> tuple[int, int, list[str]
 @pytest.mark.skipif(not RESULTS, reason="no recorded eval runs")
 @pytest.mark.parametrize("path", RESULTS, ids=lambda p: p.stem)
 def test_correction_never_worsens_a_recorded_turn(path, gold_by_id):
+    if _as_run(path) is None:
+        pytest.skip(f"{path.name} is not an eval results file")
     _, worsened, offenders = _replay(path, gold_by_id)
     assert worsened == 0, f"{path.stem}: correction made {worsened} turn(s) worse: {offenders}"
 

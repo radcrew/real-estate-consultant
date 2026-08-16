@@ -54,9 +54,19 @@ def file_digest(path: Path | str) -> str | None:
 
 
 def line_count(path: Path | str) -> int | None:
-    """Non-blank lines in a text file, or None if it cannot be read."""
+    """Non-blank lines in a text file, or None if it cannot be read.
+
+    ``errors="replace"``, because this counts lines and does not care what is on them. A
+    byte that is not UTF-8 raises ``UnicodeDecodeError``, which is a ``ValueError`` and
+    not an ``OSError``, so it escaped the guard entirely -- breaking the module's "never
+    fail the job" rule at the worst possible moment. ``write_adapter_stamp`` calls this on
+    the train and validation paths *after* ``trainer.train()`` and ``save_pretrained()``,
+    so a ``train.jsonl`` written by any tool that does not force ASCII would have crashed
+    the end of a multi-hour run over a line count. ``eval/run.py`` has the same exposure
+    through an arbitrary ``--dataset``.
+    """
     try:
-        with Path(path).open("r", encoding="utf-8") as handle:
+        with Path(path).open("r", encoding="utf-8", errors="replace") as handle:
             return sum(1 for line in handle if line.strip())
     except OSError:
         return None

@@ -103,10 +103,20 @@ class IntakeDataset(Dataset):
             return None
 
         if len(full) > max_len:
+            # Dropped, not trimmed. `full[:max_len]` cuts from the end, and the end is the
+            # *supervised* span -- labels mask the prompt and train on the completion. A
+            # trimmed row loses its closing braces and its EOS from inside the loss, so
+            # the gradient teaches `{"extracted":{"price":{"max":250` as a finished
+            # answer, against the raw_json_valid metric this whole project optimises for.
+            # The prefix-mismatch path above already drops rows for a smaller reason.
+            #
+            # No row has ever hit this: the longest sequence in the current train set is
+            # 995 tokens against the 1088 default. That is 93 tokens of headroom, and the
+            # prompt carries the questionnaire, so adding one required field would spend
+            # it. Counted and reported either way -- silently training on fewer rows than
+            # the file holds is its own defect.
             self.truncated += 1
-            full = full[:max_len]
-            if len(prompt) >= len(full):
-                return None
+            return None
 
         labels = [IGNORE_INDEX] * len(prompt) + full[len(prompt):]
         return Encoded(input_ids=full, labels=labels)
@@ -199,8 +209,9 @@ def main() -> int:
         train_set.rows = train_set.rows[: args.max_examples]
     print(f"train {len(train_set)} | val {len(val_set)}")
     if train_set.truncated or val_set.truncated:
-        print(f"WARNING truncated {train_set.truncated + val_set.truncated} examples "
-              f"at max_len={args.max_len}")
+        print(f"WARNING dropped {train_set.truncated + val_set.truncated} examples longer "
+              f"than max_len={args.max_len}; raise --max-len to train on them rather than "
+              f"losing them, since truncating one would teach an unterminated answer")
     if train_set.prefix_mismatches or val_set.prefix_mismatches:
         print(f"WARNING dropped {train_set.prefix_mismatches + val_set.prefix_mismatches} "
               "examples whose prompt was not a prefix of the full sequence")

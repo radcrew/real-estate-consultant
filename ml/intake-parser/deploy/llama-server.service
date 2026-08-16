@@ -22,6 +22,20 @@ Group=llama
 EnvironmentFile=/etc/llama-server.env
 WorkingDirectory=/opt/llama.cpp
 
+# Refuse to start without a key rather than starting without a perimeter. systemd
+# substitutes a braced ${VAR} as a single word rather than removing the argument, so a
+# missing or mis-keyed /etc/llama-server.env yielded `--api-key ''` -- an open endpoint
+# that starts cleanly, is held up by Restart=always, and whose only symptom is a request
+# succeeding when it should have been refused. Nothing else in the stack would notice:
+# the reverse proxy forwards whatever it is given, and Vercel's egress IPs are dynamic so
+# there is no allowlist behind this.
+#
+# $$ so the *shell* expands it, not systemd. systemd expands $VAR inside Exec= arguments
+# before the command runs, including inside quotes, which would paste the key's value
+# into this command line -- fine for hex from `openssl rand`, and an injection the day
+# someone sets a key containing a quote. The check must not be the thing that reads it.
+ExecStartPre=/bin/sh -c 'test -n "$${LLAMA_API_KEY}" || { echo "LLAMA_API_KEY is empty or unset in /etc/llama-server.env; refusing to serve without a token" >&2; exit 1; }'
+
 # --host 127.0.0.1: never expose this directly. TLS terminates in a reverse proxy in
 #   front of it, because the bearer token would otherwise cross the internet in clear.
 # -t: physical cores, not logical. Hyperthreading hurts here - the two threads on a core
