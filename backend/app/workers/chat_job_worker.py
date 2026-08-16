@@ -30,6 +30,7 @@ from supabase import AsyncClient
 logger = logging.getLogger(__name__)
 
 _initialised = False
+_LOOP: asyncio.AbstractEventLoop | None = None
 
 
 async def get_client() -> AsyncClient:
@@ -120,5 +121,26 @@ async def process_batch(event: dict[str, Any]) -> dict[str, Any]:
     return {"batchItemFailures": failures}
 
 
+def event_loop() -> asyncio.AbstractEventLoop:
+    """One event loop for the container's lifetime.
+
+    ``asyncio.run`` creates a loop and **closes it** on return. The Supabase client is
+    cached at module scope and binds to whichever loop created it, so a warm invocation
+    would reuse a client whose loop is gone: ``RuntimeError: Event loop is closed``. The
+    first request on each container succeeded and every one after it failed — which reads
+    like an intermittent fault rather than a certainty, because Lambda keeps handing out
+    fresh containers under light traffic.
+
+    Reusing one loop keeps the cached client valid. If a loop ever does get closed under
+    us, anything cached against it is invalid too, so the client cache is reset with it.
+    """
+    global _LOOP, _initialised
+    if _LOOP is None or _LOOP.is_closed():
+        _LOOP = asyncio.new_event_loop()
+        asyncio.set_event_loop(_LOOP)
+        _initialised = False
+    return _LOOP
+
+
 def handler(event: dict[str, Any], context: Any) -> dict[str, Any]:
-    return asyncio.run(process_batch(event))
+    return event_loop().run_until_complete(process_batch(event))

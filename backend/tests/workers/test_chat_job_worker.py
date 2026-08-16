@@ -1,6 +1,7 @@
 """Tests for the queued intake-turn worker."""
 from __future__ import annotations
 
+import asyncio
 import json
 from contextlib import ExitStack
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -223,3 +224,42 @@ class TestHandler:
             _enter(stack)
             result = chat_job_worker.handler({"Records": [_record()]}, None)
         assert result == {"batchItemFailures": []}
+
+    def test_the_loop_survives_repeated_invocations(self):
+        """Lambda reuses a warm container, and ``asyncio.run`` closes its loop on return —
+        so a module-scope client bound to that loop breaks on the *second* call. Every
+        first invocation succeeded, which is why this read as an intermittent fault.
+
+        The stub below stands in for the Supabase client by holding onto the loop that
+        created it, so a regression to ``asyncio.run`` fails here rather than in
+        production. Mocks that ignore the loop would pass either way.
+        """
+        seen: dict[str, asyncio.AbstractEventLoop] = {}
+
+        async def client_bound_to_its_loop():
+            first_loop = seen.setdefault("loop", asyncio.get_running_loop())
+            if first_loop.is_closed():
+                raise RuntimeError("Event loop is closed")
+            return MagicMock()
+
+        with ExitStack() as stack:
+            _enter(stack)
+            stack.enter_context(patch(f"{_WORKER}.get_client", client_bound_to_its_loop))
+            first = chat_job_worker.handler({"Records": [_record(message_id="m-1")]}, None)
+            second = chat_job_worker.handler({"Records": [_record(message_id="m-2")]}, None)
+            third = chat_job_worker.handler({"Records": [_record(message_id="m-3")]}, None)
+
+        assert first == second == third == {"batchItemFailures": []}
+        assert not chat_job_worker.event_loop().is_closed()
+
+    def test_a_closed_loop_is_replaced_and_clears_the_client_cache(self):
+        """Anything cached against a dead loop is dead too, so they reset together."""
+        chat_job_worker.event_loop().close()
+        chat_job_worker._initialised = True
+
+        with ExitStack() as stack:
+            _enter(stack)
+            result = chat_job_worker.handler({"Records": [_record()]}, None)
+
+        assert result == {"batchItemFailures": []}
+        assert not chat_job_worker.event_loop().is_closed()
