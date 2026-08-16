@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-FETCH_PATH = Path(__file__).resolve().parents[3] / "infra" / "qwen-lambda" / "fetch_model.py"
+FETCH_PATH = Path(__file__).resolve().parents[3] / "services" / "qwen-lambda" / "fetch_model.py"
 
 
 def _load_fetch_model():

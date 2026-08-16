@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-HANDLER_PATH = Path(__file__).resolve().parents[3] / "infra" / "qwen-lambda" / "handler.py"
+HANDLER_PATH = Path(__file__).resolve().parents[3] / "services" / "qwen-lambda" / "handler.py"
 
 
 class _StubGrammar:

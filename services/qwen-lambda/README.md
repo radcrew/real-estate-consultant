@@ -1,4 +1,4 @@
-# `qwen-inference` — Qwen2.5-0.5B on Lambda
+# `qwen-lambda` — Qwen2.5-0.5B on Lambda
 
 CPU-only container that serves criteria extraction for the intake path, and nothing
 else. `app/llm/providers/qwen_lambda.py` invokes it over IAM; the two sides of the
@@ -10,7 +10,7 @@ Free tier is perpetual — 1M requests and 400,000 GB-seconds a month — so at 
 ## 1. Fetch the weights
 
 ```bash
-cd infra/qwen-lambda
+cd services/qwen-lambda
 pip install -r requirements-build.txt
 python fetch_model.py --repo-id <org>/<model>            # add --filename for multi-quant repos
 ```

@@ -5,7 +5,7 @@ Run from ``backend/`` whenever one of the exported models changes::
     python scripts/export_qwen_schemas.py
 
 The Pydantic model is the single source of truth: the image turns these JSON Schemas
-into GBNF at build time (``infra/qwen-lambda/build_grammars.py``), so a model edited
+into GBNF at build time (``services/qwen-lambda/build_grammars.py``), so a model edited
 without re-running this leaves the decoder constrained to the previous shape — the new
 field simply never appears, with no error anywhere. ``test_qwen_schema_export`` fails on
 that drift.
@@ -23,7 +23,7 @@ EXPORTED_SCHEMAS = {
     "LlmParseModelOutput": LlmParseModelOutput,
 }
 
-SCHEMA_DIR = Path(__file__).resolve().parents[2] / "infra" / "qwen-lambda" / "schemas"
+SCHEMA_DIR = Path(__file__).resolve().parents[2] / "services" / "qwen-lambda" / "schemas"
 
 
 def render(model: type) -> str:

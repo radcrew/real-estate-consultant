@@ -319,7 +319,7 @@ they get the ordinary §8 error mapping and no special machinery.
 | `app/services/listing_embeddings.py` + `scripts/backfill_embeddings.py` | ✅ phase B |
 | `.github/workflows/embed-listings.yml` — 30-minute schedule | ✅ phase B |
 | `app/llm/providers/qwen_lambda.py` — `QwenLambdaProvider`, retry (§3.3) | ✅ phase D |
-| `infra/qwen-lambda/` — Dockerfile, handler, grammar build, README | ✅ phase D — weights still to supply |
+| `services/qwen-lambda/` — Dockerfile, handler, grammar build, README | ✅ phase D — weights still to supply |
 | `backend/scripts/export_qwen_schemas.py` + drift test | ✅ phase D |
 | `app/core/circuit_breaker.py` — in-process breaker (§3.3, §16) | ✅ phase D |
 
@@ -344,7 +344,7 @@ Lambda container images support up to 10 GB, so the weights ship **inside the im
 cold-start download, no EFS mount.
 
 ```
-infra/qwen-lambda/
+services/qwen-lambda/
 ├── Dockerfile           # FROM public.ecr.aws/lambda/python:3.12
 ├── handler.py           # model loaded at module scope, reused across warm invocations
 ├── build_grammars.py    # JSON Schema → GBNF, run during the build
@@ -1387,7 +1387,7 @@ Recorded so the reasoning is not lost, and so the trigger is explicit rather tha
 | ✅ **A — Routing layer** | Bedrock chat + embeddings providers, `routing.py`, `LlmTask`, `task=` on 4 call sites. Every route still `auto` | $0 |
 | ✅ **B — Ingest-time embeddings** | `vector(1024)` column + HNSW, repository write/k-NN helpers, `find_similar_listings` rewritten, batched backfill + script, 30-minute workflow | $0 |
 | **C — Bedrock embeddings** | Set `LLM_ROUTE_EMBEDDINGS=bedrock` and run the backfill. **No code** — but required before similar-listings returns anything, since the 384-dim HF model cannot fill the column | cents |
-| **D — Qwen 0.5B intake on Lambda** | ✅ **code complete**: `qwen_lambda.py` (contract, retry-once, error mapping, breaker), `circuit_breaker.py`, `infra/qwen-lambda/` image with build-time GBNF and HF fetch, schema export + drift test, 62 tests. Remaining is deployment only: **supply the weights** (§23.1 — fine-tune vs base undecided), build/push, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
+| **D — Qwen 0.5B intake on Lambda** | ✅ **code complete**: `qwen_lambda.py` (contract, retry-once, error mapping, breaker), `circuit_breaker.py`, `services/qwen-lambda/` image with build-time GBNF and HF fetch, schema export + drift test, 62 tests. Remaining is deployment only: **supply the weights** (§23.1 — fine-tune vs base undecided), build/push, warmer, memory tuning, then route `intake_parse=qwen` | $0 |
 | **E — Outreach on Bedrock Qwen3-32B** | ✅ code: `BedrockQwenChatProvider` (Converse, forced tool call), `"bedrock_qwen"` registered pin-only, settings, 22 tests. Deploy pending: region check, IAM grant, `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | per-token |
 | **F — Intake turns through SQS** | ✅ admission control (the blocker, §14.1), ✅ `intake_jobs` migration + repository (claim gate, `attempts` trigger, stale-claim sweeper), ✅ pipeline extracted to `intake_llm.py`, ✅ `ChatJobQueue` publisher, ✅ `chat-intake-worker` handler (claim gate, failure classification, FIFO-safe partial batches), ✅ `202` + poll + SSE endpoints with the in-flight cap, ✅ frontend service + `use-intake-job` hook + chat panel, ✅ `infra/chat-intake-worker/` image + runbook. **Code complete — 132 tests.** Deployment, **in this order**: apply `20260814_intake_jobs.sql` *before* the code ships — the endpoint writes to that table on every request and Vercel deploys from `main` automatically, so the reverse order takes intake down until the table exists. The queue itself is optional and comes after: DLQ, image, capped event source, then `SQS_CHAT_QUEUE_URL` | $0 — SQS free to 1M/mo |
 | **G — Guardrails** | ✅ code: `BedrockGuardrail`, input screened before the durable write, optional output screening, fail-closed default, 24 tests. Remaining: author the policy in the Bedrock console and set `BEDROCK_GUARDRAIL_ID` | per text unit |
@@ -1431,7 +1431,7 @@ Set it in only one place and listings get 1024-dim vectors while the query path 
 `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen`.
 
 **3 — Phase D, intake parser** (independent; needs the model artifact): settle fine-tune vs base
-(§23.1) → `infra/qwen-lambda/` fetch, build, push → create the function and warmer → IAM grant →
+(§23.1) → `services/qwen-lambda/` fetch, build, push → create the function and warmer → IAM grant →
 set `QWEN_INFERENCE_FUNCTION_NAME` and `LLM_ROUTE_INTAKE_PARSE=qwen`.
 
 **4 — Phase F, queueing** (optional; the product works without it, see the resilience note in

@@ -103,7 +103,7 @@ rationale: [`AWS_BEDROCK_ARCHITECTURE.md`](AWS_BEDROCK_ARCHITECTURE.md).
 |---|---|---|
 | Bedrock embeddings | `LLM_ROUTE_EMBEDDINGS=bedrock` | Similar-listings uses 1024-dim Cohere v3 vectors. **Required before similar-listings returns anything** — the 384-dim default cannot fill the column |
 | Bedrock Qwen3-32B | `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | Outreach drafts move off OpenRouter |
-| [`infra/qwen-lambda/`](infra/qwen-lambda/README.md) | `LLM_ROUTE_INTAKE_PARSE=qwen` | Criteria extraction runs a self-hosted Qwen2.5-0.5B on Lambda |
+| [`services/qwen-lambda/`](services/qwen-lambda/README.md) | `LLM_ROUTE_INTAKE_PARSE=qwen` | Criteria extraction runs a self-hosted Qwen2.5-0.5B on Lambda |
 | [`infra/chat-intake-worker/`](infra/chat-intake-worker/README.md) | `SQS_CHAT_QUEUE_URL` | Intake turns are queued instead of run inline, so a slow provider becomes latency rather than a lost message |
 | Bedrock Guardrails | `BEDROCK_GUARDRAIL_ID` | Intake free text is screened (PII redaction) before it is stored |
 

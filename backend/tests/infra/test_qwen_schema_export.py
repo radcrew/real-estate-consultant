@@ -29,7 +29,7 @@ class TestQwenSchemaExport:
         assert committed == set(EXPORTED_SCHEMAS)
 
     def test_schema_dir_resolves_inside_the_image_context(self):
-        expected = Path(__file__).resolve().parents[3] / "infra" / "qwen-lambda" / "schemas"
+        expected = Path(__file__).resolve().parents[3] / "services" / "qwen-lambda" / "schemas"
         assert SCHEMA_DIR == expected
 
     def test_intake_schema_declares_an_object_envelope(self):
