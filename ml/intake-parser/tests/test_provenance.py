@@ -170,3 +170,41 @@ class TestComparingTwoStamps:
 
 def stamp_outputs(directory):
     return provenance.read_stamp(directory)["outputs"]
+
+
+class TestTheShippedStampDescribesTheTrackedFiles:
+    """The committed stamp's input hashes, checked against the committed inputs.
+
+    Before `property_type_phrasings.json` was tracked, `inputs.phrasings.sha256` pointed at
+    a file no clone had — a hash of nothing anyone could produce. Tracking the file is what
+    makes this checkable, and this is the check that makes tracking it worth something.
+
+    A failure means `datasets/` is internally inconsistent: the training set was built from
+    inputs that are no longer the ones beside it. Regenerating the phrasings without
+    regenerating the dataset is the way to get there, and the phrasings are training input,
+    so that combination ships a model trained on vocabulary the repo no longer holds.
+    """
+
+    @pytest.fixture
+    def stamp(self):
+        from pipeline.paths import DATASETS_DIR
+
+        stamp = provenance.read_stamp(DATASETS_DIR)
+        if stamp is None:
+            pytest.skip("no dataset_provenance.json beside the datasets")
+        return stamp
+
+    def test_the_phrasings_input_is_recorded(self, stamp):
+        assert stamp["inputs"]["phrasings"]["sha256"]
+
+    def test_the_tracked_phrasings_are_the_ones_the_dataset_was_built_from(self, stamp):
+        import hashlib
+
+        from pipeline.paths import PHRASINGS_PATH
+
+        actual = hashlib.sha256(PHRASINGS_PATH.read_bytes()).hexdigest()
+        assert actual == stamp["inputs"]["phrasings"]["sha256"], (
+            "datasets/property_type_phrasings.json is not the file train.jsonl was "
+            "generated from. Regenerate the dataset, or restore the phrasings — do not "
+            "just update the stamp."
+        )

@@ -3,10 +3,14 @@
 # Listed by name rather than as `*.jsonl`, because `eval.jsonl` is hand-written and must
 # stay tracked — a blanket rule beside it reads as though it were generated too.
 #
+# `property_type_phrasings.json` was listed here and is not any more. It is a *sample* of
+# a model's output, not a build product: re-running `make_phrasings` needs an OpenRouter
+# key and a live Supabase connection, and returns different words each time. Nothing can
+# reproduce the copy the shipped model was trained on, so it is source.
+#
 # `train.jsonl` and `validation.jsonl` predate this rule and are held in the index by an
 # explicit `git add -f`, so git tracks them regardless of what is written here. Untracking
 # them is a separate decision from moving them — and one the move made by accident once
 # already, when this rule pruned both from a repo-wide `git add`. See `results/.gitignore`.
 train.jsonl
 validation.jsonl
-property_type_phrasings.json

@@ -20,7 +20,18 @@ model to map it back, so a proposer that is wrong will also validate itself as r
 0.5B scores 3-4 of 6 on this question — it answers ``factory -> Office`` — and would
 generate wrong pairs and confirm them. The 7B mapped all six probe words correctly.
 
-Output is a build artifact: gitignored, regenerated rather than edited.
+**The output is tracked, and re-running it is a deliberate act.** It looks like a build
+artifact and was gitignored as one, but it does not behave like one: this script needs an
+OpenRouter key and a live Supabase connection, and asks a model for words — so two runs
+disagree, and nothing can reconstruct the copy a given model was trained against. That
+makes it source. It is also what three tests in ``tests/test_data_generate.py`` measure the
+ambiguous-word weighting against, and what the eval-separation guard subtracts from
+``eval.jsonl``; with the file absent that guard has no vocabulary to check and passes
+having asserted nothing.
+
+Regenerate when the questionnaire's options change. Expect the diff to touch words that
+had no reason to move, review it as data rather than as a rebuild, and re-run the eval —
+the phrasings are training input, so changing them changes the model.
 """
 
 from __future__ import annotations

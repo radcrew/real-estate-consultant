@@ -1157,9 +1157,27 @@ class TestSynonymEvalSeparation:
     def test_the_category_exists(self):
         assert self._synonym_turns(), "no property-synonym turns; the fix is unmeasurable"
 
-    def test_turns_avoid_every_generated_phrasing(self):
+    def _trained_vocabulary(self) -> set[str]:
         phrasings = load_phrasings(PHRASINGS_PATH)
-        trained = {p.lower() for pool in phrasings.values() for p in pool} | set(phrasings)
+        return {p.lower() for pool in phrasings.values() for p in pool} | set(phrasings)
+
+    def test_there_is_a_vocabulary_to_check_against(self):
+        """Without this the guard below passes having compared nothing.
+
+        `load_phrasings` returns `{}` for a missing file, which is right for the generator
+        — examples fall back to the literal option — and silently disarming here. The file
+        was gitignored, so that was the state on every fresh clone and in CI: the one guard
+        standing between the eval and the training vocabulary, inert exactly where no one
+        would notice.
+        """
+        assert self._trained_vocabulary(), (
+            f"no phrasings at {PHRASINGS_PATH}; the separation guard cannot run. "
+            "The file is tracked — restore it rather than regenerating, since a re-run "
+            "returns different words and changes the training set."
+        )
+
+    def test_turns_avoid_every_generated_phrasing(self):
+        trained = self._trained_vocabulary()
         for row in self._synonym_turns():
             text = row["user_input"].lower()
             reused = sorted(w for w in trained if w in text)
