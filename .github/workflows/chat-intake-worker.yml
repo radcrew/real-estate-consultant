@@ -13,10 +13,18 @@
 # setup does not get a red tick.
 name: Chat intake worker
 
+# Builds on any branch listed here; only main updates the live function (see the last
+# step). A feature branch producing an image is useful — that image is what you point the
+# function at when creating it — while letting one deploy over production is not.
+#
+# Note `workflow_dispatch` only appears in the Actions tab once this file is on the
+# default branch, so a feature branch needs its own push trigger to run at all.
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
+      - feat/bedrock-llm-platform
     paths:
       - "backend/**"
       - "infra/chat-intake-worker/**"
@@ -64,6 +72,8 @@ jobs:
           REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
           set -euo pipefail
+          # Tagged by commit, so an image is always traceable to the backend it contains
+          # — and rolling back is pointing the function at an earlier tag.
           IMAGE="$REGISTRY/${ECR_REPOSITORY}:${GITHUB_SHA::7}"
 
           # Build context is backend/, not the repo root — the Dockerfile copies
@@ -78,7 +88,9 @@ jobs:
           echo "uri=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Update the Lambda function
-        if: steps.config.outputs.configured == 'true'
+        # Only main deploys. A branch build still pushes the image above, which is what
+        # you create the function from the first time.
+        if: steps.config.outputs.configured == 'true' && github.ref == 'refs/heads/main'
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
         run: |
