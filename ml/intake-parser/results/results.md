@@ -65,6 +65,40 @@ live field, and `Warehouse` mapped to `industrial` — no listing carries Wareho
 
 ## r8 — 129 turns, bare sizes golded as ceilings
 
+> ### ⚠ The v6 artifacts were overwritten. These rows cannot be re-verified.
+>
+> Every file named `*-v6-*` in `.local/models/` is the **retrain**, not the model these
+> rows measured. The retrain reused the version name, so the adapter, the merged
+> directory and both GGUFs were replaced in place on 2026-08-14, seven hours after the v6
+> rows below were recorded.
+>
+> The proof is in the checkpoint. `lora-intake-v6/checkpoint-282` reports **282 steps** and
+> a final eval loss of **0.03646**; the v6 described below is 338 steps at **0.0278**. The
+> method is sound because it reproduces the neighbouring row exactly —
+> `lora-intake-v5/checkpoint-338` reads 0.010966 against the 0.0110 printed here. 282 steps
+> at an effective batch of 8 is ~2,250 rows, and its eval logs imply 250 validation rows:
+> a `--count 2500` dataset, not the 3,000 that `datasets/dataset_provenance.json` records.
+>
+> `lora-intake-v6 (1).zip` holds the same 282-step adapter, so there is no local copy of
+> what produced these numbers. **v5 is intact and verifiable.**
+>
+> Consequences, in order:
+>
+> - **Do not ship a GGUF built from the current `lora-intake-v6`.** It scores 0.851 value
+>   accuracy against the 0.912 below. `Qwen2.5-0.5B-Instruct-intake` — the unsuffixed merge
+>   `deploy/` names — was produced on 2026-08-15, after the overwrite.
+> - `0.5b-lora-v6-f16` and `0.5b-lora-v6-q4km` stay in the table as recorded. They are still
+>   the honest measurement of a model that existed; they are simply no longer reproducible
+>   from anything on this machine.
+> - `0.5b-lora-v6-retrain-q4km` records `model: qwen2.5-0.5b-instruct-intake-v6-q4_k_m` —
+>   the *same string* as the 0.912 row. The model field cannot distinguish them, which is
+>   the whole failure.
+> - Check Colab or Drive before treating the original adapter as lost.
+>
+> `build_gguf.py` now refuses to overwrite an existing artifact without `--force`. Nothing
+> guards the adapter directory, because the notebook writes that and the notebook writes no
+> provenance stamp — which is why this went unnoticed for two days.
+
 Same 129 turns as r7 and the same binaries and serving flags — `.local/bin` unchanged, 6
 threads, `--parallel 1`, `--cache-reuse 256`, `-c 4096`, i7-10750H. All rows `--split all
 --no-next-question`.

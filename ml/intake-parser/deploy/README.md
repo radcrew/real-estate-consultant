@@ -9,6 +9,22 @@ and stays in the package, while this directory holds only what is installed on t
 quant, not the imatrix one. See `results/results.md`: the imatrix scored 0.901 against
 0.935 and costs an hour per build.
 
+> **Check which adapter it was built from before shipping it.** The v6 artifacts in
+> `.local/models/` were overwritten in place by a retrain that reused the version name, so
+> a file called `...-v6-q4_k_m.gguf` currently holds a model scoring 0.851 rather than the
+> published 0.912. The version in a filename records the *name* of a run, not the run —
+> and this deployment reads the unsuffixed merge, which was produced after the overwrite.
+>
+> The check is one command against the adapter the GGUF came from:
+>
+> ```bash
+> python -c "import json;s=json.load(open('.local/models/<adapter>/checkpoint-*/trainer_state.json'));\
+> print(s['global_step'], s['num_train_epochs'], [l for l in s['log_history'] if 'eval_loss' in l][-1]['eval_loss'])"
+> ```
+>
+> Step count and final eval loss both have to match the row in `results.md` you intend to
+> ship. See the warning at the head of that file's r8 section.
+
 ## The shape of the deployment
 
 ```
