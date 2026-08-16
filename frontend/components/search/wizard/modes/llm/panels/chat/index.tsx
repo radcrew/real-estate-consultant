@@ -18,6 +18,13 @@ type ChatPanelProps = {
   onLlmSuccess: (data: LlmInputResponse) => void;
 };
 
+/** Nothing left to ask. Say where the search actually starts — it is a button, not a reply. */
+const COMPLETE_REPLY =
+  "You're all set! Choose \"Search Properties\" to see your matches, or tell me if you'd like to change anything.";
+
+/** Understood, but the intake is not finished and there is no question to ask this turn. */
+const ACKNOWLEDGED_REPLY = "Got it — I've noted that. Anything else you'd like to add?";
+
 // A failed job rejects with the reason the backend recorded, which is more specific than
 // anything derived from the HTTP call that merely accepted the turn.
 const describeError = (e: unknown): string => {
@@ -96,23 +103,19 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
       const data = await runTurn(sessionId, text);
       onLlmSuccess(data);
 
+      // Always say something. A turn that appended nothing left the user looking at their
+      // own message with no reply and no error, which is indistinguishable from a hang.
       const followUp = data.next_question?.text?.trim();
-      const assistantReply =
-        followUp ||
-        (data.missing_fields.length === 0
-          ? "You're all set! You can start searching properties now, or tell me if you'd like to update anything."
-          : "");
+      const assistantReply = followUp || (data.is_complete ? COMPLETE_REPLY : ACKNOWLEDGED_REPLY);
 
-      if (assistantReply) {
-        setMessages((m) => [
-          ...m,
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: assistantReply,
-          },
-        ]);
-      }
+      setMessages((m) => [
+        ...m,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: assistantReply,
+        },
+      ]);
     } catch (err) {
       setErrorMessage(describeError(err));
       setMessages((m) => m.filter((x) => x.id !== userMsg.id));

@@ -148,6 +148,16 @@ class TestResolveNextIntakeQuestion:
         assert result is not None
         assert result.key == "location"
 
+    def test_returns_none_once_nothing_is_missing(self):
+        # The model keeps suggesting the field it has just collected. Honouring that asks
+        # a completed question again, and the intake never ends.
+        result = resolve_next_intake_question(
+            questions=self._QUESTIONS,
+            suggested_question={"key": "budget", "text": "What is your budget?"},
+            missing_fields=[],
+        )
+        assert result is None
+
     def test_returns_none_when_nothing_matches(self):
         result = resolve_next_intake_question(
             questions=[],

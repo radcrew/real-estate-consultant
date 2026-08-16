@@ -121,6 +121,14 @@ def resolve_next_intake_question(
     missing_fields: list[str],
 ) -> IntakeSessionFirstQuestion | None:
     """Prefer LLM-authored text while anchoring the result to a known question row."""
+    # Nothing missing means nothing left to ask, whatever the model suggested. It goes on
+    # proposing the field it just collected — the intake is complete but the suggestion
+    # still names ``size_sqft`` — and the client shows any question it is handed, so the
+    # user answers the same one forever and never reaches the end. This is the same
+    # condition the caller reports as ``is_complete``.
+    if not missing_fields:
+        return None
+
     suggested = suggested_question_as_dict(suggested_question)
     suggested_key = suggested.get("key")
     suggested_text = suggested.get("text")

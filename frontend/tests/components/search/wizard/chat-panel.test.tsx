@@ -62,6 +62,35 @@ describe("ChatPanel", () => {
     expect(screen.getByText("What size do you need?")).toBeInTheDocument();
   });
 
+  const send = async (text: string) => {
+    fireEvent.change(screen.getByPlaceholderText(/type your requirements/i), {
+      target: { value: text },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /send/i }));
+  };
+
+  it("points at the search button once the intake is complete", async () => {
+    mockRunTurn.mockResolvedValue({
+      criteria: {}, missing_fields: [], question_titles: {},
+      next_question: null, is_complete: true,
+    });
+    render(<ChatPanel onLlmSuccess={vi.fn()} />);
+    await send("100k sqft");
+    expect(await screen.findByText(/Search Properties/i)).toBeInTheDocument();
+  });
+
+  it("always replies, even with no question and no completion", async () => {
+    // An empty reply appended nothing at all: the user saw their own message, no answer
+    // and no error, which looks exactly like a hang.
+    mockRunTurn.mockResolvedValue({
+      criteria: {}, missing_fields: ["size_sqft"], question_titles: {},
+      next_question: null, is_complete: false,
+    });
+    render(<ChatPanel onLlmSuccess={vi.fn()} />);
+    await send("something vague");
+    expect(await screen.findByText(/I've noted that/i)).toBeInTheDocument();
+  });
+
   it("keeps the typed message visible while the turn is still running", async () => {
     let settle: (value: unknown) => void = () => {};
     mockRunTurn.mockReturnValue(new Promise((resolve) => { settle = resolve; }));
