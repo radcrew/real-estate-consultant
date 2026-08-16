@@ -119,6 +119,36 @@ def _answer_matches(reply: str, option: str) -> bool:
     return bool(tokens) and tokens[0] == option.lower()
 
 
+def drop_ambiguous_claims(phrasings: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Remove any wording two options both claim, from **both** of them.
+
+    A candidate claimed by two options is ambiguous, and the reason it goes is that either
+    label would be wrong on a training example. Keeping one of them is the outcome that
+    reason rules out.
+
+    This is two passes for that reason. A single pass that records the first claimant and
+    strips the second leaves the word attached to whichever option the dict happened to
+    yield first: the run prints "dropping 'depot'" while 'depot' stays in the file under
+    `industrial`, and re-running can flip which label it teaches. The output has no
+    duplicate either way, so the artifact alone never showed the difference.
+
+    Lifted out of ``main_async`` to be testable. It was the only unreachable-by-test step
+    between a model's answer and the training vocabulary.
+    """
+    claimants: dict[str, list[str]] = {}
+    for option, words in phrasings.items():
+        for word in words:
+            claimants.setdefault(word, []).append(option)
+
+    ambiguous = {word: owners for word, owners in claimants.items() if len(owners) > 1}
+    for word, owners in ambiguous.items():
+        print(f"  dropping {word!r}: claimed by {' and '.join(owners)}")
+    return {
+        option: [word for word in words if word not in ambiguous]
+        for option, words in phrasings.items()
+    }
+
+
 async def propose(client: AsyncOpenAI, model: str, option: str, count: int) -> list[str]:
     reply = await client.chat.completions.create(
         model=model, temperature=0.8, max_tokens=250,
@@ -197,22 +227,7 @@ async def main_async(argv: list[str] | None = None) -> int:
         print(f"  {option:<12} proposed {len(proposed):>2}  kept {len(kept):>2}  {kept}")
     await client.close()
 
-    # Two passes, because the drop has to apply to *every* claimant. A single pass that
-    # records the first and strips the second leaves the word attached to whichever option
-    # the dict happened to yield first -- so re-running could flip which label an
-    # ambiguous word teaches, and the run says "dropping 'depot'" while 'depot' stays in
-    # the file under `industrial`. The stated reason for dropping is that both labels
-    # would be wrong; keeping one of them is the outcome that reason rules out.
-    claimants: dict[str, list[str]] = {}
-    for option, words in phrasings.items():
-        for word in words:
-            claimants.setdefault(word, []).append(option)
-    for word, owners in claimants.items():
-        if len(owners) < 2:
-            continue
-        print(f"  dropping {word!r}: claimed by {' and '.join(owners)}")
-        for option in owners:
-            phrasings[option] = [w for w in phrasings[option] if w != word]
+    phrasings = drop_ambiguous_claims(phrasings)
 
     out = Path(args.out)
     out.write_text(json.dumps(phrasings, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
