@@ -42,7 +42,7 @@ def chunked(texts: list[str], size: int) -> list[list[str]]:
 
 
 class BedrockEmbeddingsProvider:
-    """Provider client for Cohere Embed v3 text embeddings on Amazon Bedrock.
+    """Provider client for Cohere Embed (v3 or v4) text embeddings on Amazon Bedrock.
 
     Only the Cohere request/response shape is supported. Titan embeds a single text per
     call, so it would need a fan-out request path rather than a different body.
@@ -95,14 +95,23 @@ class BedrockEmbeddingsProvider:
 
     def _invoke(self, chunk: list[str]) -> list[list[float]]:
         """Blocking ``InvokeModel`` call — always run via ``anyio.to_thread``."""
+        body: dict[str, Any] = {"texts": chunk, "input_type": "search_document"}
+        # v4 alone accepts a width, and defaults to 1536 without one. v3 has a single fixed
+        # width and rejects the field, so it is sent only when explicitly configured.
+        if self.settings.bedrock_embedding_dimensions > 0:
+            body["output_dimension"] = self.settings.bedrock_embedding_dimensions
         response = self.client.invoke_model(
             modelId=self.settings.bedrock_embedding_model,
-            body=json.dumps({"texts": chunk, "input_type": "search_document"}),
+            body=json.dumps(body),
             accept="application/json",
             contentType="application/json",
         )
         payload = json.loads(response["body"].read())
-        return _parse_embeddings(payload, expected=len(chunk))
+        return _parse_embeddings(
+            payload,
+            expected=len(chunk),
+            width=self.settings.bedrock_embedding_dimensions or None,
+        )
 
     async def embed(self, *, texts: list[str]) -> list[list[float]]:
         """Return one embedding vector per input text, in input order."""
@@ -152,8 +161,17 @@ class BedrockEmbeddingsProvider:
         raise_bedrock_api_error(cause=exc)
 
 
-def _parse_embeddings(payload: object, *, expected: int) -> list[list[float]]:
-    """Read Cohere Embed v3's ``{"embeddings": [[float, …], …]}`` response body."""
+def _parse_embeddings(
+    payload: object,
+    *,
+    expected: int,
+    width: int | None = None,
+) -> list[list[float]]:
+    """Read Cohere Embed's ``{"embeddings": [[float, …], …]}`` response body.
+
+    ``width`` is checked here rather than left to the insert: a vector of the wrong length
+    fails in the database as an opaque type error, far from the setting that caused it.
+    """
     if not isinstance(payload, dict):
         raise_bad_gateway("Bedrock returned an unexpected embedding response.")
     raw = payload.get("embeddings")
@@ -166,6 +184,11 @@ def _parse_embeddings(payload: object, *, expected: int) -> list[list[float]]:
     if len(vectors) != expected:
         raise_bad_gateway(
             "Bedrock embedding count did not match the number of input texts.",
+        )
+    if width is not None and any(len(vector) != width for vector in vectors):
+        got = sorted({len(vector) for vector in vectors})
+        raise_bad_gateway(
+            f"Bedrock returned {got} dimensional embeddings, expected {width}.",
         )
     return vectors
 

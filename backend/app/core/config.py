@@ -80,9 +80,16 @@ class Settings(BaseSettings):
     # Adaptive thinking is on by default on Claude 5 models and counts against max_tokens.
     # Callers size max_tokens for models without thinking, so leave it off for extraction.
     bedrock_disable_thinking: bool = True
+    # Not every region carries every model: eu-north-1 has no cohere.embed-english-v3, and
+    # offers v4 only through an inference profile ("eu.cohere.embed-v4:0"), whose id goes in
+    # this same field. Check list_foundation_models for the target region before changing it.
     bedrock_embedding_model: str = "cohere.embed-english-v3"
     # Cohere Embed v3 accepts roughly 96 texts per InvokeModel call.
     bedrock_embedding_batch_size: int = 96
+    # Width to ask Cohere Embed v4 for. It defaults to 1536, which does not fit the
+    # vector(1024) column, so the two have to be set together. 0 omits the field entirely,
+    # which is required for v3 — it has one fixed width and rejects the parameter.
+    bedrock_embedding_dimensions: int = 0
     bedrock_input_cost_per_1m: float = 0.0
     bedrock_output_cost_per_1m: float = 0.0
 
