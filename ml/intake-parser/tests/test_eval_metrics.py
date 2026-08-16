@@ -254,6 +254,29 @@ class TestRates:
         assert result["recall"] == 1.0
         assert result["f1"] == pytest.approx(2 / 3)
 
+    def test_a_total_miss_scores_zero_rather_than_reading_as_unmeasured(self):
+        """`None` is "not measured"; 0.0 is "measured, nothing right". Not the same thing.
+
+        tp=0 with predictions made and gold to find: both rates are defined and both are
+        0.0, so F1 is 0.0. Returning None there reported the worst possible score as no
+        score at all -- two recorded runs carry it on their `complete` category.
+        """
+        result = prf(tp=0, fp=3, fn=2)
+        assert result["precision"] == 0.0
+        assert result["recall"] == 0.0
+        assert result["f1"] == 0.0
+
+    @pytest.mark.parametrize(
+        ("tp", "fp", "fn", "why"),
+        [
+            (0, 0, 0, "nothing predicted and nothing to find"),
+            (0, 0, 2, "nothing predicted, so precision has no denominator"),
+            (0, 3, 0, "nothing to find, so recall has no denominator"),
+        ],
+    )
+    def test_f1_stays_none_when_a_rate_is_genuinely_undefined(self, tp, fp, fn, why):
+        assert prf(tp=tp, fp=fp, fn=fn)["f1"] is None, why
+
     def test_percentile_nearest_rank(self):
         assert percentile([1, 2, 3, 4, 5], 50) == 3
         assert percentile([1, 2, 3, 4, 5], 95) == 5

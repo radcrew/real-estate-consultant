@@ -35,6 +35,14 @@ eval-set noise is reported as *cannot say* rather than as a pass or a fail, and 
 difference that does clear it is flagged as unattributed while the training floor is
 unknown. A gate that answers confidently on an unmeasured threshold rejects good adapters
 and passes bad ones with equal confidence.
+
+**Two paired tests, not one.** Whole-turn correctness and skip handling are scored
+separately, because a turn can be exact on every field and still fail the user: nothing in
+``turn_is_exact`` reads a skip counter, so a candidate that stopped emitting
+``skipped_fields`` entirely -- skip recall 0.83 to 0.00 -- once cleared this gate on field
+wins alone. Skip recall was printed directly above the verdict the whole time. A measured
+skip regression is now a reject on its own, whatever the field test says; an unmeasurable
+one is printed under the promote rather than swallowed.
 """
 
 from __future__ import annotations
@@ -46,6 +54,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from pipeline.eval.metrics import prf, ratio
 from pipeline.paths import RESULTS_DIR
 
 # Metrics a candidate must not go backwards on, in the order they are reported.
@@ -74,6 +83,27 @@ def turn_is_exact(turn: dict[str, Any]) -> bool:
         and turn.get("field_fp", 0) == 0
         and turn.get("field_fn", 0) == 0
         and turn.get("value_correct", 0) == turn.get("value_compared", 0)
+    )
+
+
+def turn_skips_are_exact(turn: dict[str, Any]) -> bool:
+    """Whether the turn's skip decisions came out right: none missed, none invented.
+
+    Separate from ``turn_is_exact``, which is documented as "every key, every value" and
+    is the number every historical row was computed with -- folding skips into it would
+    silently redefine a published metric. This is a second binary per-turn outcome, so the
+    same exact paired test applies to it without any new statistics.
+
+    It exists because the verdict read only field outcomes. A candidate could stop
+    emitting ``skipped_fields`` altogether -- skip recall 0.83 to 0.00 -- and still
+    promote, because none of that reaches ``turn_is_exact``. The user-facing consequence
+    is being re-asked a question they explicitly declined.
+    """
+    return bool(
+        not turn.get("error")
+        and turn.get("schema_valid")
+        and turn.get("skip_fp", 0) == 0
+        and turn.get("skip_fn", 0) == 0
     )
 
 
@@ -108,12 +138,6 @@ def mcnemar(baseline: dict[str, bool], candidate: dict[str, bool]) -> dict[str, 
     }
 
 
-def _rate(numerator: float | None, denominator: float | None) -> float | None:
-    if not denominator:
-        return None
-    return numerator / denominator
-
-
 def totals(run: dict[str, Any]) -> dict[str, Any]:
     """Metric numerators and denominators, so a delta can be stated in items."""
     turns = run["turns"]
@@ -125,18 +149,18 @@ def totals(run: dict[str, Any]) -> dict[str, Any]:
     tp = sum(t.get("field_tp", 0) for t in turns)
     fp = sum(t.get("field_fp", 0) for t in turns)
     fn = sum(t.get("field_fn", 0) for t in turns)
-    precision, recall = _rate(tp, tp + fp), _rate(tp, tp + fn)
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if precision and recall and (precision + recall)
-        else None
-    )
+    # metrics.prf, not a second copy of it. The copy here guarded with `if precision and
+    # recall`, so a candidate emitting only keys absent from gold -- precision exactly 0.0
+    # -- printed `n/a`, and the metric that had just collapsed to zero read as "not
+    # measured". metrics.prf guards with `is None` and returns 0.0 for the same input, so
+    # the project's two scorers disagreed about one run.
+    field = prf(tp, fp, fn)
     exact = sum(1 for t in turns if turn_is_exact(t))
     return {
         "turn_exact": (exact, len(turns)),
         "value_accuracy": (value_correct, value_compared),
         "skip_recall": (skip_tp, skip_tp + skip_fn),
-        "field_f1": (f1, None),
+        "field_f1": (field["f1"], None),
         "_field_precision": (tp, tp + fp),
         "_field_recall": (tp, tp + fn),
         "_skip_fp": skip_fp,
@@ -151,7 +175,30 @@ def _rate_of(pair: tuple[Any, Any]) -> float | None:
     numerator, denominator = pair
     if denominator is None:
         return numerator
-    return _rate(numerator, denominator)
+    return ratio(numerator, denominator)
+
+
+def _items(base: tuple[Any, Any], cand: tuple[Any, Any]) -> str:
+    """The delta stated in items -- which is this column's entire purpose.
+
+    It printed one denominator for both numerators. ``value_accuracy``'s denominator is
+    ``value_compared``, the size of ``gold n pred``, which is a property of the *run*: a
+    candidate that predicts more keys is compared on more of them. Baseline 86/98 against
+    candidate 93/102 rendered as `93 vs 86 of 102`, stating a shared denominator that does
+    not exist, and a per-item weight taken from one side only.
+
+    Only ``value_accuracy`` moves in practice -- ``turn_exact`` is guarded by the
+    same-turns refusal, and ``skip_recall``'s denominator is the gold skip count -- but
+    the one that moves is the one the cycle-costing "regression" was measured in.
+    """
+    base_num, base_den = base
+    cand_num, cand_den = cand
+    if base_den is None or cand_den is None or not (base_den or cand_den):
+        return ""
+    if base_den == cand_den:
+        return f"{cand_num} vs {base_num} of {cand_den}   (1 item = {1 / cand_den:.4f})"
+    return (f"{cand_num}/{cand_den} vs {base_num}/{base_den}"
+            f"   (denominators differ; a rate delta is not an item count)")
 
 
 def compare(baseline: dict[str, Any], candidate: dict[str, Any], alpha: float) -> int:
@@ -189,17 +236,14 @@ def compare(baseline: dict[str, Any], candidate: dict[str, Any], alpha: float) -
     for name in HEADLINE:
         was, now = _rate_of(base_totals[name]), _rate_of(cand_totals[name])
         delta = None if was is None or now is None else now - was
-        _, denominator = cand_totals[name]
-        items = ""
-        if denominator:
-            items = (f"{cand_totals[name][0]} vs {base_totals[name][0]} of {denominator}"
-                     f"   (1 item = {1 / denominator:.4f})")
         print(f"{name:<16} {_fmt(was):>10} {_fmt(now):>10} "
-              f"{'n/a' if delta is None else f'{delta:+.4f}':>9}   {items}")
+              f"{'n/a' if delta is None else f'{delta:+.4f}':>9}   "
+              f"{_items(base_totals[name], cand_totals[name])}")
 
-    exact_base = {tid: turn_is_exact(t) for tid, t in base_turns.items()}
-    exact_cand = {tid: turn_is_exact(t) for tid, t in cand_turns.items()}
-    test = mcnemar(exact_base, exact_cand)
+    test = mcnemar(
+        {tid: turn_is_exact(t) for tid, t in base_turns.items()},
+        {tid: turn_is_exact(t) for tid, t in cand_turns.items()},
+    )
 
     print(f"\npaired on whole turns: {len(test['won'])} won, {len(test['lost'])} lost, "
           f"{len(base_turns) - test['discordant']} unchanged")
@@ -210,13 +254,24 @@ def compare(baseline: dict[str, Any], candidate: dict[str, Any], alpha: float) -
     for tid in test["won"]:
         print(f"  won       {tid}")
 
+    skips = mcnemar(
+        {tid: turn_skips_are_exact(t) for tid, t in base_turns.items()},
+        {tid: turn_skips_are_exact(t) for tid, t in cand_turns.items()},
+    )
+    print(f"\npaired on skip decisions: {len(skips['won'])} won, {len(skips['lost'])} lost, "
+          f"{len(base_turns) - skips['discordant']} unchanged")
+    if skips["discordant"]:
+        print(f"exact McNemar p = {skips['p']:.4f} over {skips['discordant']} disagreements")
+        for tid in skips["lost"]:
+            print(f"  skip lost {tid}")
+
     regressions = _category_regressions(baseline, candidate)
     if regressions:
         print("\ncategories where value accuracy fell:")
         for name, was, now in regressions:
             print(f"  {name:<22} {_fmt(was)} -> {_fmt(now)}")
 
-    return _verdict(test, alpha, regressions)
+    return _verdict(test, skips, alpha, regressions)
 
 
 def _gold_check(baseline: dict[str, Any], candidate: dict[str, Any]) -> str:
@@ -254,8 +309,34 @@ def _category_regressions(
     return sorted(fell, key=lambda row: row[2] - row[1])
 
 
-def _verdict(test: dict[str, Any], alpha: float, regressions: list) -> int:
+def _skips_significantly_worse(skips: dict[str, Any], alpha: float) -> bool:
+    return bool(
+        skips["discordant"]
+        and skips["p"] < alpha
+        and len(skips["lost"]) > len(skips["won"])
+    )
+
+
+def _verdict(
+    test: dict[str, Any], skips: dict[str, Any], alpha: float, regressions: list
+) -> int:
     print()
+    # Checked before the field verdict, not after it, because it can only ever make the
+    # answer more conservative. A measured skip regression is a result whatever the field
+    # test says -- and the field test cannot see it: `turn_is_exact` reads error,
+    # schema_valid, field_fp/fn and value_correct, and no skip counter at all. Skip
+    # recall is printed directly above this line and nothing used to read it.
+    if _skips_significantly_worse(skips, alpha):
+        print(f"VERDICT reject -- skip handling went backwards on "
+              f"{len(skips['lost'])} turns against {len(skips['won'])} recovered "
+              f"(p = {skips['p']:.4f} < {alpha}), which is a regression the whole-turn "
+              f"test cannot see.")
+        if test["discordant"] and test["p"] < alpha and len(test["won"]) > len(test["lost"]):
+            print(f"         Fields did improve -- {len(test['won'])} turns won against "
+                  f"{len(test['lost'])} lost -- so this is a trade, not a failure. Being "
+                  f"re-asked a declined question is the cost; decide it deliberately "
+                  f"rather than by exit code.")
+        return 1
     if test["discordant"] == 0:
         print("VERDICT cannot say -- the two runs agree on every turn. Identical "
               "behaviour, or a decode that is deterministic and data that did not move.")
@@ -271,6 +352,10 @@ def _verdict(test: dict[str, Any], alpha: float, regressions: list) -> int:
         return 1
     print(f"VERDICT promote on eval-set noise -- {len(test['won'])} turns won against "
           f"{len(test['lost'])} lost (p = {test['p']:.4f}).")
+    if len(skips["lost"]) > len(skips["won"]):
+        print(f"         Skip handling fell on {len(skips['lost'])} turns against "
+              f"{len(skips['won'])} recovered, which does not clear eval-set noise "
+              f"(p = {skips['p']:.4f}). Not a reason to reject, and not nothing.")
     if regressions:
         print(f"         but {len(regressions)} categor"
               f"{'y' if len(regressions) == 1 else 'ies'} went backwards; read them above.")

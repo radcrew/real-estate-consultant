@@ -186,11 +186,25 @@ def ratio(numerator: int, denominator: int) -> float | None:
 
 
 def prf(tp: int, fp: int, fn: int) -> dict[str, float | None]:
-    """Precision, recall and F1, each ``None`` where its denominator is empty."""
+    """Precision, recall and F1, each ``None`` where its denominator is empty.
+
+    ``None`` means *not measured*; ``0.0`` means *measured, and nothing was right*. The
+    two must not be confused, because the second is the worst possible score and the first
+    is no score at all.
+
+    F1 followed that rule for its inputs and then broke it for itself: ``precision + recall
+    == 0`` short-circuited to ``None`` alongside the genuinely-undefined cases, so a
+    candidate that predicted keys and got every one of them wrong -- both rates defined,
+    both exactly 0.0 -- reported its collapse as "not measured". Two recorded runs carry
+    that on their ``complete`` category. The guard is only needed to avoid dividing by
+    zero, and the value at that limit is 0.0.
+    """
     precision = ratio(tp, tp + fp)
     recall = ratio(tp, tp + fn)
-    if precision is None or recall is None or (precision + recall) == 0:
+    if precision is None or recall is None:
         f1 = None
+    elif precision + recall == 0:
+        f1 = 0.0
     else:
         f1 = 2 * precision * recall / (precision + recall)
     return {"precision": precision, "recall": recall, "f1": f1}

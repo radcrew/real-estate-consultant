@@ -160,3 +160,155 @@ class TestLoading:
     def test_a_missing_run_is_a_clear_error(self):
         with pytest.raises(SystemExit, match="no results at"):
             gate.load_run("definitely-not-a-label")
+
+
+class TestSkipRegressionsReachTheVerdict:
+    """Finding 8. `turn_is_exact` reads no skip counter, so the gate could not see them.
+
+    The scenario, from the review: a candidate fixes 12 field turns while ceasing to emit
+    `skipped_fields` at all. 12 won / 0 lost, p ~ 0.0005, exit 0 promote -- with skip
+    recall collapsed from 0.83 to 0.00 and printed two lines above the verdict.
+    """
+
+    def _pair(self, base_spec, cand_spec):
+        """Each spec entry is (field_exact, skips_handled)."""
+        def build(spec):
+            return [
+                _turn(f"t{i}", exact=field_ok, skips=(1, 0, 0) if skip_ok else (0, 0, 1))
+                for i, (field_ok, skip_ok) in enumerate(spec)
+            ]
+        return _run("base", build(base_spec)), _run("cand", build(cand_spec))
+
+    def test_the_review_scenario_no_longer_promotes(self, capsys):
+        # 12 turns: baseline handles every skip and gets every field wrong; the candidate
+        # inverts both. Fields say promote loudly; skips say the opposite just as loudly.
+        base = [(False, True)] * 12
+        cand = [(True, False)] * 12
+        code = gate.compare(*self._pair(base, cand), alpha=0.05)
+        out = capsys.readouterr().out
+        assert code == 1
+        assert "VERDICT reject" in out
+        assert "skip handling went backwards" in out
+
+    def test_it_says_the_fields_improved_rather_than_hiding_it(self, capsys):
+        code = gate.compare(
+            *self._pair([(False, True)] * 12, [(True, False)] * 12), alpha=0.05
+        )
+        assert code == 1
+        assert "this is a trade, not a failure" in capsys.readouterr().out
+
+    def test_a_field_win_with_skips_intact_still_promotes(self, capsys):
+        code = gate.compare(
+            *self._pair([(False, True)] * 12, [(True, True)] * 12), alpha=0.05
+        )
+        assert code == 0
+        assert "VERDICT promote" in capsys.readouterr().out
+
+    def test_a_skip_regression_too_small_to_measure_is_noted_not_rejected(self, capsys):
+        # One skip lost against 11 field wins: p = 1.0 on a single discordant pair.
+        base = [(False, True)] + [(False, True)] * 11
+        cand = [(True, False)] + [(True, True)] * 11
+        code = gate.compare(*self._pair(base, cand), alpha=0.05)
+        out = capsys.readouterr().out
+        assert code == 0
+        assert "Skip handling fell on 1 turns" in out
+        assert "not a reason to reject, and not nothing" in out.lower()
+
+    def test_recovering_skips_is_never_a_reject(self, capsys):
+        code = gate.compare(
+            *self._pair([(True, False)] * 12, [(True, True)] * 12), alpha=0.05
+        )
+        assert code != 1
+
+    def test_the_skip_pairing_is_reported_even_when_nothing_moved(self, capsys):
+        gate.compare(*self._pair([(True, True)] * 5, [(True, True)] * 5), alpha=0.05)
+        assert "paired on skip decisions" in capsys.readouterr().out
+
+
+class TestSkipExactness:
+    def test_a_clean_skip_turn_is_exact(self):
+        assert gate.turn_skips_are_exact(_turn("t", skips=(2, 0, 0))) is True
+
+    def test_a_missed_skip_is_not(self):
+        assert gate.turn_skips_are_exact(_turn("t", skips=(0, 0, 1))) is False
+
+    def test_an_invented_skip_is_not(self):
+        assert gate.turn_skips_are_exact(_turn("t", skips=(0, 1, 0))) is False
+
+    def test_an_errored_turn_is_not(self):
+        turn = _turn("t", skips=(0, 0, 0))
+        turn["error"] = "timeout"
+        assert gate.turn_skips_are_exact(turn) is False
+
+    def test_it_is_independent_of_field_correctness(self):
+        """The whole point: a turn can be field-perfect and skip-wrong."""
+        turn = _turn("t", exact=True, skips=(0, 0, 1))
+        assert gate.turn_is_exact(turn) is True
+        assert gate.turn_skips_are_exact(turn) is False
+
+
+class TestF1OfZeroIsAMeasurement:
+    """Finding 6. `if precision and recall` is truthiness, so 0.0 became None -> `n/a`."""
+
+    def test_a_candidate_predicting_only_wrong_keys_scores_zero_not_n_a(self):
+        # tp=0 with both fp and fn positive: precision and recall are both exactly 0.0.
+        run = _run("r", [_turn("t", fields=(0, 3, 2))])
+        assert gate.totals(run)["field_f1"][0] == 0.0
+
+    def test_it_agrees_with_the_scorer_that_wrote_the_results_file(self):
+        from pipeline.eval.metrics import prf
+
+        run = _run("r", [_turn("t", fields=(0, 3, 2))])
+        assert gate.totals(run)["field_f1"][0] == prf(tp=0, fp=3, fn=2)["f1"]
+
+    def test_a_run_with_no_fields_at_all_is_genuinely_not_measured(self):
+        run = _run("r", [_turn("t", fields=(0, 0, 0))])
+        assert gate.totals(run)["field_f1"][0] is None
+
+    def test_zero_prints_as_a_number(self, capsys):
+        gate.compare(
+            _run("base", [_turn("t", fields=(1, 0, 0))]),
+            _run("cand", [_turn("t", fields=(0, 3, 2))]),
+            alpha=0.05,
+        )
+        line = next(
+            row for row in capsys.readouterr().out.splitlines() if row.startswith("field_f1")
+        )
+        assert "0.0000" in line and "n/a" not in line
+
+
+class TestTheItemsColumnStatesOneDenominator:
+    """Finding 12. Two runs' numerators were printed over the candidate's denominator."""
+
+    def _line(self, capsys, metric):
+        return next(
+            row for row in capsys.readouterr().out.splitlines() if row.startswith(metric)
+        )
+
+    def test_differing_denominators_are_both_shown(self, capsys):
+        gate.compare(
+            _run("base", [_turn("t", values=(4, 5))]),
+            _run("cand", [_turn("t", values=(6, 8))]),
+            alpha=0.05,
+        )
+        line = self._line(capsys, "value_accuracy")
+        assert "6/8 vs 4/5" in line
+        assert "denominators differ" in line
+
+    def test_a_shared_denominator_still_reads_as_items(self, capsys):
+        gate.compare(
+            _run("base", [_turn("t", values=(4, 8))]),
+            _run("cand", [_turn("t", values=(6, 8))]),
+            alpha=0.05,
+        )
+        line = self._line(capsys, "value_accuracy")
+        assert "6 vs 4 of 8" in line
+        assert "1 item = 0.1250" in line
+
+    def test_it_never_claims_a_denominator_the_baseline_did_not_have(self, capsys):
+        gate.compare(
+            _run("base", [_turn("t", values=(4, 5))]),
+            _run("cand", [_turn("t", values=(6, 8))]),
+            alpha=0.05,
+        )
+        assert "6 vs 4 of 8" not in self._line(capsys, "value_accuracy")
