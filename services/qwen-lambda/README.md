@@ -1,4 +1,4 @@
-# `qwen-lambda` — Qwen2.5-0.5B on Lambda
+# `qwen-inference` — Qwen2.5-0.5B on Lambda
 
 CPU-only container that serves criteria extraction for the intake path, and nothing
 else. `app/llm/providers/qwen_lambda.py` invokes it over IAM; the two sides of the
