@@ -10,10 +10,16 @@ import { AuthProvider } from "@contexts/auth";
 import "./globals.css";
 
 // Voyager's typeface — Poppins (weights 300–700) — for visual parity.
+//
+// Named for the font, not the role: the theme maps --font-sans to it. Publishing the
+// face as --font-sans directly collides with the theme's own --font-sans on the same
+// element, at the same specificity, and "--font-sans: var(--font-sans)" is a reference
+// cycle — so whichever stylesheet happens to load second decides whether the font
+// resolves at all.
 const poppins = Poppins({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-sans",
+  variable: "--font-poppins",
   display: "swap",
 });
 
