@@ -258,9 +258,41 @@ class TestRates:
         assert percentile([1, 2, 3, 4, 5], 50) == 3
         assert percentile([1, 2, 3, 4, 5], 95) == 5
 
+    @pytest.mark.parametrize(
+        ("values", "p", "expected"),
+        [
+            # p * n / 100 is a whole number in every one of these, which is the case the
+            # old round-half-to-even implementation returned one rank too high on. Odd-
+            # length lists alone — all this test used to cover — never reach it at p50.
+            ([1, 2], 50, 1),
+            ([1, 2, 3, 4], 50, 2),
+            ([1, 2, 3, 4, 5, 6], 50, 3),
+            (list(range(1, 21)), 95, 19),
+            (list(range(1, 21)), 50, 10),
+            (list(range(1, 41)), 95, 38),
+        ],
+    )
+    def test_percentile_does_not_skip_a_rank_when_the_rank_is_exact(self, values, p, expected):
+        assert percentile(values, p) == expected
+
+    def test_percentile_is_the_smallest_value_at_or_above_p_percent(self):
+        # The defining property, checked against a count rather than a rank formula.
+        values = [float(v) for v in range(1, 130)]  # the 129-turn eval set
+        for p in (50, 90, 95, 99):
+            result = percentile(values, p)
+            at_or_below = sum(1 for v in values if v <= result)
+            assert at_or_below >= p / 100 * len(values)
+            assert sum(1 for v in values if v < result) < p / 100 * len(values)
+
     def test_percentile_edges(self):
         assert percentile([], 50) is None
         assert percentile([7.0], 95) == 7.0
+        assert percentile([7.0], 50) == 7.0  # the len==1 early return is gone; still holds
+        assert percentile([1, 2, 3], 0) == 1
+        assert percentile([1, 2, 3], 100) == 3
+
+    def test_percentile_ignores_input_order(self):
+        assert percentile([5, 1, 4, 2, 3, 6], 50) == 3
 
 
 class TestAggregate:

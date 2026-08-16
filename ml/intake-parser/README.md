@@ -280,10 +280,25 @@ any of those drift.
 These are not arbitrary, and the eval scores against the same ones. Getting them wrong in
 either place marks a correctly-trained model wrong:
 
-* A **bare budget is a ceiling**: `half a million` → `{"max": 500000}`.
-* A **bare size is exact**: `10,000 sqft` → `{"min": 10000, "max": 10000}`. v3 generated
-  max-only for both, so answering the size question with `32` trained a 32 sqft ceiling
-  and every later correction stacked against it.
+* A **bare budget is a ceiling**, with or without a currency symbol: `half a million`,
+  `$500k` and a naked `500000` typed at the budget question all gold `{"max": 500000}`.
+* A **bare size carrying a unit is a ceiling too**: `10,000 sqft` → `{"max": 10000}`.
+* A **naked size — no unit at all — is exact**: `10000` typed at the size question golds
+  `{"min": 10000, "max": 10000}`.
+
+The size rule splits on the unit because the same string cannot carry two golds. Once
+`130k sqft` appears, it reads identically whether it answers a question or arrives
+unprompted, so it takes the ceiling gold in both. A figure with no unit only ever occurs
+as a direct answer, and there the exact reading is the right one: v3 golded max-only
+everywhere, which turned an answer of `32` into a 32 sqft ceiling that every later
+correction stacked against.
+
+> **This changed at r8** — eight size golds in `eval.jsonl` moved from exact to max-only,
+> and the generator has built `SQFT_NUMBERS` with `bare_is_exact=False` since. Rows before
+> r8 were scored under the old rule and are not comparable on size. The authoritative
+> statement is the comment on the `bare` branch of `_range_phrase`; this section restates
+> it, so if the two ever disagree, the code is right.
+
 * A figure in **square yards golds square feet**: `1,500 yards` → `13500`. The only unit
   in the set where the stated figure and the gold figure differ, so it is the only place
   the model must convert rather than copy.

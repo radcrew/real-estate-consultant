@@ -44,6 +44,7 @@ from pipeline.data.generate import (
     collision_key,
     eval_input_keys,
     load_phrasings,
+    main,
     make_example,
     property_type_values,
     to_chat_record,
@@ -1170,3 +1171,103 @@ class TestSynonymEvalSeparation:
         for row in self._synonym_turns():
             for value in row["gold"]["extracted"]["property_type"]:
                 assert value in options, f"{row['id']} golds {value!r}, not an option"
+
+
+class TestAFailedGenerationWritesNothing:
+    """`--out` and `--val-out` default to the real training set, opened with "w".
+
+    A run that produces nothing usable used to truncate `datasets/train.jsonl` and stamp a
+    provenance record over it before dying on a ZeroDivisionError in the summary. The
+    training set is not regenerable without a Supabase connection and an OpenRouter key,
+    so the destructive half completing while the reporting half crashed was the worst
+    possible ordering. These pin that the refusal happens *before* any write.
+    """
+
+    def _run(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *flags: str) -> int:
+        out, val = tmp_path / "train.jsonl", tmp_path / "validation.jsonl"
+        out.write_text("SENTINEL\n", encoding="utf-8")
+        val.write_text("SENTINEL\n", encoding="utf-8")
+        # A missing phrasings file is a supported input — load_phrasings falls back to the
+        # literal option — so this stays green on a fresh clone. See finding 5.
+        monkeypatch.setattr(
+            "sys.argv",
+            ["generate", "--out", str(out), "--val-out", str(val),
+             "--phrasings", str(tmp_path / "absent.json"), *flags],
+        )
+        code = main()
+        self.out, self.val = out, val
+        return code
+
+    def test_count_zero_is_refused(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        assert self._run(tmp_path, monkeypatch, "--count", "0") == 1
+
+    def test_count_zero_leaves_the_outputs_untouched(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._run(tmp_path, monkeypatch, "--count", "0")
+        assert self.out.read_text(encoding="utf-8") == "SENTINEL\n"
+        assert self.val.read_text(encoding="utf-8") == "SENTINEL\n"
+
+    def test_count_zero_writes_no_provenance_stamp(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        self._run(tmp_path, monkeypatch, "--count", "0")
+        assert not (tmp_path / "dataset_provenance.json").exists()
+
+    def test_a_split_that_empties_one_side_is_refused(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        # 1 record at the default 0.1 val fraction splits 0/1 — an empty train.jsonl that
+        # would train on nothing, and a summary that divides by len(train).
+        assert self._run(tmp_path, monkeypatch, "--count", "1") == 1
+        assert self.out.read_text(encoding="utf-8") == "SENTINEL\n"
+
+    def test_a_healthy_run_still_writes_both_sides(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        assert self._run(tmp_path, monkeypatch, "--count", "40") == 0
+        train = [json.loads(row) for row in self.out.read_text(encoding="utf-8").splitlines()]
+        val = [json.loads(row) for row in self.val.read_text(encoding="utf-8").splitlines()]
+        assert train and val
+        assert len(train) + len(val) == 40
+
+
+class TestTheEvalGoldsFollowTheSameSizeConvention:
+    """The README's claim that "the eval scores against the same ones", made testable.
+
+    ``TestBareFiguresAreCeilings`` pins the generator side. Nothing pinned this side, so
+    when r8 moved eight size golds from exact to max-only the two could have parted
+    company silently — and a gold that disagrees with the convention marks a correctly
+    trained model wrong, which is the most expensive kind of wrong this project has.
+    """
+
+    # Deliberately narrow: only forms that actually appear as size units in the set. A
+    # loose pattern here would fail turns that are fine, which is how a guard gets deleted.
+    UNIT = re.compile(
+        r"(sq\s?\.?\s?(ft|feet|foot|m|meters?|metres?|yards?|yds?|mi|miles?|km)"
+        r"|sqft|sqm|sqyd|square|acres?|hectares?|\bha\b|ft2|m2|\bsf\b|gaj)",
+        re.I,
+    )
+
+    def _size_turns(self):
+        lines = EVAL_DATASET_PATH.read_text(encoding="utf-8").splitlines()
+        rows = [json.loads(line) for line in lines if line.strip()]
+        return [
+            r for r in rows
+            if isinstance(r["gold"]["extracted"].get("size_sqft"), dict)
+        ]
+
+    def test_the_convention_is_exercised_at_all(self):
+        assert self._size_turns(), "no size_sqft golds; this guard would pass vacuously"
+
+    def test_no_unit_carrying_size_is_golded_exact(self):
+        offenders = []
+        for row in self._size_turns():
+            bounds = row["gold"]["extracted"]["size_sqft"]
+            exact = set(bounds) == {"min", "max"} and bounds["min"] == bounds["max"]
+            if exact and self.UNIT.search(row["user_input"]):
+                offenders.append(f"{row['id']}: {row['user_input']!r} -> {bounds}")
+        assert not offenders, (
+            "a bare size carrying a unit is a ceiling since r8, so these golds mark a "
+            "correct model wrong:\n  " + "\n  ".join(offenders)
+        )

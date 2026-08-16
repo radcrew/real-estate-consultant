@@ -7,6 +7,26 @@ schema copy and JSON mode were on.
 **Rows from different `eval.jsonl` revisions are not comparable and must not share a
 table.** When the dataset changes, previous rows become historical and a new table starts.
 
+### Correction, 2026-08-16: four p50 figures
+
+`metrics.percentile` computed the nearest rank as `round(k + 0.5)`, which is round-half-to-
+even, so an **odd** integer `k` selected rank `k + 1`. Only p50 on a run whose `N/2` is an
+odd integer was affected; no p95 in this file ever landed on an integer rank.
+
+Recomputed from the per-turn `latency_ms` in `results/*.json`, so these are corrections to
+the arithmetic, not re-runs — every other column is untouched and the raw data is unchanged.
+
+| Row | p50 was | p50 is |
+|---|---|---|
+| `0.5b-stock-q4km` | 2955 | 2949 |
+| `0.5b-lora-v1-q4km` | 1236 | 1227 |
+| `0.5b-lora-v2-q4km` | 1271 | 1249 |
+| `0.5b-lora-v2-q4km-r4` | 1256 | 1255 |
+
+Two runs not tabled here shifted too — `0.5b-lora-v2-q4km-holdout` 1417 → 1378 and
+`0.5b-lora-v2-q4km-r3` 2188 → 2168 — and neither publishes a latency column. The largest
+move is 39 ms, so no conclusion in this file changes.
+
 ## Dataset revisions
 
 | Rev | Turns | Questionnaire | Notes |
@@ -687,7 +707,7 @@ because the schema now describes four questions instead of six.
 
 | Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 0.5b-lora-v2-q4km-r4 | LoRA v2 Q4_K_M | 102 | 0.990 | 0.805 | 0.921 | 0.859 | 0.657 | 0.690 | 0.707 | 1256 | 1689 |
+| 0.5b-lora-v2-q4km-r4 | LoRA v2 Q4_K_M | 102 | 0.990 | 0.805 | 0.921 | 0.859 | 0.657 | 0.690 | 0.707 | 1255 | 1689 |
 
 ```bash
 python -m pipeline.eval.run --label 0.5b-lora-v2-q4km-r4 --split all --no-next-question \
@@ -774,9 +794,9 @@ cores, AVX2, no AVX-512). All rows `--split all --no-next-question`.
 
 | Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 0.5b-stock-q4km | stock Q4_K_M | 102 | 1.000 | 0.143 | 0.841 | 0.244 | 0.392 | 0.110 | 0.830 | 2955 | 4085 |
-| 0.5b-lora-v1-q4km | LoRA v1 Q4_K_M | 102 | 0.990 | 0.899 | 0.909 | 0.904 | 0.825 | 0.848 | 0.596 | 1236 | 1716 |
-| **0.5b-lora-v2-q4km** | **LoRA v2 Q4_K_M** | 102 | **1.000** | **0.931** | **0.920** | **0.926** | **0.840** | 0.844 | **0.809** | 1271 | 1727 |
+| 0.5b-stock-q4km | stock Q4_K_M | 102 | 1.000 | 0.143 | 0.841 | 0.244 | 0.392 | 0.110 | 0.830 | 2949 | 4085 |
+| 0.5b-lora-v1-q4km | LoRA v1 Q4_K_M | 102 | 0.990 | 0.899 | 0.909 | 0.904 | 0.825 | 0.848 | 0.596 | 1227 | 1716 |
+| **0.5b-lora-v2-q4km** | **LoRA v2 Q4_K_M** | 102 | **1.000** | **0.931** | **0.920** | **0.926** | **0.840** | 0.844 | **0.809** | 1249 | 1727 |
 | `7b-router` | the incumbent | — | **blocked on credits, see below** ||||||||
 
 ```bash
@@ -861,7 +881,7 @@ and a larger share of that shape are the next pass.
 
 ### The tuned model is 2.3× faster than stock
 
-p50 2955 ms → 1271 ms, with no serving change. A model that emits only the fields present
+p50 2949 ms → 1249 ms, with no serving change. A model that emits only the fields present
 writes far fewer tokens, and CPU generation is roughly linear in output length. Precision
 and latency are one problem, not two.
 

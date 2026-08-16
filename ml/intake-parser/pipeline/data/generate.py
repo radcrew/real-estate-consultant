@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import sys
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
@@ -1243,6 +1244,32 @@ def main() -> int:
     random.shuffle(records)
     split = int(len(records) * (1 - args.val_fraction))
     train, val = records[:split], records[split:]
+
+    # Refuse before the write, not after it. Everything below opens the output paths with
+    # "w", and the defaults are the real datasets/train.jsonl and datasets/validation.jsonl
+    # — so a run that produced nothing usable used to truncate the training set on its way
+    # to a ZeroDivisionError in the summary, leaving an empty file and a stamp claiming 0
+    # rows. An empty split is a failed generation, and a failed generation writes nothing.
+    if not records:
+        print(
+            f"produced no records in {attempts} attempts - refusing to write.",
+            file=sys.stderr,
+        )
+        if rejected:
+            print("every attempt was rejected:", file=sys.stderr)
+            for reason, count in rejected.most_common():
+                print(f"  {reason:<34} {count}", file=sys.stderr)
+        else:
+            print(f"nothing was attempted; --count is {args.count}.", file=sys.stderr)
+        return 1
+    if not train or not val:
+        print(
+            f"a {len(train)}/{len(val)} train/validation split from {len(records)} records "
+            "leaves one side empty - refusing to write.\n"
+            f"raise --count or lower --val-fraction (currently {args.val_fraction}).",
+            file=sys.stderr,
+        )
+        return 1
 
     for path_str, rows in ((args.out, train), (args.val_out, val)):
         path = Path(path_str)

@@ -8,6 +8,7 @@ than a silently different number in a results table.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -196,13 +197,19 @@ def prf(tp: int, fp: int, fn: int) -> dict[str, float | None]:
 
 
 def percentile(values: list[float], p: float) -> float | None:
-    """Nearest-rank percentile. ``p`` in [0, 100]."""
+    """Nearest-rank percentile: the smallest value at or above ``p`` percent. ``p`` in [0, 100].
+
+    ``ceil``, not ``round(k + 0.5)`` — the latter is round-half-to-even, so an exact
+    integer ``k`` returned rank ``k + 1``. That skewed every percentile whose rank landed
+    on a whole number, which for an even-sized run is every p50.
+
+    ``p * n / 100`` rather than ``p / 100 * n`` keeps the multiplication in exact integers
+    for whole ``p``, so ``ceil`` is not decided by a float that missed by one ulp.
+    """
     if not values:
         return None
     ordered = sorted(values)
-    if len(ordered) == 1:
-        return ordered[0]
-    rank = max(1, min(len(ordered), int(round(p / 100 * len(ordered) + 0.5))))
+    rank = max(1, min(len(ordered), math.ceil(p * len(ordered) / 100)))
     return ordered[rank - 1]
 
 
