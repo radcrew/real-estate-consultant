@@ -7,7 +7,6 @@ from collections import defaultdict, deque
 from threading import Lock
 from uuid import UUID
 
-
 # Sweep as soon as the map passes this, rather than waiting for the interval. Callers are
 # keyed partly by a header the client controls (see ``client_ip``), so a flood of unique
 # keys must not be able to outrun the cleanup between sweeps.

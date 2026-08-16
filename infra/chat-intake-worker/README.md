@@ -137,14 +137,26 @@ the frames just stop being checked.
 **These timeouts form an ordered chain**, and each link must clear the one before it:
 
 ```
-worst-case provider call  <  function timeout  <  visibility timeout  <  CHAT_JOB_STALE_AFTER_SECONDS
-        ~265s                      300s                 360s                        420s
+batch size × worst-case provider call  <  function timeout  <  visibility timeout  <  CHAT_JOB_STALE_AFTER_SECONDS
+           1 × ~265s                             300s                 360s                        420s
 ```
 
 The provider end is larger than it looks and is what sets the floor: OpenRouter alone is
 a 75s read timeout with 3 retries (~225s), plus output guardrail screening if enabled.
 Size the function timeout from *that*, not from how long a turn usually takes — a healthy
 turn is seconds, and these numbers exist for the tail.
+
+**The batch size is part of that first term, not a separate knob.** `process_batch` runs
+records one after another, so an invocation must cover its *whole* batch, not one turn.
+At `--batch-size 5` the worst case is ~1325s against a 300s function timeout, and Lambda's
+ceiling is 900s — no timeout can make that batch fit. This is why the mapping below uses
+a batch size of 1: it is the only value that keeps the chain true at this provider budget.
+
+Batching buys little here anyway. Messages sharing a `MessageGroupId` are one
+conversation and must run in order regardless, and `INTAKE_MAX_ACTIVE_JOBS_PER_SESSION=1`
+means a session has at most one turn in flight — so a batch is only ever unrelated
+sessions that Lambda would otherwise run *concurrently* across invocations. Batching them
+serialises work that was already parallel.
 
 Break the ordering and the failures are quiet: a function timeout under the provider
 worst case kills live turns, which the claim gate then stops redelivery from retrying; a
@@ -157,7 +169,7 @@ burning receives until a live turn lands in the DLQ.
 aws lambda create-event-source-mapping \
   --function-name chat-intake-worker-prod \
   --event-source-arn arn:aws:sqs:$AWS_REGION:$ACCOUNT:chat-intake.fifo \
-  --batch-size 5 \
+  --batch-size 1 \
   --function-response-types ReportBatchItemFailures \
   --scaling-config MaximumConcurrency=10
 ```
