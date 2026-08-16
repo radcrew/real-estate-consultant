@@ -47,7 +47,7 @@ from openai import AsyncOpenAI
 from app.core.config import settings
 from app.core.supabase_sdk import close_supabase, get_supabase_sdk_client, init_supabase
 from app.repositories.questions import list_intake_questions
-from pipeline.data.generate import property_type_values
+from pipeline.data.fields import property_type_values
 from pipeline.paths import EVAL_DATASET_PATH, PHRASINGS_PATH
 
 ASK = (

@@ -14,7 +14,34 @@ from pathlib import Path
 
 import pytest
 
+from pipeline.data.fields import (
+    _bare_answer,
+    _field_fragment,
+    _place,
+    _skip_label,
+    _type_words,
+    load_phrasings,
+    property_type_values,
+)
+from pipeline.data.figures import (
+    PRICE_NUMBERS,
+    SQFT_NUMBERS,
+    _fmt_money,
+    _price_value,
+    _range_phrase,
+    _sqm_to_sqft,
+)
 from pipeline.data.generate import (
+    _next_question_key,
+    collision_key,
+    eval_input_keys,
+    main,
+    make_example,
+    to_chat_record,
+    validate,
+)
+from pipeline.data.messages import _connected_sentence
+from pipeline.data.vocabulary import (
     AMBIGUOUS_TYPE_PHRASINGS,
     BETWEEN_PHRASES,
     CITIES,
@@ -23,32 +50,11 @@ from pipeline.data.generate import (
     FIELD_LABELS,
     MAX_PHRASES,
     MIN_PHRASES,
-    PRICE_NUMBERS,
     REVERSED_BETWEEN_PHRASES,
-    SQFT_NUMBERS,
     SQFT_PER_SQYD,
     SQM_UNITS,
     SQYD_UNITS,
     STATES,
-    _bare_answer,
-    _connected_sentence,
-    _field_fragment,
-    _fmt_money,
-    _next_question_key,
-    _place,
-    _price_value,
-    _range_phrase,
-    _skip_label,
-    _sqm_to_sqft,
-    _type_words,
-    collision_key,
-    eval_input_keys,
-    load_phrasings,
-    main,
-    make_example,
-    property_type_values,
-    to_chat_record,
-    validate,
 )
 from pipeline.paths import EVAL_DATASET_PATH, PHRASINGS_PATH, QUESTIONS_PATH
 

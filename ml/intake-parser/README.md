@@ -38,6 +38,7 @@ loop you actually iterate on.
 ml/intake-parser/      # the project: which model, and what it is for
   pipeline/            # the package: code only
     data/              # questionnaire dump, phrasings, training-set generation
+                       #   vocabulary -> figures -> fields -> messages -> generate
     train/             # LoRA config and CPU entry point
     quantize/          # fetch, convert and quantize into GGUFs
     serve/             # llama-server flags
@@ -168,8 +169,18 @@ the new field, and the shortfall would look like ordinary deduplication loss.
 python -m pipeline.data.make_phrasings --model qwen/qwen-2.5-7b-instruct
 ```
 
-Writes `datasets/property_type_phrasings.json`, which is **gitignored — a build artifact,
-regenerated rather than edited.**
+Writes `datasets/property_type_phrasings.json`, which is **tracked, and re-running this is
+a deliberate act.** It looks like a build artifact and was gitignored as one, but it does
+not behave like one: this needs an OpenRouter key and a live Supabase connection, and asks
+a model for words, so two runs disagree and nothing reconstructs the copy a given adapter
+was trained against. That makes it source.
+
+Regenerate when the questionnaire's options change. Expect the diff to move words that had
+no reason to move, review it as data rather than as a rebuild, and re-run the eval — these
+are training input, so changing them changes the model. `dataset_provenance.json` records
+the file's sha256 and a test checks it, so regenerating the phrasings without regenerating
+the dataset fails rather than shipping a model trained on vocabulary the repo no longer
+holds.
 
 The generator renders the option word itself half the time. Without this file it would
 render it *every* time, so no training message would ever contain a word differing from
@@ -227,9 +238,14 @@ python -m pipeline.data.generate                  # 2500 is the default anyway
 python -m pipeline.data.generate --count 4000 --seed 23
 ```
 
-Writes `datasets/train.jsonl` and `datasets/validation.jsonl`, both gitignored, split by
-`--val-fraction` (0.1). The names matter: `pipeline/paths.py` calls the second one
-`validation.jsonl` and nothing writes `val.jsonl`.
+Writes `datasets/train.jsonl` and `datasets/validation.jsonl`, split by `--val-fraction`
+(0.1). The names matter: `pipeline/paths.py` calls the second one `validation.jsonl` and
+nothing writes `val.jsonl`.
+
+Both are **tracked**, though `datasets/.gitignore` names them — they predate the rule and
+are held in the index by an explicit `git add -f`, so a regenerated set shows up as a diff
+rather than vanishing. A generation that produces nothing usable exits non-zero before
+opening either file, so a failed run cannot leave you with an empty training set.
 
 Labels are correct by construction: a criteria dict is chosen first, rendered into natural
 language, and kept as gold — there is no teacher to be wrong. Prompts come from
@@ -407,13 +423,23 @@ re-measure after any prompt change, since it tracks sequence length rather than 
 
 | Path | Time | Note |
 |---|---|---|
-| CPU, full set, 2 epochs | ~12 h+ | Run it overnight; nothing else needs the machine |
+| CPU, full set, 1 epoch | ~6 h+ | The shipped recipe. Run it overnight |
 | CPU, 600 examples, 1 epoch | ~2 h+ | Enough to see whether the adapter moves the metrics |
 | CPU, under ~600 examples | — | Not worth it; the effect lands inside the eval's noise |
 
 Epoch count is not a free parameter to vary alongside a data change: v3 trained 2 epochs
-and the notebook currently sets 1, so a 1-epoch run on new data confounds *new data* with
-*half the training*.
+and everything since sets 1, so a 1-epoch run on new data confounds *new data* with *half
+the training*.
+
+**The script's defaults match the notebook**, which trained every adapter from v4 on: rank
+16, alpha 32, dropout 0.05, one epoch, seed 17, all seven projections. Per-device batch is
+1 × 8 against the notebook's 2 × 4 — the effective batch is 8 either way, and 1 is the
+memory choice a CPU run needs.
+
+A row longer than `--max-len` is **dropped, not truncated**, and the count is reported.
+Trimming cuts from the end, and the end is the supervised span, so a trimmed row teaches an
+unterminated answer against the `raw_json_valid` metric this set exists to move. Nothing
+currently hits it: the longest sequence is 995 tokens against the 1088 default.
 
 ## 5. Merging and quantizing
 

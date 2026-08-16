@@ -43,7 +43,11 @@ ml/intake-parser/
 │   ├── data/                   # everything that produces a file in datasets/
 │   │   ├── dump_questions.py   # DB `questions` table  →  questions.json
 │   │   ├── make_phrasings.py   # asks a 7B how clients say each property type
-│   │   └── generate.py         # programmatically-labelled training set (9 shapes)
+│   │   ├── vocabulary.py       # the corpora the generator draws from — data only
+│   │   ├── figures.py          # how a number is sampled and written (money vs area)
+│   │   ├── fields.py           # gold + wording for one field, always as a pair
+│   │   ├── messages.py         # fragments woven into a sentence, then roughed up
+│   │   └── generate.py         # composes those into a labelled turn (9 shapes)
 │   │
 │   ├── train/  train_lora.py (CPU entry point), merge.py (adapter → full weights)
 │   ├── quantize/  build_gguf.py, make_imatrix.py
@@ -176,7 +180,26 @@ unchanged — and **never fail the job**: every failure degrades to a null.
 |---|---|---|
 | `dump_questions.py` | 72 | `--out`. Writes `questions.json` from the live table. Rewriting it **invalidates the dataset**. |
 | `make_phrasings.py` | 212 | Asks a 7B for phrasings per property-type option, then asks the **same** model to map each back (`propose` → `round_trips`). Drops candidates claimed by two options, option words themselves, and anything reaching the eval set. |
-| `generate.py` | 1304 | The generator: `make_example`, `validate`, `to_chat_record`, `collision_key`, `eval_input_keys`. |
+| `vocabulary.py` | 323 | The corpora, data only. Nothing here executes and nothing imports anything. |
+| `figures.py` | 271 | Sampling and formatting as one decision: `_price_value`/`_fmt_money`, `_sqft_value`/`_fmt_sqft`, `FieldNumbers`, `_range_phrase`. |
+| `fields.py` | 257 | `(gold, wording)` for one field: `_place`, `_type_words`, `_field_fragment`, `_bare_answer`, plus `load_phrasings` and `property_type_values`. |
+| `messages.py` | 111 | `_connected_sentence`, `_rough_up`, `_add_distractors`. |
+| `generate.py` | 508 | Composition and IO: `make_example`, `validate`, `to_chat_record`, `collision_key`, `eval_input_keys`, `main`. |
+
+**The four modules layer strictly downward** — `vocabulary` imports nothing,
+`figures` reads `vocabulary`, `fields` reads both, `messages` reads `vocabulary`, and only
+`generate` reads all of them. That was checked rather than asserted: the split was derived
+from the dependency graph and there are no upward edges, so the layering cannot quietly
+become a cycle.
+
+`generate.py` was 1,341 lines before the split, of which `make_example` is still 200 —
+it composes every shape and threads prior criteria, the skipped set and the next question
+key through all of them, so breaking it further has to preserve draw *order* exactly or
+seeded output moves. Worth doing; not free.
+
+**Any change here must leave seeded output byte-identical**, or `datasets/train.jsonl`
+silently stops matching the sha256 in `dataset_provenance.json`. Generate a few hundred rows
+at fixed seeds before and after and diff the hashes; the test suite alone will not catch it.
 
 `generate.py` flags: `--count` (2500) `--seed` (17) `--val-fraction` (0.1) `--questions`
 `--eval-set` `--phrasings` `--out` `--val-out`.
@@ -316,6 +339,7 @@ flowchart LR
 | Consumer | Imports from `app` |
 |---|---|
 | `data/generate.py` | `llm.intake.service.build_intake_messages`, `schemas.llm_intake_parse.LlmParseModelOutput` |
+| `data/{vocabulary,figures,fields,messages}.py` | nothing — they depend only on each other and the stdlib |
 | `data/make_phrasings.py` | `core.config.settings`, `core.supabase_sdk`, `repositories.questions.list_intake_questions` |
 | `data/dump_questions.py` | `core.supabase_sdk`, `repositories.questions.list_intake_questions` |
 | `eval/metrics.py` | `schemas.llm_intake_parse.LlmParseModelOutput` |
