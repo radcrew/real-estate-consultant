@@ -24,11 +24,12 @@ from typing import Any
 from openai import APIStatusError, AsyncOpenAI, OpenAIError
 
 from app.core.config import settings
-from app.domain.intake_criteria import apply_criteria_filters
+from app.domain.intake_criteria import apply_criteria_filters, merge_criteria
 from app.llm.intake.service import (
     INTAKE_PARSE_MAX_TOKENS,
     INTAKE_PARSE_TEMPERATURE,
     build_intake_messages,
+    resolve_skipped_fields,
 )
 from app.llm.providers.huggingface import structured_output_messages
 from app.schemas.llm_intake_parse import LlmParseModelOutput
@@ -73,7 +74,7 @@ def production_answer(
     parsed: LlmParseModelOutput,
     turn: dict[str, Any],
     questions: list[dict[str, Any]],
-    question_keys: list[str],
+    prompt: Any,
 ) -> LlmParseModelOutput:
     """The model's reply as the intake service would leave it.
 
@@ -82,17 +83,36 @@ def production_answer(
     {"min": 100000}`` to "a 100k sqft warehouse" and the user never sees it, because
     100000 is measured in square feet and a budget cannot be.
 
-    The filters come from ``app.domain.intake_criteria`` rather than being reimplemented
-    here, so this cannot drift into scoring a pipeline production does not run.
+    Every step is imported from the backend rather than reimplemented here, so this cannot
+    drift into scoring a pipeline production does not run. It did drift once, by covering
+    only half of it: ``extracted`` was the product's and ``skipped_fields`` was still the
+    raw model's, which is a pairing production never returns. Nine turns carry prior skips
+    and two of them exist precisely to test un-skipping, so the reported skip rates under
+    ``--post-process`` were neither the model's nor the product's.
+
+    ``prompt`` is the ``IntakePrompt`` from ``build_intake_messages`` -- the same object
+    ``parse_user_input`` passes on -- so the criteria, the required fields and the prior
+    skips all come from where production gets them. Reading ``current_criteria`` off the
+    turn instead would pass ``_skipped_fields`` into the filters as though it were a
+    criterion; production strips it into ``criteria_for_prompt`` first.
     """
-    extracted, _ = apply_criteria_filters(
+    extracted, unconfirmed = apply_criteria_filters(
         parsed.extracted,
         questions,
         turn["user_input"],
-        turn.get("current_criteria") or {},
-        allowed_keys=set(question_keys),
+        prompt.criteria_for_prompt,
+        allowed_keys=set(prompt.question_keys),
     )
-    return parsed.model_copy(update={"extracted": extracted})
+    skipped_fields = resolve_skipped_fields(
+        model_skipped=parsed.skipped_fields,
+        previously_skipped=prompt.previously_skipped,
+        required_fields=prompt.required_fields,
+        merged_criteria=merge_criteria(prompt.criteria_for_prompt, extracted),
+        unconfirmed=unconfirmed,
+    )
+    return parsed.model_copy(
+        update={"extracted": extracted, "skipped_fields": skipped_fields}
+    )
 
 
 async def run_turn(
@@ -145,11 +165,20 @@ async def run_turn(
         return _error_score(turn, prompt, started, str(exc), score_next_question), ""
 
     latency_ms = (time.perf_counter() - started) * 1000
+    if not completion.choices:
+        # A 200 carrying no choices - llama-server under load, or a proxy. This is one
+        # turn's failure, not the run's: letting the IndexError out of `worker` propagates
+        # through `asyncio.gather` and out of `main_async`, so every other scored turn is
+        # lost to a traceback with nothing written. Scored as an error turn instead, which
+        # is how every other bad reply is already counted.
+        return _error_score(
+            turn, prompt, started, "response carried no choices", score_next_question
+        ), ""
     raw_text = (completion.choices[0].message.content or "").strip()
     raw_valid, schema_valid, parsed = parse_raw_output(raw_text)
     usage = completion.usage
     if post_process and parsed is not None:
-        parsed = production_answer(parsed, turn, questions, prompt.question_keys)
+        parsed = production_answer(parsed, turn, questions, prompt)
 
     score = score_turn(
         turn_id=turn["id"],
@@ -201,7 +230,13 @@ async def run_dataset(
     json_mode: bool,
     score_next_question: bool,
     post_process: bool = False,
-) -> tuple[list[TurnScore], dict[str, str]]:
+) -> tuple[list[TurnScore], dict[str, str], str | None]:
+    """Score every turn. Returns (scores, raw replies, abort reason or ``None``).
+
+    The abort reason is returned rather than printed and dropped. A run that stopped at
+    turn 3 of 129 produces 3 perfectly good scores, and every rate computed over them is
+    a real number for a set nobody asked to measure.
+    """
     semaphore = asyncio.Semaphore(max(1, concurrency))
     scores: list[TurnScore] = []
     raw_by_id: dict[str, str] = {}
@@ -241,7 +276,7 @@ async def run_dataset(
 
     order = {turn["id"]: index for index, turn in enumerate(turns)}
     scores.sort(key=lambda s: order.get(s.turn_id, 0))
-    return scores, raw_by_id
+    return scores, raw_by_id, aborted
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -313,7 +348,7 @@ async def main_async(argv: list[str] | None = None) -> int:
 
     # ASCII only: the default Windows console encoding (cp1252) cannot encode arrows.
     print(f"{args.label}: {len(turns)} turns -> {args.model} at {args.base_url}")
-    scores, raw_by_id = await run_dataset(
+    scores, raw_by_id, aborted = await run_dataset(
         turns,
         client=client,
         questions=questions,
@@ -332,10 +367,22 @@ async def main_async(argv: list[str] | None = None) -> int:
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out_path = Path(args.out) if args.out else RESULTS_DIR / f"{args.label}.json"
+    if aborted:
+        # Never over the complete run of the same label. The default path is derived from
+        # --label, so a 401 on turn 3 of a re-run would otherwise replace a good 129-turn
+        # file with a 3-turn one -- and the file that got clobbered is the raw corpus
+        # behind a published row, which no re-run reproduces.
+        out_path = out_path.with_suffix(".partial.json")
     out_path.write_text(
         json.dumps(
             {
                 "label": args.label,
+                # Self-labelling, so a partial file cannot be read as a complete one even
+                # after it is copied somewhere the filename no longer says so.
+                "complete": aborted is None,
+                "aborted": aborted,
+                "turns_requested": len(turns),
+                "turns_scored": len(scores),
                 "command": " ".join(sys.argv),
                 "model": args.model,
                 "base_url": args.base_url,
@@ -367,8 +414,20 @@ async def main_async(argv: list[str] | None = None) -> int:
     )
 
     print(f"\nWrote {out_path}\n")
-    print("Paste into results/results.md:\n")
-    print(markdown_row(args.label, args.model, args.base_url, summary))
+    if aborted:
+        # No paste-ready row. Every rate below is real arithmetic over a set nobody chose,
+        # and the one thing that must not happen is it landing in results.md looking like
+        # a row. Printed to stderr so a pipe to the clipboard captures nothing usable.
+        print(
+            f"PARTIAL RUN - {len(scores)} of {len(turns)} turns. Not a results.md row.\n"
+            f"Reason: {aborted}\n"
+            "Fix the cause and re-run; the numbers below describe only the turns that "
+            "completed, and which turns those were depended on scheduling.",
+            file=sys.stderr,
+        )
+    else:
+        print("Paste into results/results.md:\n")
+        print(markdown_row(args.label, args.model, args.base_url, summary))
     print("\nPer category (field F1 / value acc / skip recall):")
     for name, agg in categories.items():
         print(
@@ -381,7 +440,7 @@ async def main_async(argv: list[str] | None = None) -> int:
         print(f"\nKeys emitted outside the question set: {summary.invented_keys_total}")
     if summary.errors:
         print(f"Turns that errored: {summary.errors}")
-    return 0
+    return 1 if aborted else 0
 
 
 def main() -> int:

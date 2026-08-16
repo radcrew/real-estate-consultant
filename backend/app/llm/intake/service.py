@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections.abc import Iterable, Mapping
+from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -218,6 +220,36 @@ def resolve_next_intake_question(
     return map_question_to_model(row) if row else None
 
 
+def resolve_skipped_fields(
+    *,
+    model_skipped: Iterable[str],
+    previously_skipped: Iterable[str],
+    required_fields: Iterable[str],
+    merged_criteria: Mapping[str, Any],
+    unconfirmed: AbstractSet[str],
+) -> list[str]:
+    """The skips a turn leaves behind, from the model's answer and the session's history.
+
+    Union carries a skip forward across turns, so the user is never re-asked. Then
+    subtract what is answered: a field the user has since filled in is no longer skipped,
+    and without this it stays marked skipped for the life of the session. A required field
+    is answered, skipped, or missing - never two of those at once.
+
+    An unconfirmed reading does not count as filling it in. The user declined to answer
+    this field; a guess nobody can check is not them changing their mind, and clearing the
+    skip on one would put the question back in front of them.
+
+    Public, and named, because the eval harness has to score what production returns. It
+    used to restate the ``extracted`` half of post-processing and not this half, so a run
+    with ``--post-process`` scored the product's fields against the raw model's skips --
+    a number that was neither.
+    """
+    return sorted(
+        ({*previously_skipped, *model_skipped} & set(required_fields))
+        - (set(merged_criteria) - unconfirmed),
+    )
+
+
 def _build_intake_parse_result(
     *,
     parsed_output: LlmParseModelOutput,
@@ -240,18 +272,12 @@ def _build_intake_parse_result(
         allowed_keys=set(question_keys),
     )
     merged_criteria = merge_criteria(current_criteria, extracted)
-
-    # Union carries a skip forward across turns, so the user is never re-asked. Then
-    # subtract what is answered: a field the user has since filled in is no longer
-    # skipped, and without this it stays marked skipped for the life of the session.
-    # A required field is answered, skipped, or missing - never two of those at once.
-    #
-    # An unconfirmed reading does not count as filling it in. The user declined to answer
-    # this field; a guess nobody can check is not them changing their mind, and clearing
-    # the skip on one would put the question back in front of them.
-    skipped_fields = sorted(
-        ({*previously_skipped, *parsed_output.skipped_fields} & set(required_fields))
-        - (set(merged_criteria) - unconfirmed),
+    skipped_fields = resolve_skipped_fields(
+        model_skipped=parsed_output.skipped_fields,
+        previously_skipped=previously_skipped,
+        required_fields=required_fields,
+        merged_criteria=merged_criteria,
+        unconfirmed=unconfirmed,
     )
 
     # What the system did to the user's own words. Every transformation below is correct

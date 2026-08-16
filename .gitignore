@@ -26,5 +26,14 @@ Thumbs.db
 .claude/settings.local.json
 
 # Local model tooling: llama.cpp binaries, weights, GGUFs. Multi-GB and rebuildable
-# from services/intake-model — never committed.
+# from ml/intake-parser — never committed.
 .local/
+
+# Coverage databases and reports. `.coverage` is a binary SQLite file rewritten by every
+# `pytest --cov`, so a tracked copy is a diff on every test run and merge conflicts that
+# mean nothing. Three were tracked before this rule; all three are now untracked, because
+# a tracked file ignores what is written here and the rule would have been a lie for them.
+.coverage
+.coverage.*
+coverage.json
+htmlcov/
