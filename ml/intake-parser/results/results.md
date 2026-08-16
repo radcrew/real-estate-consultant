@@ -4,6 +4,14 @@ Every row is one `pipeline/eval/run.py` invocation. **Record the command**, beca
 only meaningful alongside the dataset revision, the split, and whether the duplicate
 schema copy and JSON mode were on.
 
+**And commit the run's JSON: `git add -f results/<label>.json`.** `results/` ignores
+`*.json` so scratch runs stay out, which means publishing a row and keeping its evidence
+are two separate acts and only the first is visible. That rule went unenforced for eight
+rows — v2-r5 through v5-q4km — whose per-turn output is now gone, so nothing can re-check
+them against a scorer fix or replay them. The p50 correction above was only possible for
+the runs that still had theirs. `tests/test_results_are_traceable.py` now fails on a row
+without one.
+
 **Rows from different `eval.jsonl` revisions are not comparable and must not share a
 table.** When the dataset changes, previous rows become historical and a new table starts.
 
