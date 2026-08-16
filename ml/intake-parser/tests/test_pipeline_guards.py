@@ -215,3 +215,70 @@ class TestOverLengthRowsAreDroppedNotTrimmed:
         for completion in (1, 20, 200, 2000):
             encoded = encode(prompt_len=10, completion_len=completion, max_len=64)
             assert encoded is None or len(encoded.input_ids) <= 64
+
+
+class TestGenericWordingsAreNotTypePhrasings:
+    """`property`, `site`, `estate` and `frontage` name no type, and three are golded `land`.
+
+    The round-trip check cannot catch them: `CHECK` forces a choice between the options,
+    so "which of these is closest to 'property'?" always answers something. A phrasing
+    that survives that is validated as *an* answer, not as a correct one.
+
+    This is worse than the option-word case the filter already handled. An option word in
+    the message teaches copying, which is useless; `property` labelled `land` teaches a
+    wrong answer to "looking for a property in Dallas", which any client might type.
+    """
+
+    OPTIONS = ["industrial", "retail", "flex", "land", "office", "multifamily", "specialty"]
+
+    def test_the_four_the_sweep_found_are_dropped(self):
+        from pipeline.data.make_phrasings import usable_phrasings
+
+        assert usable_phrasings(["property", "site", "estate", "frontage"], self.OPTIONS) == []
+
+    def test_real_synonyms_survive(self):
+        from pipeline.data.make_phrasings import usable_phrasings
+
+        keep = ["warehouse", "shop", "storefront", "apartment building", "distribution center"]
+        assert usable_phrasings(keep, self.OPTIONS) == keep
+
+    def test_it_still_drops_a_phrase_containing_an_option_word(self):
+        from pipeline.data.make_phrasings import usable_phrasings
+
+        assert usable_phrasings(["retail plaza", "office space"], self.OPTIONS) == []
+
+    def test_matching_folds_case_and_whitespace(self):
+        from pipeline.data.make_phrasings import usable_phrasings
+
+        assert usable_phrasings(["  Property ", "SITE"], self.OPTIONS) == []
+
+    def test_a_generic_word_inside_a_specific_phrase_is_kept(self):
+        """`storage unit` is a flex phrasing; only the bare generic term is the problem."""
+        from pipeline.data.make_phrasings import usable_phrasings
+
+        assert usable_phrasings(["storage unit"], self.OPTIONS) == ["storage unit"]
+
+    def test_the_committed_artifact_still_carries_the_debt(self):
+        """Documents what a regeneration will fix, and fails once it has.
+
+        The artifact is not edited: `dataset_provenance.json` records its sha256 and
+        `train.jsonl` was built from it, so changing it here would make the dataset
+        describe inputs the repo no longer holds. The filter above is what clears this,
+        on the next `make_phrasings` run.
+        """
+        import json
+
+        from pipeline.data.make_phrasings import GENERIC_WORDINGS
+        from pipeline.paths import PHRASINGS_PATH
+
+        phrasings = json.loads(PHRASINGS_PATH.read_text(encoding="utf-8"))
+        stale = sorted(
+            f"{option}:{word}"
+            for option, words in phrasings.items()
+            for word in words
+            if word.casefold() in GENERIC_WORDINGS
+        )
+        assert stale == ["land:estate", "land:property", "land:site", "retail:frontage"], (
+            "the committed phrasings changed. If they were regenerated, this list should "
+            f"be empty and this test can go; got {stale}"
+        )

@@ -119,6 +119,51 @@ def _answer_matches(reply: str, option: str) -> bool:
     return bool(tokens) and tokens[0] == option.lower()
 
 
+# Wordings that name commercial property in general, or a feature any type can have,
+# rather than a type. The round-trip check cannot catch these: ``CHECK`` forces a choice
+# between the options, so asking "which of these is closest to 'property'?" always yields
+# something, and the answer is whichever option the model leans toward that day.
+#
+# The committed artifact contains four of them -- `property`, `site` and `estate` under
+# `land`, `frontage` under `retail` -- so "looking for a property in Dallas" currently
+# teaches `land`. That file is what the shipped training set was built from and its hash
+# is recorded in `dataset_provenance.json`, so it is not edited here; the next
+# regeneration drops them.
+#
+# The test for membership: would this word alone, in an otherwise neutral sentence,
+# identify one type? "warehouse" yes, "premises" no.
+GENERIC_WORDINGS = frozenset({
+    "asset", "building", "buildings", "development", "estate", "frontage",
+    "investment", "premises", "property", "properties", "real estate", "site",
+    "sites", "space", "spaces", "unit", "units",
+})
+
+
+def usable_phrasings(proposed: list[str], options: list[str]) -> list[str]:
+    """Candidates worth round-tripping: not an option word, not a generic one.
+
+    A candidate is dropped when it *contains* an option word, not merely when it equals
+    one. "retail plaza" and "office space" passed the equality test and were 7 of 16
+    retail phrasings and 16 of 21 office ones -- every one of them putting the gold word
+    straight into the message, which is the copying this file exists to break. They also
+    crowded out the real synonyms: "shop" round-trips to retail correctly but was never
+    proposed, and production sent "a shop in Amsterdam".
+
+    Generic wordings are the other half, and they are worse: an option word in the message
+    teaches copying, which is merely useless, while `property` labelled `land` teaches a
+    wrong answer to a sentence any client might type.
+    """
+    kept = []
+    for phrase in proposed:
+        folded = phrase.strip().casefold()
+        if folded in GENERIC_WORDINGS:
+            continue
+        if any(re.search(rf"\b{re.escape(option)}\b", phrase) for option in options):
+            continue
+        kept.append(phrase)
+    return kept
+
+
 def drop_ambiguous_claims(phrasings: dict[str, list[str]]) -> dict[str, list[str]]:
     """Remove any wording two options both claim, from **both** of them.
 
@@ -211,10 +256,7 @@ async def main_async(argv: list[str] | None = None) -> int:
         # the gold word straight into the message, which is the copying this file exists
         # to break. They also crowded out the real synonyms: "shop" round-trips to retail
         # correctly but was never proposed, and production sent "a shop in Amsterdam".
-        candidates = [
-            p for p in proposed
-            if not any(re.search(rf"\b{re.escape(o)}\b", p) for o in options)
-        ]
+        candidates = usable_phrasings(proposed, options)
         # A phrasing the eval already scores turns that turn into a recall check.
         if leaked := [p for p in candidates if reaches_eval(p, held_out)]:
             print(f"  {option:<12} holding out {leaked}: scored by a property-synonym turn")
