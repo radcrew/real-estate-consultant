@@ -148,8 +148,8 @@ class TestAnAbortedRunDoesNotLookLikeAResult:
 
     @pytest.fixture
     def invoke(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-        async def go(responder, *extra: str) -> tuple[int, Path]:
-            out = tmp_path / "row.json"
+        async def go(responder, *extra: str, out_name: str = "row.json") -> tuple[int, Path]:
+            out = tmp_path / out_name
             monkeypatch.setattr(
                 run_module, "AsyncOpenAI", lambda **kw: _StubClient(responder)
             )
@@ -195,6 +195,29 @@ class TestAnAbortedRunDoesNotLookLikeAResult:
         assert "401" in written["aborted"]
         assert written["turns_scored"] == 2
         assert written["turns_requested"] == 6
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("out_name", "expected"),
+        [
+            ("row.json", "row.partial.json"),
+            # These are the real shapes. `Path.suffix` splits on the last dot, so an --out
+            # without a `.json` extension has a "suffix" of `.5b-lora-v6-q4km` -- and
+            # `with_suffix` would replace it, writing `0.partial.json` and colliding every
+            # aborted run onto one name.
+            ("0.5b-lora-v6-q4km", "0.5b-lora-v6-q4km.partial.json"),
+            ("0.5b-lora-v6-q4km.json", "0.5b-lora-v6-q4km.partial.json"),
+            ("v1.2-run", "v1.2-run.partial.json"),
+            ("plain", "plain.partial.json"),
+        ],
+    )
+    async def test_the_partial_name_keeps_the_whole_label(self, invoke, out_name, expected):
+        _, out = await invoke(
+            lambda c: _status_error(401) if c == 3 else _Completion.of(GOOD_REPLY),
+            out_name=out_name,
+        )
+        assert (out.parent / expected).exists(), sorted(p.name for p in out.parent.iterdir())
+        assert not out.exists()
 
     @pytest.mark.asyncio
     async def test_no_paste_ready_row_is_offered(self, invoke, capsys):

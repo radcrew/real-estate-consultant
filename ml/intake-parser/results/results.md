@@ -95,9 +95,12 @@ live field, and `Warehouse` mapped to `industrial` — no listing carries Wareho
 >   the whole failure.
 > - Check Colab or Drive before treating the original adapter as lost.
 >
-> `build_gguf.py` now refuses to overwrite an existing artifact without `--force`. Nothing
-> guards the adapter directory, because the notebook writes that and the notebook writes no
-> provenance stamp — which is why this went unnoticed for two days.
+> The notebook writing no record of what it trained is why this went unnoticed for two
+> days. Three guards close that now: the notebook writes `training_provenance.json` beside
+> the adapter and refuses to train over an existing output directory, and `build_gguf.py`
+> refuses to overwrite an existing GGUF without `--force`. None of them helps an adapter
+> that is already downloaded, so the step-count check in the README's §"After a fine-tune"
+> is still the thing to run.
 
 Same 129 turns as r7 and the same binaries and serving flags — `.local/bin` unchanged, 6
 threads, `--parallel 1`, `--cache-reuse 256`, `-c 4096`, i7-10750H. All rows `--split all
@@ -115,9 +118,13 @@ to be measured against.
 
 | Label | Model | Turns | Raw JSON | Field prec | Field recall | Field F1 | Value acc | Skip prec | Skip recall | p50 ms | p95 ms |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 0.5b-lora-v6-f16 | LoRA v6 F16 | 129 | 1.000 | **0.971** | 0.962 | **0.967** | **0.931** | **0.897** | 0.854 | 1187 | 2021 |
-| **0.5b-lora-v6-q4km** | **LoRA v6 Q4_K_M** | 129 | 1.000 | 0.944 | 0.962 | 0.953 | **0.912** | 0.881 | **0.902** | 1020 | 1366 |
+| 0.5b-lora-v6-f16 † | LoRA v6 F16 | 129 | 1.000 | **0.971** | 0.962 | **0.967** | **0.931** | **0.897** | 0.854 | 1187 | 2021 |
+| **0.5b-lora-v6-q4km** † | **LoRA v6 Q4_K_M** | 129 | 1.000 | 0.944 | 0.962 | 0.953 | **0.912** | 0.881 | **0.902** | 1020 | 1366 |
 | 0.5b-lora-v5-q4km-r8 | LoRA v5 Q4_K_M | 129 | 1.000 | 0.944 | 0.962 | 0.953 | 0.853 | 0.854 | 0.854 | 1027 | 1490 |
+
+† The artifact these measured was overwritten by a retrain that reused the version name.
+The numbers stand; the file no longer does. See the warning at the head of this section
+before rebuilding or shipping anything called `v6`. `0.5b-lora-v5-q4km-r8` is unaffected.
 
 ```bash
 python -m pipeline.serve.serve_local --model qwen2.5-0.5b-instruct-intake-v6-q4_k_m.gguf

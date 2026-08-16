@@ -372,7 +372,14 @@ async def main_async(argv: list[str] | None = None) -> int:
         # --label, so a 401 on turn 3 of a re-run would otherwise replace a good 129-turn
         # file with a 3-turn one -- and the file that got clobbered is the raw corpus
         # behind a published row, which no re-run reproduces.
-        out_path = out_path.with_suffix(".partial.json")
+        #
+        # Not `with_suffix`. Labels here are things like `0.5b-lora-v6-q4km`, and `suffix`
+        # splits on the last dot: an --out without a `.json` extension has a "suffix" of
+        # `.5b-lora-v6-q4km`, so with_suffix would replace it and write `0.partial.json`.
+        # Two aborted runs would then collide on one meaningless name.
+        name = out_path.name
+        stem = name[: -len(".json")] if name.endswith(".json") else name
+        out_path = out_path.with_name(f"{stem}.partial.json")
     out_path.write_text(
         json.dumps(
             {
