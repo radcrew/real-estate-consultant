@@ -29,7 +29,12 @@ INTAKE_PARSE_SYSTEM_PROMPT_RULES = (
     "NEVER pick a key from skipped_fields or already answered criteria.\n"
     "- ``next_question.text`` should be concise and conversational. "
     "If missing_fields is empty, set both key and text to null.\n"
-    "- ``is_complete`` should be true once missing_fields is empty."
+    "- ``is_complete`` should be true once missing_fields is empty.\n"
+    "- ``asked_question`` in the user message is the question just put to the user, when "
+    "one was. Their message is normally a direct answer to it, so a reply that plausibly "
+    "answers it MUST be extracted under ``asked_question.key`` — including a bare value "
+    "with no field named, such as '1000' for a size question or 'Texas' for a location "
+    "one. Only extract it elsewhere when the message clearly names a different field."
 )
 
 OPENING_QUESTION_SYSTEM_PROMPT_BASE = (
