@@ -24,6 +24,19 @@ const GENERIC_FAILURE = "That message couldn't be processed. Please try again.";
 /** Rejection reason when the caller is gone; nothing is listening by then. */
 const ABANDONED = "Intake job no longer being followed.";
 
+/**
+ * How many polls in a row may fail before giving up.
+ *
+ * Tolerating a blip is worth it; tolerating everything is not. Retrying a persistent
+ * fault to the deadline makes a broken turn indistinguishable from a slow one — the user
+ * watches "thinking" for ten minutes and no error ever reaches them.
+ */
+const MAX_CONSECUTIVE_POLL_FAILURES = 3;
+
+/** A client error will not fix itself, so retrying only delays telling the user. */
+const isPermanent = (status: number | undefined): boolean =>
+  status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429;
+
 const isTerminal = (state: IntakeJobState): boolean =>
   TERMINAL_JOB_STATUSES.includes(state.status);
 
@@ -55,18 +68,22 @@ export const useIntakeJob = (): UseIntakeJobResult => {
 
   const pollUntilSettled = useCallback(
     async (sessionId: string, jobId: string, deadline: number): Promise<IntakeJobState> => {
+      let consecutiveFailures = 0;
       for (;;) {
         // Nothing else can stop this loop, so a component that has gone away has to be
         // noticed here — otherwise it keeps calling the API until the deadline.
         if (abandonedRef.current) throw new Error(ABANDONED);
         try {
           const state = await intakeSessionsService.getLlmJob(sessionId, jobId);
+          consecutiveFailures = 0;
           if (isTerminal(state) || Date.now() >= deadline) return state;
         } catch (e) {
           // One bad response is not a dead turn — the server is very likely still
-          // processing it. A 404 is the exception: the job does not exist, and asking
-          // again will not change that.
-          if (isAxiosError(e) && e.response?.status === 404) throw e;
+          // processing it. But a 401, 403 or 404 is an answer, not a blip, and a fault
+          // that repeats is not going to stop repeating.
+          if (isAxiosError(e) && isPermanent(e.response?.status)) throw e;
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES) throw e;
           if (Date.now() >= deadline) throw e;
         }
         await sleep(POLL_INTERVAL_MS);

@@ -56,6 +56,49 @@ describe("useIntakeJob", () => {
     expect(mockGetJob).toHaveBeenCalledTimes(2);
   }, 10_000);
 
+  it("gives up after repeated failures instead of retrying to the deadline", async () => {
+    // A fault that repeats is not a blip. Retrying it for ten minutes makes a broken
+    // turn look identical to a slow one, and the user never sees an error at all.
+    mockEnqueue.mockResolvedValue(queued);
+    mockGetJob.mockRejectedValue(new Error("upstream on fire"));
+
+    const { result } = renderHook(() => useIntakeJob());
+    await expect(result.current.runTurn("sess-1", "warehouse")).rejects.toThrow(
+      "upstream on fire",
+    );
+    expect(mockGetJob).toHaveBeenCalledTimes(3);
+  }, 10_000);
+
+  it.each([401, 403, 422])("stops immediately on a %s", async (status) => {
+    // Client errors are answers, not blips — retrying only delays telling the user.
+    mockEnqueue.mockResolvedValue(queued);
+    mockGetJob.mockRejectedValue(
+      Object.assign(new Error("client error"), {
+        isAxiosError: true,
+        response: { status },
+      }),
+    );
+
+    const { result } = renderHook(() => useIntakeJob());
+    await expect(result.current.runTurn("sess-1", "warehouse")).rejects.toThrow();
+    expect(mockGetJob).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps waiting through a 429, which does clear on its own", async () => {
+    mockEnqueue.mockResolvedValue(queued);
+    mockGetJob
+      .mockRejectedValueOnce(
+        Object.assign(new Error("rate limited"), {
+          isAxiosError: true,
+          response: { status: 429 },
+        }),
+      )
+      .mockResolvedValue(succeeded);
+
+    const { result } = renderHook(() => useIntakeJob());
+    await expect(result.current.runTurn("sess-1", "warehouse")).resolves.toEqual(RESULT);
+  }, 10_000);
+
   it("stops immediately when the job does not exist", async () => {
     // The one answer retrying cannot improve.
     mockEnqueue.mockResolvedValue(queued);
