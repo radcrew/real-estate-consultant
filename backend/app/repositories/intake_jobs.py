@@ -143,17 +143,25 @@ async def fail_intake_job(
 async def expire_stale_running_jobs(
     client: AsyncClient,
     *,
+    session_id: UUID,
     older_than: datetime,
 ) -> list[dict[str, Any]]:
-    """Fail jobs stuck in ``running`` since before ``older_than``.
+    """Fail this session's jobs stuck in ``running`` since before ``older_than``.
 
     A worker killed mid-turn — Lambda timeout, OOM — leaves a claimed row nobody will
     ever finish, and the claim gate means redelivery cannot rescue it. Without this the
     client waits out its whole timeout on a job that is already dead.
+
+    Scoped to one session because that is the whole problem: the row holds *this*
+    conversation's in-flight slot. An unscoped sweep runs on every enqueue, matches no
+    index (the partial index is keyed on ``session_id``), and makes concurrent turns in
+    unrelated conversations contend for the same rows. Clearing other sessions' rows is
+    housekeeping, and belongs on a schedule rather than in a user's request.
     """
     result = await execute_db_safe(
         client.table("intake_jobs")
         .update({"status": "failed", "error": "Worker did not report a result."})
+        .eq("session_id", str(session_id))
         .eq("status", "running")
         .lt("updated_at", older_than.astimezone(UTC).isoformat())
         .execute(),
@@ -164,9 +172,12 @@ async def expire_stale_running_jobs(
 async def expire_abandoned_queued_jobs(
     client: AsyncClient,
     *,
+    session_id: UUID,
     older_than: datetime,
 ) -> list[dict[str, Any]]:
-    """Fail jobs still ``queued`` since before ``older_than`` — nothing will run them.
+    """Fail this session's jobs still ``queued`` since before ``older_than``.
+
+    Nothing will run them. Scoped for the same reason as ``expire_stale_running_jobs``.
 
     A queued row counts against the session's in-flight cap, so one that is never picked
     up locks the user out of their own conversation permanently. Three ways to get there,
@@ -188,6 +199,7 @@ async def expire_abandoned_queued_jobs(
     result = await execute_db_safe(
         client.table("intake_jobs")
         .update({"status": "failed", "error": "This message was never picked up."})
+        .eq("session_id", str(session_id))
         .eq("status", "queued")
         .lt("updated_at", older_than.astimezone(UTC).isoformat())
         .execute(),

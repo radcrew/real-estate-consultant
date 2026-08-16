@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from contextlib import ExitStack
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 from fastapi import HTTPException
 
@@ -165,6 +166,11 @@ class TestEnqueue:
         # Both unfinished states are swept: the in-flight cap counts queued and running
         # alike, so clearing only one still leaves the session lockable.
         assert order == ["running", "queued", "count"]
+        # Scoped to this session. Unscoped it swept table-wide on every enqueue, and
+        # because these are mocks that accept anything, dropping the argument would put
+        # that back without failing a single test.
+        for sweep in (expire_running, expire_queued):
+            assert sweep.await_args.kwargs["session_id"] == UUID(_SESSION_UUID)
 
     async def test_the_queued_sweep_clears_a_redelivery_gap(self):
         """The window measures untouched time, so it only has to clear the gap between

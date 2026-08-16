@@ -160,11 +160,24 @@ class TestExpireStaleRunningJobs:
         """A worker killed mid-turn leaves a claim redelivery can no longer rescue."""
         cutoff = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
         client = make_supabase_client([_JOB_ROW])
-        rows = await expire_stale_running_jobs(client, older_than=cutoff)
+        rows = await expire_stale_running_jobs(
+            client, session_id=_SESSION_ID, older_than=cutoff
+        )
         assert rows == [_JOB_ROW]
         table = client.table.return_value
-        table.eq.assert_called_once_with("status", "running")
+        table.eq.assert_any_call("status", "running")
         table.lt.assert_called_once_with("updated_at", cutoff.isoformat())
+
+    async def test_only_touches_the_given_session(self):
+        # Unscoped, this ran table-wide on every enqueue: no index covers it, and
+        # concurrent turns in unrelated conversations contend for the same rows.
+        client = make_supabase_client([_JOB_ROW])
+        await expire_stale_running_jobs(
+            client,
+            session_id=_SESSION_ID,
+            older_than=datetime(2026, 8, 14, 12, 0, tzinfo=UTC),
+        )
+        client.table.return_value.eq.assert_any_call("session_id", str(_SESSION_ID))
 
 
 class TestExpireAbandonedQueuedJobs:
@@ -174,17 +187,28 @@ class TestExpireAbandonedQueuedJobs:
         down, or a message that exhausted maxReceiveCount into the DLQ."""
         cutoff = datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
         client = make_supabase_client([_JOB_ROW])
-        rows = await expire_abandoned_queued_jobs(client, older_than=cutoff)
+        rows = await expire_abandoned_queued_jobs(
+            client, session_id=_SESSION_ID, older_than=cutoff
+        )
         assert rows == [_JOB_ROW]
         table = client.table.return_value
-        table.eq.assert_called_once_with("status", "queued")
+        table.eq.assert_any_call("status", "queued")
         table.lt.assert_called_once_with("updated_at", cutoff.isoformat())
+
+    async def test_only_touches_the_given_session(self):
+        client = make_supabase_client([_JOB_ROW])
+        await expire_abandoned_queued_jobs(
+            client,
+            session_id=_SESSION_ID,
+            older_than=datetime(2026, 8, 14, 12, 0, tzinfo=UTC),
+        )
+        client.table.return_value.eq.assert_any_call("session_id", str(_SESSION_ID))
 
     async def test_it_is_terminal_not_a_requeue(self):
         """Requeuing would recreate the state it exists to clear."""
         client = make_supabase_client([_JOB_ROW])
         await expire_abandoned_queued_jobs(
-            client, older_than=datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
+            client, session_id=_SESSION_ID, older_than=datetime(2026, 8, 14, 12, 0, tzinfo=UTC)
         )
         payload = client.table.return_value.update.call_args.args[0]
         assert payload["status"] == "failed"

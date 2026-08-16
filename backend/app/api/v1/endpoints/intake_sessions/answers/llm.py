@@ -62,13 +62,19 @@ async def submit_llm_intake_input(
     # stuck, for different reasons and on different timescales — `running` when a worker
     # is killed mid-turn (the claim gate stops redelivery from rescuing it), `queued`
     # when nothing ever picks the job up.
+    #
+    # Only this session's rows: that is the slot being freed, and it keeps a per-request
+    # sweep off every other conversation's rows. Other sessions' dead rows are cleared
+    # when they next send a turn, or by a scheduled sweep — they harm nobody meanwhile.
     now = datetime.now(UTC)
     await expire_stale_running_jobs(
         client,
+        session_id=session_id,
         older_than=now - timedelta(seconds=settings.chat_job_stale_after_seconds),
     )
     await expire_abandoned_queued_jobs(
         client,
+        session_id=session_id,
         older_than=now - timedelta(seconds=settings.chat_job_abandoned_after_seconds),
     )
 
