@@ -92,7 +92,7 @@ Smart Chat, intake parsing, fit explanations, and outreach drafts all call one c
 
 Optional tuning: `OPENROUTER_CHAT_MODEL`, `OPENROUTER_BASE_URL`, `HF_MODEL`, `HF_BASE_URL`, and per-provider cost telemetry vars (see `.env.example`). Hugging Face chat uses JSON-object responses validated locally (avoids flaky grammar-constrained structured outputs on the Inference Providers router).
 
-### Embeddings (OpenRouter + Hugging Face)
+### Embeddings (Bedrock + OpenRouter + Hugging Face)
 
 `app.llm.providers.embeddings` uses a **separate** priority from chat so both keys can be set with chat on OpenRouter and embeddings on Hugging Face:
 
@@ -100,11 +100,109 @@ Optional tuning: `OPENROUTER_CHAT_MODEL`, `OPENROUTER_BASE_URL`, `HF_MODEL`, `HF
 |----------|---------------------|
 | `HF_TOKEN` | **Hugging Face** (wins even if `OPENROUTER_API_KEY` is also set) |
 | `OPENROUTER_API_KEY` only | **OpenRouter** |
-| neither | **503** with `"Embeddings unavailable"` |
+| `AWS_REGION` only | **Bedrock** — checked last, so a configured region never displaces a working provider |
+| none | **503** with `"Embeddings unavailable"` |
 
-Models: `HF_EMBEDDING_MODEL` (default `sentence-transformers/all-MiniLM-L6-v2`), `OPENROUTER_EMBEDDING_MODEL` (default `openai/text-embedding-3-small`). Hugging Face embeddings use the Inference Providers **feature-extraction** pipeline (the OpenAI-compatible `…/v1` router is chat-only).
+`LLM_ROUTE_EMBEDDINGS` overrides that order (`bedrock` / `huggingface` / `openrouter`, default `auto`). Because Bedrock is checked last, **an explicit pin is the only way to select it while `HF_TOKEN` is set**.
 
-**First consumer:** `GET /api/v1/listings/{property_id}/similar` — loads a small candidate pool (same state/city/type preferred), embeds seed + candidates via `embed()`, ranks by cosine similarity, returns scores on the same 0–100 scale as search `match_score`. Requires an embeddings key (`HF_TOKEN` preferred). No stored vectors / pgvector yet.
+Models: `BEDROCK_EMBEDDING_MODEL` (default `cohere.embed-english-v3`), `HF_EMBEDDING_MODEL` (default `sentence-transformers/all-MiniLM-L6-v2`), `OPENROUTER_EMBEDDING_MODEL` (default `openai/text-embedding-3-small`). Hugging Face embeddings use the Inference Providers **feature-extraction** pipeline (the OpenAI-compatible `…/v1` router is chat-only).
+
+### Listing embeddings (pgvector)
+
+`public.properties.embedding` is a **`vector(1024)`** column with an HNSW cosine index (migration `20260813_properties_embedding.sql`). Listings are embedded **once**, not per request.
+
+⚠️ The width is fixed at 1024 for Cohere Embed v3, so **writing embeddings requires `LLM_ROUTE_EMBEDDINGS=bedrock`** — the 384-dim Hugging Face default cannot populate the column, and a mismatch fails loudly rather than corrupting it.
+
+Populate and keep current:
+
+```bash
+python scripts/backfill_embeddings.py                 # drain the backlog
+python scripts/backfill_embeddings.py --max-batches 2 # bounded run
+```
+
+It selects rows with no vector *or* one from a superseded model, so new listings and a model change are the same case. Each batch commits before the next is selected, so an interrupted run resumes. `.github/workflows/embed-listings.yml` runs it every 30 minutes; listings are written by the ingestion microservice, which has no LLM providers, so embedding is a pull schedule rather than part of the ingest path.
+
+**Consumer:** `GET /api/v1/listings/{property_id}/similar` — reads the seed's **stored** vector (the backfill built it from the same text, so re-embedding would recompute an identical value on a public endpoint; only an unembedded or superseded seed falls back to an embedding call), then runs an indexed k-NN query scoped to the seed's state (widening once if that returns short), returning scores on the same 0–100 scale as search `match_score`. Results are sorted by score, so state decides which rows are eligible, not how they rank. Rows without an embedding are excluded, so run the backfill before relying on it.
+
+⚠️ **Filtered HNSW can under-return.** With a `WHERE` clause, pgvector scans `hnsw.ef_search` index candidates and *then* filters, so a query can return fewer rows than match — which here shows up as the widening path triggering when it should not. If similar-listings looks short in a state with plenty of listings, raise `hnsw.ef_search` (default 40), or enable `hnsw.iterative_scan` on pgvector ≥ 0.8. Harmless at a small corpus; check it before assuming the data is wrong.
+
+### Intake turns (`public.intake_jobs`)
+
+A turn of the LLM intake chat is stored before it runs (migration
+`20260814_intake_jobs.sql`), so a slow or failing provider costs latency rather than the
+message the user typed.
+
+⚠️ **Apply the migration before deploying the code** (see *Migrations* below). The backend
+deploys from `main` automatically, and `POST /answers/llm` writes to `intake_jobs` on
+every request — deploy first and intake is down until the table exists.
+
+The endpoint returns **`202 {job_id, status}`** rather than the turn itself. The client
+then polls `GET /intake-sessions/{id}/jobs/{job_id}` until the job settles.
+
+⚠️ **An SSE stream was built here and removed — do not re-add `EventSource`.** These
+routes are on the protected router and need a bearer token; `EventSource` cannot set
+headers, so every browser connection 401'd and fell through to polling silently. The API
+tests override `get_current_user`, so they could not have caught it. Push delivery, if
+ever wanted, needs `fetch` + `ReadableStream`.
+
+**No queue is required to run.** With `SQS_CHAT_QUEUE_URL` empty — the default, and what
+local dev and CI use — the turn runs inline and the job is already terminal when the
+`202` returns. Setting the variable switches dispatch to `chat-intake.fifo` and the
+[`chat-intake-worker`](../infra/chat-intake-worker/README.md) Lambda.
+
+⚠️ **The response shape is the same either way; the resilience is not.** Inline, the
+`202` comes back *after* the turn finishes, so the request spans the whole provider call.
+If the platform kills it first, the row survives — the user's text is safe — but the
+response never arrived, so the client never learned the `job_id` and cannot follow the
+job. The row then holds the session's in-flight slot until the stale sweep, so a retry
+meets "still working on your last message" for several minutes. Enable the queue in
+production: it is what makes a stalled provider cost latency rather than a turn.
+
+Two behaviours worth knowing when reading the code:
+
+- **The claim is the idempotency gate.** The worker moves a job `queued → running` with
+  the update filtered on `status = 'queued'`, so a redelivered SQS message whose job
+  already ran matches no row and is dropped instead of paying for the turn twice.
+- **A session allows one turn in flight** (`INTAKE_MAX_ACTIVE_JOBS_PER_SESSION`). A
+  worker killed mid-turn would otherwise hold that slot forever, so the enqueue endpoint
+  sweeps jobs stuck in `running` past `CHAT_JOB_STALE_AFTER_SECONDS` before counting.
+
+Sessions are owned: `intake_sessions.user_id` is set at creation and every API route
+loads them through `get_owned_intake_session_row`, so another user's session answers 404
+exactly like a missing one. The queued worker keeps the unscoped lookup — it serves no
+user request, and authorisation belongs at the API boundary.
+
+⚠️ Migration `20260815_intake_sessions_user_id.sql` leaves pre-existing rows with a NULL
+owner, which makes them unreachable. Conversations in flight at deploy time restart.
+
+Both LLM intake routes are also metered per address and per session
+(`INTAKE_IP_RATE_LIMIT_PER_MINUTE`, `INTAKE_SESSION_RATE_LIMIT_PER_MINUTE`) — they spend
+money per request, and behind the queue each accepted request becomes a job the worker
+will pay for.
+
+## Migrations
+
+Plain SQL in `supabase/migrations`, applied in filename order and recorded in
+`public.schema_migrations` so each runs once:
+
+```bash
+python scripts/migrate.py --dry-run   # what would run
+python scripts/migrate.py             # apply it
+```
+
+Needs the **direct port (5432)** in `DATABASE_URL` — pgbouncer transaction mode rejects
+DDL, and the script refuses to start on `:6543` rather than failing partway through. Every
+migration runs in its own transaction, so an interrupted run resumes instead of restarting.
+
+Editing a migration that has already run is the way two environments quietly end up with
+different schemas, so each file's checksum is recorded and the script warns when one no
+longer matches. Write a new migration instead.
+
+**No Alembic, deliberately.** Only `properties` has a SQLAlchemy model; the rest of the
+schema is reached through PostgREST, so autogenerate — which diffs models against the
+database — would propose dropping the unmodelled tables. These migrations are also mostly
+RLS policies, triggers and extensions, which autogenerate cannot produce anyway. The
+Supabase CLI reads the same files if you later want branching or schema diffing.
 
 ## Dataset
 

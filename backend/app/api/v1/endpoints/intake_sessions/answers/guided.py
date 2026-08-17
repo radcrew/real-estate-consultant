@@ -9,11 +9,11 @@ from fastapi import APIRouter
 from app.api.v1.endpoints.intake_sessions.answers.exceptions import (
     raise_intake_unknown_question_key,
 )
-from app.core.deps import SupabaseSdkDep
+from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.domain.intake_validation import compute_current_index
 from app.repositories.intake_sessions import (
     append_intake_criteria_answer,
-    get_intake_session_row,
+    get_owned_intake_session_row,
     parse_intake_session,
     save_intake_criteria,
 )
@@ -38,9 +38,12 @@ async def submit_intake_session_answers(
     session_id: UUID,
     body: UpdateIntakeSessionAnswersRequest,
     client: SupabaseSdkDep,
+    current_user: CurrentUser,
 ) -> UpdateIntakeSessionAnswersResponse:
     answer_key = body.key.strip()
-    session_row = await get_intake_session_row(client, session_id)
+    session_row = await get_owned_intake_session_row(
+        client, session_id, user_id=UUID(current_user.id)
+    )
     questions = await list_intake_questions(client)
 
     merged_criteria = append_intake_criteria_answer(

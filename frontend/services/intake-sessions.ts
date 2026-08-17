@@ -129,6 +129,32 @@ export type LlmInputBody = {
   mode: "llm";
 };
 
+export type IntakeJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+export const TERMINAL_JOB_STATUSES: readonly IntakeJobStatus[] = ["succeeded", "failed"];
+
+/** `202` body: the turn was accepted, not run. Follow the job for the result. */
+export type EnqueuedLlmJob = {
+  job_id: string;
+  status: IntakeJobStatus;
+};
+
+export type IntakeJobState = {
+  job_id: string;
+  status: IntakeJobStatus;
+  result: LlmInputResponse | null;
+  error: string | null;
+};
+
+/**
+ * Turns are followed by polling `getLlmJob`, not by a stream.
+ *
+ * An `EventSource` version was built and removed: these routes require a bearer token
+ * and `EventSource` cannot set headers, so every connection 401'd. If streaming is
+ * revisited for latency, it needs `fetch` + `ReadableStream` (which can carry the
+ * header) rather than `EventSource`.
+ */
+
 export class IntakeSessionsService {
   constructor(private readonly http: AxiosInstance) {}
 
@@ -170,13 +196,27 @@ export class IntakeSessionsService {
     return data;
   }
 
-  async submitLlmInput(
+  /**
+   * Hand the turn to the backend and get a job back.
+   *
+   * The result no longer arrives here: a provider stall used to surface as a 5xx that
+   * took the user's message with it, so the text is made durable first and delivered
+   * through the job.
+   */
+  async enqueueLlmInput(
     sessionId: string,
     body: LlmInputBody,
-  ): Promise<LlmInputResponse> {
-    const { data } = await this.http.post<LlmInputResponse>(
+  ): Promise<EnqueuedLlmJob> {
+    const { data } = await this.http.post<EnqueuedLlmJob>(
       `/intake-sessions/${sessionId}/answers/llm`,
       body,
+    );
+    return data;
+  }
+
+  async getLlmJob(sessionId: string, jobId: string): Promise<IntakeJobState> {
+    const { data } = await this.http.get<IntakeJobState>(
+      `/intake-sessions/${sessionId}/jobs/${jobId}`,
     );
     return data;
   }

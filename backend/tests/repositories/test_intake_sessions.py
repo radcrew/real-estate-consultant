@@ -5,6 +5,7 @@ from app.repositories.intake_sessions import (
     append_intake_criteria_answer,
     create_intake_session_row,
     get_intake_session_row,
+    get_owned_intake_session_row,
     get_profile_session_row,
     parse_intake_session,
     save_intake_criteria,
@@ -15,6 +16,7 @@ from tests.repositories.conftest import make_supabase_client
 
 _SESSION_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 _PROFILE_ID = "b2c3d4e5-f6a7-8901-bcde-f23456789012"
+_USER_ID = "c3d4e5f6-a7b8-9012-cdef-345678901234"
 _SESSION_ROW = {
     "id": _SESSION_ID,
     "status": "in_progress",
@@ -84,17 +86,40 @@ class TestGetProfileSessionRow:
         assert info.value.status_code == 404
 
 
+class TestGetOwnedIntakeSessionRow:
+    async def test_returns_the_row_for_its_owner(self):
+        client = make_supabase_client([_SESSION_ROW])
+        result = await get_owned_intake_session_row(client, _SESSION_ID, user_id=_USER_ID)
+        assert result == _SESSION_ROW
+
+    async def test_filters_on_both_id_and_owner(self):
+        client = make_supabase_client([_SESSION_ROW])
+        await get_owned_intake_session_row(client, _SESSION_ID, user_id=_USER_ID)
+        filters = {c.args for c in client.table.return_value.eq.call_args_list}
+        assert ("id", str(_SESSION_ID)) in filters
+        assert ("user_id", str(_USER_ID)) in filters
+
+    async def test_someone_elses_session_looks_missing(self):
+        """Distinguishing them confirms the id is real, which is what a guess needs."""
+        client = make_supabase_client([])
+        with pytest.raises(HTTPException) as info:
+            await get_owned_intake_session_row(client, _SESSION_ID, user_id=_USER_ID)
+        assert info.value.status_code == 404
+        assert info.value.detail == "Intake session not found."
+
+
 class TestCreateIntakeSessionRow:
     async def test_returns_parsed_session(self):
         client = make_supabase_client([_SESSION_ROW])
-        result = await create_intake_session_row(client)
+        result = await create_intake_session_row(client, user_id=_USER_ID)
         assert str(result.id) == _SESSION_ID
 
-    async def test_inserts_empty_criteria_and_no_profile(self):
+    async def test_records_the_owner(self):
+        """An ownerless session is one nobody can reach."""
         client = make_supabase_client([_SESSION_ROW])
-        await create_intake_session_row(client)
+        await create_intake_session_row(client, user_id=_USER_ID)
         client.table.return_value.insert.assert_called_once_with(
-            {"search_profile_id": None, "criteria": {}},
+            {"search_profile_id": None, "criteria": {}, "user_id": str(_USER_ID)},
         )
 
 

@@ -1,0 +1,4 @@
+# Weights are pulled in at build time, never committed — they are hundreds of MB and
+# the image digest is what versions them.
+model/*.gguf
+grammars/

@@ -30,6 +30,7 @@ from app.llm.providers.prompts import (
     OPENING_QUESTION_OPTIONS_HINT,
     OPENING_QUESTION_SYSTEM_PROMPT_BASE,
 )
+from app.llm.providers.routing import LlmTask
 from app.repositories.questions import map_question_to_model
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.schemas.llm_intake_parse import LlmOpeningQuestionOutput, LlmParseModelOutput
@@ -138,6 +139,11 @@ async def parse_user_input(
         # The system prompt already carries the intake schema; a second copy of the
         # Pydantic schema would be ~1k characters of duplicate prompt per turn.
         include_schema_instruction=False,
+        # The route says which provider this task prefers; the override says which box
+        # this deployment is running. Both are passed and the pin wins in `chat.py`, so
+        # a deployment that has not set INTAKE_CHAT_* follows the route instead of
+        # falling back to whichever key happens to be present.
+        task=LlmTask.INTAKE_PARSE,
         model=model,
         base_url=base_url,
         api_key=api_key,
@@ -189,6 +195,7 @@ async def generate_opening_question(
         response_format=LlmOpeningQuestionOutput,
         temperature=0.35,
         max_tokens=200,
+        task=LlmTask.OPENING_QUESTION,
     )
     text = response_output.text
     if not text:

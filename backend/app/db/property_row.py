@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Float, Integer, Text
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import DateTime, Float, Integer, Text
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+
+# Cohere Embed v3 on Bedrock. Fixed because HNSW needs a constant width and a stored
+# vector is only comparable against others from the same model.
+EMBEDDING_DIMENSIONS = 1024
 
 
 class PropertyRow(Base):
@@ -32,3 +38,11 @@ class PropertyRow(Base):
     listing_broker_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     listing_broker_email: Mapped[str | None] = mapped_column(Text, nullable=True)
     listing_broker_phone: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Written once at ingest, not per request. embedding_model makes rows produced by a
+    # superseded model findable so a re-embed can target only what is stale.
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(EMBEDDING_DIMENSIONS), nullable=True
+    )
+    embedding_model: Mapped[str | None] = mapped_column(Text, nullable=True)
+    embedded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

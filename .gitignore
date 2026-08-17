@@ -14,6 +14,23 @@ services/mcp/.auth.json
 .vercel
 **/.vercel
 
+# Python bytecode and caches. backend/ has its own copy of these rules; this covers
+# every other Python directory — infra/, scripts/, services/ — which would otherwise
+# expose __pycache__ the moment one of them is first added to git.
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# Coverage artifacts. `.coverage` is a binary SQLite database rewritten by every
+# `pytest --cov` run — including the CI coverage job — so tracking it means a dirty tree
+# after running the tests and a merge conflict no one can resolve by hand.
+.coverage
+.coverage.*
+coverage.json
+htmlcov/
+
 # OS / editor
 .DS_Store
 Thumbs.db

@@ -89,6 +89,73 @@ class Settings(BaseSettings):
     openrouter_input_cost_per_1m: float = 0.0
     openrouter_output_cost_per_1m: float = 0.0
 
+    # Region for both Bedrock clients. Required: neither boto3 nor the Anthropic Bedrock
+    # client applies a default. Credentials are resolved by the standard boto3 chain
+    # (env vars on Vercel, instance/task role on AWS compute) and so are not repeated here.
+    aws_region: str = ""
+
+    # Chat runs on the Bedrock Messages API endpoint, whose model IDs carry an `anthropic.`
+    # prefix and no date suffix. Embeddings run on bedrock-runtime InvokeModel, whose IDs
+    # are versioned instead. The two conventions are not interchangeable.
+    bedrock_chat_model: str = "anthropic.claude-sonnet-5"
+    bedrock_effort: str = "low"
+    # Adaptive thinking is on by default on Claude 5 models and counts against max_tokens.
+    # Callers size max_tokens for models without thinking, so leave it off for extraction.
+    bedrock_disable_thinking: bool = True
+    # Not every region carries every model: eu-north-1 has no cohere.embed-english-v3, and
+    # offers v4 only through an inference profile ("eu.cohere.embed-v4:0"), whose id goes in
+    # this same field. Check list_foundation_models for the target region before changing it.
+    bedrock_embedding_model: str = "cohere.embed-english-v3"
+    # Cohere Embed v3 accepts roughly 96 texts per InvokeModel call.
+    bedrock_embedding_batch_size: int = 96
+    # Width to ask Cohere Embed v4 for. It defaults to 1536, which does not fit the
+    # vector(1024) column, so the two have to be set together. 0 omits the field entirely,
+    # which is required for v3 — it has one fixed width and rejects the parameter.
+    bedrock_embedding_dimensions: int = 0
+    bedrock_input_cost_per_1m: float = 0.0
+    bedrock_output_cost_per_1m: float = 0.0
+
+    # Qwen chat runs on the Converse API, which is vendor-neutral: the Anthropic SDK
+    # behind bedrock_chat cannot call non-Anthropic models. Converse IDs are versioned.
+    bedrock_qwen_chat_model: str = "qwen.qwen3-32b-v1:0"
+    # Qwen3 is a hybrid-thinking family, and thinking is billed against maxTokens for no
+    # benefit on a structured draft. The switch is model-revision specific, so set this
+    # false to omit the field entirely if a deployed revision rejects it.
+    bedrock_qwen_disable_thinking: bool = True
+    bedrock_qwen_input_cost_per_1m: float = 0.0
+    bedrock_qwen_output_cost_per_1m: float = 0.0
+
+    # Bedrock Guardrails screening for intake free text (app/clients/bedrock_guardrail.py).
+    # Priced per text unit, so an empty id disables it and screening passes through.
+    bedrock_guardrail_id: str = ""
+    bedrock_guardrail_version: str = "DRAFT"
+    # Screen the assistant's generated question as well as the user's message. Doubles
+    # the per-turn cost; the question is template-driven, so the risk it carries is lower.
+    bedrock_guardrail_screen_output: bool = False
+    # On a guardrail outage, prefer availability over screening. False (the default)
+    # refuses the turn rather than storing text nothing checked.
+    bedrock_guardrail_fail_open: bool = False
+
+    # The fine-tuned Qwen2.5-0.5B criteria extractor, self-hosted on Lambda and invoked
+    # over IAM. An empty name disables the provider the same way a blank region does.
+    qwen_inference_function_name: str = ""
+    # Recorded on every llm_call, so "did the retrain regress intake parsing?" is a
+    # dashboard question rather than a deploy.
+    qwen_model_version: str = ""
+
+    # Per-call-site provider routing (see app/llm/providers/routing.py). "auto" keeps the
+    # key-presence order in providers/chat.py, so routing is opt-in and metered providers
+    # are never selected by accident. Any other value pins that path to one provider.
+    llm_route_intake_parse: str = "auto"
+    llm_route_opening_question: str = "auto"
+    llm_route_fit_explanation: str = "auto"
+    llm_route_outreach_draft: str = "auto"
+    llm_route_default: str = "auto"
+    # Embeddings has a single call site, so one pin rather than a per-task table. An
+    # explicit pin is the only way to reach Bedrock while HF_TOKEN is set, since
+    # key-presence order deliberately checks Bedrock last.
+    llm_route_embeddings: str = "auto"
+
     log_level: str = "INFO"
 
     # SolarWinds Observability bulk HTTP log ingestion. Leave blank to disable.
@@ -104,6 +171,47 @@ class Settings(BaseSettings):
     mcp_api_key_pepper: str = ""
     # Per-key sliding-window limit for MCP API key auth (single process).
     mcp_api_key_rate_limit_per_minute: int = 120
+
+    # Admission control for the anonymous, LLM-backed intake routes (see
+    # core/intake_admission.py). Sessions cost money per request and carry no identity,
+    # so the address budget is the real ceiling; the session budget only paces one
+    # conversation. Both are per process, so the effective limit scales with instances.
+    intake_ip_rate_limit_per_minute: int = 60
+    intake_session_rate_limit_per_minute: int = 12
+
+    # FIFO queue carrying LLM intake turns to the Lambda consumer. Empty disables
+    # queueing and the endpoint runs the turn inline — which is what local dev and the
+    # test suite do, so neither needs a queue to exist.
+    sqs_chat_queue_url: str = ""
+    # How long the client follows a turn before giving up lives in the frontend
+    # (JOB_DEADLINE_MS): it polls, so the backend holds no per-client state and needs no
+    # matching setting. Only the sweep below cares, and it says so.
+    # A worker killed mid-turn leaves a claimed row nobody will finish, and the claim
+    # gate means redelivery cannot rescue it. Rows untouched for longer than this are
+    # treated as dead.
+    #
+    # Last link in an ordered chain, each step of which must clear the one before:
+    #   worst-case provider call < worker function timeout < queue visibility timeout
+    #   < this
+    # The provider end dominates and is larger than it looks — OpenRouter alone is a 75s
+    # read timeout with 3 retries. Set this below the function timeout and a turn still
+    # being worked on is expired out from under it.
+    chat_job_stale_after_seconds: float = 420.0
+    # Jobs never picked up at all. This measures *untouched* time — the trigger moves
+    # updated_at on every status change, so a job cycling through redelivery keeps
+    # refreshing it and only one nothing has touched ages out. The floor is therefore a
+    # single visibility timeout (the gap between attempts), not the whole redelivery
+    # span.
+    #
+    # The ceiling is how long the *client* waits before giving up, which lives in the
+    # frontend as JOB_DEADLINE_MS — keep the two in step. Set this higher and a user
+    # told their turn failed is simultaneously told it is still running; much lower and
+    # jobs are cleared while someone is still watching them.
+    chat_job_abandoned_after_seconds: float = 600.0
+    # Unfinished turns allowed per session. One is the natural limit: FIFO ordering per
+    # session already serialises them, so a second in flight only queues behind the first
+    # while giving an abuser a cheap way to multiply work per session.
+    intake_max_active_jobs_per_session: int = 1
 
     # Populated automatically by Vercel; set manually for other hosts.
     git_sha: str = Field(

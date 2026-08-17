@@ -1,0 +1,4 @@
+# Pin exactly once a build is verified: build_grammars.py depends on
+# llama_cpp.llama_grammar.json_schema_to_gbnf, whose location has moved between
+# releases. A failed build is the intended outcome if it moves again.
+llama-cpp-python>=0.3.0,<0.4.0

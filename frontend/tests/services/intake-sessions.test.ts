@@ -66,12 +66,22 @@ describe("IntakeSessionsService", () => {
     });
   });
 
-  describe("submitLlmInput", () => {
-    it("calls POST /intake-sessions/{id}/answers/llm with body", async () => {
-      const http = makeHttp({ mode: "llm", is_complete: false });
+  describe("enqueueLlmInput", () => {
+    it("calls POST /intake-sessions/{id}/answers/llm and returns the job", async () => {
+      const http = makeHttp({ job_id: "job-1", status: "queued" });
       const body = { input: "warehouse in Austin", mode: "llm" as const };
-      await new IntakeSessionsService(http).submitLlmInput("s-1", body);
+      const job = await new IntakeSessionsService(http).enqueueLlmInput("s-1", body);
       expect(http.post).toHaveBeenCalledWith("/intake-sessions/s-1/answers/llm", body);
+      // The turn is accepted, not run — the result arrives through the job.
+      expect(job).toEqual({ job_id: "job-1", status: "queued" });
+    });
+  });
+
+  describe("getLlmJob", () => {
+    it("calls GET /intake-sessions/{id}/jobs/{jobId}", async () => {
+      const http = makeHttp({ job_id: "job-1", status: "succeeded", result: null, error: null });
+      await new IntakeSessionsService(http).getLlmJob("s-1", "job-1");
+      expect(http.get).toHaveBeenCalledWith("/intake-sessions/s-1/jobs/job-1");
     });
   });
 });

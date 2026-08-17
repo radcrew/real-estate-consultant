@@ -1,0 +1,17 @@
+{
+  "Records": [
+    {
+      "messageId": "00000000-0000-0000-0000-000000000001",
+      "receiptHandle": "sample",
+      "body": "{\"job_id\": \"REPLACE-WITH-A-QUEUED-JOB-ID\", \"session_id\": \"REPLACE-WITH-ITS-SESSION-ID\"}",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "MessageGroupId": "REPLACE-WITH-ITS-SESSION-ID",
+        "MessageDeduplicationId": "REPLACE-WITH-A-QUEUED-JOB-ID"
+      },
+      "messageAttributes": {},
+      "eventSource": "aws:sqs",
+      "awsRegion": "us-east-1"
+    }
+  ]
+}

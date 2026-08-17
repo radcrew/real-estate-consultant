@@ -14,6 +14,7 @@ The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with 
 | **Backend** | [FastAPI](https://fastapi.tiangolo.com/) | APIs, modular listing ingestion, normalization, and orchestration of model calls |
 | **Data & platform** | [Supabase](https://supabase.com/) | Postgres, authentication, and other Supabase features (e.g. Storage) as the project needs them |
 | **LLM** | [OpenRouter](https://openrouter.ai/) and/or [Hugging Face](https://huggingface.co/) | Structured chat for intake, fit summaries, and outreach drafts (`OPENROUTER_API_KEY` preferred when both keys are set) |
+| **LLM (optional)** | [AWS Bedrock](https://aws.amazon.com/bedrock/) + Lambda | Per-call-site routing to Bedrock (embeddings, outreach) or a self-hosted Qwen on Lambda (intake parse). Off unless configured — see below |
 
 Ingestion may integrate additional tools (for example **Apify** or similar) behind FastAPI; those are implementation details of each connector, not replacements for the core stack above.
 
@@ -50,9 +51,9 @@ Production deploys use **[Vercel](https://vercel.com)** via `.github/workflows/f
    - `https://<your-project>.vercel.app/auth/callback`
    - Preview URLs if you test OAuth on PR deployments.
 
-**URLs:** Production is `https://<project-name>.vercel.app` (shown in the workflow deploy step and Vercel dashboard). PRs run **build only**; previews can use Vercel’s Git integration or add a preview deploy job later.
+**URLs:** Production is `https://<project-name>.vercel.app` (shown in the workflow deploy step and Vercel dashboard). Pull requests get their own preview URL, posted to the workflow run summary.
 
-**CI:** On pull requests, the workflow runs `next build` only. On push to `main`, it builds and deploys with `vercel deploy --prebuilt --prod`.
+**CI:** On pull requests, the workflow builds and then deploys a preview with `vercel deploy`. On push to `main`, it builds and deploys with `vercel deploy --prod`. It runs no lint and no tests. The Vitest suite runs in `.github/workflows/coverage.yml`, on pull requests only, and ESLint runs in no workflow at all, so run `pnpm lint` locally.
 
 Set `NEXT_PUBLIC_BACKEND_API_URL` in Vercel (frontend project) to the backend production URL below.
 
@@ -65,7 +66,7 @@ The FastAPI API deploys as a **second Vercel project** via `.github/workflows/ba
 1. In Vercel, create/import a project with **Root Directory** = `backend` (or `cd backend && npx vercel link`).
 2. Add GitHub secrets **`VERCEL_BACKEND_PROJECT_ID`** (backend project ID) and reuse **`VERCEL_TOKEN`** / **`VERCEL_ORG_ID`**. The frontend workflow uses **`VERCEL_FRONTEND_PROJECT_ID`**.
 3. In the **backend** Vercel project → **Environment Variables** (Production), set variables from `backend/.env.example` (at minimum `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `FRONTEND_ORIGIN` = your frontend Vercel URL, and at least one of `OPENROUTER_API_KEY` or `HF_TOKEN` for chat).
-4. Merge to **`main`** to run production deploy (`vercel deploy --prebuilt --prod`).
+4. Merge to **`main`** to run production deploy (`vercel deploy --prod`). Opening a PR deploys a preview first; both are smoke-tested against `/health/ready` and `/api/v1/ping`.
 
 **URL:** `https://<backend-project-name>.vercel.app` — use this as `NEXT_PUBLIC_BACKEND_API_URL` on the frontend. Routes are unchanged (`/health`, `/api/v1/...`, `/docs`).
 
@@ -88,6 +89,27 @@ The MCP adapter is a **third Vercel project** (`real-estate-consultant-mcp`) wit
 4. Enable **Fluid Compute** on the MCP project.
 
 **URL:** `https://real-estate-consultant-mcp.vercel.app/mcp` — health: `/health`. Host config template: [`.cursor/mcp.remote.example.json`](.cursor/mcp.remote.example.json). Details: [`services/mcp/README.md`](services/mcp/README.md).
+
+---
+
+## Deploy AWS components (optional)
+
+**None of these are required to run the product.** Each is off until its environment
+variable is set, and the backend behaves correctly without any of them — the LLM routes
+stay on OpenRouter/Hugging Face and intake turns run inside the request. Design and
+rationale: [`AWS_BEDROCK_ARCHITECTURE.md`](AWS_BEDROCK_ARCHITECTURE.md).
+
+| Component | Turned on by | What it changes |
+|---|---|---|
+| Bedrock embeddings | `LLM_ROUTE_EMBEDDINGS=bedrock` | Similar-listings uses 1024-dim Cohere v3 vectors. **Required before similar-listings returns anything** — the 384-dim default cannot fill the column |
+| Bedrock Qwen3-32B | `LLM_ROUTE_OUTREACH_DRAFT=bedrock_qwen` | Outreach drafts move off OpenRouter |
+| [`services/qwen-lambda/`](services/qwen-lambda/README.md) | `LLM_ROUTE_INTAKE_PARSE=qwen` | Criteria extraction runs a self-hosted Qwen2.5-0.5B on Lambda |
+| [`infra/chat-intake-worker/`](infra/chat-intake-worker/README.md) | `SQS_CHAT_QUEUE_URL` | Intake turns are queued instead of run inline, so a slow provider becomes latency rather than a lost message |
+| Bedrock Guardrails | `BEDROCK_GUARDRAIL_ID` | Intake free text is screened (PII redaction) before it is stored |
+
+Two of these are separate deployables with their own environments. Their `LLM_ROUTE_*`
+pins must match the backend's, or the same turn gets a different model depending on which
+path ran it.
 
 ---
 

@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "LlmParseNextQuestion": {
+      "description": "LLM-authored pointer to the next questionnaire step.",
+      "properties": {
+        "key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Key"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        }
+      },
+      "title": "LlmParseNextQuestion",
+      "type": "object"
+    }
+  },
+  "description": "Expected top-level JSON object from the intake parsing model.",
+  "properties": {
+    "extracted": {
+      "additionalProperties": true,
+      "title": "Extracted",
+      "type": "object"
+    },
+    "is_complete": {
+      "default": false,
+      "title": "Is Complete",
+      "type": "boolean"
+    },
+    "missing_fields": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing Fields",
+      "type": "array"
+    },
+    "next_question": {
+      "$ref": "#/$defs/LlmParseNextQuestion"
+    },
+    "skipped_fields": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Skipped Fields",
+      "type": "array"
+    }
+  },
+  "title": "LlmParseModelOutput",
+  "type": "object"
+}

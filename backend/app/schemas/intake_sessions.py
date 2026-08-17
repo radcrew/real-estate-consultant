@@ -96,7 +96,7 @@ class SubmitLlmIntakeInputRequest(BaseModel):
 
 
 class SubmitLlmIntakeInputResponse(BaseModel):
-    """Response body for ``POST /api/v1/intake-sessions/{session_id}/answers/llm``."""
+    """The turn's result. Delivered via the job, not the POST that started it."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -113,5 +113,35 @@ class SubmitLlmIntakeInputResponse(BaseModel):
     # figure that belongs to another field, a bound the wording moved. Empty for the
     # ordinary turn. Each is {field, kind, message}.
     notes: list[dict[str, str]] = []
+    # Both were built by the service and passed here, but were never declared — Pydantic
+    # dropped them silently, so the side panel's missing-field labels have always fallen
+    # back to raw keys. Declared now, with defaults so an older stored job result still
+    # loads.
+    skipped_fields: list[str] = Field(default_factory=list)
+    question_titles: dict[str, str] = Field(default_factory=dict)
     next_question: IntakeSessionFirstQuestion | None = None
     is_complete: bool
+
+
+class EnqueuedLlmIntakeJobResponse(BaseModel):
+    """``202`` body for ``POST /api/v1/intake-sessions/{session_id}/answers/llm``.
+
+    Identical whether the turn was queued or run inline: the client always follows a job,
+    so a deployment without a queue needs no different client code.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    job_id: UUID
+    status: str = Field(description="queued | running | succeeded | failed")
+
+
+class IntakeJobStatusResponse(BaseModel):
+    """A job's current state, from the poll endpoint or an SSE frame."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    job_id: UUID
+    status: str
+    result: SubmitLlmIntakeInputResponse | None = None
+    error: str | None = None

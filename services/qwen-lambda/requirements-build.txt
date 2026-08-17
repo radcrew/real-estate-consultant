@@ -1,0 +1,2 @@
+# Build-time only — fetch_model.py runs on your machine, not in the image.
+huggingface_hub>=0.26.0
