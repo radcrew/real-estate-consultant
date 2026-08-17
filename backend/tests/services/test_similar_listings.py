@@ -11,6 +11,25 @@ from fastapi import HTTPException
 from app.services.similar_listings import find_similar_listings
 
 
+_ACTIVE_MODEL = "bedrock:cohere.embed-v4-test"
+
+
+@pytest.fixture(autouse=True)
+def _active_embedding_model():
+    """Pin the embeddings route for every test in this module.
+
+    ``find_similar_listings`` resolves the active model to scope the stored-vector
+    lookup, and that resolver reads live settings — it raises 503 when no embeddings
+    provider is configured. Unpinned, these tests pass on a machine with a populated
+    .env and fail in CI, which has neither the file nor any provider keys.
+    """
+    with patch(
+        "app.services.similar_listings.resolve_embeddings_model_id",
+        return_value=_ACTIVE_MODEL,
+    ):
+        yield
+
+
 def _seed(seed_id, **overrides):
     return {
         "id": seed_id,
@@ -115,7 +134,7 @@ class TestFindSimilarListings:
             ),
         ):
             await find_similar_listings(db, seed_id, limit=6)
-        assert mock_lookup.await_args.kwargs["model"]
+        assert mock_lookup.await_args.kwargs["model"] == _ACTIVE_MODEL
 
     async def test_embeds_only_the_seed(self):
         """The point of ingest-time embeddings: one call, not one per candidate."""
