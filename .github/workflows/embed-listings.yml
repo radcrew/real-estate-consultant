@@ -1,0 +1,78 @@
+# Keeps listing embeddings current so similar-listings search has vectors to rank.
+#
+# Listings are written by the ingestion microservice (PostgREST, no LLM providers), so
+# embedding happens here on a pull schedule rather than in the ingest path: the backfill
+# already selects rows with no vector or one from a superseded model, which makes "new
+# listing" and "model changed" the same case.
+#
+# Runs the script directly against the database rather than exposing a trigger endpoint —
+# no new public surface, and no auth mechanism to add to the backend.
+#
+# Required GitHub secrets:
+#   DATABASE_URL           — direct port (5432); pgbouncer transaction mode blocks DDL/SET
+#   AWS_REGION             — region for the Bedrock embeddings call
+#   AWS_ACCESS_KEY_ID      — IAM user limited to bedrock:InvokeModel on the embedding model
+#   AWS_SECRET_ACCESS_KEY
+#   LLM_ROUTE_EMBEDDINGS   — "bedrock"; the 1024-dim column cannot hold the 384-dim HF model
+#   BEDROCK_EMBEDDING_MODEL      — region-specific. eu-north-1 has no cohere.embed-english-v3
+#                                  (the code default) and reaches v4 only through an
+#                                  inference profile: "eu.cohere.embed-v4:0".
+#   BEDROCK_EMBEDDING_DIMENSIONS — "1024" for v4, which otherwise returns 1536 and will not
+#                                  fit the column. Leave unset for v3, which rejects it.
+name: Embed listings
+
+on:
+  schedule:
+    # Every 30 minutes. New listings are searchable within that window; a run with
+    # nothing pending exits after one query.
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      max_batches:
+        description: "Batches to process (blank = drain the backlog)"
+        required: false
+        default: ""
+
+jobs:
+  embed:
+    name: Backfill listing embeddings
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -U pip && python -m pip install -e .
+
+      - name: Run backfill
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          LLM_ROUTE_EMBEDDINGS: ${{ secrets.LLM_ROUTE_EMBEDDINGS }}
+          BEDROCK_EMBEDDING_MODEL: ${{ secrets.BEDROCK_EMBEDDING_MODEL }}
+          BEDROCK_EMBEDDING_DIMENSIONS: ${{ secrets.BEDROCK_EMBEDDING_DIMENSIONS }}
+          MAX_BATCHES: ${{ inputs.max_batches }}
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$AWS_REGION" ]; then
+            echo "DATABASE_URL or AWS_REGION secret is not set — skipping."
+            exit 0
+          fi
+
+          args=""
+          if [ -n "$MAX_BATCHES" ]; then
+            args="--max-batches $MAX_BATCHES"
+          fi
+
+          python scripts/backfill_embeddings.py $args

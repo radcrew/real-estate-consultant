@@ -9,6 +9,7 @@ from app.llm.fit.exceptions import raise_fit_explanation_empty
 from app.llm.fit.prompts import FIT_EXPLANATION_SYSTEM_PROMPT, build_fit_user_message
 from app.llm.fit.schema import FitExplanationLLM
 from app.llm.providers.chat import generate_structured_output
+from app.llm.providers.routing import LlmTask
 
 _NO_CRITERIA_SUMMARY = (
     "No specific search criteria are set yet, so every listing scores neutrally. "
@@ -60,6 +61,7 @@ async def generate_fit_explanation(
         response_format=FitExplanationLLM,
         temperature=0.2,
         max_tokens=400,
+        task=LlmTask.FIT_EXPLANATION,
     )
     if not parsed.summary.strip():
         raise_fit_explanation_empty()

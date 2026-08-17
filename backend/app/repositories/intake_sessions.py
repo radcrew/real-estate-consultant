@@ -43,10 +43,41 @@ def append_intake_criteria_answer(
 
 
 async def get_intake_session_row(client: AsyncClient, session_id: UUID) -> dict[str, Any]:
+    """Load a session **without** checking who owns it.
+
+    For trusted backend contexts only — the queued worker runs a turn with no user
+    request behind it. Anything serving an HTTP caller must use
+    :func:`get_owned_intake_session_row`, or the session id becomes a bearer token again.
+    """
     result = await execute_db_safe(
         client.table("intake_sessions")
         .select(_INTAKE_SESSION_SELECT)
         .eq("id", str(session_id))
+        .limit(1)
+        .execute(),
+    )
+    if not as_row_list(result.data):
+        raise_intake_session_not_found()
+    return get_single_row(result, detail=_LOAD_SESSION_ERROR)
+
+
+async def get_owned_intake_session_row(
+    client: AsyncClient,
+    session_id: UUID,
+    *,
+    user_id: UUID,
+) -> dict[str, Any]:
+    """Load a session belonging to ``user_id``.
+
+    Someone else's session answers exactly like a missing one. Distinguishing them would
+    confirm that an id is real, which is the only thing an attacker holding a guess needs
+    to learn. Rows predating ownership have a NULL owner and match nobody.
+    """
+    result = await execute_db_safe(
+        client.table("intake_sessions")
+        .select(_INTAKE_SESSION_SELECT)
+        .eq("id", str(session_id))
+        .eq("user_id", str(user_id))
         .limit(1)
         .execute(),
     )
@@ -72,10 +103,15 @@ async def get_profile_session_row(
     return get_single_row(result, detail=_LOAD_SESSION_ERROR)
 
 
-async def create_intake_session_row(client: AsyncClient) -> IntakeSession:
+async def create_intake_session_row(client: AsyncClient, *, user_id: UUID) -> IntakeSession:
+    """Create a session owned by ``user_id``.
+
+    Required rather than optional: an ownerless session is one nobody can reach, and a
+    default here would let a caller create one by forgetting an argument.
+    """
     result = await execute_db_safe(
         client.table("intake_sessions")
-        .insert({"search_profile_id": None, "criteria": {}})
+        .insert({"search_profile_id": None, "criteria": {}, "user_id": str(user_id)})
         .execute(),
     )
     row = get_single_row(

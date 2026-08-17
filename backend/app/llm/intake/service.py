@@ -21,6 +21,7 @@ from app.llm.providers.prompts import (
     OPENING_QUESTION_OPTIONS_HINT,
     OPENING_QUESTION_SYSTEM_PROMPT_BASE,
 )
+from app.llm.providers.routing import LlmTask
 from app.repositories.questions import map_question_to_model
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.schemas.llm_intake_parse import LlmOpeningQuestionOutput, LlmParseModelOutput
@@ -29,6 +30,38 @@ QuestionRow = dict[str, Any]
 
 # Reserved criteria key holding required fields the user explicitly declined to answer.
 SKIPPED_FIELDS_KEY = "_skipped_fields"
+
+
+def pending_question_for(
+    questions: list[QuestionRow],
+    *,
+    criteria: dict[str, Any],
+    required_fields: list[str],
+    skipped: list[str],
+) -> dict[str, Any] | None:
+    """The question the user is most likely replying to, or ``None`` when none is open.
+
+    Derived rather than stored: the session keeps criteria, not the last question asked,
+    and the next question is itself chosen as the first unanswered required field — so
+    recomputing it here reaches the same one without new state to keep in step.
+
+    Without this the parser sees a bare "1000" with no idea which field it answers, and
+    has to guess from the shape of the number alone.
+    """
+    key = next(
+        (k for k in required_fields if k not in criteria and k not in skipped),
+        None,
+    )
+    if key is None:
+        return None
+    row = find_question_row_by_key(questions, key)
+    if row is None:
+        return None
+    # Read the two fields directly rather than mapping the whole row: this is prompt
+    # context, so a row too incomplete to render as a question should still be able to
+    # say which field is open.
+    text = row.get("text")
+    return {"key": key, "text": text if isinstance(text, str) else ""}
 
 
 async def parse_user_input(
@@ -43,6 +76,12 @@ async def parse_user_input(
         key for key in current_criteria.get(SKIPPED_FIELDS_KEY, []) if isinstance(key, str)
     ]
     criteria_for_prompt = {k: v for k, v in current_criteria.items() if k != SKIPPED_FIELDS_KEY}
+    asked_question = pending_question_for(
+        questions,
+        criteria=criteria_for_prompt,
+        required_fields=required_fields,
+        skipped=previously_skipped,
+    )
 
     intake_schema = render_intake_response_schema(questions=questions)
     system_prompt = (
@@ -52,6 +91,7 @@ async def parse_user_input(
     user_prompt = json.dumps(
         {
             "user_input": user_input,
+            "asked_question": asked_question,
             "current_criteria": criteria_for_prompt,
             "question_keys": question_keys,
             "required_fields": required_fields,
@@ -67,6 +107,7 @@ async def parse_user_input(
         response_format=LlmParseModelOutput,
         temperature=0.1,
         max_tokens=800,
+        task=LlmTask.INTAKE_PARSE,
     )
     return _build_intake_parse_result(
         parsed_output=parsed_output,
@@ -105,6 +146,7 @@ async def generate_opening_question(
         response_format=LlmOpeningQuestionOutput,
         temperature=0.35,
         max_tokens=200,
+        task=LlmTask.OPENING_QUESTION,
     )
     text = response_output.text
     if not text:
@@ -118,6 +160,14 @@ def resolve_next_intake_question(
     missing_fields: list[str],
 ) -> IntakeSessionFirstQuestion | None:
     """Prefer LLM-authored text while anchoring the result to a known question row."""
+    # Nothing missing means nothing left to ask, whatever the model suggested. It goes on
+    # proposing the field it just collected — the intake is complete but the suggestion
+    # still names ``size_sqft`` — and the client shows any question it is handed, so the
+    # user answers the same one forever and never reaches the end. This is the same
+    # condition the caller reports as ``is_complete``.
+    if not missing_fields:
+        return None
+
     suggested = suggested_question_as_dict(suggested_question)
     suggested_key = suggested.get("key")
     suggested_text = suggested.get("text")

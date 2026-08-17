@@ -11,6 +11,8 @@ _CHAINABLE_METHODS = (
     "neq",
     "in_",
     "is_",
+    "lt",
+    "gt",
     "order",
     "limit",
     "insert",

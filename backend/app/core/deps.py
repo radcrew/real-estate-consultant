@@ -9,7 +9,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from supabase_auth.types import User
 
-from app.core.api_key_rate_limit import ApiKeyRateLimiter
 from app.core.config import settings
 from app.core.database import get_session
 from app.core.db_safe import SupabaseRequestError
@@ -18,6 +17,7 @@ from app.core.exceptions import (
     raise_auth_missing_bearer,
     raise_auth_user_not_returned,
 )
+from app.core.rate_limit import SlidingWindowRateLimiter
 from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
 from app.domain.mcp_api_keys import looks_like_mcp_api_key, mcp_scopes_allow
 from app.repositories.account import get_auth_user
@@ -34,7 +34,7 @@ SupabaseAuthDep = Annotated[AsyncClient, Depends(get_supabase_auth_client)]
 _http_bearer = HTTPBearer(auto_error=False)
 
 _api_key_ctx: ContextVar[ResolvedMcpApiKey | None] = ContextVar("mcp_api_key_ctx", default=None)
-_api_key_limiter = ApiKeyRateLimiter(
+_api_key_limiter = SlidingWindowRateLimiter(
     max_calls=settings.mcp_api_key_rate_limit_per_minute,
     window_seconds=60.0,
 )

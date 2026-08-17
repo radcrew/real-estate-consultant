@@ -43,7 +43,7 @@ async def quick_search(
     current_user: CurrentUser,
 ) -> QuickSearchResponse:
     search_profile_id = await create_search_profile(client, current_user.id)
-    session = await create_intake_session_row(client)
+    session = await create_intake_session_row(client, user_id=UUID(current_user.id))
     criteria: dict = {}
     if body.location:
         criteria["location"] = body.location

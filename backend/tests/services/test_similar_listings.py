@@ -11,6 +11,53 @@ from fastapi import HTTPException
 from app.services.similar_listings import find_similar_listings
 
 
+_ACTIVE_MODEL = "bedrock:cohere.embed-v4-test"
+
+
+@pytest.fixture(autouse=True)
+def _active_embedding_model():
+    """Pin the embeddings route for every test in this module.
+
+    ``find_similar_listings`` resolves the active model to scope the stored-vector
+    lookup, and that resolver reads live settings — it raises 503 when no embeddings
+    provider is configured. Unpinned, these tests pass on a machine with a populated
+    .env and fail in CI, which has neither the file nor any provider keys.
+    """
+    with patch(
+        "app.services.similar_listings.resolve_embeddings_model_id",
+        return_value=_ACTIVE_MODEL,
+    ):
+        yield
+
+
+def _seed(seed_id, **overrides):
+    return {
+        "id": seed_id,
+        "city": "Austin",
+        "state": "TX",
+        "property_type": "Warehouse",
+        "description": "Dock-high warehouse near I-35",
+        **overrides,
+    }
+
+
+def _row(row_id, **overrides):
+    return {"id": row_id, "city": "Austin", "state": "TX", **overrides}
+
+
+def _stored_vector(value):
+    return patch(
+        "app.services.similar_listings.get_property_embedding",
+        new_callable=AsyncMock,
+        return_value=value,
+    )
+
+
+def _no_stored_vector():
+    """Seed not backfilled yet, so these exercise the embed-on-the-fly fallback."""
+    return _stored_vector(None)
+
+
 class TestFindSimilarListings:
     async def test_missing_seed_returns_none(self):
         db = AsyncMock()
@@ -22,106 +69,304 @@ class TestFindSimilarListings:
             result = await find_similar_listings(db, uuid4(), limit=3)
         assert result is None
 
-    async def test_no_candidates_returns_empty(self):
+    async def test_zero_limit_skips_embedding(self):
         seed_id = uuid4()
-        seed = {
-            "id": seed_id,
-            "city": "Austin",
-            "state": "TX",
-            "property_type": "Warehouse",
-            "description": "Dock-high warehouse",
-        }
         db = AsyncMock()
         with (
             patch(
                 "app.services.similar_listings.get_property_by_id",
                 new_callable=AsyncMock,
-                return_value=seed,
+                return_value=_seed(seed_id),
             ),
-            patch(
-                "app.services.similar_listings.list_similar_candidate_rows",
-                new_callable=AsyncMock,
-                return_value=[],
-            ),
-            patch(
-                "app.services.similar_listings.embed",
-                new_callable=AsyncMock,
-            ) as mock_embed,
+            _no_stored_vector(),
+            patch("app.services.similar_listings.embed", new_callable=AsyncMock) as mock_embed,
         ):
-            result = await find_similar_listings(db, seed_id, limit=3)
+            result = await find_similar_listings(db, seed_id, limit=0)
         assert result == []
         mock_embed.assert_not_called()
 
-    async def test_ranks_by_cosine_similarity(self):
+    async def test_a_backfilled_seed_costs_no_provider_call(self):
+        """The seed is an ingested listing, and the backfill built its vector from the
+        same text a query would re-embed — so the stored value is the identical vector,
+        not an approximation. This endpoint is public, so re-deriving it would let the
+        caller decide how often the provider is billed."""
         seed_id = uuid4()
-        near_id = uuid4()
-        far_id = uuid4()
-        seed = {
-            "id": seed_id,
-            "city": "Austin",
-            "state": "TX",
-            "property_type": "Warehouse",
-            "description": "Dock-high warehouse near I-35",
-        }
-        near = {
-            "id": near_id,
-            "city": "Austin",
-            "state": "TX",
-            "property_type": "Warehouse",
-            "description": "Warehouse with docks",
-        }
-        far = {
-            "id": far_id,
-            "city": "Dallas",
-            "state": "TX",
-            "property_type": "Office",
-            "description": "Downtown office tower",
-        }
         db = AsyncMock()
         with (
             patch(
                 "app.services.similar_listings.get_property_by_id",
                 new_callable=AsyncMock,
-                return_value=seed,
+                return_value=_seed(seed_id),
             ),
+            _stored_vector([0.5, 0.5]),
+            patch("app.services.similar_listings.embed", new_callable=AsyncMock) as mock_embed,
             patch(
-                "app.services.similar_listings.list_similar_candidate_rows",
+                "app.services.similar_listings.list_similar_by_embedding",
                 new_callable=AsyncMock,
-                return_value=[far, near],
+                return_value=[(_row(uuid4()), 0.9)],
+            ) as mock_knn,
+        ):
+            await find_similar_listings(db, seed_id, limit=6)
+        mock_embed.assert_not_called()
+        assert mock_knn.await_args.kwargs["embedding"] == [0.5, 0.5]
+
+    async def test_the_lookup_is_scoped_to_the_active_model(self):
+        """Vectors from different models are not comparable, so a superseded one has to
+        be treated as absent rather than mixed into the query."""
+        seed_id = uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
             ),
+            _no_stored_vector() as mock_lookup,
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,
-                return_value=[
-                    [1.0, 0.0],
-                    [0.0, 1.0],
-                    [0.9, 0.1],
+                return_value=[[0.1, 0.2]],
+            ),
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            await find_similar_listings(db, seed_id, limit=6)
+        assert mock_lookup.await_args.kwargs["model"] == _ACTIVE_MODEL
+
+    async def test_embeds_only_the_seed(self):
+        """The point of ingest-time embeddings: one call, not one per candidate."""
+        seed_id = uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
+            ),
+            _no_stored_vector(),
+            patch(
+                "app.services.similar_listings.embed",
+                new_callable=AsyncMock,
+                return_value=[[0.1, 0.2]],
+            ) as mock_embed,
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+                return_value=[(_row(uuid4()), 0.9)],
+            ),
+        ):
+            await find_similar_listings(db, seed_id, limit=6)
+        mock_embed.assert_awaited_once()
+        assert len(mock_embed.await_args.kwargs["texts"]) == 1
+
+    async def test_scores_similarity_on_the_match_scale(self):
+        seed_id = uuid4()
+        near_id, far_id = uuid4(), uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
+            ),
+            _no_stored_vector(),
+            patch(
+                "app.services.similar_listings.embed",
+                new_callable=AsyncMock,
+                return_value=[[1.0, 0.0]],
+            ),
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+                return_value=[(_row(near_id), 0.95), (_row(far_id), 0.40)],
+            ),
+        ):
+            result = await find_similar_listings(db, seed_id, limit=2)
+
+        assert result is not None
+        assert [row["id"] for row, _ in result] == [near_id, far_id]
+        assert [score for _, score in result] == [95.0, 40.0]
+
+    async def test_scopes_to_the_seed_state(self):
+        seed_id = uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
+            ),
+            _no_stored_vector(),
+            patch(
+                "app.services.similar_listings.embed",
+                new_callable=AsyncMock,
+                return_value=[[0.1, 0.2]],
+            ),
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+                return_value=[(_row(uuid4()), 0.9)] * 3,
+            ) as mock_knn,
+        ):
+            await find_similar_listings(db, seed_id, limit=3)
+        assert mock_knn.await_count == 1
+        assert mock_knn.await_args.kwargs["state"] == "TX"
+
+    async def test_widens_when_the_state_is_sparse(self):
+        """The old pool filled from other states rather than returning short."""
+        seed_id = uuid4()
+        in_state, out_of_state = uuid4(), uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
+            ),
+            _no_stored_vector(),
+            patch(
+                "app.services.similar_listings.embed",
+                new_callable=AsyncMock,
+                return_value=[[0.1, 0.2]],
+            ),
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+                side_effect=[
+                    [(_row(in_state), 0.9)],
+                    [(_row(out_of_state, state="OH"), 0.5)],
+                ],
+            ) as mock_knn,
+        ):
+            result = await find_similar_listings(db, seed_id, limit=3)
+
+        assert mock_knn.await_count == 2
+        second = mock_knn.await_args_list[1].kwargs
+        assert second.get("state") is None
+        assert list(second["exclude_ids"]) == [in_state]
+        assert second["limit"] == 2
+        assert result is not None
+        assert [row["id"] for row, _ in result] == [in_state, out_of_state]
+
+    async def test_widened_results_are_sorted_by_score(self):
+        """Concatenating two sorted queries can put a weaker in-state match on top."""
+        seed_id = uuid4()
+        weak_in_state, strong_out_of_state = uuid4(), uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
+            ),
+            _no_stored_vector(),
+            patch(
+                "app.services.similar_listings.embed",
+                new_callable=AsyncMock,
+                return_value=[[0.1, 0.2]],
+            ),
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+                side_effect=[
+                    [(_row(weak_in_state), 0.40)],
+                    [(_row(strong_out_of_state, state="OH"), 0.95)],
                 ],
             ),
         ):
             result = await find_similar_listings(db, seed_id, limit=2)
 
         assert result is not None
-        assert len(result) == 2
-        assert result[0][0]["id"] == near_id
-        assert result[0][1] > result[1][1]
-        assert result[1][0]["id"] == far_id
+        assert [row["id"] for row, _ in result] == [strong_out_of_state, weak_in_state]
+        scores = [score for _, score in result]
+        assert scores == sorted(scores, reverse=True)
 
-    async def test_embeddings_unavailable_propagates(self):
+    async def test_does_not_widen_when_full(self):
         seed_id = uuid4()
-        seed = {"id": seed_id, "state": "TX", "description": "Warehouse"}
         db = AsyncMock()
         with (
             patch(
                 "app.services.similar_listings.get_property_by_id",
                 new_callable=AsyncMock,
-                return_value=seed,
+                return_value=_seed(seed_id),
+            ),
+            _no_stored_vector(),
+            patch(
+                "app.services.similar_listings.embed",
+                new_callable=AsyncMock,
+                return_value=[[0.1, 0.2]],
             ),
             patch(
-                "app.services.similar_listings.list_similar_candidate_rows",
+                "app.services.similar_listings.list_similar_by_embedding",
                 new_callable=AsyncMock,
-                return_value=[{"id": uuid4(), "description": "Other"}],
+                return_value=[(_row(uuid4()), 0.9), (_row(uuid4()), 0.8)],
+            ) as mock_knn,
+        ):
+            await find_similar_listings(db, seed_id, limit=2)
+        assert mock_knn.await_count == 1
+
+    async def test_seed_without_state_queries_once(self):
+        seed_id = uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id, state=None),
             ),
+            _no_stored_vector(),
+            patch(
+                "app.services.similar_listings.embed",
+                new_callable=AsyncMock,
+                return_value=[[0.1, 0.2]],
+            ),
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+                return_value=[],
+            ) as mock_knn,
+        ):
+            result = await find_similar_listings(db, seed_id, limit=3)
+        assert result == []
+        assert mock_knn.await_count == 1
+
+    async def test_empty_embedding_response_returns_empty(self):
+        seed_id = uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
+            ),
+            _no_stored_vector(),
+            patch(
+                "app.services.similar_listings.embed",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "app.services.similar_listings.list_similar_by_embedding",
+                new_callable=AsyncMock,
+            ) as mock_knn,
+        ):
+            result = await find_similar_listings(db, seed_id, limit=3)
+        assert result == []
+        mock_knn.assert_not_called()
+
+    async def test_embeddings_unavailable_propagates(self):
+        seed_id = uuid4()
+        db = AsyncMock()
+        with (
+            patch(
+                "app.services.similar_listings.get_property_by_id",
+                new_callable=AsyncMock,
+                return_value=_seed(seed_id),
+            ),
+            _no_stored_vector(),
             patch(
                 "app.services.similar_listings.embed",
                 new_callable=AsyncMock,

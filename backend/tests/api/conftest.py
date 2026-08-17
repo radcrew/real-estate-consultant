@@ -6,10 +6,28 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.core import intake_admission as intake_admission_module
 from app.core.database import get_session
 from app.core.deps import get_current_user, get_current_user_jwt
+from app.core.intake_admission import IntakeAdmissionControl
 from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
 from app.main import create_app
+
+
+@pytest.fixture(autouse=True)
+def fresh_intake_admission(monkeypatch):
+    """Give every test its own admission budget.
+
+    The production control is a module-level singleton holding a sliding window, so
+    without this the suite shares one budget and tests start 429-ing each other once
+    enough intake requests land inside the same minute — a failure that would look like
+    a bug in whichever test happened to run last.
+    """
+    monkeypatch.setattr(
+        intake_admission_module,
+        "intake_admission",
+        IntakeAdmissionControl(ip_per_minute=10_000, session_per_minute=10_000),
+    )
 
 
 @pytest.fixture

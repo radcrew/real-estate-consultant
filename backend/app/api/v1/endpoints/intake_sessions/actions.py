@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.models.intake_sessions import IntakeSession
 from app.repositories.intake_sessions import (
-    get_intake_session_row,
+    get_owned_intake_session_row,
     parse_intake_session,
     update_intake_session_completed,
 )
@@ -30,7 +30,11 @@ async def complete_intake_session(
     client: SupabaseSdkDep,
     current_user: CurrentUser,
 ) -> IntakeSession:
-    session_row = await get_intake_session_row(client, session_id)
+    # Ownership is checked here, not by ensure_search_profile_access below: that only
+    # guards the linked profile, and search_profile_id is null for the whole conversation.
+    session_row = await get_owned_intake_session_row(
+        client, session_id, user_id=UUID(current_user.id)
+    )
     search_profile_id = await ensure_search_profile_access(
         client,
         session_row.get("search_profile_id"),
