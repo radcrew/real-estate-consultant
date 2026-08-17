@@ -1,7 +1,6 @@
 """Tests for app.llm.intake.service — intake orchestration."""
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -12,7 +11,6 @@ from app.llm.intake.service import (
     _build_intake_parse_result,
     generate_opening_question,
     parse_user_input,
-    pending_question_for,
     resolve_next_intake_question,
 )
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
@@ -153,61 +151,16 @@ class TestBuildIntakeParseResult:
 # resolve_next_intake_question
 # ---------------------------------------------------------------------------
 
-class TestPendingQuestionFor:
-    """The turn context the parser needs to read a bare answer like "1000"."""
-
-    _QUESTIONS = [
-        _q("location", "text", order=1, text="Where?", title="Location"),
-        _q("budget", "range", order=2, text="Budget?", title="Budget"),
-    ]
-
-    def test_returns_first_unanswered_required_field(self):
-        result = pending_question_for(
-            self._QUESTIONS,
-            criteria={},
-            required_fields=["location", "budget"],
-            skipped=[],
-        )
-        assert result == {"key": "location", "text": "Where?"}
-
-    def test_advances_past_answered_fields(self):
-        result = pending_question_for(
-            self._QUESTIONS,
-            criteria={"location": "Austin"},
-            required_fields=["location", "budget"],
-            skipped=[],
-        )
-        assert result is not None
-        assert result["key"] == "budget"
-
-    def test_skips_declined_fields(self):
-        # A skipped field is not open, so a reply cannot be an answer to it.
-        result = pending_question_for(
-            self._QUESTIONS,
-            criteria={},
-            required_fields=["location", "budget"],
-            skipped=["location"],
-        )
-        assert result is not None
-        assert result["key"] == "budget"
-
-    def test_none_when_nothing_is_open(self):
-        result = pending_question_for(
-            self._QUESTIONS,
-            criteria={"location": "Austin", "budget": {"min": 1}},
-            required_fields=["location", "budget"],
-            skipped=[],
-        )
-        assert result is None
-
-    def test_none_when_the_key_has_no_question_row(self):
-        result = pending_question_for(
-            self._QUESTIONS,
-            criteria={},
-            required_fields=["nonexistent"],
-            skipped=[],
-        )
-        assert result is None
+# `TestPendingQuestionFor` lived here and is gone. `pending_question_for` was main's
+# answer to "which question is the user replying to"; this branch's
+# `intake_next_question.pending_question_key` is the same question answered in the domain
+# layer, and it is the one the 0.5B is trained against -- every one of the 2,700 training
+# rows carries `pending_question` as a bare key string, none carries `asked_question` as a
+# {key, text} dict. Keeping both would have put two spellings of one concept in the prompt.
+#
+# All five cases it covered have an equivalent in tests/domain/test_pending_question.py:
+# first-unanswered, advances-past-answered, skips-declined, none-when-closed, and
+# none-when-the-key-has-no-row. No coverage was dropped with the function.
 
 
 class TestResolveNextIntakeQuestion:

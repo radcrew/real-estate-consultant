@@ -5,21 +5,24 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 
-from app.core.deps import SupabaseSdkDep
-from app.domain.intake_criteria import normalize_merged_criteria
-from app.domain.intake_validation import compute_current_index
-from app.llm import (
-    parse_user_input,
-    resolve_next_intake_question,
+from app.clients.bedrock_guardrail import bedrock_guardrail
+from app.clients.sqs import chat_job_queue
+from app.core.config import settings
+from app.core.deps import CurrentUser, SupabaseSdkDep
+from app.core.intake_admission import AdmitIntakeLlmTurn
+from app.llm.providers.exceptions import raise_guardrail_blocked
+from app.repositories.intake_jobs import (
+    claim_intake_job,
+    count_active_intake_jobs,
+    create_intake_job,
+    expire_abandoned_queued_jobs,
+    expire_stale_running_jobs,
 )
-from app.llm.intake.service import SKIPPED_FIELDS_KEY
 from app.repositories.intake_sessions import (
-    get_intake_session_row,
-    save_intake_criteria,
+    get_owned_intake_session_row,
 )
-from app.repositories.intake_sessions import get_owned_intake_session_row
 from app.schemas.intake_sessions import (
     EnqueuedLlmIntakeJobResponse,
     SubmitLlmIntakeInputRequest,
@@ -71,35 +74,47 @@ async def submit_llm_intake_input(
         session_id=session_id,
         older_than=now - timedelta(seconds=settings.chat_job_stale_after_seconds),
     )
-    missing_fields = llm_result["missing_fields"]
-    skipped_fields = llm_result["skipped_fields"]
-    is_complete = bool(llm_result["is_complete"])
-
-    next_question = resolve_next_intake_question(
-        questions,
-        llm_result["next_question"],
-        missing_fields,
+    await expire_abandoned_queued_jobs(
+        client,
+        session_id=session_id,
+        older_than=now - timedelta(seconds=settings.chat_job_abandoned_after_seconds),
     )
 
-    current_index = compute_current_index(questions, merged_criteria)
+    active = await count_active_intake_jobs(client, session_id=session_id)
+    if active >= settings.intake_max_active_jobs_per_session:
+        raise_too_many_requests(
+            "Still working on your last message. Please wait for it to finish.",
+        )
 
-    await save_intake_criteria(client, session_id, merged_criteria)
+    # Screened *before* the row is written, not inside the turn: the job row persists the
+    # user's text, so redacting later would mean the unscreened version had already been
+    # stored — and every downstream reader (the worker, a redrive) replays what is here.
+    screened = await bedrock_guardrail.screen(body.input, source="INPUT")
+    if screened.blocked:
+        raise_guardrail_blocked()
 
-    public_criteria = {k: v for k, v in merged_criteria.items() if k != SKIPPED_FIELDS_KEY}
-    question_titles = {
-        row["key"]: (row.get("title") or row["key"].replace("_", " ").title())
-        for row in questions
-        if isinstance(row.get("key"), str)
-    }
+    # Written before the publish: a row with no message is visible and redrivable, while
+    # a message with no row is undiagnosable when the consumer picks it up.
+    job = await create_intake_job(client, session_id=session_id, user_input=screened.text)
+    job_id = UUID(str(job["id"]))
 
-    return SubmitLlmIntakeInputResponse(
-        extracted=extracted,
-        criteria=public_criteria,
-        current_index=current_index,
-        total_questions=len(questions),
-        missing_fields=missing_fields,
-        skipped_fields=skipped_fields,
-        question_titles=question_titles,
-        next_question=next_question,
-        is_complete=is_complete,
+    if chat_job_queue.enabled:
+        await chat_job_queue.publish(job_id=job_id, session_id=session_id)
+        return EnqueuedLlmIntakeJobResponse(job_id=job_id, status="queued")
+
+    # No queue configured — local development and the test suite. The turn runs inline
+    # and lands terminal, so the client contract is byte-identical either way.
+    claimed = await claim_intake_job(client, job_id=job_id)
+    if claimed is None:  # pragma: no cover — nothing else can claim a row created here
+        return EnqueuedLlmIntakeJobResponse(job_id=job_id, status="queued")
+    outcome = await execute_claimed_job(
+        client,
+        job_id=job_id,
+        session_id=session_id,
+        # The screened text, matching what the row holds and what the worker would replay.
+        user_input=screened.text,
+        # Nothing would redeliver it, so a transient fault must still end the job rather
+        # than stranding it as queued forever.
+        allow_retry=False,
     )
+    return EnqueuedLlmIntakeJobResponse(job_id=job_id, status=outcome.status)

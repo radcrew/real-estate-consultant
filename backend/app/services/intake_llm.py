@@ -25,7 +25,8 @@ from app.core.config import settings
 from app.domain.intake_criteria import normalize_merged_criteria
 from app.domain.intake_validation import compute_current_index
 from app.llm import parse_user_input, resolve_next_intake_question
-from app.llm.intake.service import SKIPPED_FIELDS_KEY
+from app.llm.intake.service import INTAKE_PARSE_TEMPERATURE, SKIPPED_FIELDS_KEY
+from app.repositories.intake_parse_log import record_intake_parse
 from app.repositories.intake_sessions import get_intake_session_row, save_intake_criteria
 from app.repositories.questions import list_intake_questions
 from app.schemas.intake_sessions import (
@@ -117,6 +118,28 @@ async def run_llm_intake_turn(
     current_index = compute_current_index(questions, merged_criteria)
 
     await save_intake_criteria(client, session_id, merged_criteria)
+
+    # Keep the turn. The eval is grown from these rows, and every bug reported so far had
+    # to be reconstructed by asking the user what they had typed. Best-effort by design:
+    # the answer above is already computed, so a telemetry failure must not reach the user.
+    #
+    # This moved here with the parse itself. The endpoint used to own it, and now enqueues
+    # a job instead — so logging left with the code that had something to log.
+    await record_intake_parse(
+        client,
+        session_id=session_id,
+        user_input=user_input,
+        current_criteria=current_criteria_dict,
+        # ``.get`` on the telemetry-only keys: this call exists to record the turn, and
+        # a key missing from the result must not be the thing that fails it.
+        model_output=llm_result.get("model_output", {}),
+        extracted=llm_result["extracted"],
+        unconfirmed_fields=llm_result.get("unconfirmed_fields", []),
+        missing_fields=missing_fields,
+        model=llm_result.get("model"),
+        temperature=INTAKE_PARSE_TEMPERATURE,
+        latency_ms=llm_result.get("latency_ms"),
+    )
 
     # The skipped-fields bookkeeping is persisted but never shown: it is how the model is
     # told not to ask again, not a criterion the user chose.
