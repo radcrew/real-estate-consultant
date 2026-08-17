@@ -233,6 +233,15 @@ class QwenLambdaProvider:
         response_format: type[StructuredOutputT],
         temperature: float,
         max_tokens: int,
+        # Accepted for the ``ChatProvider`` contract, not used here. ``base_url`` /
+        # ``api_key`` / ``model`` pin one call to an OpenAI-compatible endpoint, which
+        # this provider is not, and ``chat.py`` routes a pinned call to the Hugging Face
+        # provider rather than here. Declared so every provider satisfies one signature
+        # rather than the caller having to know which accepts what.
+        include_schema_instruction: bool = True,
+        model: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
     ) -> StructuredOutputT:
         """Return a typed structured output from the Qwen function."""
         if not self.settings.aws_region.strip():

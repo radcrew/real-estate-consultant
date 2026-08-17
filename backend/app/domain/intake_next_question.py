@@ -49,3 +49,29 @@ def first_question_row_in_missing(
         if isinstance(row_key, str) and row_key in missing:
             return row
     return None
+
+
+def pending_question_key(
+    questions: list[QuestionRow],
+    *,
+    answered: dict[str, Any],
+    required_fields: list[str],
+    skipped: list[str],
+) -> str | None:
+    """The question the user is answering this turn, or None when none is outstanding.
+
+    The same rule ``resolve_next_intake_question`` uses to choose what to ask: the first
+    required field, in questionnaire order, that is neither answered nor skipped. Derived
+    rather than passed in, so it cannot disagree with what was actually asked.
+
+    This reaches the model. Without it a reply of "10" to "What size are you looking for
+    (in square feet)?" is unattributable -- nothing in the turn payload says which
+    question was put -- and the model guessed ``price``, then echoed the stored budget
+    back on every following turn.
+    """
+    outstanding = [
+        key for key in required_fields if key not in answered and key not in skipped
+    ]
+    row = first_question_row_in_missing(questions, outstanding)
+    key = row.get("key") if row else None
+    return key if isinstance(key, str) else None

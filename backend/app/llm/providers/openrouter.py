@@ -107,8 +107,21 @@ class OpenRouterProvider:
         response_format: type[StructuredOutputT],
         temperature: float,
         max_tokens: int,
+        include_schema_instruction: bool = True,
+        model: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
     ) -> StructuredOutputT:
-        """Request a typed structured output from OpenRouter."""
+        """Request a typed structured output from OpenRouter.
+
+        ``include_schema_instruction`` is accepted for protocol parity and unused:
+        ``beta.chat.completions.parse`` sends the schema natively, so this provider
+        never prepends a copy to ``messages``.
+
+        The endpoint overrides are likewise accepted for parity and unused. Intake's
+        override is resolved in ``chat.py``, which routes a pinned task to the Hugging
+        Face provider directly rather than through the configured default.
+        """
         if not self.settings.openrouter_api_key.strip():
             raise_openrouter_api_key_not_configured()
 

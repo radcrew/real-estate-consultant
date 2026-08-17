@@ -1,0 +1,23 @@
+# Line endings for the files whose bytes are recorded, declared rather than left to each
+# clone's core.autocrlf.
+#
+# Without this the same commit is different bytes on Windows and on Linux, which stays
+# invisible until something hashes a file. It did not stay invisible: the intake dataset
+# stamp records a sha256 per input, those were written on Windows with CRLF, and the CI
+# job on Linux recomputed them as LF and reported that the training data had changed.
+# Nothing had changed. `provenance.file_digest` now normalises text before hashing, and
+# this stops the two representations diverging in the first place.
+#
+# Deliberately scoped to ml/intake-parser rather than applied repo-wide: this is about
+# reproducible hashes, not about imposing a working-tree convention on everyone.
+ml/intake-parser/**  text eol=lf
+
+# Never translated, never diffed as text. Listed because `text eol=lf` above would
+# otherwise corrupt anything binary that lands under that tree.
+*.gguf        binary
+*.safetensors binary
+*.dat         binary
+*.bin         binary
+*.pth         binary
+*.pt          binary
+*.zip         binary

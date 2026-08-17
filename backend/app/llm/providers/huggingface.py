@@ -40,6 +40,25 @@ logger = logging.getLogger(__name__)
 StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
 
 
+def structured_output_messages(
+    *,
+    messages: list[dict[str, Any]],
+    response_format: type[BaseModel],
+) -> list[dict[str, Any]]:
+    """Prepend the schema instruction the provider sends with every structured request.
+
+    Module-level so the intake-parser eval harness can reproduce the exact request without
+    reaching into the provider or restating the instruction.
+    """
+    schema = response_format.model_json_schema()
+    instruction = (
+        "Respond with a single JSON object that validates against this JSON Schema. "
+        "Do not wrap the JSON in markdown fences or add commentary.\n"
+        f"{json.dumps(schema, ensure_ascii=True)}"
+    )
+    return [{"role": "system", "content": instruction}, *messages]
+
+
 class HuggingFaceProvider:
     """Provider client for Hugging Face OpenAI-compatible chat completions."""
 
@@ -123,13 +142,10 @@ class HuggingFaceProvider:
         messages: list[dict[str, Any]],
         response_format: type[BaseModel],
     ) -> list[dict[str, Any]]:
-        schema = response_format.model_json_schema()
-        instruction = (
-            "Respond with a single JSON object that validates against this JSON Schema. "
-            "Do not wrap the JSON in markdown fences or add commentary.\n"
-            f"{json.dumps(schema, ensure_ascii=True)}"
+        return structured_output_messages(
+            messages=messages,
+            response_format=response_format,
         )
-        return [{"role": "system", "content": instruction}, *messages]
 
     async def generate_structured_output(
         self,
@@ -138,6 +154,10 @@ class HuggingFaceProvider:
         response_format: type[StructuredOutputT],
         temperature: float,
         max_tokens: int,
+        include_schema_instruction: bool = True,
+        model: str | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
     ) -> StructuredOutputT:
         """Request typed JSON from Hugging Face and validate with Pydantic.
 
@@ -145,19 +165,42 @@ class HuggingFaceProvider:
         outputs: HF Inference Providers often return 422
         ``grammar is not valid: failed to compile grammar`` depending on which
         upstream provider the router selects for the same model id.
-        """
-        if not self.settings.hf_token.strip():
-            raise_hf_api_key_not_configured()
 
-        request_messages = self._structured_messages(
-            messages=messages,
-            response_format=response_format,
+        ``include_schema_instruction`` False leaves ``messages`` untouched, for callers
+        whose system prompt already carries the schema.
+
+        ``model`` / ``base_url`` / ``api_key`` pin one task to another OpenAI-compatible
+        endpoint, such as a self-hosted ``llama-server``. With none supplied the shared
+        client and configured model are used, so the default path is unchanged.
+        """
+        target_model = (model or "").strip() or self.settings.hf_model
+        override_url = (base_url or "").strip()
+        override_key = (api_key or "").strip()
+
+        if override_url:
+            # A per-call client: the shared one is bound to hf_base_url, and the override
+            # must not leak into the tasks still on the router.
+            client = AsyncOpenAI(
+                api_key=override_key or "missing-api-key",
+                base_url=override_url,
+                timeout=self.timeout,
+                max_retries=self.transient_retries,
+            )
+        else:
+            if not self.settings.hf_token.strip():
+                raise_hf_api_key_not_configured()
+            client = self.client
+
+        request_messages = (
+            self._structured_messages(messages=messages, response_format=response_format)
+            if include_schema_instruction
+            else messages
         )
         start = time.perf_counter()
         try:
             try:
-                completion = await self.client.chat.completions.create(
-                    model=self.settings.hf_model,
+                completion = await client.chat.completions.create(
+                    model=target_model,
                     messages=request_messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
@@ -170,47 +213,84 @@ class HuggingFaceProvider:
                 status = getattr(json_mode_exc, "status_code", None)
                 if status not in {400, 404, 422}:
                     raise
-                completion = await self.client.chat.completions.create(
-                    model=self.settings.hf_model,
+                completion = await client.chat.completions.create(
+                    model=target_model,
                     messages=request_messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                 )
         except APITimeoutError as exc:
-            self._log_call(outcome="timeout", duration_ms=(time.perf_counter() - start) * 1000)
+            self._log_call(
+                outcome="timeout",
+                duration_ms=(time.perf_counter() - start) * 1000,
+                model=target_model,
+            )
             raise_hf_request_timeout(cause=exc)
         except OpenAIError as exc:
-            self._log_call(outcome="error", duration_ms=(time.perf_counter() - start) * 1000)
+            self._log_call(
+                outcome="error",
+                duration_ms=(time.perf_counter() - start) * 1000,
+                model=target_model,
+            )
             raise_hf_openai_error(cause=exc)
 
         duration_ms = (time.perf_counter() - start) * 1000
         message = completion.choices[0].message
         if message.refusal:
-            self._log_call(outcome="refusal", duration_ms=duration_ms, usage=completion.usage)
+            self._log_call(
+                outcome="refusal",
+                duration_ms=duration_ms,
+                usage=completion.usage,
+                model=target_model,
+            )
             raise_hf_structured_refusal(refusal=str(message.refusal))
         content = (message.content or "").strip()
         if not content:
-            self._log_call(outcome="incomplete", duration_ms=duration_ms, usage=completion.usage)
+            self._log_call(
+                outcome="incomplete",
+                duration_ms=duration_ms,
+                usage=completion.usage,
+                model=target_model,
+            )
             raise_hf_structured_reply_incomplete()
 
         try:
             parsed = response_format.model_validate_json(self._extract_json_object(content))
         except ValidationError as exc:
-            self._log_call(outcome="parse_failed", duration_ms=duration_ms, usage=completion.usage)
+            self._log_call(
+                outcome="parse_failed",
+                duration_ms=duration_ms,
+                usage=completion.usage,
+                model=target_model,
+            )
             raise_hf_completion_parse_failed(cause=exc)
         except (json.JSONDecodeError, ValueError) as exc:
-            self._log_call(outcome="parse_failed", duration_ms=duration_ms, usage=completion.usage)
+            self._log_call(
+                outcome="parse_failed",
+                duration_ms=duration_ms,
+                usage=completion.usage,
+                model=target_model,
+            )
             raise_bad_gateway(
                 "We couldn't process the assistant's reply. Please try again in a moment.",
                 cause=exc,
             )
 
-        self._log_call(outcome="success", duration_ms=duration_ms, usage=completion.usage)
+        self._log_call(
+                outcome="success",
+                duration_ms=duration_ms,
+                usage=completion.usage,
+                model=target_model,
+            )
         return parsed
 
     def _feature_extraction_url(self) -> str:
-        """HF OpenAI router (`…/v1`) is chat-only; embeddings use feature-extraction."""
-        root = self.settings.hf_base_url.rstrip("/").removesuffix("/v1")
+        """HF OpenAI router (`…/v1`) is chat-only; embeddings use feature-extraction.
+
+        Reads ``hf_embedding_base_url``, not ``hf_base_url``: chat may be pointed at a
+        self-hosted server that does not implement this protocol.
+        """
+        root = self.settings.hf_embedding_base_url.rstrip("/").removesuffix("/v1")
         model = self.settings.hf_embedding_model.strip().strip("/")
         return f"{root}/hf-inference/models/{model}/pipeline/feature-extraction"
 

@@ -143,3 +143,134 @@ class TestGenerateStructuredOutput:
             )
         assert info.value.status_code == 503
         assert info.value.detail == "AI unavailable"
+
+
+class TestIntakeEndpointOverride:
+    """A pinned endpoint must reach exactly one call site and change nothing else."""
+
+    async def test_override_routes_to_the_openai_compatible_provider(self):
+        # Even with OpenRouter configured as the default: its path uses
+        # beta.chat.completions.parse, which assumes that vendor's structured outputs.
+        config = _config(openrouter_api_key="or-key", hf_token="hf-key")
+        with patch.object(
+            huggingface_provider, "generate_structured_output", new_callable=AsyncMock
+        ) as hf_call, patch.object(
+            openrouter_provider, "generate_structured_output", new_callable=AsyncMock
+        ) as or_call:
+            await generate_structured_output(
+                messages=[{"role": "user", "content": "hi"}],
+                response_format=_Schema,
+                temperature=0.1,
+                max_tokens=100,
+                config=config,
+                model="qwen-intake",
+                base_url="http://box:8080/v1",
+                api_key="box-key",
+            )
+        or_call.assert_not_awaited()
+        kwargs = hf_call.await_args.kwargs
+        assert kwargs["base_url"] == "http://box:8080/v1"
+        assert kwargs["api_key"] == "box-key"
+        assert kwargs["model"] == "qwen-intake"
+
+    async def test_default_path_is_unchanged_when_overrides_are_empty(self):
+        config = _config(openrouter_api_key="or-key")
+        with patch.object(
+            openrouter_provider, "generate_structured_output", new_callable=AsyncMock
+        ) as or_call:
+            await generate_structured_output(
+                messages=[{"role": "user", "content": "hi"}],
+                response_format=_Schema,
+                temperature=0.1,
+                max_tokens=100,
+                config=config,
+            )
+        kwargs = or_call.await_args.kwargs
+        assert kwargs["model"] is None
+        assert kwargs["base_url"] is None
+        assert kwargs["api_key"] is None
+
+    async def test_blank_base_url_does_not_count_as_an_override(self):
+        config = _config(openrouter_api_key="or-key")
+        with patch.object(
+            openrouter_provider, "generate_structured_output", new_callable=AsyncMock
+        ) as or_call:
+            await generate_structured_output(
+                messages=[{"role": "user", "content": "hi"}],
+                response_format=_Schema,
+                temperature=0.1,
+                max_tokens=100,
+                config=config,
+                base_url="   ",
+            )
+        or_call.assert_awaited_once()
+
+
+class TestPinnedEndpointFallback:
+    """When the self-hosted box is down, intake degrades to the router."""
+
+    _ARGS = dict(
+        messages=[{"role": "user", "content": "hi"}],
+        response_format=_Schema,
+        temperature=0.1,
+        max_tokens=100,
+        model="qwen-intake",
+        base_url="http://box:8080/v1",
+        api_key="box-key",
+    )
+
+    @pytest.mark.parametrize("status", [502, 503, 504])
+    async def test_transport_faults_fall_back_to_the_router(self, status):
+        config = _config(hf_token="hf-key")
+        with patch.object(
+            huggingface_provider, "generate_structured_output", new_callable=AsyncMock
+        ) as call:
+            call.side_effect = [
+                HTTPException(status_code=status, detail="box down"),
+                _Schema(text="from the router"),
+            ]
+            result = await generate_structured_output(config=config, **self._ARGS)
+        assert result.text == "from the router"
+        assert call.await_count == 2
+        # The retry must not reuse the dead endpoint.
+        assert call.await_args_list[1].kwargs.get("base_url") is None
+
+    @pytest.mark.parametrize("status", [400, 401, 403, 422])
+    async def test_request_and_auth_faults_stay_loud(self, status):
+        # A wrong key or a malformed request would fail the same way on the router,
+        # so silently retrying just doubles the cost and hides a config error.
+        config = _config(hf_token="hf-key")
+        with patch.object(
+            huggingface_provider, "generate_structured_output", new_callable=AsyncMock
+        ) as call:
+            call.side_effect = HTTPException(status_code=status, detail="nope")
+            with pytest.raises(HTTPException) as info:
+                await generate_structured_output(config=config, **self._ARGS)
+        assert info.value.status_code == status
+        assert call.await_count == 1
+
+    async def test_unpinned_calls_never_retry(self):
+        config = _config(hf_token="hf-key")
+        with patch.object(
+            huggingface_provider, "generate_structured_output", new_callable=AsyncMock
+        ) as call:
+            call.side_effect = HTTPException(status_code=503, detail="down")
+            with pytest.raises(HTTPException):
+                await generate_structured_output(
+                    messages=[{"role": "user", "content": "hi"}],
+                    response_format=_Schema,
+                    temperature=0.1,
+                    max_tokens=100,
+                    config=config,
+                )
+        assert call.await_count == 1
+
+    async def test_fallback_failure_surfaces_rather_than_looping(self):
+        config = _config(hf_token="hf-key")
+        with patch.object(
+            huggingface_provider, "generate_structured_output", new_callable=AsyncMock
+        ) as call:
+            call.side_effect = HTTPException(status_code=503, detail="down")
+            with pytest.raises(HTTPException):
+                await generate_structured_output(config=config, **self._ARGS)
+        assert call.await_count == 2

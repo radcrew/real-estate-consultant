@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from contextvars import ContextVar
 from typing import Annotated
 from uuid import UUID
 
+import anyio
+import httpx
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +28,12 @@ from app.repositories.mcp_api_keys import ResolvedMcpApiKey, resolve_mcp_api_key
 from app.repositories.profiles import get_profile_row
 from app.utils.exceptions import raise_forbidden, raise_service_unavailable, raise_too_many_requests
 from supabase import AsyncClient, AuthApiError
+
+logger = logging.getLogger(__name__)
+
+# httpx maps most transport faults to ``httpx.HTTPError``, but anyio's stream errors
+# escape unmapped when a pooled connection dies mid-write, so both are caught.
+_AUTH_TRANSPORT_ERRORS = (httpx.HTTPError, anyio.BrokenResourceError, anyio.EndOfStream)
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 
@@ -82,6 +91,37 @@ async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str
     return await get_auth_user(client, str(resolved.user_id))
 
 
+async def _auth_user_from_token(client: AsyncClient, token: str) -> User:
+    """Validate a session JWT against Supabase Auth, tolerating a transport blip.
+
+    ``get_user`` is a GET, so retrying is safe. One retry is worth it because the two
+    failures seen in practice are both self-healing on a fresh connection: a pooled
+    connection closed by the remote (``anyio.EndOfStream`` re-raised from
+    ``HTTP2Connection._write_exception``), and a momentary DNS failure
+    (``getaddrinfo failed``).
+
+    A second failure is an outage, not a bad credential — 503, not an unhandled 500.
+    """
+    try:
+        response = await client.auth.get_user(token)
+    except AuthApiError as exc:
+        raise_auth_invalid_access_token(cause=exc)
+    except _AUTH_TRANSPORT_ERRORS as exc:
+        logger.warning("Supabase auth transport failure, retrying once: %s", exc)
+        try:
+            response = await client.auth.get_user(token)
+        except AuthApiError as retry_exc:
+            raise_auth_invalid_access_token(cause=retry_exc)
+        except _AUTH_TRANSPORT_ERRORS as retry_exc:
+            raise_service_unavailable(
+                "Authentication service is unreachable.", cause=retry_exc
+            )
+
+    if response is None or response.user is None:
+        raise_auth_user_not_returned()
+    return response.user
+
+
 async def get_current_user(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],
@@ -102,14 +142,7 @@ async def get_current_user(
     if looks_like_mcp_api_key(token):
         return await _user_from_api_key(request, client, token)
 
-    try:
-        response = await client.auth.get_user(token)
-    except AuthApiError as exc:
-        raise_auth_invalid_access_token(cause=exc)
-
-    if response is None or response.user is None:
-        raise_auth_user_not_returned()
-    return response.user
+    return await _auth_user_from_token(client, token)
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
@@ -141,14 +174,7 @@ async def get_current_user_jwt(
             "MCP API key management requires a user session JWT, not an API key.",
         )
 
-    try:
-        response = await client.auth.get_user(token)
-    except AuthApiError as exc:
-        raise_auth_invalid_access_token(cause=exc)
-
-    if response is None or response.user is None:
-        raise_auth_user_not_returned()
-    return response.user
+    return await _auth_user_from_token(client, token)
 
 
 CurrentUserJwt = Annotated[User, Depends(get_current_user_jwt)]

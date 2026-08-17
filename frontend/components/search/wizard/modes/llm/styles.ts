@@ -19,8 +19,11 @@ export const STYLES = {
     "flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-600 dark:bg-primary-600/15",
   avatarUser:
     "order-2 flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200",
+  // whitespace-pre-line: an assistant turn can now carry an explanation of what was done
+  // to the user's words followed by the next question, separated by a blank line. Without
+  // this the two run together into one paragraph.
   bubbleBot:
-    "max-w-[min(100%,34rem)] rounded-2xl rounded-tl-md border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm leading-relaxed text-foreground dark:border-neutral-700 dark:bg-neutral-800/60",
+    "max-w-[min(100%,34rem)] whitespace-pre-line rounded-2xl rounded-tl-md border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-sm leading-relaxed text-foreground dark:border-neutral-700 dark:bg-neutral-800/60",
   bubbleUser:
     "max-w-[min(100%,34rem)] rounded-2xl rounded-tr-md bg-primary-600 px-3.5 py-2.5 text-sm font-medium leading-relaxed text-neutral-50",
   typingBubble:

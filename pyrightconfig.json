@@ -23,6 +23,15 @@
         "services/ingestion",
         "services/ingestion/.venv/Lib/site-packages"
       ]
+    },
+    {
+      "root": "ml/intake-parser",
+      "pythonVersion": "3.11",
+      "extraPaths": [
+        "ml/intake-parser",
+        "backend",
+        "backend/.venv/Lib/site-packages"
+      ]
     }
   ]
 }

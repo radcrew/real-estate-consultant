@@ -20,7 +20,9 @@ from app.repositories.intake_jobs import (
     expire_abandoned_queued_jobs,
     expire_stale_running_jobs,
 )
-from app.repositories.intake_sessions import get_owned_intake_session_row
+from app.repositories.intake_sessions import (
+    get_owned_intake_session_row,
+)
 from app.schemas.intake_sessions import (
     EnqueuedLlmIntakeJobResponse,
     SubmitLlmIntakeInputRequest,

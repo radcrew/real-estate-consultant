@@ -48,12 +48,30 @@ def merge_missing_fields(
     required_fields: list[str],
     model_missing: list[str],
     skipped_fields: list[str] | None = None,
+    unconfirmed_fields: list[str] | None = None,
 ) -> list[str]:
-    """Use the model's missing keys when they match real gaps; otherwise criteria-based gaps."""
+    """Use the model's missing keys when they match real gaps; otherwise criteria-based gaps.
+
+    ``unconfirmed_fields`` are answered in the criteria but not supported by anything the
+    user said — the third state between *missing* and *explicit*. The value is stored so
+    nothing is lost, and the question is still asked, because a reading nobody can check
+    is not an answer.
+
+    They are added after the reconciliation above rather than inside it. The model
+    believing it has answered the field is the failure being corrected, so its opinion
+    must not be able to narrow one of these back out of the list.
+    """
     skipped = set(skipped_fields or [])
+    unconfirmed = {key for key in (unconfirmed_fields or ()) if key in required_fields} - skipped
     still_missing = _missing_required_fields(merged_criteria, required_fields, skipped)
     from_model = [key for key in model_missing if key in required_fields and key not in skipped]
     if from_model:
         overlap = [key for key in from_model if key in still_missing]
-        return overlap if overlap else still_missing
-    return still_missing
+        resolved = overlap if overlap else still_missing
+    else:
+        resolved = still_missing
+
+    if not unconfirmed:
+        return resolved
+    asking = set(resolved) | unconfirmed
+    return [key for key in required_fields if key in asking]

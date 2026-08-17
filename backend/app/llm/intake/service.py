@@ -3,14 +3,23 @@
 from __future__ import annotations
 
 import json
+import logging
+import time
+from collections.abc import Iterable, Mapping
+from collections.abc import Set as AbstractSet
+from dataclasses import dataclass, field
 from typing import Any
 
-from app.domain.intake_next_question import (
-    find_question_row_by_key,
-    first_question_row_in_missing,
-    match_row_for_text_suggestion,
-    suggested_question_as_dict,
+from app.core.config import settings
+from app.domain.intake_criteria import (
+    apply_criteria_filters,
+    merge_criteria,
 )
+from app.domain.intake_next_question import (
+    first_question_row_in_missing,
+    pending_question_key,
+)
+from app.domain.intake_notes import explain_extraction
 from app.domain.intake_validation import merge_missing_fields
 from app.llm.intake.exceptions import raise_hf_opening_response_missing_text
 from app.llm.intake.schema import extract_question_keys, render_intake_response_schema
@@ -26,59 +35,49 @@ from app.repositories.questions import map_question_to_model
 from app.schemas.intake_sessions import IntakeSessionFirstQuestion
 from app.schemas.llm_intake_parse import LlmOpeningQuestionOutput, LlmParseModelOutput
 
+logger = logging.getLogger(__name__)
+
 QuestionRow = dict[str, Any]
 
 # Reserved criteria key holding required fields the user explicitly declined to answer.
 SKIPPED_FIELDS_KEY = "_skipped_fields"
 
+# Decode settings for criteria extraction. Named so the intake-parser eval harness scores
+# the same decode production runs; changing one here changes both.
+INTAKE_PARSE_TEMPERATURE = 0.1
+INTAKE_PARSE_MAX_TOKENS = 800
 
-def pending_question_for(
-    questions: list[QuestionRow],
-    *,
-    criteria: dict[str, Any],
-    required_fields: list[str],
-    skipped: list[str],
-) -> dict[str, Any] | None:
-    """The question the user is most likely replying to, or ``None`` when none is open.
+@dataclass(frozen=True)
+class IntakePrompt:
+    """The extraction request, plus the derived context needed to score its reply."""
 
-    Derived rather than stored: the session keeps criteria, not the last question asked,
-    and the next question is itself chosen as the first unanswered required field — so
-    recomputing it here reaches the same one without new state to keep in step.
-
-    Without this the parser sees a bare "1000" with no idea which field it answers, and
-    has to guess from the shape of the number alone.
-    """
-    key = next(
-        (k for k in required_fields if k not in criteria and k not in skipped),
-        None,
-    )
-    if key is None:
-        return None
-    row = find_question_row_by_key(questions, key)
-    if row is None:
-        return None
-    # Read the two fields directly rather than mapping the whole row: this is prompt
-    # context, so a row too incomplete to render as a question should still be able to
-    # say which field is open.
-    text = row.get("text")
-    return {"key": key, "text": text if isinstance(text, str) else ""}
+    messages: list[dict[str, Any]] = field(default_factory=list)
+    question_keys: list[str] = field(default_factory=list)
+    required_fields: list[str] = field(default_factory=list)
+    previously_skipped: list[str] = field(default_factory=list)
+    criteria_for_prompt: dict[str, Any] = field(default_factory=dict)
 
 
-async def parse_user_input(
+def build_intake_messages(
     *,
     user_input: str,
     current_criteria: dict[str, Any],
     questions: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Parse free-form user intake input into structured criteria and next-step hints."""
+) -> IntakePrompt:
+    """Build the criteria-extraction request sent for one intake turn.
+
+    Shared with the intake-parser eval harness so it cannot score a prompt production never
+    sends. Constant content (schema, rules) stays ahead of variable content (the turn
+    payload) so a served prefix cache keeps hitting.
+    """
     question_keys, required_fields = extract_question_keys(questions)
     previously_skipped = [
         key for key in current_criteria.get(SKIPPED_FIELDS_KEY, []) if isinstance(key, str)
     ]
     criteria_for_prompt = {k: v for k, v in current_criteria.items() if k != SKIPPED_FIELDS_KEY}
-    asked_question = pending_question_for(
+    pending_question = pending_question_key(
         questions,
-        criteria=criteria_for_prompt,
+        answered=criteria_for_prompt,
         required_fields=required_fields,
         skipped=previously_skipped,
     )
@@ -91,31 +90,81 @@ async def parse_user_input(
     user_prompt = json.dumps(
         {
             "user_input": user_input,
-            "asked_question": asked_question,
             "current_criteria": criteria_for_prompt,
             "question_keys": question_keys,
             "required_fields": required_fields,
             "previously_skipped_fields": previously_skipped,
+            "pending_question": pending_question,
         },
         ensure_ascii=True,
     )
-    parsed_output = await generate_structured_output(
+    logger.debug("intake_prompt",
+                 extra={"system_prompt": system_prompt, "user_prompt": user_prompt})
+
+    return IntakePrompt(
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        response_format=LlmParseModelOutput,
-        temperature=0.1,
-        max_tokens=800,
-        task=LlmTask.INTAKE_PARSE,
-    )
-    return _build_intake_parse_result(
-        parsed_output=parsed_output,
         question_keys=question_keys,
-        current_criteria=criteria_for_prompt,
         required_fields=required_fields,
         previously_skipped=previously_skipped,
+        criteria_for_prompt=criteria_for_prompt,
     )
+
+
+async def parse_user_input(
+    *,
+    user_input: str,
+    current_criteria: dict[str, Any],
+    questions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Parse free-form user intake input into structured criteria and next-step hints."""
+    prompt = build_intake_messages(
+        user_input=user_input,
+        current_criteria=current_criteria,
+        questions=questions,
+    )
+    # Only this call site takes the override. generate_opening_question, fit and
+    # outreach stay on the configured default, so a small pinned model never writes prose.
+    override = settings.intake_chat_override
+    model, base_url, api_key = override if override else (None, None, None)
+
+    started = time.perf_counter()
+    parsed_output = await generate_structured_output(
+        messages=prompt.messages,
+        response_format=LlmParseModelOutput,
+        temperature=INTAKE_PARSE_TEMPERATURE,
+        max_tokens=INTAKE_PARSE_MAX_TOKENS,
+        # The system prompt already carries the intake schema; a second copy of the
+        # Pydantic schema would be ~1k characters of duplicate prompt per turn.
+        include_schema_instruction=False,
+        # The route says which provider this task prefers; the override says which box
+        # this deployment is running. Both are passed and the pin wins in `chat.py`, so
+        # a deployment that has not set INTAKE_CHAT_* follows the route instead of
+        # falling back to whichever key happens to be present.
+        task=LlmTask.INTAKE_PARSE,
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+    )
+    latency_ms = int((time.perf_counter() - started) * 1000)
+
+    result = _build_intake_parse_result(
+        parsed_output=parsed_output,
+        user_input=user_input,
+        questions=questions,
+        question_keys=prompt.question_keys,
+        current_criteria=prompt.criteria_for_prompt,
+        required_fields=prompt.required_fields,
+        previously_skipped=prompt.previously_skipped,
+    )
+    # For the parse log. Which model answered is recorded here rather than at the call
+    # site because only this function knows whether the intake override was in force —
+    # and a logged turn that cannot be attributed to an adapter cannot compare two.
+    result["model"] = model or settings.hf_model
+    result["latency_ms"] = latency_ms
+    return result
 
 
 async def generate_opening_question(
@@ -159,72 +208,100 @@ def resolve_next_intake_question(
     suggested_question: object,
     missing_fields: list[str],
 ) -> IntakeSessionFirstQuestion | None:
-    """Prefer LLM-authored text while anchoring the result to a known question row."""
-    # Nothing missing means nothing left to ask, whatever the model suggested. It goes on
-    # proposing the field it just collected — the intake is complete but the suggestion
-    # still names ``size_sqft`` — and the client shows any question it is handed, so the
-    # user answers the same one forever and never reaches the end. This is the same
-    # condition the caller reports as ``is_complete``.
+    """Pick the next question from ``missing_fields``, using the configured wording.
+
+    ``suggested_question`` is accepted and deliberately ignored. The model is still asked
+    for it — see ``build_intake_response_schema`` — because the tuned adapter emits
+    malformed JSON without the field, but nothing it writes there is used.
+
+    Four defects came from trusting that text. It is composed from the turn alone, with
+    no knowledge of what the backend recorded, so it asked for a field the same turn had
+    just filled in, echoed the user's own sentence back as a question, merged two
+    questions into one, and copied the schema's own description into a reply.
+    ``questions.json`` holds the wording and cannot get any of that wrong.
+    """
     if not missing_fields:
         return None
 
-    suggested = suggested_question_as_dict(suggested_question)
-    suggested_key = suggested.get("key")
-    suggested_text = suggested.get("text")
+    row = first_question_row_in_missing(questions, missing_fields)
+    return map_question_to_model(row) if row else None
 
-    # Handle text suggestion
-    if isinstance(suggested_text, str) and (text := suggested_text.strip()):
-        row = match_row_for_text_suggestion(
-            questions,
-            suggested_key=suggested_key,
-            missing_fields=missing_fields,
-        )
 
-        mapped = map_question_to_model(row) if row else None
+def resolve_skipped_fields(
+    *,
+    model_skipped: Iterable[str],
+    previously_skipped: Iterable[str],
+    required_fields: Iterable[str],
+    merged_criteria: Mapping[str, Any],
+    unconfirmed: AbstractSet[str],
+) -> list[str]:
+    """The skips a turn leaves behind, from the model's answer and the session's history.
 
-        return IntakeSessionFirstQuestion(
-            key=mapped.key if mapped else "llm_followup",
-            title=mapped.title if mapped else "",
-            text=text,
-            type=mapped.type if mapped else "text",
-            options=mapped.options if mapped else None,
-        )
+    Union carries a skip forward across turns, so the user is never re-asked. Then
+    subtract what is answered: a field the user has since filled in is no longer skipped,
+    and without this it stays marked skipped for the life of the session. A required field
+    is answered, skipped, or missing - never two of those at once.
 
-    # Handle key suggestion
-    if isinstance(suggested_key, str):
-        if row := find_question_row_by_key(questions, suggested_key):
-            return map_question_to_model(row)
+    An unconfirmed reading does not count as filling it in. The user declined to answer
+    this field; a guess nobody can check is not them changing their mind, and clearing the
+    skip on one would put the question back in front of them.
 
-    # Fallback
-    if row := first_question_row_in_missing(questions, missing_fields):
-        return map_question_to_model(row)
-
-    return None
+    Public, and named, because the eval harness has to score what production returns. It
+    used to restate the ``extracted`` half of post-processing and not this half, so a run
+    with ``--post-process`` scored the product's fields against the raw model's skips --
+    a number that was neither.
+    """
+    return sorted(
+        ({*previously_skipped, *model_skipped} & set(required_fields))
+        - (set(merged_criteria) - unconfirmed),
+    )
 
 
 def _build_intake_parse_result(
     *,
     parsed_output: LlmParseModelOutput,
+    user_input: str,
+    questions: list[QuestionRow],
     question_keys: list[str],
     current_criteria: dict[str, Any],
     required_fields: list[str],
     previously_skipped: list[str],
 ) -> dict[str, Any]:
-    allowed_keys = set(question_keys)
-    extracted = {
-        key: value for key, value in parsed_output.extracted.items() if key in allowed_keys
-    }
-    merged_criteria = {**current_criteria, **extracted}
-
-    skipped_fields = sorted(
-        {*previously_skipped, *parsed_output.skipped_fields} & set(required_fields),
+    # Every check between the model's answer and what the session stores, in one place so
+    # the eval harness can score the same thing production returns. ``unconfirmed`` is the
+    # third state: values kept but unsupported by the message, which are stored and still
+    # asked about.
+    extracted, unconfirmed = apply_criteria_filters(
+        parsed_output.extracted,
+        questions,
+        user_input,
+        current_criteria,
+        allowed_keys=set(question_keys),
+    )
+    merged_criteria = merge_criteria(current_criteria, extracted)
+    skipped_fields = resolve_skipped_fields(
+        model_skipped=parsed_output.skipped_fields,
+        previously_skipped=previously_skipped,
+        required_fields=required_fields,
+        merged_criteria=merged_criteria,
+        unconfirmed=unconfirmed,
     )
 
+    # What the system did to the user's own words. Every transformation below is correct
+    # and none is obvious from the result alone: someone who typed "100k yard" and is
+    # shown 900,000 sq ft cannot tell a right answer from a bug, and "You're all set!"
+    # reads as the system having ignored them.
+    notes = explain_extraction(
+        user_input, parsed_output.extracted, extracted, questions, current_criteria
+    )
+
+    unconfirmed_fields = sorted(unconfirmed & set(required_fields) - set(skipped_fields))
     missing_fields = merge_missing_fields(
         merged_criteria=merged_criteria,
         required_fields=required_fields,
         model_missing=parsed_output.missing_fields,
         skipped_fields=skipped_fields,
+        unconfirmed_fields=unconfirmed_fields,
     )
 
     if skipped_fields:
@@ -238,6 +315,11 @@ def _build_intake_parse_result(
         "merged_criteria": merged_criteria,
         "missing_fields": missing_fields,
         "skipped_fields": skipped_fields,
+        "unconfirmed_fields": unconfirmed_fields,
+        "notes": notes,
+        # The reply before the filters. Kept alongside ``extracted`` so a logged turn can
+        # say whether the model or a filter is what changed between two runs.
+        "model_output": parsed_output.model_dump(),
         "next_question": next_question,
         "is_complete": is_complete,
     }

@@ -1,0 +1,71 @@
+[
+  {
+    "key": "property_type",
+    "title": "Property Type",
+    "text": "What type of property are you looking for?",
+    "type": "multi-select",
+    "options": [
+      {
+        "label": "Industrial",
+        "value": "industrial"
+      },
+      {
+        "label": "Retail",
+        "value": "retail"
+      },
+      {
+        "label": "Flex",
+        "value": "flex"
+      },
+      {
+        "label": "Land",
+        "value": "land"
+      },
+      {
+        "label": "Office",
+        "value": "office"
+      },
+      {
+        "label": "Multifamily",
+        "value": "multifamily"
+      },
+      {
+        "label": "Specialty",
+        "value": "specialty"
+      }
+    ],
+    "order_index": 1,
+    "required": true
+  },
+  {
+    "key": "location",
+    "title": "Location",
+    "text": "Where are you looking to search?",
+    "type": "location",
+    "options": null,
+    "order_index": 2,
+    "required": true
+  },
+  {
+    "key": "price",
+    "title": "Price",
+    "text": "What is your budget range?",
+    "type": "range",
+    "options": {
+      "unit": "USD"
+    },
+    "order_index": 3,
+    "required": true
+  },
+  {
+    "key": "size_sqft",
+    "title": "Size",
+    "text": "What size are you looking for (in square feet)?",
+    "type": "range",
+    "options": {
+      "unit": "FT"
+    },
+    "order_index": 4,
+    "required": true
+  }
+]

@@ -1,0 +1,73 @@
+# Copy to /etc/systemd/system/llama-server.service on the host, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now llama-server
+# 
+# A native binary under systemd, not a container. One artifact to copy and one unit to
+# enable; a container adds a layer to debug without changing what executes, and on a
+# small shared-vCPU box it puts another scheduler between the process and cores that are
+# already scarce.
+# 
+# Secrets live in /etc/llama-server.env, mode 0600, root-owned:
+#   LLAMA_API_KEY=<the same value as INTAKE_CHAT_API_KEY on Vercel>
+# Do not put the key in this file: unit files are world-readable.
+
+[Unit]
+Description=llama.cpp server (intake criteria extraction)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=llama
+Group=llama
+EnvironmentFile=/etc/llama-server.env
+WorkingDirectory=/opt/llama.cpp
+
+# Refuse to start without a key rather than starting without a perimeter. systemd
+# substitutes a braced ${VAR} as a single word rather than removing the argument, so a
+# missing or mis-keyed /etc/llama-server.env yielded `--api-key ''` -- an open endpoint
+# that starts cleanly, is held up by Restart=always, and whose only symptom is a request
+# succeeding when it should have been refused. Nothing else in the stack would notice:
+# the reverse proxy forwards whatever it is given, and Vercel's egress IPs are dynamic so
+# there is no allowlist behind this.
+#
+# $$ so the *shell* expands it, not systemd. systemd expands $VAR inside Exec= arguments
+# before the command runs, including inside quotes, which would paste the key's value
+# into this command line -- fine for hex from `openssl rand`, and an injection the day
+# someone sets a key containing a quote. The check must not be the thing that reads it.
+ExecStartPre=/bin/sh -c 'test -n "$${LLAMA_API_KEY}" || { echo "LLAMA_API_KEY is empty or unset in /etc/llama-server.env; refusing to serve without a token" >&2; exit 1; }'
+
+# --host 127.0.0.1: never expose this directly. TLS terminates in a reverse proxy in
+#   front of it, because the bearer token would otherwise cross the internet in clear.
+# -t: physical cores, not logical. Hyperthreading hurts here - the two threads on a core
+#   contend for the same vector units.
+# --parallel 1: on CPU, concurrent requests contend for those same cores. More slots make
+#   each request slower rather than the system faster. Raise only after measuring two
+#   simultaneous requests.
+# --cache-reuse: the whole reason for a long-lived process. The intake prompt is ~929
+#   constant tokens followed by a small variable payload, so the prefix survives between
+#   turns instead of being reprocessed.
+ExecStart=/opt/llama.cpp/llama-server \
+  --model /opt/models/qwen2.5-0.5b-instruct-intake-q4_k_m.gguf \
+  --alias qwen2.5-0.5b-instruct-intake \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --ctx-size 4096 \
+  --threads 4 \
+  --parallel 1 \
+  --cache-reuse 256 \
+  --jinja \
+  --api-key ${LLAMA_API_KEY}
+
+Restart=always
+RestartSec=3
+# Model load for a 0.5B is a few seconds, so recovery is cheap and a tight restart is fine.
+TimeoutStartSec=120
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/models /opt/llama.cpp
+
+[Install]
+WantedBy=multi-user.target

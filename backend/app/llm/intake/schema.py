@@ -5,10 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from pydantic import TypeAdapter
-
 from app.repositories.questions import sorted_intake_questions
-from app.schemas.llm_intake_parse import LlmParseNextQuestion
 
 QuestionRow = dict[str, Any]
 
@@ -19,9 +16,28 @@ def _question_key(row: QuestionRow) -> str | None:
 
 
 def _string_options(options: Any) -> list[str]:
-    if isinstance(options, list):
-        return [str(value) for value in options if isinstance(value, (str, int, float))]
-    return []
+    """Selectable choices for a question, as the values the backend stores.
+
+    Rows come in two shapes: ``intake-parser/datasets/questions.json`` used plain
+    strings, the database uses ``{"label": "Industrial", "value": "industrial"}``. Reading
+    only the string form made this return ``[]`` for every real question, so the prompt
+    listed no options and the model had to guess the vocabulary — it answered "warehouse"
+    for a questionnaire that only offers "industrial", and the answer was then dropped as
+    unconfigured.
+    """
+    if not isinstance(options, list):
+        return []
+    chosen: list[str] = []
+    for option in options:
+        if isinstance(option, dict):
+            option = next(
+                (text for key in ("value", "label")
+                 if isinstance(text := option.get(key), str) and text.strip()),
+                None,
+            )
+        if isinstance(option, (str, int, float)) and str(option).strip():
+            chosen.append(str(option).strip())
+    return chosen
 
 
 def extract_question_keys(
@@ -55,15 +71,18 @@ def _build_question_value_schema(row: QuestionRow) -> dict[str, Any]:
         return {
             "type": "string",
             "description": (
-                "City, region, or address phrase. Use comma-separated parts when "
-                "multiple (e.g. 'Chicago, IL, US')."
+                "Copy only the place the message states; never add a region it omits."
             ),
         }
 
     if question_type in {"range", "numeric_range", "sqft_range", "rent_range", "size_range"}:
+        # No description on purpose. "Numeric bounds" restates the type, and the clause
+        # that used to follow it -- "omit keys or use null when unknown" -- contradicted
+        # both `min`/`max` being typed `number` (null is not a number) and the training
+        # set, where 0 of 2160 targets carry a null bound. Models took the invitation and
+        # emitted {"min": null, "max": null} for fields the message never mentioned.
         return {
             "type": "object",
-            "description": "Numeric bounds; omit keys or use null when unknown.",
             "properties": {
                 "min": {"type": "number"},
                 "max": {"type": "number"},
@@ -99,11 +118,23 @@ def _build_question_value_schema(row: QuestionRow) -> dict[str, Any]:
 
 
 def _add_question_description(schema: dict[str, Any], row: QuestionRow) -> dict[str, Any]:
+    """Append the question this field answers, **after** any extraction guidance.
+
+    Order matters. The model copies this string into ``next_question.text`` — see the
+    stock-model outputs in ``intake-parser/results/0.5b-stock-q4km.json``,
+    where every leaked question is the wording followed by the guidance that trailed it.
+    Putting the question last means a copied tail is the question itself, not prompt
+    scaffolding.
+    """
     text = row.get("text")
     if isinstance(text, str) and text.strip():
-        description = f"Question: {text.strip()}"
+        question = f"Answers: {text.strip()}"
         existing = schema.get("description")
-        schema["description"] = f"{description}. {existing}" if existing else description
+        if existing:
+            lead = existing if existing.endswith(".") else f"{existing}."
+            schema["description"] = f"{lead} {question}"
+        else:
+            schema["description"] = question
     return schema
 
 
@@ -115,6 +146,11 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
         if (key := _question_key(row))
     }
 
+    # Only ``extracted`` and ``skipped_fields`` are read. ``missing_fields`` is recomputed
+    # by ``merge_missing_fields`` and ``is_complete`` is derived from it, so asking the
+    # model for either buys prompt tokens and nothing else.
+    #
+    # ``next_question`` is asked for but never read — see the note on it below.
     return {
         "type": "object",
         "additionalProperties": False,
@@ -128,26 +164,29 @@ def build_intake_response_schema(*, questions: list[QuestionRow]) -> dict[str, A
                 ),
                 "properties": extracted_properties,
             },
-            "missing_fields": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Required criteria keys still missing and worth asking about.",
-            },
             "skipped_fields": {
                 "type": "array",
                 "items": {"type": "string"},
                 "description": (
-                    "Required criteria keys the user explicitly declined to answer "
-                    "(e.g. 'no preference', 'doesn't matter', 'skip that'). "
+                    "Criteria keys the user explicitly declined to answer. "
                     "Never ask about these again."
                 ),
             },
-            "next_question": TypeAdapter(LlmParseNextQuestion).json_schema(),
-            "is_complete": {"type": "boolean"},
+            # Compatibility shim, not a request for content. The v2 adapter was tuned
+            # against a three-key object; asking for two makes it emit
+            # ``"skipped_fields":[}}`` and 21% of turns fail to parse. The field is
+            # required so the shape it learned stays valid, carries no description so
+            # there is no prose to copy into a reply, and its value is discarded by
+            # ``resolve_next_intake_question``.
+            #
+            # Delete this once a model trained on the two-key schema is serving.
+            "next_question": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {"text": {"type": ["string", "null"]}},
+            },
         },
-        "required": [
-            "extracted", "missing_fields", "skipped_fields", "next_question", "is_complete",
-        ],
+        "required": ["extracted", "skipped_fields", "next_question"],
     }
 
 

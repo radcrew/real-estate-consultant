@@ -27,6 +27,23 @@ _SESSION_ROW = {
     "criteria": {},
 }
 
+_QUESTIONS = [
+    {"key": "location", "title": "Location", "text": "Where?", "type": "location", "order_index": 0, "required": False, "options": None},
+    {"key": "property_type", "title": "Property Type", "text": "What type?", "type": "multiselect", "order_index": 1, "required": False, "options": None},
+]
+
+_LLM_RESULT = {
+    "extracted": {"location": "Austin"},
+    "merged_criteria": {"location": "Austin"},
+    "missing_fields": ["property_type"],
+    "skipped_fields": [],
+    "unconfirmed_fields": [],
+    "model_output": {"extracted": {"location": "Austin"}},
+    "model": "qwen2.5-0.5b-instruct-intake-v6-q4_k_m",
+    "latency_ms": 1200,
+    "is_complete": False,
+    "next_question": {"key": "property_type", "text": "What type?"},
+}
 _JOB_ROW = {"id": _JOB_UUID, "session_id": _SESSION_UUID, "status": "queued"}
 
 

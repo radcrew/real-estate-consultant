@@ -1,10 +1,12 @@
 import logging
+import socket
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import InterfaceError, OperationalError
 from starlette.exceptions import HTTPException
 
 from app.api.router import api_router
@@ -19,6 +21,23 @@ from app.core.supabase_sdk import close_supabase, init_supabase
 configure_logging(settings.log_level, settings.swo_logs_url, settings.swo_token)
 
 logger = logging.getLogger(__name__)
+
+# Reaching the database can fail without the code being wrong: DNS blips, a refused or
+# reset socket, or asyncpg's connect timeout firing. None of these are a 500.
+#
+# ``TimeoutError`` is listed because SQLAlchemy does not wrap it. asyncpg raises it from
+# ``compat.timeout`` inside the pool's connection creator, and ``safe_reraise`` passes it
+# straight through, so it escapes as a bare builtin rather than an OperationalError.
+#
+# ``DBAPIError`` is deliberately NOT here: it also covers ProgrammingError, and a broken
+# query is a bug that should stay loud.
+DB_UNAVAILABLE_ERRORS = (
+    OperationalError,
+    InterfaceError,
+    TimeoutError,
+    ConnectionError,
+    socket.gaierror,
+)
 
 
 @asynccontextmanager
@@ -55,6 +74,28 @@ def create_app() -> FastAPI:
             status_code=502,
             content={"detail": "We couldn't reach the database. Please try again shortly."},
         )
+
+    for _db_error in DB_UNAVAILABLE_ERRORS:
+
+        @app.exception_handler(_db_error)
+        async def db_unavailable_handler(request: Request, exc: Exception) -> JSONResponse:
+            logger.warning(
+                "database_unavailable",
+                extra={
+                    "error": type(exc).__name__,
+                    "detail": str(exc)[:300],
+                    "path": request.url.path,
+                    "method": request.method,
+                },
+            )
+            # Registered per concrete class, so this runs in ExceptionMiddleware — inside
+            # CORSMiddleware — and the response picks up CORS headers on the way out. The
+            # bare-``Exception`` handler below has to add them by hand for that reason.
+            return JSONResponse(
+                status_code=503,
+                content={"detail": "The database is temporarily unreachable. "
+                                   "Please try again shortly."},
+            )
 
     @app.exception_handler(HTTPException)
     async def http_exception_logging_handler(request: Request, exc: HTTPException) -> JSONResponse:

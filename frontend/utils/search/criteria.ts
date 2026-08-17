@@ -126,20 +126,37 @@ export const parseSearchCriteriaEntries = (criteria: Record<string, unknown>): P
     })
     .filter((x): x is ParsedCriteriaEntry => x != null);
 
+/**
+ * A bound as it should be displayed, or null when there is no bound to display.
+ *
+ * NaN is this module's marker for "no value": `parseRangeBound` returns it for an absent
+ * bound and `EMPTY_RANGE_DATA` is built from it. It is also a `number` that is neither
+ * `null` nor `undefined`, so a `!= null` guard waves it straight through and
+ * `Number(NaN).toLocaleString()` is the string `"NaN"` — which is how an empty range came
+ * to render as `≤ NaN` beside a field the user had filled in.
+ */
+const displayBound = (raw: unknown): string | null => {
+  if (raw === null || raw === undefined || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n.toLocaleString() : null;
+};
+
 export const formatCriteriaValue = (value: unknown): string => {
   if (value === null || value === undefined) return "—";
   if (typeof value === "string") return value;
-  if (typeof value === "number") return value.toLocaleString();
+  if (typeof value === "number") return Number.isFinite(value) ? value.toLocaleString() : "—";
   if (Array.isArray(value)) return value.join(", ");
   if (typeof value === "object") {
     const obj = value as Record<string, unknown>;
     if ("label" in obj && obj.label) return String(obj.label);
     if ("min" in obj || "max" in obj) {
-      const min = obj.min != null ? Number(obj.min).toLocaleString() : null;
-      const max = obj.max != null ? Number(obj.max).toLocaleString() : null;
+      const min = displayBound(obj.min);
+      const max = displayBound(obj.max);
       if (min && max) return `${min} – ${max}`;
       if (min) return `≥ ${min}`;
       if (max) return `≤ ${max}`;
+      // Both bounds are markers, not numbers: the range is empty, not "NaN wide".
+      return "—";
     }
     return JSON.stringify(value);
   }

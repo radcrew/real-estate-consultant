@@ -103,6 +103,9 @@ export const ChatPanel = ({ onLlmSuccess }: ChatPanelProps) => {
       const data = await runTurn(sessionId, text);
       onLlmSuccess(data);
 
+      // What the system did to their words comes before what it wants next. Someone who
+      // typed "100k yard" and is shown 900,000 sq ft cannot tell a correct conversion
+      // from a bug, and "You're all set!" on its own reads as having been ignored.
       // Always say something. A turn that appended nothing left the user looking at their
       // own message with no reply and no error, which is indistinguishable from a hang.
       const followUp = data.next_question?.text?.trim();

@@ -105,6 +105,14 @@ class SubmitLlmIntakeInputResponse(BaseModel):
     current_index: int
     total_questions: int
     missing_fields: list[str]
+    # Answered in ``criteria`` but unsupported by anything the user said, so also present
+    # in ``missing_fields``: a reading worth offering back and not worth trusting. Lets a
+    # client say "I think industrial — is that right?" instead of asking from scratch.
+    unconfirmed_fields: list[str] = []
+    # Plain-language notes on what was done to the user's own words: a unit converted, a
+    # figure that belongs to another field, a bound the wording moved. Empty for the
+    # ordinary turn. Each is {field, kind, message}.
+    notes: list[dict[str, str]] = []
     # Both were built by the service and passed here, but were never declared — Pydantic
     # dropped them silently, so the side panel's missing-field labels have always fallen
     # back to raw keys. Declared now, with defaults so an older stored job result still

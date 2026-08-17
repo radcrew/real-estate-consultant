@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from app.llm.intake.schema import (
     build_intake_response_schema,
     extract_question_keys,
@@ -66,9 +64,33 @@ class TestBuildIntakeResponseSchema:
 
     def test_top_level_required_keys_present(self):
         schema = build_intake_response_schema(questions=[_q("loc", "location", 1)])
-        assert set(schema["required"]) == {
-            "extracted", "missing_fields", "skipped_fields", "next_question", "is_complete"
-        }
+        assert set(schema["required"]) == {"extracted", "skipped_fields", "next_question"}
+
+    def test_recomputed_fields_are_not_requested(self):
+        # merge_missing_fields recomputes one and derives the other, so asking the
+        # model for them costs prompt tokens and buys nothing.
+        schema = build_intake_response_schema(questions=[_q("loc", "location", 1)])
+        assert "missing_fields" not in schema["properties"]
+        assert "is_complete" not in schema["properties"]
+
+    def test_next_question_is_asked_for_but_carries_no_description(self):
+        # Asked for only so the tuned adapter, which learned a three-key object, keeps
+        # emitting valid JSON -- without it 21% of turns came back as
+        # '"skipped_fields":[}}'. The value is discarded by
+        # resolve_next_intake_question, and it carries no description so there is no
+        # prose for the model to copy into a reply.
+        schema = build_intake_response_schema(questions=[_q("loc", "location", 1)])
+        next_question = schema["properties"]["next_question"]
+        assert set(next_question["properties"]) == {"text"}
+        assert "description" not in next_question
+        assert "description" not in next_question["properties"]["text"]
+
+    def test_skip_description_carries_no_example_phrases(self):
+        # Example refusal phrasings in the schema get echoed back as if they were keys.
+        schema = build_intake_response_schema(questions=[_q("loc", "location", 1)])
+        description = schema["properties"]["skipped_fields"]["description"]
+        assert "no preference" not in description
+        assert "skip that" not in description
 
     def test_location_type_produces_string_schema(self):
         props = self._props([_q("loc", "location", 1)])

@@ -50,9 +50,31 @@ class Settings(BaseSettings):
     hf_model: str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     hf_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     hf_base_url: str = "https://router.huggingface.co/v1"
+    # Embeddings speak HF's feature-extraction protocol, which llama.cpp does not
+    # implement, so their base URL is separate from chat's. Without this, pointing
+    # intake at a self-hosted server would silently break embeddings.
+    hf_embedding_base_url: str = "https://router.huggingface.co/v1"
     # USD per 1M tokens, for cost-attribution telemetry. 0 disables cost estimates.
     hf_input_cost_per_1m: float = 0.0
     hf_output_cost_per_1m: float = 0.0
+
+    # Per-task override for intake criteria extraction only. Empty means "use the
+    # default chat provider", so unset behaviour is byte-identical to before.
+    # Clearing these is the rollback: env change and redeploy, no code revert.
+    intake_chat_model: str = ""
+    intake_chat_base_url: str = ""
+    # Its own credential. The provider sends one bearer token for whatever host it is
+    # pointed at, so without this the self-hosted box would receive HF_TOKEN.
+    intake_chat_api_key: str = ""
+
+    @property
+    def intake_chat_override(self) -> tuple[str, str, str] | None:
+        """Return (model, base_url, api_key) when intake is pinned elsewhere, else None."""
+        model = self.intake_chat_model.strip()
+        base_url = self.intake_chat_base_url.strip()
+        if not model or not base_url:
+            return None
+        return model, base_url, self.intake_chat_api_key.strip()
 
     # Chat: OPENROUTER_API_KEY wins over HF_TOKEN when both are set (see llm.providers.chat).
     # Embeddings: HF_TOKEN wins when both are set (see llm.providers.embeddings).
