@@ -41,11 +41,37 @@ DATASET_STAMP_NAME = "dataset_provenance.json"
 ADAPTER_STAMP_NAME = "training_provenance.json"
 
 
+# Formats whose bytes differ by checkout rather than by content. Git translates line
+# endings per platform, so hashing the raw bytes of one of these records the machine as
+# much as the file: the same commit hashes one way on Windows and another on Linux, and a
+# stamp written on one is unverifiable on the other. Everything this module hashes today
+# is on this list; binaries stay byte-exact so their digest still matches ``sha256sum``.
+_LINE_ENDING_SENSITIVE = frozenset(
+    {".json", ".jsonl", ".py", ".md", ".txt", ".csv", ".yml", ".yaml", ".service"}
+)
+
+
 def file_digest(path: Path | str) -> str | None:
-    """sha256 of a file, or None if it cannot be read."""
+    """sha256 of a file, or None if it cannot be read.
+
+    Text formats are hashed with line endings normalised to LF, so the digest describes
+    the content rather than the checkout. Without that, a stamp written on Windows fails
+    its own verification in CI -- which is exactly how this was found: the phrasings hash
+    matched locally and mismatched on Linux, and nothing about the file had changed.
+
+    Binaries are streamed and hashed byte-for-byte. They are not line-ending translated,
+    so their bytes already agree everywhere, and leaving them exact keeps the digest
+    comparable with ``sha256sum``.
+    """
+    target = Path(path)
     try:
+        if target.suffix.lower() in _LINE_ENDING_SENSITIVE:
+            # Read whole rather than stream: normalising across block boundaries has to
+            # carry a trailing CR between reads, and these files are datasets and source,
+            # not weights.
+            return hashlib.sha256(target.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
         digest = hashlib.sha256()
-        with Path(path).open("rb") as handle:
+        with target.open("rb") as handle:
             for block in iter(lambda: handle.read(1 << 20), b""):
                 digest.update(block)
         return digest.hexdigest()

@@ -8,6 +8,8 @@ stamp and about a stamp noticing it describes a file that has since been regener
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from pipeline import provenance
@@ -208,3 +210,63 @@ class TestTheShippedStampDescribesTheTrackedFiles:
             "generated from. Regenerate the dataset, or restore the phrasings — do not "
             "just update the stamp."
         )
+
+
+class TestDigestsDescribeContentNotTheCheckout:
+    """A stamp written on Windows has to verify on Linux, or it records the machine.
+
+    Git translates line endings per platform, so the same commit is different bytes in a
+    Windows working tree and a Linux one. Hashing those bytes made every text digest in
+    the stamp valid on exactly one checkout: the phrasings hash matched locally and
+    mismatched in CI, and the CI failure read as "the training data changed" when nothing
+    about the file had.
+    """
+
+    def test_crlf_and_lf_hash_the_same(self, tmp_path):
+        lf = tmp_path / "a.jsonl"
+        crlf = tmp_path / "b.jsonl"
+        lf.write_bytes(b'{"x": 1}\n{"x": 2}\n')
+        crlf.write_bytes(b'{"x": 1}\r\n{"x": 2}\r\n')
+        assert provenance.file_digest(lf) == provenance.file_digest(crlf)
+
+    def test_a_real_content_change_still_changes_the_digest(self, tmp_path):
+        """The guard above must not be so eager that it stops noticing edits."""
+        one = tmp_path / "a.jsonl"
+        two = tmp_path / "b.jsonl"
+        one.write_bytes(b'{"x": 1}\n')
+        two.write_bytes(b'{"x": 2}\n')
+        assert provenance.file_digest(one) != provenance.file_digest(two)
+
+    def test_binaries_stay_byte_exact(self, tmp_path):
+        """Weights are not line-ending translated, so their digest should still match
+        `sha256sum`. Normalising them would only make the number harder to check."""
+        import hashlib
+
+        blob = tmp_path / "adapter.safetensors"
+        payload = b"\x00\x01\r\n\x02\xff"
+        blob.write_bytes(payload)
+        assert provenance.file_digest(blob) == hashlib.sha256(payload).hexdigest()
+
+    def test_the_shipped_stamp_verifies_from_this_checkout(self):
+        """The end the CI job failed on. Every digest the stamp records for a file that
+        still exists must match what this machine computes, whatever its line endings."""
+        from pipeline.paths import DATASETS_DIR
+
+        stamp = provenance.read_stamp(DATASETS_DIR)
+        if stamp is None:
+            pytest.skip("no dataset_provenance.json beside the datasets")
+        checked = 0
+        for section in ("inputs", "outputs"):
+            for name, meta in (stamp.get(section) or {}).items():
+                # `generator` records generate.py as it was when the data was made; that
+                # file has since been split, so its digest is history and cannot match.
+                if name in {"generator", "eval_set"}:
+                    continue
+                path = DATASETS_DIR / Path(meta["path"]).name
+                if not path.exists():
+                    continue
+                assert provenance.file_digest(path) == meta["sha256"], (
+                    f"{name} does not match the stamp beside it"
+                )
+                checked += 1
+        assert checked >= 4, f"only checked {checked} inputs; the stamp shape changed"
