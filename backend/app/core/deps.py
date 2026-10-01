@@ -1,30 +1,33 @@
 from __future__ import annotations
 
+import asyncio
 from contextvars import ContextVar
 from typing import Annotated
 from uuid import UUID
 
+import jwt
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cognito import verify_access_token
 from app.core.config import settings
 from app.core.database import get_session
 from app.core.db_safe import SupabaseRequestError
 from app.core.exceptions import (
     raise_auth_invalid_access_token,
     raise_auth_missing_bearer,
-    raise_auth_user_not_returned,
+    raise_auth_provider_unavailable,
 )
 from app.core.rate_limit import SlidingWindowRateLimiter
 from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
 from app.domain.mcp_api_keys import looks_like_mcp_api_key, mcp_scopes_allow
-from app.models.auth_user import AuthUser, auth_user_from_supabase
+from app.models.auth_user import AuthUser
 from app.repositories.account import get_auth_user
 from app.repositories.mcp_api_keys import ResolvedMcpApiKey, resolve_mcp_api_key
 from app.repositories.profiles import get_profile_row
 from app.utils.exceptions import raise_forbidden, raise_service_unavailable, raise_too_many_requests
-from supabase import AsyncClient, AuthApiError
+from supabase import AsyncClient
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 
@@ -82,6 +85,25 @@ async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str
     return await get_auth_user(client, str(resolved.user_id))
 
 
+async def _user_from_access_token(client: AsyncClient, token: str) -> AuthUser:
+    """Verify a Cognito access token; email and phone come from ``public.profiles``."""
+    try:
+        # PyJWKClient fetches the pool's JWKS with blocking I/O on a cache miss.
+        claims = await asyncio.to_thread(verify_access_token, token)
+    except jwt.PyJWKClientConnectionError as exc:
+        raise_auth_provider_unavailable(cause=exc)
+    except jwt.PyJWTError as exc:
+        raise_auth_invalid_access_token(cause=exc)
+
+    user_id = claims["sub"]
+    try:
+        profile = await get_profile_row(client, UUID(user_id))
+    except SupabaseRequestError as exc:
+        raise_service_unavailable("Profile service unavailable.", cause=exc)
+    profile = profile or {}
+    return AuthUser(id=user_id, email=profile.get("email"), phone=profile.get("phone"))
+
+
 async def get_current_user(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],
@@ -102,14 +124,7 @@ async def get_current_user(
     if looks_like_mcp_api_key(token):
         return await _user_from_api_key(request, client, token)
 
-    try:
-        response = await client.auth.get_user(token)
-    except AuthApiError as exc:
-        raise_auth_invalid_access_token(cause=exc)
-
-    if response is None or response.user is None:
-        raise_auth_user_not_returned()
-    return auth_user_from_supabase(response.user)
+    return await _user_from_access_token(client, token)
 
 
 CurrentUser = Annotated[AuthUser, Depends(get_current_user)]
@@ -141,14 +156,7 @@ async def get_current_user_jwt(
             "MCP API key management requires a user session JWT, not an API key.",
         )
 
-    try:
-        response = await client.auth.get_user(token)
-    except AuthApiError as exc:
-        raise_auth_invalid_access_token(cause=exc)
-
-    if response is None or response.user is None:
-        raise_auth_user_not_returned()
-    return auth_user_from_supabase(response.user)
+    return await _user_from_access_token(client, token)
 
 
 CurrentUserJwt = Annotated[AuthUser, Depends(get_current_user_jwt)]
