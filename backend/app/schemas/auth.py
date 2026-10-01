@@ -15,6 +15,14 @@ class SignInRequest(EmailPasswordRequest):
     pass
 
 
+class ResendCodeRequest(BaseModel):
+    email: EmailStr
+
+
+class ConfirmSignUpRequest(ResendCodeRequest):
+    code: str = Field(min_length=1, max_length=20)
+
+
 class SignUpResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

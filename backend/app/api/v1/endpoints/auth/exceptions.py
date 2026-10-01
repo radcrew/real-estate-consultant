@@ -49,6 +49,18 @@ def raise_sign_up_email_already_exists(*, cause: BaseException) -> NoReturn:
     raise_conflict("An account with this email already exists.", cause=cause)
 
 
+def raise_invalid_verification_code(*, cause: BaseException) -> NoReturn:
+    raise_client_error(status.HTTP_400_BAD_REQUEST, "Invalid verification code.", cause=cause)
+
+
+def raise_verification_code_expired(*, cause: BaseException) -> NoReturn:
+    raise_client_error(
+        status.HTTP_400_BAD_REQUEST,
+        "Verification code has expired. Request a new one.",
+        cause=cause,
+    )
+
+
 def cognito_error_code(exc: ClientError) -> str:
     return exc.response.get("Error", {}).get("Code", "")
 

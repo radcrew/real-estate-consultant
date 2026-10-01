@@ -7,6 +7,7 @@ boto3 and ``PyJWKClient`` are synchronous; async callers run them via ``asyncio.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -37,6 +38,11 @@ def _idp_client(region: str) -> Any:
 def get_idp_client() -> Any:
     """Unsigned ``cognito-idp`` client for the configured region."""
     return _idp_client(settings.cognito_region)
+
+
+async def call_idp(operation: str, **params: Any) -> dict[str, Any]:
+    """Run one ``cognito-idp`` operation off the event loop. botocore errors propagate."""
+    return await asyncio.to_thread(getattr(get_idp_client(), operation), **params)
 
 
 @cache

@@ -1,4 +1,3 @@
-import asyncio
 from uuid import UUID
 
 from botocore.exceptions import BotoCoreError, ClientError
@@ -10,7 +9,7 @@ from app.api.v1.endpoints.auth.exceptions import (
     raise_sign_in_transport_unavailable,
     raise_sign_up_email_already_exists,
 )
-from app.core.cognito import get_idp_client, secret_hash
+from app.core.cognito import call_idp, secret_hash
 from app.core.config import settings
 from app.core.deps import SupabaseSdkDep
 from app.repositories.profiles import upsert_profile_patch
@@ -30,8 +29,8 @@ async def sign_up(body: SignUpRequest, client: SupabaseSdkDep) -> SignUpResponse
 
     email = str(body.email)
     try:
-        result = await asyncio.to_thread(
-            get_idp_client().sign_up,
+        result = await call_idp(
+            "sign_up",
             ClientId=settings.cognito_client_id,
             SecretHash=secret_hash(email),
             Username=email,
