@@ -3,29 +3,8 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
-
-from supabase import AuthApiError, AuthInvalidCredentialsError
-
-
-def _make_session(user_id: str = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"):
-    user = MagicMock()
-    user.id = user_id
-    user.email = "user@example.com"
-
-    session = MagicMock()
-    session.user = user
-    session.access_token = "access-tok"
-    session.refresh_token = "refresh-tok"
-    session.expires_in = 3600
-    session.token_type = "bearer"
-
-    result = MagicMock()
-    result.session = session
-    return result
-
 
 _NEW_SUB = "6f1c2a9e-0000-4000-8000-000000000002"
 
@@ -43,47 +22,73 @@ _SIGN_UP = {
 }
 
 
+_AUTH_RESULT = {
+    "AccessToken": "access-tok",
+    "IdToken": "id-tok",
+    "RefreshToken": "refresh-tok",
+    "ExpiresIn": 3600,
+    "TokenType": "Bearer",
+}
+
+
 class TestSignIn:
-    async def test_success_returns_tokens(self, client, mock_supabase):
-        mock_supabase.auth.sign_in_with_password = AsyncMock(return_value=_make_session())
+    @pytest.fixture
+    def idp(self):
+        idp = MagicMock()
+        idp.initiate_auth.return_value = {"AuthenticationResult": dict(_AUTH_RESULT)}
+        with patch("app.core.cognito.get_idp_client", return_value=idp):
+            yield idp
+
+    @pytest.fixture(autouse=True)
+    def verify(self):
+        claims = {"sub": _NEW_SUB, "username": _NEW_SUB}
+        with patch(
+            "app.api.v1.endpoints.auth.sign_in.verify_access_token", return_value=claims
+        ) as mock:
+            yield mock
+
+    async def test_success_returns_cognito_session(self, client, idp):
         r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
         assert r.status_code == 200
-        body = r.json()
-        assert body["access_token"] == "access-tok"
-        assert body["user"]["email"] == "user@example.com"
+        assert r.json() == {
+            "access_token": "access-tok",
+            "id_token": "id-tok",
+            "refresh_token": "refresh-tok",
+            "expires_in": 3600,
+            "token_type": "Bearer",
+            "user": {"id": _NEW_SUB, "email": "user@example.com", "username": _NEW_SUB},
+        }
 
-    async def test_invalid_credentials_returns_401(self, client, mock_supabase):
-        mock_supabase.auth.sign_in_with_password = AsyncMock(
-            side_effect=AuthInvalidCredentialsError("Invalid credentials")
-        )
+    async def test_uses_password_flow_with_secret_hash(self, client, idp):
+        await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
+        kwargs = idp.initiate_auth.call_args.kwargs
+        assert kwargs["AuthFlow"] == "USER_PASSWORD_AUTH"
+        assert kwargs["AuthParameters"]["USERNAME"] == "user@example.com"
+        assert kwargs["AuthParameters"]["SECRET_HASH"]
+
+    @pytest.mark.parametrize("code", ["NotAuthorizedException", "UserNotFoundException"])
+    async def test_bad_credentials_and_unknown_user_look_the_same(self, client, idp, code):
+        idp.initiate_auth.side_effect = _client_error(code, "nope")
         r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
         assert r.status_code == 401
+        assert r.json()["detail"] == "Invalid email or password."
 
-    async def test_auth_api_error_invalid_grant_returns_401(self, client, mock_supabase):
-        exc = AuthApiError("bad", status=400, code="invalid_credentials")
-        mock_supabase.auth.sign_in_with_password = AsyncMock(side_effect=exc)
-        r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
-        assert r.status_code == 401
-
-    async def test_email_not_confirmed_returns_403(self, client, mock_supabase):
-        exc = AuthApiError("Email not confirmed", status=400, code="email_not_confirmed")
-        mock_supabase.auth.sign_in_with_password = AsyncMock(side_effect=exc)
+    async def test_unconfirmed_user_returns_403(self, client, idp):
+        idp.initiate_auth.side_effect = _client_error("UserNotConfirmedException", "confirm")
         r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
         assert r.status_code == 403
+        assert "Confirm your email" in r.json()["detail"]
 
-    async def test_transport_error_returns_503(self, client, mock_supabase):
-        mock_supabase.auth.sign_in_with_password = AsyncMock(
-            side_effect=httpx.ConnectError("timeout")
-        )
+    async def test_challenge_returns_403(self, client, idp):
+        idp.initiate_auth.return_value = {"ChallengeName": "NEW_PASSWORD_REQUIRED"}
+        r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
+        assert r.status_code == 403
+        assert "NEW_PASSWORD_REQUIRED" in r.json()["detail"]
+
+    async def test_unreachable_cognito_returns_503(self, client, idp):
+        idp.initiate_auth.side_effect = EndpointConnectionError(endpoint_url="https://cognito-idp")
         r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
         assert r.status_code == 503
-
-    async def test_no_session_returns_403(self, client, mock_supabase):
-        result = MagicMock()
-        result.session = None
-        mock_supabase.auth.sign_in_with_password = AsyncMock(return_value=result)
-        r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
-        assert r.status_code == 403
 
     async def test_invalid_body_returns_422(self, client):
         r = await client.post("/api/v1/auth/sign-in", json={"email": "bad"})

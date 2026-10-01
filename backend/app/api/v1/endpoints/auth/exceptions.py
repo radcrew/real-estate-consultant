@@ -16,20 +16,14 @@ from app.utils.exceptions import (
     raise_unauthorized,
     raise_unprocessable_entity,
 )
-from supabase import AuthApiError
 
 
 def raise_sign_in_invalid_credentials(*, cause: BaseException) -> NoReturn:
     raise_unauthorized("Invalid email or password.", cause=cause)
 
 
-def raise_sign_in_email_not_confirmed(*, message: str, cause: AuthApiError) -> NoReturn:
-    raise_forbidden(message, cause=cause)
-
-
-def raise_auth_api_error(exc: AuthApiError) -> NoReturn:
-    status_code = exc.status if 400 <= exc.status < 600 else status.HTTP_400_BAD_REQUEST
-    raise_client_error(status_code, str(exc.message), cause=exc)
+def raise_sign_in_email_not_confirmed(*, cause: BaseException) -> NoReturn:
+    raise_forbidden("Confirm your email address before signing in.", cause=cause)
 
 
 def raise_sign_in_transport_unavailable(*, cause: BaseException) -> NoReturn:
@@ -39,10 +33,9 @@ def raise_sign_in_transport_unavailable(*, cause: BaseException) -> NoReturn:
     )
 
 
-def raise_sign_in_no_session() -> NoReturn:
-    raise_forbidden(
-        "No session returned. Confirm your email if your project requires it.",
-    )
+def raise_sign_in_challenge_required(challenge: str | None) -> NoReturn:
+    """Cognito wants another step (new password, MFA, ...) that this app does not support."""
+    raise_forbidden(f"Sign-in requires an additional step ({challenge or 'unknown'}).")
 
 
 def raise_sign_up_email_already_exists(*, cause: BaseException) -> NoReturn:

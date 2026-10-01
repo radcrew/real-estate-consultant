@@ -37,10 +37,13 @@ class SignInUser(BaseModel):
 
     id: str
     email: str | None
+    # Cognito user name; the client sends it back to /auth/refresh.
+    username: str
 
 
 class SignInResponse(BaseModel):
     access_token: str
+    id_token: str
     refresh_token: str
     expires_in: int
     token_type: str
