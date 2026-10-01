@@ -31,6 +31,16 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     signup_email_confirm: bool = True
 
+    # Cognito user pool and its confidential app client. Kept apart from aws_region:
+    # the pool and Bedrock need not live in the same region.
+    cognito_region: str = ""
+    cognito_user_pool_id: str = ""
+    cognito_client_id: str = ""
+    # Signs SECRET_HASH and the Hosted UI token exchange. Backend only.
+    cognito_client_secret: str = ""
+    # Hosted UI base URL, e.g. https://<prefix>.auth.<region>.amazoncognito.com
+    cognito_domain: str = ""
+
     # Browser origins allowed to call the API (comma-separated). Example: Next dev or prod web URL.
     # Both http and https localhost are allowed by default so the Next dev server
     # works whether or not it's started with --experimental-https.
