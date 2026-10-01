@@ -485,3 +485,34 @@ class TestOAuthExchange:
         r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
         assert r.status_code == 400
         profiles.upsert.assert_not_called()
+
+
+class TestSignOut:
+    _AUTH = {"Authorization": "Bearer access-tok"}
+
+    @pytest.fixture
+    def idp(self):
+        idp = MagicMock()
+        idp.global_sign_out.return_value = {}
+        with patch("app.core.cognito.get_idp_client", return_value=idp):
+            yield idp
+
+    async def test_revokes_with_the_bearer_access_token(self, client, idp):
+        r = await client.post("/api/v1/auth/sign-out", headers=self._AUTH)
+        assert r.status_code == 204
+        idp.global_sign_out.assert_called_once_with(AccessToken="access-tok")
+
+    async def test_already_invalid_token_still_returns_204(self, client, idp):
+        idp.global_sign_out.side_effect = _client_error("NotAuthorizedException", "revoked")
+        r = await client.post("/api/v1/auth/sign-out", headers=self._AUTH)
+        assert r.status_code == 204
+
+    async def test_missing_bearer_returns_401(self, client, idp):
+        r = await client.post("/api/v1/auth/sign-out")
+        assert r.status_code == 401
+        idp.global_sign_out.assert_not_called()
+
+    async def test_unreachable_cognito_returns_503(self, client, idp):
+        idp.global_sign_out.side_effect = EndpointConnectionError(endpoint_url="https://cognito-idp")
+        r = await client.post("/api/v1/auth/sign-out", headers=self._AUTH)
+        assert r.status_code == 503
