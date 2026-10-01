@@ -23,7 +23,6 @@ from app.core.rate_limit import SlidingWindowRateLimiter
 from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
 from app.domain.mcp_api_keys import looks_like_mcp_api_key, mcp_scopes_allow
 from app.models.auth_user import AuthUser
-from app.repositories.account import get_auth_user
 from app.repositories.mcp_api_keys import ResolvedMcpApiKey, resolve_mcp_api_key
 from app.repositories.profiles import get_profile_row
 from app.utils.exceptions import raise_forbidden, raise_service_unavailable, raise_too_many_requests
@@ -71,6 +70,16 @@ def _enforce_request_scope(request: Request, scopes: list[str]) -> None:
         raise_forbidden("MCP API key lacks mcp:write scope.")
 
 
+async def _user_from_profile(client: AsyncClient, user_id: str) -> AuthUser:
+    """Email and phone live in ``public.profiles``; neither credential type carries them."""
+    try:
+        profile = await get_profile_row(client, UUID(user_id))
+    except SupabaseRequestError as exc:
+        raise_service_unavailable("Profile service unavailable.", cause=exc)
+    profile = profile or {}
+    return AuthUser(id=user_id, email=profile.get("email"), phone=profile.get("phone"))
+
+
 async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str) -> AuthUser:
     try:
         resolved = await resolve_mcp_api_key(client, raw_key)
@@ -82,11 +91,11 @@ async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str
         raise_too_many_requests("MCP API key rate limit exceeded. Try again shortly.")
     _enforce_request_scope(request, resolved.scopes)
     _api_key_ctx.set(resolved)
-    return await get_auth_user(client, str(resolved.user_id))
+    return await _user_from_profile(client, str(resolved.user_id))
 
 
 async def _user_from_access_token(client: AsyncClient, token: str) -> AuthUser:
-    """Verify a Cognito access token; email and phone come from ``public.profiles``."""
+    """Verify a Cognito access token and load the caller by its ``sub``."""
     try:
         # PyJWKClient fetches the pool's JWKS with blocking I/O on a cache miss.
         claims = await asyncio.to_thread(verify_access_token, token)
@@ -95,13 +104,7 @@ async def _user_from_access_token(client: AsyncClient, token: str) -> AuthUser:
     except jwt.PyJWTError as exc:
         raise_auth_invalid_access_token(cause=exc)
 
-    user_id = claims["sub"]
-    try:
-        profile = await get_profile_row(client, UUID(user_id))
-    except SupabaseRequestError as exc:
-        raise_service_unavailable("Profile service unavailable.", cause=exc)
-    profile = profile or {}
-    return AuthUser(id=user_id, email=profile.get("email"), phone=profile.get("phone"))
+    return await _user_from_profile(client, claims["sub"])
 
 
 async def get_current_user(
