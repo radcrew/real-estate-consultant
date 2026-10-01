@@ -33,6 +33,12 @@ class ResetPasswordRequest(EmailPasswordRequest):
     code: str = Field(min_length=1, max_length=20)
 
 
+class OAuthExchangeRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=2048)
+    # Must equal the redirect_uri sent to /oauth2/authorize; Cognito checks both.
+    redirect_uri: str = Field(min_length=1, max_length=2048)
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(min_length=1)
     # SignInUser.username from the original sign-in.

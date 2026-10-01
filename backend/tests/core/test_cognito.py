@@ -98,3 +98,27 @@ class TestVerifyAccessToken:
     def test_token_without_sub_is_rejected(self):
         with pytest.raises(jwt.MissingRequiredClaimError):
             cognito.verify_access_token(_token(sub=None))
+
+
+def _id_token(**overrides) -> str:
+    return _token(**{"token_use": "id", "client_id": None, "aud": CLIENT_ID, **overrides})
+
+
+class TestVerifyIdToken:
+    def test_valid_token_returns_claims(self):
+        claims = cognito.verify_id_token(_id_token(email="g@example.com"))
+        assert claims["email"] == "g@example.com"
+
+    def test_access_token_is_rejected(self):
+        with pytest.raises(jwt.InvalidTokenError):
+            cognito.verify_id_token(_token())
+
+    def test_other_audience_is_rejected(self):
+        with pytest.raises(jwt.InvalidAudienceError):
+            cognito.verify_id_token(_id_token(aud="someone-else"))
+
+    def test_other_issuer_is_rejected(self):
+        with pytest.raises(jwt.InvalidIssuerError):
+            cognito.verify_id_token(
+                _id_token(iss="https://cognito-idp.us-east-1.amazonaws.com/other")
+            )

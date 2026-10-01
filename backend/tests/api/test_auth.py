@@ -1,8 +1,10 @@
 """Tests for the public /api/v1/auth endpoints."""
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import jwt
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
@@ -349,3 +351,137 @@ class TestResetPassword:
         )
         assert r.status_code == 422
         idp.confirm_forgot_password.assert_not_called()
+
+
+class TestOAuthExchange:
+    _BODY = {"code": "auth-code", "redirect_uri": "http://localhost:3000/auth/callback"}
+    _TOKENS = {
+        "access_token": "access-tok",
+        "id_token": "id-tok",
+        "refresh_token": "refresh-tok",
+        "expires_in": 3600,
+        "token_type": "Bearer",
+    }
+    _GOOGLE_SUB = "6f1c2a9e-0000-4000-8000-000000000003"
+    _GOOGLE_CLAIMS = {
+        "sub": _GOOGLE_SUB,
+        "email": "g@example.com",
+        "given_name": "Grace",
+        "family_name": "Hopper",
+    }
+
+    @pytest.fixture
+    def token_endpoint(self, monkeypatch):
+        """Route the module's httpx client to an in-process handler; record requests."""
+        state = {"status": 200, "json": dict(self._TOKENS), "requests": []}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            state["requests"].append(request)
+            return httpx.Response(state["status"], json=state["json"])
+
+        transport = httpx.MockTransport(handler)
+        fake_httpx = SimpleNamespace(
+            AsyncClient=lambda **kw: httpx.AsyncClient(transport=transport, **kw),
+            HTTPError=httpx.HTTPError,
+        )
+        monkeypatch.setattr("app.api.v1.endpoints.auth.oauth.httpx", fake_httpx)
+        monkeypatch.setattr(
+            "app.api.v1.endpoints.auth.oauth.settings.cognito_domain",
+            "https://radestate.auth.us-east-1.amazoncognito.com/",
+        )
+        return state
+
+    @pytest.fixture(autouse=True)
+    def verify(self):
+        with (
+            patch(
+                "app.api.v1.endpoints.auth.oauth.verify_id_token",
+                return_value=dict(self._GOOGLE_CLAIMS),
+            ) as id_mock,
+            patch(
+                "app.api.v1.endpoints.auth.sign_in.verify_access_token",
+                return_value={"sub": self._GOOGLE_SUB, "username": "google_1234"},
+            ),
+        ):
+            yield id_mock
+
+    @pytest.fixture
+    def profiles(self):
+        with (
+            patch(
+                "app.api.v1.endpoints.auth.oauth.get_profile_row",
+                new_callable=AsyncMock,
+                return_value=None,
+            ) as get_row,
+            patch(
+                "app.api.v1.endpoints.auth.oauth.upsert_profile_patch",
+                new_callable=AsyncMock,
+            ) as upsert,
+        ):
+            yield SimpleNamespace(get_row=get_row, upsert=upsert)
+
+    async def test_returns_session_for_the_google_user(self, client, token_endpoint, profiles):
+        r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        assert r.status_code == 200
+        body = r.json()
+        assert body["access_token"] == "access-tok"
+        assert body["refresh_token"] == "refresh-tok"
+        assert body["user"] == {
+            "id": self._GOOGLE_SUB,
+            "email": "g@example.com",
+            "username": "google_1234",
+        }
+
+    async def test_posts_code_to_the_token_endpoint_with_client_auth(
+        self, client, token_endpoint, profiles
+    ):
+        await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        (request,) = token_endpoint["requests"]
+        assert str(request.url) == "https://radestate.auth.us-east-1.amazoncognito.com/oauth2/token"
+        assert request.headers["authorization"].startswith("Basic ")
+        form = dict(httpx.QueryParams(request.content.decode()))
+        assert form["grant_type"] == "authorization_code"
+        assert form["code"] == "auth-code"
+        assert form["redirect_uri"] == "http://localhost:3000/auth/callback"
+
+    async def test_new_profile_takes_names_from_google(self, client, token_endpoint, profiles):
+        await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        user_id, patch_body = profiles.upsert.call_args.args[1:]
+        assert str(user_id) == self._GOOGLE_SUB
+        assert (patch_body.email, patch_body.first_name, patch_body.last_name) == (
+            "g@example.com",
+            "Grace",
+            "Hopper",
+        )
+
+    async def test_existing_names_are_kept(self, client, token_endpoint, profiles):
+        profiles.get_row.return_value = {"first_name": "Amazing", "last_name": "Grace"}
+        await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        patch_body = profiles.upsert.call_args.args[2]
+        assert (patch_body.first_name, patch_body.last_name) == ("Amazing", "Grace")
+
+    async def test_profile_failure_does_not_block_sign_in(self, client, token_endpoint, profiles):
+        from app.core.db_safe import SupabaseRequestError
+
+        profiles.upsert.side_effect = SupabaseRequestError("down")
+        r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        assert r.status_code == 200
+
+    async def test_rejected_code_returns_400(self, client, token_endpoint, profiles):
+        token_endpoint["status"] = 400
+        token_endpoint["json"] = {"error": "invalid_grant"}
+        r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        assert r.status_code == 400
+        assert "Google sign-in" in r.json()["detail"]
+        profiles.upsert.assert_not_called()
+
+    async def test_token_endpoint_outage_returns_503(self, client, token_endpoint, profiles):
+        token_endpoint["status"] = 502
+        r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        assert r.status_code == 503
+
+    async def test_invalid_id_token_returns_400(self, client, token_endpoint, profiles, verify):
+        verify.side_effect = jwt.InvalidAudienceError("aud")
+        r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        assert r.status_code == 400
+        profiles.upsert.assert_not_called()

@@ -61,21 +61,31 @@ def secret_hash(username: str) -> str:
     return base64.b64encode(digest).decode()
 
 
+def _decode(token: str, **kwargs: Any) -> dict[str, Any]:
+    iss = issuer()
+    signing_key = _jwks_client(f"{iss}/.well-known/jwks.json").get_signing_key_from_jwt(token)
+    return jwt.decode(token, signing_key.key, algorithms=["RS256"], issuer=iss, **kwargs)
+
+
+def verify_id_token(token: str) -> dict[str, Any]:
+    """Return the claims of a valid ID token issued to our app client (``aud``)."""
+    claims = _decode(
+        token,
+        audience=settings.cognito_client_id,
+        options={"require": ["exp", "iss", "sub", "aud"]},
+    )
+    if claims.get("token_use") != "id":
+        raise jwt.InvalidTokenError("Not an ID token.")
+    return claims
+
+
 def verify_access_token(token: str) -> dict[str, Any]:
     """Return the claims of a valid access token issued to our app client.
 
     Raises ``jwt.PyJWTError`` for anything else, including ID tokens. Access tokens carry
     ``client_id`` instead of ``aud``, so the audience is checked by hand.
     """
-    iss = issuer()
-    signing_key = _jwks_client(f"{iss}/.well-known/jwks.json").get_signing_key_from_jwt(token)
-    claims = jwt.decode(
-        token,
-        signing_key.key,
-        algorithms=["RS256"],
-        issuer=iss,
-        options={"require": ["exp", "iss", "sub"], "verify_aud": False},
-    )
+    claims = _decode(token, options={"require": ["exp", "iss", "sub"], "verify_aud": False})
     if claims.get("token_use") != "access":
         raise jwt.InvalidTokenError("Not an access token.")
     if claims.get("client_id") != settings.cognito_client_id:
