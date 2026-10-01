@@ -279,3 +279,73 @@ class TestRefresh:
     async def test_missing_username_returns_422(self, client):
         r = await client.post("/api/v1/auth/refresh", json={"refresh_token": "refresh-tok"})
         assert r.status_code == 422
+
+
+class TestForgotPassword:
+    @pytest.fixture
+    def idp(self):
+        idp = MagicMock()
+        idp.forgot_password.return_value = {}
+        with patch("app.core.cognito.get_idp_client", return_value=idp):
+            yield idp
+
+    async def test_returns_204(self, client, idp):
+        r = await client.post("/api/v1/auth/forgot-password", json={"email": "user@example.com"})
+        assert r.status_code == 204
+        assert idp.forgot_password.call_args.kwargs["Username"] == "user@example.com"
+
+    async def test_unknown_email_also_returns_204(self, client, idp):
+        idp.forgot_password.side_effect = _client_error("UserNotFoundException", "no user")
+        r = await client.post("/api/v1/auth/forgot-password", json={"email": "who@example.com"})
+        assert r.status_code == 204
+
+    async def test_throttled_returns_429(self, client, idp):
+        idp.forgot_password.side_effect = _client_error("LimitExceededException", "limit")
+        r = await client.post("/api/v1/auth/forgot-password", json={"email": "user@example.com"})
+        assert r.status_code == 429
+
+
+class TestResetPassword:
+    _BODY = {"email": "user@example.com", "code": " 123456 ", "password": "new-securepass"}
+
+    @pytest.fixture
+    def idp(self):
+        idp = MagicMock()
+        idp.confirm_forgot_password.return_value = {}
+        with patch("app.core.cognito.get_idp_client", return_value=idp):
+            yield idp
+
+    async def test_returns_204_and_sends_code_and_new_password(self, client, idp):
+        r = await client.post("/api/v1/auth/reset-password", json=self._BODY)
+        assert r.status_code == 204
+        kwargs = idp.confirm_forgot_password.call_args.kwargs
+        assert kwargs["ConfirmationCode"] == "123456"
+        assert kwargs["Password"] == "new-securepass"
+
+    @pytest.mark.parametrize("code", ["CodeMismatchException", "UserNotFoundException"])
+    async def test_bad_code_and_unknown_email_look_the_same(self, client, idp, code):
+        idp.confirm_forgot_password.side_effect = _client_error(code, "nope")
+        r = await client.post("/api/v1/auth/reset-password", json=self._BODY)
+        assert r.status_code == 400
+        assert r.json()["detail"] == "Invalid verification code."
+
+    async def test_expired_code_returns_400(self, client, idp):
+        idp.confirm_forgot_password.side_effect = _client_error("ExpiredCodeException", "old")
+        r = await client.post("/api/v1/auth/reset-password", json=self._BODY)
+        assert r.status_code == 400
+        assert "Request a new one" in r.json()["detail"]
+
+    async def test_weak_password_returns_422(self, client, idp):
+        idp.confirm_forgot_password.side_effect = _client_error(
+            "InvalidPasswordException", "Password must have symbol characters"
+        )
+        r = await client.post("/api/v1/auth/reset-password", json=self._BODY)
+        assert r.status_code == 422
+        assert "symbol" in r.json()["detail"]
+
+    async def test_short_password_rejected_before_cognito(self, client, idp):
+        r = await client.post(
+            "/api/v1/auth/reset-password", json={**self._BODY, "password": "short"}
+        )
+        assert r.status_code == 422
+        idp.confirm_forgot_password.assert_not_called()

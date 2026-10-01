@@ -23,6 +23,16 @@ class ConfirmSignUpRequest(ResendCodeRequest):
     code: str = Field(min_length=1, max_length=20)
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(EmailPasswordRequest):
+    """``password`` is the new password; ``code`` is the one emailed by forgot-password."""
+
+    code: str = Field(min_length=1, max_length=20)
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str = Field(min_length=1)
     # SignInUser.username from the original sign-in.

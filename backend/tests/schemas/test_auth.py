@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from app.schemas.auth import (
     EmailPasswordRequest,
     RefreshRequest,
+    ResetPasswordRequest,
     SignInRequest,
     SignInResponse,
     SignInUser,
@@ -99,3 +100,13 @@ class TestRefreshRequest:
     def test_empty_username_raises(self):
         with pytest.raises(ValidationError):
             RefreshRequest(refresh_token="ref", username="")
+
+
+class TestResetPasswordRequest:
+    def test_valid(self):
+        obj = ResetPasswordRequest(email="u@example.com", code="123456", password="securepass")
+        assert obj.code == "123456"
+
+    def test_missing_code_raises(self):
+        with pytest.raises(ValidationError):
+            ResetPasswordRequest(email="u@example.com", password="securepass")
