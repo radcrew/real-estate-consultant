@@ -5,6 +5,7 @@ import pytest
 from fastapi import HTTPException
 from supabase import AuthApiError, AuthInvalidCredentialsError, AuthWeakPasswordError
 
+from app.models.auth_user import AuthUser
 from app.repositories.account import (
     get_auth_user,
     update_auth_user,
@@ -71,10 +72,10 @@ class TestVerifyCurrentEmailPassword:
 class TestGetAuthUser:
     async def test_returns_user(self):
         client = _client_with_auth()
-        fake_user = MagicMock(id=_USER_ID)
+        fake_user = MagicMock(id=_USER_ID, email="u@example.com", phone=None)
         client.auth.admin.get_user_by_id = AsyncMock(return_value=MagicMock(user=fake_user))
         result = await get_auth_user(client, _USER_ID)
-        assert result is fake_user
+        assert result == AuthUser(id=_USER_ID, email="u@example.com", phone=None)
 
     async def test_auth_api_error_raises_503(self):
         client = _client_with_auth()

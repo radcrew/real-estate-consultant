@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
-from supabase_auth.types import User
 
+from app.models.auth_user import AuthUser, auth_user_from_supabase
 from app.repositories.exceptions import (
     raise_admin_auth_api_error,
     raise_could_not_load_profile,
@@ -42,9 +42,9 @@ async def verify_current_email_password(
         raise_password_auth_transport_unavailable(cause=exc)
 
 
-async def get_auth_user(client: AsyncClient, user_id: str) -> User:
+async def get_auth_user(client: AsyncClient, user_id: str) -> AuthUser:
     try:
-        return (await client.auth.admin.get_user_by_id(user_id)).user
+        return auth_user_from_supabase((await client.auth.admin.get_user_by_id(user_id)).user)
 
     except AuthApiError as exc:
         raise_could_not_load_profile(cause=exc)

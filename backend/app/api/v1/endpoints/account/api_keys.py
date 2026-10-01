@@ -11,11 +11,11 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, status
-from supabase_auth.types import User
 
 from app.api.v1.endpoints.account.exceptions import raise_mcp_api_key_not_found
 from app.core.db_safe import SupabaseRequestError
 from app.core.deps import SupabaseSdkDep, get_current_user_jwt
+from app.models.auth_user import AuthUser
 from app.repositories.mcp_api_keys import (
     create_mcp_api_key,
     list_mcp_api_keys,
@@ -32,7 +32,7 @@ from app.utils.exceptions import raise_service_unavailable, raise_unprocessable_
 router = APIRouter(prefix="/api-keys", tags=["account"])
 
 # Explicit Depends — avoid Annotated aliases under postponed evaluation.
-RequireUserJwt = Annotated[User, Depends(get_current_user_jwt)]
+RequireUserJwt = Annotated[AuthUser, Depends(get_current_user_jwt)]
 
 
 def _meta_response(row: dict) -> McpApiKeyResponse:

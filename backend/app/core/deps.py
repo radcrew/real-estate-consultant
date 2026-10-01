@@ -7,7 +7,6 @@ from uuid import UUID
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
-from supabase_auth.types import User
 
 from app.core.config import settings
 from app.core.database import get_session
@@ -20,6 +19,7 @@ from app.core.exceptions import (
 from app.core.rate_limit import SlidingWindowRateLimiter
 from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
 from app.domain.mcp_api_keys import looks_like_mcp_api_key, mcp_scopes_allow
+from app.models.auth_user import AuthUser, auth_user_from_supabase
 from app.repositories.account import get_auth_user
 from app.repositories.mcp_api_keys import ResolvedMcpApiKey, resolve_mcp_api_key
 from app.repositories.profiles import get_profile_row
@@ -68,7 +68,7 @@ def _enforce_request_scope(request: Request, scopes: list[str]) -> None:
         raise_forbidden("MCP API key lacks mcp:write scope.")
 
 
-async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str) -> User:
+async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str) -> AuthUser:
     try:
         resolved = await resolve_mcp_api_key(client, raw_key)
     except SupabaseRequestError as exc:
@@ -86,7 +86,7 @@ async def get_current_user(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],
     client: Annotated[AsyncClient, Depends(get_supabase_sdk_client)],
-) -> User:
+) -> AuthUser:
     """Validate Bearer JWT **or** MCP API key (``rad_…`` / ``X-API-Key``).
 
     Dual-credential auth is intentional for tool/account routes under the
@@ -109,17 +109,17 @@ async def get_current_user(
 
     if response is None or response.user is None:
         raise_auth_user_not_returned()
-    return response.user
+    return auth_user_from_supabase(response.user)
 
 
-CurrentUser = Annotated[User, Depends(get_current_user)]
+CurrentUser = Annotated[AuthUser, Depends(get_current_user)]
 
 
 async def get_current_user_jwt(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],
     client: Annotated[AsyncClient, Depends(get_supabase_sdk_client)],
-) -> User:
+) -> AuthUser:
     """JWT session only — MCP API keys are rejected.
 
     Key-management routes must not accept ``rad_…`` / ``X-API-Key``. A write-scoped
@@ -148,16 +148,16 @@ async def get_current_user_jwt(
 
     if response is None or response.user is None:
         raise_auth_user_not_returned()
-    return response.user
+    return auth_user_from_supabase(response.user)
 
 
-CurrentUserJwt = Annotated[User, Depends(get_current_user_jwt)]
+CurrentUserJwt = Annotated[AuthUser, Depends(get_current_user_jwt)]
 
 
 async def get_current_admin(
     user: CurrentUser,
     client: SupabaseSdkDep,
-) -> User:
+) -> AuthUser:
     """Require admin profile; API keys also need ``mcp:admin`` or ``*`` scope."""
     api_key = get_request_mcp_api_key()
     if api_key is not None and not mcp_scopes_allow(api_key.scopes, "mcp:admin"):
@@ -172,4 +172,4 @@ async def get_current_admin(
     return user
 
 
-CurrentAdmin = Annotated[User, Depends(get_current_admin)]
+CurrentAdmin = Annotated[AuthUser, Depends(get_current_admin)]

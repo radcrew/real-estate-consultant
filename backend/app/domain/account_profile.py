@@ -1,14 +1,13 @@
-"""Build account API payloads from Supabase Auth ``User`` + ``public.profiles`` row."""
+"""Build account API payloads from ``AuthUser`` + ``public.profiles`` row."""
 
 from __future__ import annotations
 
-from supabase_auth.types import User
-
+from app.models.auth_user import AuthUser
 from app.models.profile import Profile
 from app.schemas.account import AccountProfileResponse
 
 
-def account_profile_response(*, user: User, profile: Profile | None) -> AccountProfileResponse:
+def account_profile_response(*, user: AuthUser, profile: Profile | None) -> AccountProfileResponse:
     if profile is None:
         return AccountProfileResponse(
             id=user.id,
