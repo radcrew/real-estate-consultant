@@ -20,7 +20,7 @@ from app.core.exceptions import (
     raise_auth_provider_unavailable,
 )
 from app.core.rate_limit import SlidingWindowRateLimiter
-from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
+from app.core.supabase_sdk import get_supabase_sdk_client
 from app.domain.mcp_api_keys import looks_like_mcp_api_key, mcp_scopes_allow
 from app.models.auth_user import AuthUser
 from app.repositories.mcp_api_keys import ResolvedMcpApiKey, resolve_mcp_api_key
@@ -31,7 +31,6 @@ from supabase import AsyncClient
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 
 SupabaseSdkDep = Annotated[AsyncClient, Depends(get_supabase_sdk_client)]
-SupabaseAuthDep = Annotated[AsyncClient, Depends(get_supabase_auth_client)]
 
 _http_bearer = HTTPBearer(auto_error=False)
 
@@ -70,14 +69,18 @@ def _enforce_request_scope(request: Request, scopes: list[str]) -> None:
         raise_forbidden("MCP API key lacks mcp:write scope.")
 
 
-async def _user_from_profile(client: AsyncClient, user_id: str) -> AuthUser:
+async def _user_from_profile(
+    client: AsyncClient, user_id: str, *, username: str | None = None
+) -> AuthUser:
     """Email and phone live in ``public.profiles``; neither credential type carries them."""
     try:
         profile = await get_profile_row(client, UUID(user_id))
     except SupabaseRequestError as exc:
         raise_service_unavailable("Profile service unavailable.", cause=exc)
     profile = profile or {}
-    return AuthUser(id=user_id, email=profile.get("email"), phone=profile.get("phone"))
+    return AuthUser(
+        id=user_id, email=profile.get("email"), phone=profile.get("phone"), username=username
+    )
 
 
 async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str) -> AuthUser:
@@ -104,7 +107,7 @@ async def _user_from_access_token(client: AsyncClient, token: str) -> AuthUser:
     except jwt.PyJWTError as exc:
         raise_auth_invalid_access_token(cause=exc)
 
-    return await _user_from_profile(client, claims["sub"])
+    return await _user_from_profile(client, claims["sub"], username=claims.get("username"))
 
 
 async def get_current_user(

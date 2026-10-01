@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 
 _UID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 _PROP_UUID = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
@@ -92,33 +93,67 @@ class TestUpdateAccountProfile:
 
 
 class TestChangePassword:
-    async def test_success_returns_204(self, client, mock_user):
-        mock_user.email = "user@example.com"
-        with (
-            patch("app.api.v1.endpoints.account.password.verify_current_email_password", new_callable=AsyncMock),
-            patch("app.api.v1.endpoints.account.password.update_auth_user_password", new_callable=AsyncMock),
-        ):
-            r = await client.post(
-                "/api/v1/account/password",
-                json={"current_password": "oldpass1", "new_password": "newpass1"},
-            )
-        assert r.status_code == 204
+    _BODY = {"current_password": "oldpass11", "new_password": "newpass11"}
+    _AUTH = {"Authorization": "Bearer access-tok"}
 
-    async def test_same_password_returns_422(self, client, mock_user):
-        mock_user.email = "user@example.com"
-        r = await client.post(
-            "/api/v1/account/password",
-            json={"current_password": "samepass", "new_password": "samepass"},
+    @pytest.fixture
+    def idp(self):
+        idp = MagicMock()
+        idp.change_password.return_value = {}
+        with patch("app.core.cognito.get_idp_client", return_value=idp):
+            yield idp
+
+    @pytest.fixture(autouse=True)
+    def cognito_user(self, mock_user):
+        mock_user.username = _UID
+
+    async def test_success_returns_204(self, client, idp):
+        r = await client.post("/api/v1/account/password", json=self._BODY, headers=self._AUTH)
+        assert r.status_code == 204
+        idp.change_password.assert_called_once_with(
+            PreviousPassword="oldpass11", ProposedPassword="newpass11", AccessToken="access-tok"
         )
+
+    async def test_wrong_current_password_returns_401(self, client, idp):
+        idp.change_password.side_effect = ClientError(
+            {"Error": {"Code": "NotAuthorizedException", "Message": "Incorrect"}}, "ChangePassword"
+        )
+        r = await client.post("/api/v1/account/password", json=self._BODY, headers=self._AUTH)
+        assert r.status_code == 401
+        assert r.json()["detail"] == "Current password is incorrect."
+
+    async def test_weak_new_password_returns_422(self, client, idp):
+        idp.change_password.side_effect = ClientError(
+            {"Error": {"Code": "InvalidPasswordException", "Message": "Needs a number"}},
+            "ChangePassword",
+        )
+        r = await client.post("/api/v1/account/password", json=self._BODY, headers=self._AUTH)
         assert r.status_code == 422
 
-    async def test_no_email_returns_400(self, client, mock_user):
-        mock_user.email = ""
+    async def test_same_password_returns_422(self, client, idp):
         r = await client.post(
             "/api/v1/account/password",
-            json={"current_password": "oldpass1", "new_password": "newpass1"},
+            json={"current_password": "samepass1", "new_password": "samepass1"},
+            headers=self._AUTH,
         )
+        assert r.status_code == 422
+        idp.change_password.assert_not_called()
+
+    async def test_google_user_returns_400(self, client, idp, mock_user):
+        mock_user.username = "google_1234"
+        r = await client.post("/api/v1/account/password", json=self._BODY, headers=self._AUTH)
         assert r.status_code == 400
+        idp.change_password.assert_not_called()
+
+    async def test_api_key_caller_returns_403(self, client, idp, mock_user):
+        mock_user.username = None
+        r = await client.post(
+            "/api/v1/account/password",
+            json=self._BODY,
+            headers={"X-API-Key": "rad_abcdefghijklmnop"},
+        )
+        assert r.status_code == 403
+        idp.change_password.assert_not_called()
 
 
 class TestSavedListings:

@@ -8,11 +8,16 @@ from typing import Any
 
 @dataclass(frozen=True)
 class AuthUser:
-    """``id`` is the provider's user id (a UUID string) and keys ``public.profiles``."""
+    """``id`` is the provider's user id (a UUID string) and keys ``public.profiles``.
+
+    ``username`` is Cognito's user name, set only for access-token callers (``google_…``
+    for Google users). MCP API key callers have none.
+    """
 
     id: str
     email: str | None = None
     phone: str | None = None
+    username: str | None = None
 
 
 def auth_user_from_supabase(user: Any) -> AuthUser:

@@ -1,6 +1,5 @@
 import pytest
 from fastapi import HTTPException
-from supabase import AuthApiError
 
 from app.repositories.exceptions import (
     raise_admin_auth_api_error,
@@ -8,11 +7,9 @@ from app.repositories.exceptions import (
     raise_current_password_incorrect,
     raise_intake_questions_load_empty,
     raise_intake_session_not_found,
-    raise_password_auth_transport_unavailable,
-    raise_password_verification_unavailable,
     raise_profile_service_unavailable,
-    raise_weak_password,
 )
+from supabase import AuthApiError
 
 
 class TestAdminAuthApiError:
@@ -47,24 +44,6 @@ class TestAdminAuthApiError:
         assert info.value.status_code == 400
 
 
-class TestWeakPassword:
-    def test_raises_422_with_message(self):
-        with pytest.raises(HTTPException) as info:
-            raise_weak_password(message="Too weak", cause=ValueError())
-        assert info.value.status_code == 422
-        assert "Too weak" in info.value.detail
-
-    def test_reasons_appended(self):
-        with pytest.raises(HTTPException) as info:
-            raise_weak_password(message="Weak", reasons=["too short", "no digit"], cause=ValueError())
-        assert "too short" in info.value.detail
-
-    def test_empty_reasons_ignored(self):
-        with pytest.raises(HTTPException) as info:
-            raise_weak_password(message="Weak", reasons=[], cause=ValueError())
-        assert info.value.detail == "Weak"
-
-
 class TestServiceHelpers:
     def test_could_not_load_profile_raises_503(self):
         with pytest.raises(HTTPException) as info:
@@ -80,16 +59,6 @@ class TestServiceHelpers:
         with pytest.raises(HTTPException) as info:
             raise_current_password_incorrect()
         assert info.value.status_code == 401
-
-    def test_password_verification_unavailable_raises_503(self):
-        with pytest.raises(HTTPException) as info:
-            raise_password_verification_unavailable()
-        assert info.value.status_code == 503
-
-    def test_password_auth_transport_unavailable_raises_503(self):
-        with pytest.raises(HTTPException) as info:
-            raise_password_auth_transport_unavailable()
-        assert info.value.status_code == 503
 
     def test_intake_session_not_found_raises_404(self):
         with pytest.raises(HTTPException) as info:
