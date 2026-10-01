@@ -76,7 +76,11 @@ Environment values are loaded from `backend/.env` by path, so loading does not d
 | `DATABASE_URL` | yes | Postgres connection string (Supabase) |
 | `SUPABASE_URL` | yes | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Service role key for server-side Supabase calls |
-| `SUPABASE_ANON_KEY` | recommended | Anon key where the backend needs it |
+| `COGNITO_REGION` | yes | AWS region of the Cognito user pool |
+| `COGNITO_USER_POOL_ID` | yes | User pool id; sets the token issuer and JWKS URL |
+| `COGNITO_CLIENT_ID` | yes | App client id |
+| `COGNITO_CLIENT_SECRET` | yes | App client secret. Backend only |
+| `COGNITO_DOMAIN` | yes | Hosted UI base URL, used for the Google code exchange |
 | `FRONTEND_ORIGIN` | recommended | Comma-separated CORS origins (Next dev/prod URLs) |
 | `DB_SERVERLESS` | Vercel | Set `true` when `DATABASE_URL` uses Supabase pgbouncer (port 6543) |
 

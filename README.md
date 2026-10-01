@@ -65,7 +65,7 @@ The FastAPI API deploys as a **second Vercel project** via `.github/workflows/ba
 
 1. In Vercel, create/import a project with **Root Directory** = `backend` (or `cd backend && npx vercel link`).
 2. Add GitHub secrets **`VERCEL_BACKEND_PROJECT_ID`** (backend project ID) and reuse **`VERCEL_TOKEN`** / **`VERCEL_ORG_ID`**. The frontend workflow uses **`VERCEL_FRONTEND_PROJECT_ID`**.
-3. In the **backend** Vercel project → **Environment Variables** (Production), set variables from `backend/.env.example` (at minimum `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `FRONTEND_ORIGIN` = your frontend Vercel URL, and at least one of `OPENROUTER_API_KEY` or `HF_TOKEN` for chat).
+3. In the **backend** Vercel project → **Environment Variables** (Production), set variables from `backend/.env.example` (at minimum `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, the five `COGNITO_*` variables, `FRONTEND_ORIGIN` = your frontend Vercel URL, and at least one of `OPENROUTER_API_KEY` or `HF_TOKEN` for chat).
 4. Merge to **`main`** to run production deploy (`vercel deploy --prod`). Opening a PR deploys a preview first; both are smoke-tested against `/health/ready` and `/api/v1/ping`.
 
 **URL:** `https://<backend-project-name>.vercel.app` — use this as `NEXT_PUBLIC_BACKEND_API_URL` on the frontend. Routes are unchanged (`/health`, `/api/v1/...`, `/docs`).

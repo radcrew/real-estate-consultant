@@ -8,7 +8,7 @@ from uuid import UUID
 from httpx import ASGITransport, AsyncClient
 
 from app.core.database import get_session
-from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
+from app.core.supabase_sdk import get_supabase_sdk_client
 from app.main import create_app
 from app.repositories.mcp_api_keys import ResolvedMcpApiKey
 
@@ -115,7 +115,6 @@ class TestDualAuthApiKey:
         app = create_app()
         app.dependency_overrides[get_session] = lambda: mock_db
         app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
-        app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
 
         with (
             patch(
@@ -149,7 +148,6 @@ class TestDualAuthApiKey:
         app = create_app()
         app.dependency_overrides[get_session] = lambda: mock_db
         app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
-        app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
 
         with patch(
             "app.core.deps.resolve_mcp_api_key",
@@ -173,7 +171,6 @@ class TestDualAuthApiKey:
         app = create_app()
         app.dependency_overrides[get_session] = lambda: mock_db
         app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
-        app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
 
         headers = {"Authorization": "Bearer rad_abcdefghijklmnop"}
         with patch(
@@ -204,7 +201,6 @@ class TestDualAuthApiKey:
         app = create_app()
         app.dependency_overrides[get_session] = lambda: mock_db
         app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
-        app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
 
         with patch(
             "app.core.deps.resolve_mcp_api_key",
