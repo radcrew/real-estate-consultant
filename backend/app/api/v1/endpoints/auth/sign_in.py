@@ -19,17 +19,24 @@ from app.schemas.auth import SignInRequest, SignInResponse, SignInUser
 router = APIRouter()
 
 
-async def session_response(auth: dict[str, Any], *, email: str | None) -> SignInResponse:
+async def session_response(
+    auth: dict[str, Any],
+    *,
+    email: str | None,
+    refresh_token: str | None = None,
+) -> SignInResponse:
     """Build the client session from a Cognito ``AuthenticationResult``.
 
     ``username`` is Cognito's own user name (the ``sub`` for pools that sign in by email,
     ``google_…`` for Google users). Refreshing a token needs it for ``SECRET_HASH``.
+    A refresh returns no new refresh token unless rotation is on, so the caller passes
+    the one it used.
     """
     claims = await asyncio.to_thread(verify_access_token, auth["AccessToken"])
     return SignInResponse(
         access_token=auth["AccessToken"],
         id_token=auth["IdToken"],
-        refresh_token=auth["RefreshToken"],
+        refresh_token=auth.get("RefreshToken") or refresh_token,
         expires_in=auth["ExpiresIn"],
         token_type=auth["TokenType"],
         user=SignInUser(id=claims["sub"], email=email, username=claims["username"]),

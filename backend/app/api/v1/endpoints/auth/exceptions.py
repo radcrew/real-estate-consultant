@@ -22,6 +22,10 @@ def raise_sign_in_invalid_credentials(*, cause: BaseException) -> NoReturn:
     raise_unauthorized("Invalid email or password.", cause=cause)
 
 
+def raise_refresh_token_rejected(*, cause: BaseException) -> NoReturn:
+    raise_unauthorized("Session expired. Please sign in again.", cause=cause)
+
+
 def raise_sign_in_email_not_confirmed(*, cause: BaseException) -> NoReturn:
     raise_forbidden("Confirm your email address before signing in.", cause=cause)
 

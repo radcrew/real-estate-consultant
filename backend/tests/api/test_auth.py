@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import jwt
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
 
@@ -228,3 +229,53 @@ class TestResendCode:
         )
         r = await client.post("/api/v1/auth/resend-code", json={"email": "new@example.com"})
         assert r.status_code == 503
+
+
+class TestRefresh:
+    _BODY = {"refresh_token": "refresh-tok", "username": _NEW_SUB}
+
+    @pytest.fixture
+    def idp(self):
+        auth = {k: v for k, v in _AUTH_RESULT.items() if k != "RefreshToken"}
+        auth["IdToken"] = jwt.encode({"email": "user@example.com"}, "x" * 32, algorithm="HS256")
+        idp = MagicMock()
+        idp.initiate_auth.return_value = {"AuthenticationResult": auth}
+        with patch("app.core.cognito.get_idp_client", return_value=idp):
+            yield idp
+
+    @pytest.fixture(autouse=True)
+    def verify(self):
+        claims = {"sub": _NEW_SUB, "username": _NEW_SUB}
+        with patch("app.api.v1.endpoints.auth.sign_in.verify_access_token", return_value=claims):
+            yield
+
+    async def test_returns_new_tokens_and_keeps_the_refresh_token(self, client, idp):
+        r = await client.post("/api/v1/auth/refresh", json=self._BODY)
+        assert r.status_code == 200
+        body = r.json()
+        assert body["access_token"] == "access-tok"
+        assert body["refresh_token"] == "refresh-tok"
+        assert body["user"] == {"id": _NEW_SUB, "email": "user@example.com", "username": _NEW_SUB}
+
+    async def test_secret_hash_is_built_from_the_cognito_username(self, client, idp):
+        from app.core.cognito import secret_hash
+
+        await client.post("/api/v1/auth/refresh", json=self._BODY)
+        kwargs = idp.initiate_auth.call_args.kwargs
+        assert kwargs["AuthFlow"] == "REFRESH_TOKEN_AUTH"
+        assert kwargs["AuthParameters"]["SECRET_HASH"] == secret_hash(_NEW_SUB)
+
+    async def test_rejected_refresh_token_returns_401(self, client, idp):
+        idp.initiate_auth.side_effect = _client_error("NotAuthorizedException", "expired")
+        r = await client.post("/api/v1/auth/refresh", json=self._BODY)
+        assert r.status_code == 401
+        assert "sign in again" in r.json()["detail"]
+
+    async def test_unreachable_cognito_returns_503(self, client, idp):
+        idp.initiate_auth.side_effect = EndpointConnectionError(endpoint_url="https://cognito-idp")
+        r = await client.post("/api/v1/auth/refresh", json=self._BODY)
+        assert r.status_code == 503
+
+    async def test_missing_username_returns_422(self, client):
+        r = await client.post("/api/v1/auth/refresh", json={"refresh_token": "refresh-tok"})
+        assert r.status_code == 422

@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from app.schemas.auth import (
     EmailPasswordRequest,
+    RefreshRequest,
     SignInRequest,
     SignInResponse,
     SignInUser,
@@ -88,3 +89,13 @@ class TestSignUpResponse:
     def test_email_can_be_none(self):
         obj = SignUpResponse(id="u1", email=None, confirmation_required=False)
         assert obj.email is None
+
+
+class TestRefreshRequest:
+    def test_valid(self):
+        obj = RefreshRequest(refresh_token="ref", username="google_123")
+        assert obj.username == "google_123"
+
+    def test_empty_username_raises(self):
+        with pytest.raises(ValidationError):
+            RefreshRequest(refresh_token="ref", username="")
