@@ -29,7 +29,6 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_service_role_key: str
     supabase_anon_key: str = ""
-    signup_email_confirm: bool = True
 
     # Cognito user pool and its confidential app client. Kept apart from aws_region:
     # the pool and Bedrock need not live in the same region.

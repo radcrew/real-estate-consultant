@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
@@ -22,7 +20,8 @@ class SignUpResponse(BaseModel):
 
     id: str
     email: str | None
-    created_at: datetime
+    # True until the emailed code is submitted to /auth/confirm.
+    confirmation_required: bool
 
 
 class SignInUser(BaseModel):

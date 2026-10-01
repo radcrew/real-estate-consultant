@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import NoReturn
 
+from botocore.exceptions import ClientError
 from fastapi import status
 
 from app.utils.exceptions import (
@@ -12,20 +12,11 @@ from app.utils.exceptions import (
     raise_conflict,
     raise_forbidden,
     raise_service_unavailable,
+    raise_too_many_requests,
     raise_unauthorized,
     raise_unprocessable_entity,
 )
-from supabase import AuthApiError, AuthWeakPasswordError
-
-
-def _weak_password_detail(message: str, reasons: Iterable[str] | None) -> str:
-    base = (message or "Password does not meet requirements.").strip()
-    if not reasons:
-        return base
-    parts = [str(r).strip() for r in reasons if str(r).strip()]
-    if not parts:
-        return base
-    return f"{base} ({'; '.join(parts)})"
+from supabase import AuthApiError
 
 
 def raise_sign_in_invalid_credentials(*, cause: BaseException) -> NoReturn:
@@ -58,12 +49,18 @@ def raise_sign_up_email_already_exists(*, cause: BaseException) -> NoReturn:
     raise_conflict("An account with this email already exists.", cause=cause)
 
 
-def raise_sign_up_weak_password_sdk(*, exc: AuthWeakPasswordError) -> NoReturn:
-    raise_unprocessable_entity(
-        _weak_password_detail(str(exc.message), getattr(exc, "reasons", None)),
-        cause=exc,
-    )
+def cognito_error_code(exc: ClientError) -> str:
+    return exc.response.get("Error", {}).get("Code", "")
 
 
-def raise_sign_up_weak_password_api(*, exc: AuthApiError) -> NoReturn:
-    raise_unprocessable_entity(_weak_password_detail(str(exc.message), None), cause=exc)
+def raise_cognito_error(exc: ClientError) -> NoReturn:
+    """Fallback for Cognito errors an endpoint does not map itself."""
+    code = cognito_error_code(exc)
+    message = exc.response.get("Error", {}).get("Message") or "Authentication request failed."
+    if code == "InvalidPasswordException":
+        raise_unprocessable_entity(message, cause=exc)
+    if code in ("TooManyRequestsException", "LimitExceededException"):
+        raise_too_many_requests("Too many attempts. Please wait and try again.", cause=exc)
+    if code == "InternalErrorException":
+        raise_sign_in_transport_unavailable(cause=exc)
+    raise_client_error(status.HTTP_400_BAD_REQUEST, message, cause=exc)
