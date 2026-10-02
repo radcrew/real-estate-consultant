@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { isAxiosError } from "axios";
 import { usePathname } from "next/navigation";
 
 import { getApiErrorMessage } from "@utils/common";
@@ -38,14 +39,28 @@ export type SignUpCredentials = {
   lastName: string;
 };
 
+export type SignUpResult = {
+  // True when Cognito emailed a code that must be confirmed before sign-in.
+  confirmationRequired: boolean;
+};
+
 export type AuthContextValue = {
   session: StoredSession | null;
   ready: boolean;
   refresh: () => void;
   signOut: () => void;
-  signIn: (credentials: AuthCredentials, onSuccess: () => void) => Promise<void>;
+  signIn: (
+    credentials: AuthCredentials,
+    onSuccess: () => void,
+    onUnconfirmed?: () => void,
+  ) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
-  signUp: (credentials: SignUpCredentials, onSuccess: () => void) => Promise<void>;
+  signUp: (
+    credentials: SignUpCredentials,
+    onSuccess: (result: SignUpResult) => void,
+  ) => Promise<void>;
+  confirmSignUp: (email: string, code: string, onSuccess: () => void) => Promise<void>;
+  resendCode: (email: string, onSuccess: () => void) => Promise<void>;
   requestPasswordReset: (email: string, onSuccess: () => void) => Promise<void>;
   updatePassword: (password: string, onSuccess: () => void) => Promise<void>;
   clearError: () => void;
@@ -54,6 +69,14 @@ export type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+// The backend's 403 detail for a sign-in by an account whose email is not confirmed yet.
+const EMAIL_NOT_CONFIRMED_DETAIL = "Confirm your email address before signing in.";
+
+const isEmailNotConfirmed = (err: unknown): boolean =>
+  isAxiosError(err) &&
+  err.response?.status === 403 &&
+  (err.response.data as { detail?: unknown } | undefined)?.detail === EMAIL_NOT_CONFIRMED_DETAIL;
 
 type AuthProviderProps = {
   children: ReactNode;
@@ -69,7 +92,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const avatarPatchedRef = useRef(false);
 
   const signIn = useCallback(
-    async ({ email, password }: AuthCredentials, onSuccess: () => void) => {
+    async (
+      { email, password }: AuthCredentials,
+      onSuccess: () => void,
+      onUnconfirmed?: () => void,
+    ) => {
       setError(null);
       setSubmitting(true);
 
@@ -94,6 +121,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
         onSuccess();
       } catch (err) {
+        if (onUnconfirmed && isEmailNotConfirmed(err)) {
+          onUnconfirmed();
+          return;
+        }
         setError(getApiErrorMessage(err));
       } finally {
         setSubmitting(false);
@@ -145,18 +176,38 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const signUp = useCallback(
-    async ({ email, password, firstName, lastName }: SignUpCredentials, onSuccess: () => void) => {
+    async (
+      { email, password, firstName, lastName }: SignUpCredentials,
+      onSuccess: (result: SignUpResult) => void,
+    ) => {
       setError(null);
       setSubmitting(true);
 
       try {
-        await authService.signUp({
+        const data = await authService.signUp({
           email: email.trim(),
           password,
           first_name: firstName,
           last_name: lastName,
         });
 
+        onSuccess({ confirmationRequired: data.confirmation_required });
+      } catch (err) {
+        setError(getApiErrorMessage(err));
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [],
+  );
+
+  const confirmSignUp = useCallback(
+    async (email: string, code: string, onSuccess: () => void) => {
+      setError(null);
+      setSubmitting(true);
+
+      try {
+        await authService.confirmSignUp(email.trim(), code.trim());
         onSuccess();
       } catch (err) {
         setError(getApiErrorMessage(err));
@@ -166,6 +217,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     },
     [],
   );
+
+  const resendCode = useCallback(async (email: string, onSuccess: () => void) => {
+    setError(null);
+    setSubmitting(true);
+
+    try {
+      await authService.resendCode(email.trim());
+      onSuccess();
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }, []);
 
   const requestPasswordReset = useCallback(
     async (email: string, onSuccess: () => void) => {
@@ -271,6 +336,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         signIn,
         signInWithGoogle,
         signUp,
+        confirmSignUp,
+        resendCode,
         requestPasswordReset,
         updatePassword,
         clearError,

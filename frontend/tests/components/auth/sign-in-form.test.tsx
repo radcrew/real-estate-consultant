@@ -25,8 +25,10 @@ vi.mock("@contexts/auth", () => ({
   useAuth: () => mockAuth,
 }));
 
+const mockPush = vi.fn();
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push: mockPush, refresh: vi.fn() }),
   useSearchParams: () => ({ get: vi.fn().mockReturnValue(null) }),
 }));
 
@@ -65,8 +67,21 @@ describe("SignInForm", () => {
       expect(mockAuth.signIn).toHaveBeenCalledWith(
         { email: "jane@example.com", password: "secret123" },
         expect.any(Function),
+        expect.any(Function),
       );
     });
+  });
+
+  it("sends an unconfirmed account to the verify step", async () => {
+    render(<SignInForm />);
+    await userEvent.type(screen.getByLabelText(/email/i), "jane@example.com");
+    await userEvent.type(screen.getByLabelText(/password/i), "secret123");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    await waitFor(() => expect(mockAuth.signIn).toHaveBeenCalled());
+
+    const onUnconfirmed = vi.mocked(mockAuth.signIn).mock.calls[0][2]!;
+    onUnconfirmed();
+    expect(mockPush).toHaveBeenCalledWith("/sign-up?confirm=jane%40example.com");
   });
 
   it("shows an error alert when context has an error", () => {

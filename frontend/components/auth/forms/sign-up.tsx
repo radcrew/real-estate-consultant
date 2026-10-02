@@ -1,10 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, useCallback, useState } from "react";
 
 import { ButtonPrimary } from "@components/ui/button-primary";
-import { useAuth } from "@contexts/auth";
+import { type SignUpResult, useAuth } from "@contexts/auth";
 
 import { AuthFormError } from "./error";
 import { AuthFormDivider } from "./divider";
@@ -12,9 +12,12 @@ import { EmailField } from "../fields/email";
 import { PasswordField } from "../fields/password";
 import { TextField } from "../fields/text";
 import { GoogleAuthButton } from "./button";
+import { VerifyEmailForm } from "./verify-email";
 
 export const SignUpForm = () => {
   const router = useRouter();
+  // Sign-in sends unconfirmed accounts here as ?confirm=<email>.
+  const [pendingEmail, setPendingEmail] = useState(useSearchParams().get("confirm"));
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -24,10 +27,17 @@ export const SignUpForm = () => {
 
   const { signUp, error: requestError, isSubmitting } = useAuth();
 
-  const handleSuccess = useCallback(() => {
-    router.push("/sign-in?registered=1");
-    router.refresh();
-  }, [router]);
+  const handleSuccess = useCallback(
+    ({ confirmationRequired }: SignUpResult) => {
+      if (confirmationRequired) {
+        setPendingEmail(email.trim());
+        return;
+      }
+      router.push("/sign-in?registered=1");
+      router.refresh();
+    },
+    [router, email],
+  );
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -47,6 +57,10 @@ export const SignUpForm = () => {
 
     await signUp({ email, password, firstName: fn, lastName: ln }, handleSuccess);
   };
+
+  if (pendingEmail) {
+    return <VerifyEmailForm email={pendingEmail} password={password || undefined} />;
+  }
 
   return (
     <div className="flex flex-col gap-5">

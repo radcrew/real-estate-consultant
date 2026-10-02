@@ -13,6 +13,11 @@ const mockAuth: AuthContextValue = {
   signIn: vi.fn(),
   signInWithGoogle: vi.fn(),
   signUp: vi.fn(),
+  confirmSignUp: vi.fn(),
+  resendCode: vi.fn(),
+  requestPasswordReset: vi.fn(),
+  updatePassword: vi.fn(),
+  clearError: vi.fn(),
   signOut: vi.fn(),
   refresh: vi.fn(),
   session: null,
@@ -25,8 +30,12 @@ vi.mock("@contexts/auth", () => ({
   useAuth: () => mockAuth,
 }));
 
+const mockPush = vi.fn();
+let confirmParam: string | null = null;
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push: mockPush, refresh: vi.fn() }),
+  useSearchParams: () => ({ get: (key: string) => (key === "confirm" ? confirmParam : null) }),
 }));
 
 vi.mock("next/image", () => ({
@@ -35,6 +44,8 @@ vi.mock("next/image", () => ({
 
 beforeEach(() => {
   mockAuth.signUp = vi.fn();
+  mockPush.mockReset();
+  confirmParam = null;
   mockAuth.error = null;
   mockAuth.isSubmitting = false;
 });
@@ -148,5 +159,30 @@ describe("SignUpForm", () => {
     mockAuth.isSubmitting = true;
     render(<SignUpForm />);
     expect(screen.getByRole("button", { name: /creating account/i })).toBeDisabled();
+  });
+
+  it("switches to the verify step when Cognito asks for confirmation", async () => {
+    mockAuth.signUp = vi.fn(async (_creds, onSuccess) => onSuccess({ confirmationRequired: true }));
+    render(<SignUpForm />);
+    await fillForm();
+    await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+    expect(await screen.findByLabelText(/verification code/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("jane@example.com");
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("goes to sign-in when no confirmation is needed", async () => {
+    mockAuth.signUp = vi.fn(async (_creds, onSuccess) => onSuccess({ confirmationRequired: false }));
+    render(<SignUpForm />);
+    await fillForm();
+    await userEvent.click(screen.getByRole("button", { name: /create account/i }));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/sign-in?registered=1"));
+  });
+
+  it("opens straight on the verify step for ?confirm=<email>", () => {
+    confirmParam = "jane@example.com";
+    render(<SignUpForm />);
+    expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/first name/i)).not.toBeInTheDocument();
   });
 });

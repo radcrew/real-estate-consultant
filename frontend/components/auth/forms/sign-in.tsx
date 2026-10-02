@@ -30,7 +30,9 @@ export const SignInForm = () => {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    await signIn({ email, password }, handleSuccess);
+    await signIn({ email, password }, handleSuccess, () =>
+      router.push(`/sign-up?confirm=${encodeURIComponent(email.trim())}`),
+    );
   };
 
   return (
