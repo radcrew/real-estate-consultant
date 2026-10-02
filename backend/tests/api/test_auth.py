@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import httpx
 import jwt
@@ -106,15 +106,7 @@ class TestSignUp:
         with patch("app.core.cognito.get_idp_client", return_value=idp):
             yield idp
 
-    @pytest.fixture
-    def upsert(self):
-        with patch(
-            "app.api.v1.endpoints.auth.sign_up.upsert_profile_patch",
-            new_callable=AsyncMock,
-        ) as mock:
-            yield mock
-
-    async def test_success_returns_201_and_needs_confirmation(self, client, idp, upsert):
+    async def test_success_returns_201_and_needs_confirmation(self, client, idp):
         r = await client.post("/api/v1/auth/sign-up", json=_SIGN_UP)
         assert r.status_code == 201
         assert r.json() == {
@@ -123,7 +115,7 @@ class TestSignUp:
             "confirmation_required": True,
         }
 
-    async def test_sends_names_as_cognito_attributes(self, client, idp, upsert):
+    async def test_sends_names_as_cognito_attributes(self, client, idp):
         await client.post("/api/v1/auth/sign-up", json=_SIGN_UP)
         kwargs = idp.sign_up.call_args.kwargs
         assert kwargs["Username"] == "new@example.com"
@@ -131,20 +123,12 @@ class TestSignUp:
         assert {"Name": "family_name", "Value": "Smith"} in kwargs["UserAttributes"]
         assert kwargs["SecretHash"]
 
-    async def test_profile_row_is_keyed_by_cognito_sub(self, client, idp, upsert):
-        await client.post("/api/v1/auth/sign-up", json=_SIGN_UP)
-        user_id, patch_body = upsert.call_args.args[1:]
-        assert str(user_id) == _NEW_SUB
-        assert patch_body.first_name == "Alice"
-        assert patch_body.email == "new@example.com"
-
-    async def test_email_already_exists_returns_409(self, client, idp, upsert):
+    async def test_email_already_exists_returns_409(self, client, idp):
         idp.sign_up.side_effect = _client_error("UsernameExistsException", "exists")
         r = await client.post("/api/v1/auth/sign-up", json=_SIGN_UP)
         assert r.status_code == 409
-        upsert.assert_not_called()
 
-    async def test_weak_password_returns_422_with_cognito_message(self, client, idp, upsert):
+    async def test_weak_password_returns_422_with_cognito_message(self, client, idp):
         idp.sign_up.side_effect = _client_error(
             "InvalidPasswordException", "Password must have uppercase characters"
         )
@@ -152,12 +136,12 @@ class TestSignUp:
         assert r.status_code == 422
         assert "uppercase" in r.json()["detail"]
 
-    async def test_throttled_returns_429(self, client, idp, upsert):
+    async def test_throttled_returns_429(self, client, idp):
         idp.sign_up.side_effect = _client_error("TooManyRequestsException", "slow down")
         r = await client.post("/api/v1/auth/sign-up", json=_SIGN_UP)
         assert r.status_code == 429
 
-    async def test_unreachable_cognito_returns_503(self, client, idp, upsert):
+    async def test_unreachable_cognito_returns_503(self, client, idp):
         idp.sign_up.side_effect = EndpointConnectionError(endpoint_url="https://cognito-idp")
         r = await client.post("/api/v1/auth/sign-up", json=_SIGN_UP)
         assert r.status_code == 503
@@ -405,22 +389,7 @@ class TestOAuthExchange:
         ):
             yield id_mock
 
-    @pytest.fixture
-    def profiles(self):
-        with (
-            patch(
-                "app.api.v1.endpoints.auth.oauth.get_profile_row",
-                new_callable=AsyncMock,
-                return_value=None,
-            ) as get_row,
-            patch(
-                "app.api.v1.endpoints.auth.oauth.upsert_profile_patch",
-                new_callable=AsyncMock,
-            ) as upsert,
-        ):
-            yield SimpleNamespace(get_row=get_row, upsert=upsert)
-
-    async def test_returns_session_for_the_google_user(self, client, token_endpoint, profiles):
+    async def test_returns_session_for_the_google_user(self, client, token_endpoint):
         r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
         assert r.status_code == 200
         body = r.json()
@@ -432,9 +401,7 @@ class TestOAuthExchange:
             "username": "google_1234",
         }
 
-    async def test_posts_code_to_the_token_endpoint_with_client_auth(
-        self, client, token_endpoint, profiles
-    ):
+    async def test_posts_code_to_the_token_endpoint_with_client_auth(self, client, token_endpoint):
         await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
         (request,) = token_endpoint["requests"]
         assert str(request.url) == "https://radestate.auth.us-east-1.amazoncognito.com/oauth2/token"
@@ -444,47 +411,22 @@ class TestOAuthExchange:
         assert form["code"] == "auth-code"
         assert form["redirect_uri"] == "http://localhost:3000/auth/callback"
 
-    async def test_new_profile_takes_names_from_google(self, client, token_endpoint, profiles):
-        await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
-        user_id, patch_body = profiles.upsert.call_args.args[1:]
-        assert str(user_id) == self._GOOGLE_SUB
-        assert (patch_body.email, patch_body.first_name, patch_body.last_name) == (
-            "g@example.com",
-            "Grace",
-            "Hopper",
-        )
-
-    async def test_existing_names_are_kept(self, client, token_endpoint, profiles):
-        profiles.get_row.return_value = {"first_name": "Amazing", "last_name": "Grace"}
-        await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
-        patch_body = profiles.upsert.call_args.args[2]
-        assert (patch_body.first_name, patch_body.last_name) == ("Amazing", "Grace")
-
-    async def test_profile_failure_does_not_block_sign_in(self, client, token_endpoint, profiles):
-        from app.core.db_safe import SupabaseRequestError
-
-        profiles.upsert.side_effect = SupabaseRequestError("down")
-        r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
-        assert r.status_code == 200
-
-    async def test_rejected_code_returns_400(self, client, token_endpoint, profiles):
+    async def test_rejected_code_returns_400(self, client, token_endpoint):
         token_endpoint["status"] = 400
         token_endpoint["json"] = {"error": "invalid_grant"}
         r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
         assert r.status_code == 400
         assert "Google sign-in" in r.json()["detail"]
-        profiles.upsert.assert_not_called()
 
-    async def test_token_endpoint_outage_returns_503(self, client, token_endpoint, profiles):
+    async def test_token_endpoint_outage_returns_503(self, client, token_endpoint):
         token_endpoint["status"] = 502
         r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
         assert r.status_code == 503
 
-    async def test_invalid_id_token_returns_400(self, client, token_endpoint, profiles, verify):
+    async def test_invalid_id_token_returns_400(self, client, token_endpoint, verify):
         verify.side_effect = jwt.InvalidAudienceError("aud")
         r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
         assert r.status_code == 400
-        profiles.upsert.assert_not_called()
 
 
 class TestSignOut:

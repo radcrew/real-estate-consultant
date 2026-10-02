@@ -90,7 +90,8 @@ async def update_account_profile(
 
     new_email = updates.pop("email", None)
     email_change_pending = False
-    if new_email is not None and str(new_email) != current_user.email:
+    stored = await get_profile_row(client, UUID(current_user.id)) if new_email else None
+    if new_email is not None and str(new_email) != (stored or {}).get("email"):
         if (current_user.username or "").startswith("google_"):
             raise_account_email_managed_by_google()
         access_token = session_access_token(current_user, credentials)

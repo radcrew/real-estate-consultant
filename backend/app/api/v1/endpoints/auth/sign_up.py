@@ -1,5 +1,3 @@
-from uuid import UUID
-
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, status
 
@@ -11,9 +9,6 @@ from app.api.v1.endpoints.auth.exceptions import (
 )
 from app.core.cognito import call_idp, secret_hash
 from app.core.config import settings
-from app.core.deps import SupabaseSdkDep
-from app.repositories.profiles import upsert_profile_patch
-from app.schemas.account import AccountProfileUpdate
 from app.schemas.auth import SignUpRequest, SignUpResponse
 from app.utils.exceptions import raise_bad_request
 
@@ -21,7 +16,7 @@ router = APIRouter()
 
 
 @router.post("/sign-up", status_code=status.HTTP_201_CREATED)
-async def sign_up(body: SignUpRequest, client: SupabaseSdkDep) -> SignUpResponse:
+async def sign_up(body: SignUpRequest) -> SignUpResponse:
     first_name = body.first_name.strip()
     last_name = body.last_name.strip()
     if not first_name or not last_name:
@@ -50,14 +45,9 @@ async def sign_up(body: SignUpRequest, client: SupabaseSdkDep) -> SignUpResponse
     except BotoCoreError as exc:
         raise_sign_in_transport_unavailable(cause=exc)
 
-    user_id = result["UserSub"]
-    await upsert_profile_patch(
-        client,
-        UUID(user_id),
-        AccountProfileUpdate(email=email, first_name=first_name, last_name=last_name),
-    )
+    # Names are kept as Cognito attributes; auth does not write public.profiles.
     return SignUpResponse(
-        id=user_id,
+        id=result["UserSub"],
         email=email,
         confirmation_required=not result["UserConfirmed"],
     )

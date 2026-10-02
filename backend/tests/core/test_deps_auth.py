@@ -1,5 +1,6 @@
-"""Auth in ``app.core.deps``: Cognito bearer tokens, MCP API keys, and the profile lookup.
+"""Auth in ``app.core.deps``: Cognito bearer tokens and MCP API keys.
 
+Identity comes from the token or key alone; auth never reads ``public.profiles``.
 Calls the dependencies directly so these run without building the FastAPI app.
 """
 
@@ -14,7 +15,6 @@ from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.core import deps
-from app.core.db_safe import SupabaseRequestError
 from app.models.auth_user import AuthUser
 from app.repositories.mcp_api_keys import ResolvedMcpApiKey
 
@@ -34,52 +34,50 @@ def _bearer(token: str = "access-token") -> HTTPAuthorizationCredentials:
 
 @pytest.fixture
 def verify():
-    with patch.object(deps, "verify_access_token", return_value={"sub": _SUB}) as mock:
+    claims = {"sub": _SUB, "username": "google_123"}
+    with patch.object(deps, "verify_access_token", return_value=claims) as mock:
         yield mock
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def profile_row():
+    """Auth must not read profiles; any call is a failure."""
     with patch.object(deps, "get_profile_row", new_callable=AsyncMock) as mock:
-        mock.return_value = {"id": _SUB, "email": "user@example.com", "phone": "+15550001234"}
         yield mock
 
 
-@pytest.mark.parametrize("dependency", [deps.get_current_user, deps.get_current_user_jwt])
+async def _current_user(*args):
+    return await deps.get_current_user(*args, MagicMock())
+
+
+async def _current_user_jwt(*args):
+    return await deps.get_current_user_jwt(*args)
+
+
+@pytest.mark.parametrize("dependency", [_current_user, _current_user_jwt])
 class TestBearerAuth:
-    async def test_valid_token_returns_profile_backed_user(self, dependency, verify, profile_row):
-        user = await dependency(_request(), _bearer(), MagicMock())
-        assert user == AuthUser(id=_SUB, email="user@example.com", phone="+15550001234")
+    async def test_valid_token_returns_the_token_user(self, dependency, verify, profile_row):
+        user = await dependency(_request(), _bearer())
+        assert user == AuthUser(id=_SUB, username="google_123")
         verify.assert_called_once_with("access-token")
-
-    async def test_user_without_profile_row_has_no_email(self, dependency, verify, profile_row):
-        profile_row.return_value = None
-        user = await dependency(_request(), _bearer(), MagicMock())
-        assert user == AuthUser(id=_SUB)
-
-    async def test_invalid_token_is_401(self, dependency, verify, profile_row):
-        verify.side_effect = jwt.ExpiredSignatureError("Signature has expired")
-        with pytest.raises(HTTPException) as info:
-            await dependency(_request(), _bearer(), MagicMock())
-        assert info.value.status_code == 401
         profile_row.assert_not_called()
 
-    async def test_unreachable_jwks_is_503_not_401(self, dependency, verify, profile_row):
+    async def test_invalid_token_is_401(self, dependency, verify):
+        verify.side_effect = jwt.ExpiredSignatureError("Signature has expired")
+        with pytest.raises(HTTPException) as info:
+            await dependency(_request(), _bearer())
+        assert info.value.status_code == 401
+
+    async def test_unreachable_jwks_is_503_not_401(self, dependency, verify):
         """A Cognito outage must not look like a bad token, or clients sign users out."""
         verify.side_effect = jwt.PyJWKClientConnectionError("timed out")
         with pytest.raises(HTTPException) as info:
-            await dependency(_request(), _bearer(), MagicMock())
+            await dependency(_request(), _bearer())
         assert info.value.status_code == 503
 
-    async def test_profile_store_down_is_503(self, dependency, verify, profile_row):
-        profile_row.side_effect = SupabaseRequestError("down")
+    async def test_missing_bearer_is_401(self, dependency, verify):
         with pytest.raises(HTTPException) as info:
-            await dependency(_request(), _bearer(), MagicMock())
-        assert info.value.status_code == 503
-
-    async def test_missing_bearer_is_401(self, dependency, verify, profile_row):
-        with pytest.raises(HTTPException) as info:
-            await dependency(_request(), None, MagicMock())
+            await dependency(_request(), None)
         assert info.value.status_code == 401
         verify.assert_not_called()
 
@@ -95,16 +93,16 @@ class TestApiKeyAuth:
         ) as mock:
             yield mock
 
-    async def test_key_user_comes_from_the_profile_row(self, resolve, verify, profile_row):
+    async def test_key_user_is_the_key_owner(self, resolve, verify, profile_row):
         request = _request({"X-API-Key": "rad_abcdefghijklmnop"})
         user = await deps.get_current_user(request, None, MagicMock())
-        assert user == AuthUser(id=_SUB, email="user@example.com", phone="+15550001234")
+        assert user == AuthUser(id=_SUB)
         verify.assert_not_called()
+        profile_row.assert_not_called()
 
-    async def test_unknown_key_is_401(self, resolve, verify, profile_row):
+    async def test_unknown_key_is_401(self, resolve):
         resolve.return_value = None
         request = _request({"X-API-Key": "rad_abcdefghijklmnop"})
         with pytest.raises(HTTPException) as info:
             await deps.get_current_user(request, None, MagicMock())
         assert info.value.status_code == 401
-        profile_row.assert_not_called()

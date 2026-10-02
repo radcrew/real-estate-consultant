@@ -5,9 +5,7 @@ from its ``/auth/callback`` route handler, because only the backend holds the cl
 """
 
 import asyncio
-import logging
 from typing import Any
-from uuid import UUID
 
 import httpx
 import jwt
@@ -20,15 +18,9 @@ from app.api.v1.endpoints.auth.exceptions import (
 from app.api.v1.endpoints.auth.sign_in import session_response
 from app.core.cognito import verify_id_token
 from app.core.config import settings
-from app.core.db_safe import SupabaseRequestError
-from app.core.deps import SupabaseSdkDep
-from app.repositories.profiles import get_profile_row, upsert_profile_patch
-from app.schemas.account import AccountProfileUpdate
 from app.schemas.auth import OAuthExchangeRequest, SignInResponse
-from supabase import AsyncClient
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 _TOKEN_TIMEOUT = httpx.Timeout(10.0)
 
@@ -56,37 +48,14 @@ async def _exchange_code(code: str, redirect_uri: str) -> dict[str, Any]:
     return r.json()
 
 
-async def _sync_profile(client: AsyncClient, claims: dict[str, Any]) -> None:
-    """Always take the email from Google; fill names only where the user has none.
-
-    A failed write is logged, not raised: the profile is display data and must not
-    block sign-in.
-    """
-    user_id = UUID(claims["sub"])
-    try:
-        existing = await get_profile_row(client, user_id) or {}
-        await upsert_profile_patch(
-            client,
-            user_id,
-            AccountProfileUpdate(
-                email=claims.get("email"),
-                first_name=existing.get("first_name") or claims.get("given_name"),
-                last_name=existing.get("last_name") or claims.get("family_name"),
-            ),
-        )
-    except SupabaseRequestError as exc:
-        logger.error("Profile sync after Google sign-in failed for %s: %s", user_id, exc)
-
-
 @router.post("/oauth/exchange")
-async def oauth_exchange(body: OAuthExchangeRequest, client: SupabaseSdkDep) -> SignInResponse:
+async def oauth_exchange(body: OAuthExchangeRequest) -> SignInResponse:
     tokens = await _exchange_code(body.code, body.redirect_uri)
     try:
         claims = await asyncio.to_thread(verify_id_token, tokens["id_token"])
     except jwt.PyJWTError as exc:
         raise_oauth_code_rejected(cause=exc)
 
-    await _sync_profile(client, claims)
     auth = {
         "AccessToken": tokens["access_token"],
         "IdToken": tokens["id_token"],
