@@ -2,7 +2,7 @@
 
 Internal MVP for an **AI-assisted commercial real estate search** workflow: intake, lawful listing ingestion, property understanding, fit-based ranking, saved searches and watchlists, and **draft** broker outreach (no auto-send).
 
-The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with chat LLMs routed through **OpenRouter** and/or **Hugging Face** on the backend. Details are in [Stack](#stack) below.
+The app is built with **Next.js** and **FastAPI**, backed by **Supabase** for data and **AWS Cognito** for sign-in, with chat LLMs routed through **OpenRouter** and/or **Hugging Face** on the backend. Details are in [Stack](#stack) below.
 
 ---
 
@@ -12,7 +12,8 @@ The app is built with **Next.js** and **FastAPI**, backed by **Supabase**, with 
 |-------|------------|---------|
 | **Frontend** | [Next.js](https://nextjs.org/) | Product UI, intake, results, watchlists; server components and Route Handlers as appropriate |
 | **Backend** | [FastAPI](https://fastapi.tiangolo.com/) | APIs, modular listing ingestion, normalization, and orchestration of model calls |
-| **Data & platform** | [Supabase](https://supabase.com/) | Postgres, authentication, and other Supabase features (e.g. Storage) as the project needs them |
+| **Data & platform** | [Supabase](https://supabase.com/) | Postgres and Storage |
+| **Auth** | [AWS Cognito](https://aws.amazon.com/cognito/) | Email/password and Google sign-in. The backend talks to Cognito; the frontend only redirects to the Hosted UI for Google |
 | **LLM** | [OpenRouter](https://openrouter.ai/) and/or [Hugging Face](https://huggingface.co/) | Structured chat for intake, fit summaries, and outreach drafts (`OPENROUTER_API_KEY` preferred when both keys are set) |
 | **LLM (optional)** | [AWS Bedrock](https://aws.amazon.com/bedrock/) + Lambda | Per-call-site routing to Bedrock (embeddings, outreach) or a self-hosted Qwen on Lambda (intake parse). Off unless configured — see below |
 
@@ -45,11 +46,8 @@ Production deploys use **[Vercel](https://vercel.com)** via `.github/workflows/f
    - `VERCEL_ORG_ID`, `VERCEL_FRONTEND_PROJECT_ID` — from the linked frontend project settings
 3. In the Vercel project (or GitHub secrets for CI builds), set env vars from `frontend/.env.example`:
    - `NEXT_PUBLIC_BACKEND_API_URL` — public URL of the FastAPI backend
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. In **Supabase → Authentication → URL configuration**, add redirect URLs:
-   - `https://<your-project>.vercel.app/auth/callback`
-   - Preview URLs if you test OAuth on PR deployments.
+   - `COGNITO_DOMAIN`, `COGNITO_CLIENT_ID`: Hosted UI base URL and app client id, read by the `/auth/google` route handler. Server-only: no `NEXT_PUBLIC_` prefix. The client secret lives on the backend only.
+4. In the **Cognito app client**, add `https://<your-project>.vercel.app/auth/callback` and `http://localhost:3000/auth/callback` as callback URLs, and the same origins with `/` as sign-out URLs. Cognito does not accept wildcards, so Google sign-in does not work on PR preview URLs; email/password sign-in does.
 
 **URLs:** Production is `https://<project-name>.vercel.app` (shown in the workflow deploy step and Vercel dashboard). Pull requests get their own preview URL, posted to the workflow run summary.
 

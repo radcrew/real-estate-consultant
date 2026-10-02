@@ -112,16 +112,14 @@ Path aliases live in `frontend/tsconfig.json` and are resolved by Vitest through
 
 `components/` is organised by feature (`account`, `admin`, `agents`, `auth`, `blog`, `contact`, `landing`, `listings`, `list-property`, `property`, `saved`, `search`) plus a shared `ui/`.
 
-### Two auth systems in one app
+### Auth: AWS Cognito, through the backend
 
-The most common way to get lost in this codebase. Sign-in is split:
+Users live in a Cognito user pool, not Supabase Auth. Every auth call goes through FastAPI `/api/v1/auth/*` (`sign-up`, `confirm`, `resend-code`, `sign-in`, `refresh`, `forgot-password`, `reset-password`, `oauth/exchange`, `sign-out`), which holds the app client secret. `backend/app/core/cognito.py` verifies tokens against the pool's JWKS; `profiles.id` and every `user_id` column hold the Cognito `sub`.
 
-- **Email and password** goes to the FastAPI backend: `services/auth.ts` → `POST /api/v1/auth/sign-in`, and the error surfaces through `getApiErrorMessage`.
-- **Google OAuth, password reset and password update** go to Supabase directly, via `lib/supabase-browser.ts` (browser, PKCE, cookie-backed) and `lib/supabase-server.ts` (the `/auth/callback` Route Handler).
-
-`lib/auth-session.ts` owns the app's own session under the key `radestate.session`, held in `sessionStorage` **and** mirrored to a cookie so a server render can read it. `contexts/auth.tsx` wraps both systems behind one `useAuth()`.
-
-Consequence: a sign-in bug can live in either system, and the same user-facing string can come from either. When tracing one, find which system produces the message before reading any code. `apiClient` also redirects to `/sign-in?next=…` on any 401, so an unrelated failing request can look like an auth bug.
+- **Google** is the one browser redirect: `app/(auth)/auth/google/route.ts` sets a state cookie and sends the user to the Cognito Hosted UI; `app/(auth)/auth/callback/route.ts` checks the state and calls `/auth/oauth/exchange`. Google users have usernames starting `google_` and cannot change their password or email.
+- **Session**: `lib/auth-session.ts` owns `radestate.session`, held in `sessionStorage` **and** mirrored to a cookie. Cognito tokens are large, so the ID token is deliberately not stored: the cookie must stay under ~4 KB.
+- **401s**: `apiClient` tries `/auth/refresh` once (needs `user.username` in the session), then redirects to `/sign-in?next=…`. An unrelated failing request can still look like an auth bug.
+- **Config**: backend needs the five `COGNITO_*` settings; the frontend needs `COGNITO_DOMAIN` and `COGNITO_CLIENT_ID` server-side for the Google redirect.
 
 ### Theme and the Voyager palette
 
