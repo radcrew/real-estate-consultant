@@ -23,7 +23,6 @@ import {
   type StoredSession,
 } from "@lib/auth-session";
 import { OAUTH_START_PATH } from "@config/env";
-import { getSupabaseBrowserClient } from "@lib/supabase-browser";
 import { authService } from "@services/auth";
 import { accountService } from "@services/account";
 
@@ -37,6 +36,13 @@ export type SignUpCredentials = {
   password: string;
   firstName: string;
   lastName: string;
+};
+
+export type ResetPasswordValues = {
+  email: string;
+  // The code emailed by requestPasswordReset.
+  code: string;
+  password: string;
 };
 
 export type SignUpResult = {
@@ -62,7 +68,7 @@ export type AuthContextValue = {
   confirmSignUp: (email: string, code: string, onSuccess: () => void) => Promise<void>;
   resendCode: (email: string, onSuccess: () => void) => Promise<void>;
   requestPasswordReset: (email: string, onSuccess: () => void) => Promise<void>;
-  updatePassword: (password: string, onSuccess: () => void) => Promise<void>;
+  resetPassword: (values: ResetPasswordValues, onSuccess: () => void) => Promise<void>;
   clearError: () => void;
   error: string | null;
   isSubmitting: boolean;
@@ -213,22 +219,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setSubmitting(true);
 
       try {
-        const supabase = getSupabaseBrowserClient();
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-          email.trim(),
-          { redirectTo: `${window.location.origin}/reset-password` },
-        );
-
-        if (resetError) {
-          console.error("[auth] password reset request failed:", resetError.message);
-          setError("Could not send the reset email. Please try again.");
-          return;
-        }
-
+        // The backend answers the same whether or not the account exists.
+        await authService.forgotPassword(email.trim());
         onSuccess();
       } catch (err) {
-        console.error("[auth] password reset request failed:", err);
-        setError("Could not send the reset email. Please try again.");
+        setError(getApiErrorMessage(err));
       } finally {
         setSubmitting(false);
       }
@@ -236,27 +231,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     [],
   );
 
-  const updatePassword = useCallback(
-    async (password: string, onSuccess: () => void) => {
+  const resetPassword = useCallback(
+    async ({ email, code, password }: ResetPasswordValues, onSuccess: () => void) => {
       setError(null);
       setSubmitting(true);
 
       try {
-        const supabase = getSupabaseBrowserClient();
-        const { error: updateError } = await supabase.auth.updateUser({ password });
-
-        if (updateError) {
-          setError(
-            updateError.message ||
-              "Could not update your password. Your reset link may have expired.",
-          );
-          return;
-        }
-
+        await authService.resetPassword({ email: email.trim(), code: code.trim(), password });
         onSuccess();
       } catch (err) {
-        console.error("[auth] password update failed:", err);
-        setError("Could not update your password. Please try again.");
+        setError(getApiErrorMessage(err));
       } finally {
         setSubmitting(false);
       }
@@ -314,7 +298,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         confirmSignUp,
         resendCode,
         requestPasswordReset,
-        updatePassword,
+        resetPassword,
         clearError,
         signOut,
         refresh,

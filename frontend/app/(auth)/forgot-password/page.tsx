@@ -14,7 +14,7 @@ const ForgotPasswordPage = () => (
   <div className="flex flex-col gap-6">
     <AuthPageTitle
       title="Forgot password?"
-      description="Enter the email for your account and we'll send you a link to reset your password."
+      description="Enter the email for your account and we'll send you a code to reset your password."
     />
 
     <Suspense fallback={null}>

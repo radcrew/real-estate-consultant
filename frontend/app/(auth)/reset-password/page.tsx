@@ -14,7 +14,7 @@ const ResetPasswordPage = () => (
   <div className="flex flex-col gap-6">
     <AuthPageTitle
       title="Set a new password"
-      description="Choose a new password for your RadEstate account."
+      description="Enter the code we emailed you and choose a new password."
     />
 
     <Suspense fallback={null}>

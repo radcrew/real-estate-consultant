@@ -12,7 +12,7 @@ const mockAuth: AuthContextValue = {
   confirmSignUp: vi.fn(),
   resendCode: vi.fn(),
   requestPasswordReset: vi.fn(),
-  updatePassword: vi.fn(),
+  resetPassword: vi.fn(),
   clearError: vi.fn(),
   signOut: vi.fn(),
   refresh: vi.fn(),
