@@ -1,6 +1,7 @@
 import type { AxiosInstance } from "axios";
 import { describe, expect, it, vi } from "vitest";
-import { AuthService, toStoredSession } from "@services/auth";
+import { toStoredSession } from "@lib/auth-session";
+import { AuthService } from "@services/auth";
 import type { SignInResponse, SignUpResponse } from "@services/auth";
 
 const makeHttp = (data: unknown) =>

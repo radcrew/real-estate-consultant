@@ -18,11 +18,12 @@ import {
   clearSession,
   readSession,
   saveSession,
+  toStoredSession,
   type StoredSession,
 } from "@lib/auth-session";
 import { OAUTH_CALLBACK_PATH } from "@config/env";
 import { getSupabaseBrowserClient } from "@lib/supabase-browser";
-import { authService, toStoredSession } from "@services/auth";
+import { authService } from "@services/auth";
 import { accountService } from "@services/account";
 
 export type AuthCredentials = {

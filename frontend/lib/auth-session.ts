@@ -1,3 +1,5 @@
+import type { SignInResponse } from "@services/auth";
+
 const STORAGE_KEY = "radestate.session";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
@@ -102,3 +104,25 @@ export const readSession = (): StoredSession | null => {
     return null;
   }
 };
+
+/**
+ * Map a sign-in, refresh or Google exchange response to the stored session.
+ *
+ * The ID token is left out on purpose: the session is mirrored to a cookie, and Cognito's
+ * three tokens together exceed the ~4 KB browser cookie limit. Nothing reads it.
+ */
+export const toStoredSession = (
+  data: SignInResponse,
+  previous?: StoredSession | null,
+): StoredSession => ({
+  accessToken: data.access_token,
+  refreshToken: data.refresh_token,
+  expiresIn: data.expires_in,
+  tokenType: data.token_type,
+  user: {
+    id: data.user.id,
+    email: data.user.email,
+    username: data.user.username,
+    avatarUrl: previous?.user.avatarUrl,
+  },
+});
