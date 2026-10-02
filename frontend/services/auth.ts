@@ -74,8 +74,11 @@ export class AuthService {
     await this.http.post("/auth/reset-password", body);
   }
 
-  async signOut(): Promise<void> {
-    await this.http.post("/auth/sign-out");
+  /** Takes the token explicitly: the caller clears the session before this request runs. */
+  async signOut(accessToken: string): Promise<void> {
+    await this.http.post("/auth/sign-out", undefined, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
   }
 }
 

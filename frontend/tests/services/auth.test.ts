@@ -88,10 +88,12 @@ describe("AuthService", () => {
     expect(http.post).toHaveBeenCalledWith("/auth/reset-password", body);
   });
 
-  it("signOut posts to /auth/sign-out", async () => {
+  it("signOut posts to /auth/sign-out with the given token", async () => {
     const http = makeHttp(undefined);
-    await new AuthService(http).signOut();
-    expect(http.post).toHaveBeenCalledWith("/auth/sign-out");
+    await new AuthService(http).signOut("tok");
+    expect(http.post).toHaveBeenCalledWith("/auth/sign-out", undefined, {
+      headers: { Authorization: "Bearer tok" },
+    });
   });
 });
 

@@ -253,6 +253,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const signInWithGoogle = useCallback(() => startGoogleOAuth(), [startGoogleOAuth]);
 
   const signOut = useCallback(() => {
+    // Revoke the Cognito tokens in the background; the local session goes either way.
+    const accessToken = readSession()?.accessToken;
+    if (accessToken) {
+      authService.signOut(accessToken).catch((err) => {
+        console.warn("[auth] token revocation failed:", err);
+      });
+    }
     clearSession();
   }, []);
 
