@@ -25,4 +25,5 @@ export const GOOGLE_MAPS_API_KEY =
 export const WEB3FORMS_ACCESS_KEY =
   process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY?.trim() ?? "";
 
+export const OAUTH_START_PATH = "/auth/google";
 export const OAUTH_CALLBACK_PATH = "/auth/callback";

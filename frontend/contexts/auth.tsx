@@ -22,7 +22,7 @@ import {
   toStoredSession,
   type StoredSession,
 } from "@lib/auth-session";
-import { OAUTH_CALLBACK_PATH } from "@config/env";
+import { OAUTH_START_PATH } from "@config/env";
 import { getSupabaseBrowserClient } from "@lib/supabase-browser";
 import { authService } from "@services/auth";
 import { accountService } from "@services/account";
@@ -142,37 +142,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setError(null);
     setSubmitting(true);
 
-    try {
-      const supabase = getSupabaseBrowserClient();
-      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}${OAUTH_CALLBACK_PATH}`,
-        },
-      });
-
-      if (oauthError) {
-        console.error("[auth] Google sign-in failed:", oauthError.message);
-        setError("Could not start Google sign-in. Please try again.");
-        setSubmitting(false);
-        googleOAuthInFlightRef.current = false;
-        return;
-      }
-
-      if (data.url) {
-        window.location.assign(data.url);
-        return;
-      }
-
-      setError("Could not start Google sign-in. Please try again.");
-      setSubmitting(false);
-      googleOAuthInFlightRef.current = false;
-    } catch (err) {
-      console.error("[auth] Google sign-in failed:", err);
-      setError("Could not start Google sign-in. Please try again.");
-      setSubmitting(false);
-      googleOAuthInFlightRef.current = false;
-    }
+    // The route handler sets the state cookie and redirects to Cognito's Hosted UI.
+    const next = new URLSearchParams(window.location.search).get("next");
+    const target = next
+      ? `${OAUTH_START_PATH}?next=${encodeURIComponent(next)}`
+      : OAUTH_START_PATH;
+    window.location.assign(target);
   }, []);
 
   const signUp = useCallback(
