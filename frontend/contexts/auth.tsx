@@ -22,7 +22,7 @@ import {
 } from "@lib/auth-session";
 import { OAUTH_CALLBACK_PATH } from "@config/env";
 import { getSupabaseBrowserClient } from "@lib/supabase-browser";
-import { authService } from "@services/auth";
+import { authService, toStoredSession } from "@services/auth";
 import { accountService } from "@services/account";
 
 export type AuthCredentials = {
@@ -73,24 +73,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setSubmitting(true);
 
       try {
-        const {
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          expires_in: expiresIn,
-          token_type: tokenType,
-          user,
-        } = await authService.signIn({
+        const data = await authService.signIn({
           email: email.trim(),
           password,
         });
 
-        saveSession({
-          accessToken,
-          refreshToken,
-          expiresIn,
-          tokenType,
-          user,
-        });
+        saveSession(toStoredSession(data));
 
         // Fetch the profile in the background to populate avatarUrl in the
         // session — don't block sign-in if this fails.

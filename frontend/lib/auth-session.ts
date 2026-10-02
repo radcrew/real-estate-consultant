@@ -18,6 +18,8 @@ export type StoredSession = {
   user: {
     id: string;
     email: string | null;
+    // Cognito user name, needed to refresh. Absent on sessions saved before Cognito.
+    username?: string;
     avatarUrl?: string | null;
   };
 };
