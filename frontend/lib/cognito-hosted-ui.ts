@@ -7,8 +7,11 @@
 export const OAUTH_STATE_COOKIE = "radestate.oauth_state";
 export const OAUTH_STATE_MAX_AGE_SECONDS = 300;
 
-// aws.cognito.signin.user.admin lets the access token call GlobalSignOut on sign-out.
-const SCOPES = "openid email profile aws.cognito.signin.user.admin";
+// Must be a subset of the app client's allowed OpenID Connect scopes, or Cognito rejects
+// the whole request (invalid_scope). aws.cognito.signin.user.admin is left out until the
+// client allows it: without it, sign-out cannot revoke a Google user's tokens server-side
+// (/auth/sign-out treats that refusal as signed out) and they simply expire.
+const SCOPES = "openid email profile";
 
 export type OAuthState = {
   state: string;

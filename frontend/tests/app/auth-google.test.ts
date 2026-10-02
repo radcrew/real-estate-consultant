@@ -33,13 +33,11 @@ describe("google sign-in start route", () => {
     });
   });
 
-  it("asks for the scope that lets sign-out revoke Google users' tokens", () => {
+  it("asks only for scopes the app client allows", () => {
     const res = GET(new Request(START));
     const scope = new URL(res.headers.get("location") ?? "").searchParams.get("scope");
 
-    expect(scope?.split(" ")).toEqual(
-      expect.arrayContaining(["openid", "email", "profile", "aws.cognito.signin.user.admin"]),
-    );
+    expect(scope).toBe("openid email profile");
   });
 
   it("stores the same state it sends, in an HttpOnly cookie scoped to the callback", () => {
