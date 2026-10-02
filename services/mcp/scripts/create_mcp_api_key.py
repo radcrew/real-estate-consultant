@@ -1,6 +1,6 @@
 """Create an MCP API key (local or production backend).
 
-Signs in as the local MCP bootstrap user (or uses --access-token), then
+Signs in as the local MCP user (see scripts/backend_auth.py), or uses --access-token, then
 POST /api/v1/account/api-keys. Never commits the key.
 
 Examples:
@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 import httpx
+from backend_auth import local_credentials, obtain_access_token
 
 SVC_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = SVC_ROOT.parents[1]
@@ -27,8 +28,6 @@ ENV_EXAMPLE = SVC_ROOT / ".env.example"
 BACKEND_ENV = REPO_ROOT / "backend" / ".env"
 
 DEFAULT_BACKEND = "http://127.0.0.1:8888"
-EMAIL = "mcp.local@radestate.dev"
-PASSWORD = "McpLocalPass123!"
 
 
 def load_dotenv(path: Path) -> dict[str, str]:
@@ -73,25 +72,6 @@ def backend_reachable(base: str) -> bool:
     return response.status_code == 200
 
 
-def obtain_user_jwt(api_base: str) -> str | None:
-    """Sign in (and sign up if needed) via backend auth."""
-    with httpx.Client(base_url=api_base, timeout=30.0, trust_env=False) as client:
-        client.post(
-            "/auth/sign-up",
-            json={
-                "email": EMAIL,
-                "password": PASSWORD,
-                "first_name": "MCP",
-                "last_name": "Local",
-            },
-        )
-        si = client.post("/auth/sign-in", json={"email": EMAIL, "password": PASSWORD})
-        if si.status_code != 200:
-            print(f"sign-in failed status={si.status_code} body={si.text[:300]}")
-            return None
-        return si.json()["access_token"]
-
-
 def create_api_key(api_base: str, jwt: str, *, name: str) -> dict:
     with httpx.Client(base_url=api_base, timeout=30.0, trust_env=False) as client:
         response = client.post(
@@ -116,7 +96,12 @@ def main() -> int:
     parser.add_argument(
         "--access-token",
         default="",
-        help="Optional existing user JWT (skip email/password sign-in).",
+        help="Optional existing Cognito access token (skip email/password sign-in).",
+    )
+    parser.add_argument(
+        "--email",
+        default="",
+        help="Account to sign in as (default: MCP_LOCAL_EMAIL, then the local bootstrap user).",
     )
     parser.add_argument(
         "--print-only",
@@ -145,12 +130,13 @@ def main() -> int:
 
     jwt = (args.access_token or "").strip()
     if not jwt:
-        print(f"signing in as {EMAIL} @ {backend} …")
-        jwt = obtain_user_jwt(api_base)
+        email, password = local_credentials(args.email or None)
+        print(f"signing in as {email} @ {backend} …")
+        jwt = obtain_access_token(api_base, email, password)
         if not jwt:
             print(
-                "Tip: for production, pass a user JWT from the app: "
-                "--access-token <supabase_user_jwt>",
+                "Tip: for production, pass the accessToken from your app session: "
+                "--access-token <cognito_access_token>",
             )
             return 1
 
