@@ -1,38 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { isAxiosError } from "axios";
 
-import { adminService } from "@services/admin";
-import { getSupabaseBrowserClient } from "@lib/supabase-browser";
+import { adminService, type JobRow } from "@services/admin";
 import { getApiErrorMessage } from "@utils/common";
 
-export type JobStatus = "pending" | "running" | "done" | "failed";
+export type { JobResult, JobRow, JobStatus } from "@services/admin";
 
-export type JobResult = {
-  fetched?: number;
-  normalized?: number;
-  rejected?: number;
-} | null;
-
-export type JobRow = {
-  id: string;
-  source: string;
-  status: JobStatus;
-  attempts: number;
-  result: JobResult;
-  error: string | null;
-};
-
-const JOB_COLUMNS = "id, source, status, attempts, result, error";
-
-// Supabase query errors aren't AxiosErrors, so getApiErrorMessage falls back
-// to a generic message for them — surface their .message instead.
-const describeError = (e: unknown): string => {
-  if (isAxiosError(e)) return getApiErrorMessage(e);
-  if (e instanceof Error) return e.message;
-  return "Request failed.";
-};
+// How often to re-read a pending or running job. Ingestion runs take minutes.
+export const JOB_POLL_INTERVAL_MS = 2000;
 
 type UseIngestJobResult = {
   job: JobRow | null;
@@ -47,47 +23,43 @@ export const useIngestJob = (): UseIngestJobResult => {
   const [error, setError] = useState<string | null>(null);
   const [triggering, setTriggering] = useState(false);
 
-  useEffect(() => {
-    if (!job) return;
+  const isBusy = job?.status === "pending" || job?.status === "running";
 
-    const supabase = getSupabaseBrowserClient();
-    const channel = supabase
-      .channel(`jobs-${job.id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "jobs", filter: `id=eq.${job.id}` },
-        (payload) => setJob(payload.new as JobRow),
-      )
-      .subscribe();
+  // Poll through the backend while the job is active. Each status change schedules the
+  // next read; reaching done/failed stops it.
+  useEffect(() => {
+    if (!job || !isBusy) return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      adminService
+        .getJob(job.id)
+        .then((next) => {
+          if (!cancelled) setJob(next);
+        })
+        .catch((e) => {
+          if (!cancelled) setError(getApiErrorMessage(e));
+        });
+    }, JOB_POLL_INTERVAL_MS);
 
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      clearTimeout(timer);
     };
-    // Re-subscribe only when the job id changes, not on every realtime update.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job?.id]);
+  }, [job, isBusy]);
 
   const triggerIngest = useCallback(async () => {
     setError(null);
     setTriggering(true);
     try {
       const enqueued = await adminService.enqueueIngest();
-      const supabase = getSupabaseBrowserClient();
-      const { data, error: fetchError } = await supabase
-        .from("jobs")
-        .select(JOB_COLUMNS)
-        .eq("id", enqueued.job_id)
-        .single();
-      if (fetchError) throw fetchError;
-      setJob(data as JobRow);
+      setJob(await adminService.getJob(enqueued.job_id));
     } catch (e) {
-      setError(describeError(e));
+      setError(getApiErrorMessage(e));
     } finally {
       setTriggering(false);
     }
   }, []);
-
-  const isBusy = job?.status === "pending" || job?.status === "running";
 
   return { job, error, triggering, isBusy, triggerIngest };
 };
