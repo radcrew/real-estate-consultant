@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -12,24 +11,17 @@ _UID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 _PROP_UUID = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
 
 
-def _make_auth_user(email: str = "user@example.com"):
-    from supabase_auth.types import User
-    return User(
-        id=_UID,
-        app_metadata={},
-        user_metadata={},
-        aud="authenticated",
-        created_at=datetime(2024, 1, 1, tzinfo=timezone.utc),
-        email=email,
-    )
-
-
 class TestGetAccountProfile:
     async def test_returns_profile(self, client, mock_user):
         with patch(
             "app.api.v1.endpoints.account.profile.get_profile_row",
             new_callable=AsyncMock,
-            return_value={"id": _UID, "first_name": "Alice", "last_name": "Smith"},
+            return_value={
+                "id": _UID,
+                "email": "user@example.com",
+                "first_name": "Alice",
+                "last_name": "Smith",
+            },
         ):
             r = await client.get("/api/v1/account/profile")
         assert r.status_code == 200
@@ -47,49 +39,167 @@ class TestGetAccountProfile:
         assert r.status_code == 200
         assert r.json()["first_name"] is None
 
-    async def test_does_not_call_admin_api(self, client):
-        """GET must not re-fetch the auth user via the Admin API — that call is a
-        redundant network round-trip and was the source of intermittent 503s."""
-        with (
-            patch(
-                "app.api.v1.endpoints.account.profile.get_auth_user",
-                new_callable=AsyncMock,
-            ) as mock_get_auth_user,
-            patch(
-                "app.api.v1.endpoints.account.profile.get_profile_row",
-                new_callable=AsyncMock,
-                return_value=None,
-            ),
-        ):
-            r = await client.get("/api/v1/account/profile")
-        assert r.status_code == 200
-        mock_get_auth_user.assert_not_called()
-
-
 class TestUpdateAccountProfile:
-    async def test_success_returns_updated_profile(self, client):
-        auth_user = _make_auth_user()
+    _AUTH = {"Authorization": "Bearer access-tok"}
+
+    @pytest.fixture
+    def idp(self):
+        idp = MagicMock()
+        idp.update_user_attributes.return_value = {}
+        with patch("app.core.cognito.get_idp_client", return_value=idp):
+            yield idp
+
+    @pytest.fixture
+    def profiles(self):
         with (
-            patch("app.api.v1.endpoints.account.profile.upsert_profile_patch", new_callable=AsyncMock),
-            patch("app.api.v1.endpoints.account.profile.update_auth_user", new_callable=AsyncMock),
             patch(
-                "app.api.v1.endpoints.account.profile.get_auth_user",
+                "app.api.v1.endpoints.account.profile.upsert_profile_patch",
                 new_callable=AsyncMock,
-                return_value=auth_user,
-            ),
+            ) as upsert,
             patch(
                 "app.api.v1.endpoints.account.profile.get_profile_row",
                 new_callable=AsyncMock,
-                return_value={"id": _UID, "first_name": "Bob"},
+                return_value={"id": _UID, "email": "user@example.com", "first_name": "Bob"},
             ),
         ):
-            r = await client.patch("/api/v1/account/profile", json={"first_name": "Bob"})
+            yield upsert
+
+    @pytest.fixture(autouse=True)
+    def cognito_user(self, mock_user):
+        mock_user.username = _UID
+
+    async def test_name_change_writes_profile_only(self, client, idp, profiles):
+        r = await client.patch("/api/v1/account/profile", json={"first_name": "Bob"})
         assert r.status_code == 200
         assert r.json()["first_name"] == "Bob"
+        assert r.json()["email_change_pending"] is False
+        assert profiles.call_args.args[2].model_dump(exclude_unset=True) == {"first_name": "Bob"}
+        idp.update_user_attributes.assert_not_called()
+
+    async def test_phone_is_written_to_the_profile(self, client, idp, profiles):
+        r = await client.patch("/api/v1/account/profile", json={"phone": "+15550001234"})
+        assert r.status_code == 200
+        assert profiles.call_args.args[2].phone == "+15550001234"
+        idp.update_user_attributes.assert_not_called()
+
+    async def test_new_email_goes_to_cognito_not_the_profile(self, client, idp, profiles):
+        r = await client.patch(
+            "/api/v1/account/profile", json={"email": "new@example.com"}, headers=self._AUTH
+        )
+        assert r.status_code == 200
+        body = r.json()
+        assert body["email_change_pending"] is True
+        assert body["email"] == "user@example.com"
+        idp.update_user_attributes.assert_called_once_with(
+            AccessToken="access-tok",
+            UserAttributes=[{"Name": "email", "Value": "new@example.com"}],
+        )
+        profiles.assert_not_called()
+
+    async def test_unchanged_email_is_ignored(self, client, idp, profiles):
+        r = await client.patch(
+            "/api/v1/account/profile",
+            json={"email": "user@example.com", "first_name": "Bob"},
+            headers=self._AUTH,
+        )
+        assert r.status_code == 200
+        assert r.json()["email_change_pending"] is False
+        idp.update_user_attributes.assert_not_called()
+
+    async def test_email_taken_returns_409(self, client, idp, profiles):
+        idp.update_user_attributes.side_effect = ClientError(
+            {"Error": {"Code": "AliasExistsException", "Message": "taken"}},
+            "UpdateUserAttributes",
+        )
+        r = await client.patch(
+            "/api/v1/account/profile", json={"email": "new@example.com"}, headers=self._AUTH
+        )
+        assert r.status_code == 409
+
+    async def test_google_user_cannot_change_email(self, client, idp, profiles, mock_user):
+        mock_user.username = "google_1234"
+        r = await client.patch(
+            "/api/v1/account/profile", json={"email": "new@example.com"}, headers=self._AUTH
+        )
+        assert r.status_code == 400
+        idp.update_user_attributes.assert_not_called()
+
+    async def test_api_key_caller_cannot_change_email(self, client, idp, profiles, mock_user):
+        mock_user.username = None
+        r = await client.patch(
+            "/api/v1/account/profile",
+            json={"email": "new@example.com"},
+            headers={"X-API-Key": "rad_abcdefghijklmnop"},
+        )
+        assert r.status_code == 403
+        idp.update_user_attributes.assert_not_called()
 
     async def test_empty_body_returns_400(self, client):
         r = await client.patch("/api/v1/account/profile", json={})
         assert r.status_code == 400
+
+
+class TestVerifyAccountEmail:
+    _AUTH = {"Authorization": "Bearer access-tok"}
+
+    @pytest.fixture
+    def idp(self):
+        idp = MagicMock()
+        idp.verify_user_attribute.return_value = {}
+        idp.get_user.return_value = {
+            "UserAttributes": [{"Name": "email", "Value": "new@example.com"}]
+        }
+        with patch("app.core.cognito.get_idp_client", return_value=idp):
+            yield idp
+
+    @pytest.fixture
+    def profiles(self):
+        with (
+            patch(
+                "app.api.v1.endpoints.account.profile.upsert_profile_patch",
+                new_callable=AsyncMock,
+            ) as upsert,
+            patch(
+                "app.api.v1.endpoints.account.profile.get_profile_row",
+                new_callable=AsyncMock,
+                return_value={"id": _UID, "email": "new@example.com"},
+            ),
+        ):
+            yield upsert
+
+    @pytest.fixture(autouse=True)
+    def cognito_user(self, mock_user):
+        mock_user.username = _UID
+
+    async def test_verified_email_is_written_to_the_profile(self, client, idp, profiles):
+        r = await client.post(
+            "/api/v1/account/email/verify", json={"code": " 123456 "}, headers=self._AUTH
+        )
+        assert r.status_code == 200
+        assert r.json()["email"] == "new@example.com"
+        idp.verify_user_attribute.assert_called_once_with(
+            AccessToken="access-tok", AttributeName="email", Code="123456"
+        )
+        assert profiles.call_args.args[2].email == "new@example.com"
+
+    async def test_wrong_code_returns_400_and_keeps_the_profile(self, client, idp, profiles):
+        idp.verify_user_attribute.side_effect = ClientError(
+            {"Error": {"Code": "CodeMismatchException", "Message": "bad"}}, "VerifyUserAttribute"
+        )
+        r = await client.post(
+            "/api/v1/account/email/verify", json={"code": "000000"}, headers=self._AUTH
+        )
+        assert r.status_code == 400
+        profiles.assert_not_called()
+
+    async def test_api_key_caller_returns_403(self, client, idp, profiles, mock_user):
+        mock_user.username = None
+        r = await client.post(
+            "/api/v1/account/email/verify",
+            json={"code": "123456"},
+            headers={"X-API-Key": "rad_abcdefghijklmnop"},
+        )
+        assert r.status_code == 403
 
 
 class TestChangePassword:

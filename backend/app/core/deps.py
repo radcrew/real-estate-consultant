@@ -136,6 +136,29 @@ async def get_current_user(
 CurrentUser = Annotated[AuthUser, Depends(get_current_user)]
 
 
+def session_access_token(
+    user: AuthUser, credentials: HTTPAuthorizationCredentials | None
+) -> str:
+    """The bearer access token of a signed-in user, for Cognito's self-service APIs.
+
+    ChangePassword, UpdateUserAttributes and friends are authorised by that token, which
+    an MCP API key caller does not have (their ``username`` is None).
+    """
+    if user.username is None or credentials is None:
+        raise_forbidden("This action requires a signed-in session, not an API key.")
+    return credentials.credentials.strip()
+
+
+async def get_session_access_token(
+    user: CurrentUser,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],
+) -> str:
+    return session_access_token(user, credentials)
+
+
+SessionAccessToken = Annotated[str, Depends(get_session_access_token)]
+
+
 async def get_current_user_jwt(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],

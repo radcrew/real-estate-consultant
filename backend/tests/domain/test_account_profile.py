@@ -42,6 +42,13 @@ class TestAccountProfileResponse:
         assert result.state == "TX"
         assert result.country == "US"
 
+    def test_email_and_phone_come_from_the_profile_row(self):
+        user = _make_user(email="token@example.com")
+        profile = Profile(id=_UUID, email="row@example.com", phone="+15550001234")
+        result = account_profile_response(user=user, profile=profile)
+        assert result.email == "row@example.com"
+        assert result.phone == "+15550001234"
+
     def test_avatar_url_from_profile(self):
         user = _make_user()
         profile = Profile(id=_UUID, avatar_url="https://example.com/avatar.png")

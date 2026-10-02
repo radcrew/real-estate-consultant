@@ -21,6 +21,7 @@ PROFILE_PATCH_DB_COLUMNS: frozenset[str] = frozenset(
         "city",
         "state",
         "email",
+        "phone",
     },
 )
 
@@ -28,6 +29,7 @@ _PROFILE_SELECT = ",".join(
     (
         "id",
         "email",
+        "phone",
         "created_at",
         "is_admin",
         "first_name",
@@ -70,7 +72,7 @@ async def upsert_profile_patch(
     user_id: UUID,
     body: AccountProfileUpdate,
 ) -> None:
-    """Insert or update ``public.profiles`` columns present in the patch (not ``phone``)."""
+    """Insert or update the ``public.profiles`` columns present in the patch."""
     patch = _profile_patch_dict(body)
     if not patch:
         return

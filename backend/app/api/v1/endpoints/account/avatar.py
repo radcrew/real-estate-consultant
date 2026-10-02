@@ -12,7 +12,6 @@ from fastapi import APIRouter, File, UploadFile
 from app.core.deps import CurrentUser, SupabaseSdkDep
 from app.domain.account_profile import account_profile_response
 from app.models.profile import profile_from_row
-from app.repositories.account import get_auth_user
 from app.repositories.profiles import get_profile_row, set_profile_avatar_url
 from app.schemas.account import AccountProfileResponse
 from app.utils.exceptions import raise_bad_gateway, raise_bad_request
@@ -69,6 +68,5 @@ async def upload_account_avatar(
 
     await set_profile_avatar_url(client, user_id, public_url)
 
-    user = await get_auth_user(client, current_user.id)
     raw = await get_profile_row(client, user_id)
-    return account_profile_response(user=user, profile=profile_from_row(raw))
+    return account_profile_response(user=current_user, profile=profile_from_row(raw))

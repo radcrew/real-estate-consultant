@@ -17,8 +17,8 @@ def account_profile_response(*, user: AuthUser, profile: Profile | None) -> Acco
 
     return AccountProfileResponse(
         id=user.id,
-        email=user.email,
-        phone=user.phone,
+        email=profile.email,
+        phone=profile.phone,
         first_name=profile.first_name,
         last_name=profile.last_name,
         address=profile.address,
