@@ -1,4 +1,6 @@
-from app.repositories.jobs import get_active_job_by_idempotency_key, insert_job_row
+from uuid import UUID
+
+from app.repositories.jobs import get_active_job_by_idempotency_key, get_job_row, insert_job_row
 from tests.repositories.conftest import make_supabase_client
 
 _JOB_ROW = {"id": "job-1", "source": "loopnet-seed", "status": "pending"}
@@ -39,3 +41,16 @@ class TestInsertJobRow:
         client.table.return_value.insert.assert_called_once_with(
             {"source": "loopnet-seed", "idempotency_key": "loopnet-seed:2026-01-01"},
         )
+
+
+class TestGetJobRow:
+    _ID = UUID("6f1c2a9e-0000-4000-8000-0000000000aa")
+
+    async def test_returns_the_row(self):
+        client = make_supabase_client([_JOB_ROW])
+        assert await get_job_row(client, self._ID) == _JOB_ROW
+        client.table.return_value.eq.assert_called_once_with("id", str(self._ID))
+
+    async def test_returns_none_when_missing(self):
+        client = make_supabase_client([])
+        assert await get_job_row(client, self._ID) is None

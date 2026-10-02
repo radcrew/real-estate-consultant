@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import logging
 from datetime import date
+from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.api.v1.endpoints.admin.exceptions import raise_job_already_queued
+from app.api.v1.endpoints.admin.exceptions import raise_job_already_queued, raise_job_not_found
 from app.core.deps import CurrentAdmin, SupabaseSdkDep
-from app.repositories.jobs import get_active_job_by_idempotency_key, insert_job_row
+from app.repositories.jobs import (
+    get_active_job_by_idempotency_key,
+    get_job_row,
+    insert_job_row,
+)
 from app.services.ingestion import wake_processor
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -26,6 +32,15 @@ class EnqueueResponse(BaseModel):
     source: str
     status: str
     idempotency_key: str
+
+
+class JobResponse(BaseModel):
+    id: str
+    source: str
+    status: str
+    attempts: int
+    result: dict[str, Any] | None = None
+    error: str | None = None
 
 
 @router.post("/ingest", response_model=EnqueueResponse, summary="Enqueue an ingestion job")
@@ -55,3 +70,16 @@ async def enqueue_ingest(
         status="pending",
         idempotency_key=idem_key,
     )
+
+
+@router.get("/jobs/{job_id}", response_model=JobResponse, summary="Get an ingestion job")
+async def get_job(
+    _admin: CurrentAdmin,
+    job_id: UUID,
+    client: SupabaseSdkDep,
+) -> JobResponse:
+    """Polled by the admin page while a job runs; replaces the browser's Realtime feed."""
+    row = await get_job_row(client, job_id)
+    if row is None:
+        raise_job_not_found()
+    return JobResponse.model_validate(row)

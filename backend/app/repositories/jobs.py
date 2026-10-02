@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import UUID
 
 from app.core.db_safe import execute_db_safe
 from app.utils.supabase.response import as_row_list, get_single_row
@@ -22,6 +23,18 @@ async def get_active_job_by_idempotency_key(
         .select("id,status")
         .eq("idempotency_key", idempotency_key)
         .in_("status", _ACTIVE_STATUSES)
+        .limit(1)
+        .execute(),
+    )
+    rows = as_row_list(result.data)
+    return rows[0] if rows else None
+
+
+async def get_job_row(client: AsyncClient, job_id: UUID) -> dict[str, Any] | None:
+    result = await execute_db_safe(
+        client.table("jobs")
+        .select("id,source,status,attempts,result,error")
+        .eq("id", str(job_id))
         .limit(1)
         .execute(),
     )

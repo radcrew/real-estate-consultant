@@ -79,3 +79,40 @@ class TestEnqueueIngest:
             r = await admin_client.post("/api/v1/admin/ingest", json={"source": "loopnet-seed"})
 
         assert r.status_code == 502
+
+
+class TestGetJob:
+    _ID = "6f1c2a9e-0000-4000-8000-0000000000aa"
+
+    async def test_returns_the_job(self, admin_client):
+        row = {
+            "id": self._ID,
+            "source": "loopnet-seed",
+            "status": "done",
+            "attempts": 1,
+            "result": {"fetched": 10, "normalized": 9, "rejected": 1},
+            "error": None,
+        }
+        with patch(
+            "app.api.v1.endpoints.admin.router.get_job_row",
+            new_callable=AsyncMock,
+            return_value=row,
+        ) as get_row:
+            r = await admin_client.get(f"/api/v1/admin/jobs/{self._ID}")
+
+        assert r.status_code == 200
+        assert r.json() == row
+        assert str(get_row.call_args.args[1]) == self._ID
+
+    async def test_unknown_job_returns_404(self, admin_client):
+        with patch(
+            "app.api.v1.endpoints.admin.router.get_job_row",
+            new_callable=AsyncMock,
+            return_value=None,
+        ):
+            r = await admin_client.get(f"/api/v1/admin/jobs/{self._ID}")
+        assert r.status_code == 404
+
+    async def test_malformed_id_returns_422(self, admin_client):
+        r = await admin_client.get("/api/v1/admin/jobs/not-a-uuid")
+        assert r.status_code == 422
