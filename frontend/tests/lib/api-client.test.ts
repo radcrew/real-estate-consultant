@@ -245,12 +245,16 @@ describe("apiClient refresh on 401", () => {
     expect(mockClearSession).toHaveBeenCalledOnce();
   });
 
-  it("does not refresh for /auth/* routes, where 401 means bad credentials", async () => {
+  it("hands a bad-credentials 401 from /auth/* back to the form untouched", async () => {
     const post = vi.spyOn(axios, "post");
+    const err = makeResponse(401, {}, { url: "/auth/sign-in" });
 
-    await expect(reject(makeResponse(401, {}, { url: "/auth/sign-in" }))).rejects.toBeDefined();
+    await expect(reject(err)).rejects.toBe(err);
 
+    // No refresh, no sign-out, no reload: the form must keep showing its error.
     expect(post).not.toHaveBeenCalled();
+    expect(mockClearSession).not.toHaveBeenCalled();
+    expect(window.location.href).toBe("");
   });
 
   it("does not refresh twice for the same request", async () => {

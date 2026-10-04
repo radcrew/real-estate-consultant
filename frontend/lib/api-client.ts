@@ -70,9 +70,13 @@ apiClient.interceptors.response.use(
     }
 
     const config = error.config as RetriableConfig | undefined;
-    // /auth/* answers 401 for bad credentials, not for an expired session.
-    const isAuthRoute = config?.url?.startsWith("/auth/") ?? false;
-    if (config && !isAuthRoute && !config._retriedAfterRefresh && (await refreshSession())) {
+    // /auth/* answers 401 for bad credentials, not for an expired session. Hand it back to
+    // the form: redirecting would reload the sign-in page and wipe the error message.
+    if (config?.url?.startsWith("/auth/")) {
+      return Promise.reject(error);
+    }
+
+    if (config && !config._retriedAfterRefresh && (await refreshSession())) {
       config._retriedAfterRefresh = true;
       // The request interceptor re-reads the session and sends the new token.
       return apiClient.request(config);
