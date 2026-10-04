@@ -1,13 +1,14 @@
 -- Users now come from AWS Cognito, not Supabase Auth.
 --
--- Every user_id / profiles.id column keeps its uuid type and from now on holds the
--- Cognito `sub`. Those users never exist in auth.users, so any foreign key into it would
--- reject every new row. Drop them all. Known ones: mcp_api_keys.user_id and
--- intake_sessions.user_id; the loop also catches keys created outside this folder
--- (saved_listings, search_profiles, outreach_drafts were never defined here).
+-- Tables stay keyed by a uuid. For users moved over from Supabase Auth it is their old
+-- auth.users id, found through public.cognito_identity_mapping. A user with no mapping row
+-- (anyone who signed up through Cognito) uses their Cognito `sub` as the id, and that id
+-- never exists in auth.users. Any foreign key into auth.users would reject every row such
+-- a user writes, so drop them all, except the one on cognito_identity_mapping.uuid: that
+-- column only ever holds real auth.users ids, and the key keeps the mapping honest.
 --
--- ⚠️ Existing rows keep their Supabase user ids and match no Cognito user. That is the
--- agreed cut-over: old accounts are not migrated.
+-- The loop also catches keys created outside this folder (profiles, saved_listings,
+-- search_profiles, outreach_drafts, favorites were never defined here).
 --
 -- RLS policies that compare against auth.uid() are left in place. The backend uses the
 -- service role and bypasses them, and the browser no longer queries these tables with a
@@ -24,6 +25,7 @@ begin
     where con.contype = 'f'
       and con.confrelid = 'auth.users'::regclass
       and ns.nspname = 'public'
+      and con.conrelid <> 'public.cognito_identity_mapping'::regclass
   loop
     execute format('alter table %s drop constraint %I', fk.table_name, fk.conname);
   end loop;
