@@ -18,6 +18,7 @@ from app.api.v1.endpoints.auth.exceptions import (
 from app.api.v1.endpoints.auth.sign_in import session_response
 from app.core.cognito import verify_id_token
 from app.core.config import settings
+from app.core.deps import SupabaseSdkDep
 from app.schemas.auth import OAuthExchangeRequest, SignInResponse
 
 router = APIRouter()
@@ -49,7 +50,7 @@ async def _exchange_code(code: str, redirect_uri: str) -> dict[str, Any]:
 
 
 @router.post("/oauth/exchange")
-async def oauth_exchange(body: OAuthExchangeRequest) -> SignInResponse:
+async def oauth_exchange(body: OAuthExchangeRequest, client: SupabaseSdkDep) -> SignInResponse:
     tokens = await _exchange_code(body.code, body.redirect_uri)
     try:
         claims = await asyncio.to_thread(verify_id_token, tokens["id_token"])
@@ -63,4 +64,4 @@ async def oauth_exchange(body: OAuthExchangeRequest) -> SignInResponse:
         "ExpiresIn": tokens["expires_in"],
         "TokenType": tokens["token_type"],
     }
-    return await session_response(auth, email=claims.get("email"))
+    return await session_response(auth, client, email=claims.get("email"))

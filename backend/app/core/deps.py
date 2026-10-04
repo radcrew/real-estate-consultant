@@ -89,7 +89,7 @@ async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str
 _user_id_by_sub: dict[str, str] = {}
 
 
-async def _user_id_for_sub(client: AsyncClient, sub: str) -> str:
+async def user_id_for_sub(client: AsyncClient, sub: str) -> str:
     if sub not in _user_id_by_sub:
         try:
             _user_id_by_sub[sub] = await resolve_user_id(client, sub)
@@ -108,7 +108,7 @@ async def _user_from_access_token(client: AsyncClient, token: str) -> AuthUser:
     except jwt.PyJWTError as exc:
         raise_auth_invalid_access_token(cause=exc)
 
-    user_id = await _user_id_for_sub(client, claims["sub"])
+    user_id = await user_id_for_sub(client, claims["sub"])
     return AuthUser(id=user_id, username=claims.get("username"))
 
 

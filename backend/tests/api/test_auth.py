@@ -62,6 +62,18 @@ class TestSignIn:
             "user": {"id": _NEW_SUB, "email": "user@example.com", "username": _NEW_SUB},
         }
 
+    async def test_user_id_is_the_mapped_supabase_uuid(self, client, idp, monkeypatch):
+        from app.core import deps
+
+        async def resolve(_client, sub):
+            return "a1b2c3d4-e5f6-7890-abcd-ef1234567890" if sub == _NEW_SUB else sub
+
+        monkeypatch.setattr(deps, "resolve_user_id", resolve)
+        r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
+        assert r.json()["user"]["id"] == "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        # username stays Cognito's: refresh needs it for SECRET_HASH.
+        assert r.json()["user"]["username"] == _NEW_SUB
+
     async def test_uses_password_flow_with_secret_hash(self, client, idp):
         await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
         kwargs = idp.initiate_auth.call_args.kwargs

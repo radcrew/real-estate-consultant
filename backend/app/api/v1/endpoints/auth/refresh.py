@@ -11,13 +11,14 @@ from app.api.v1.endpoints.auth.exceptions import (
 from app.api.v1.endpoints.auth.sign_in import session_response
 from app.core.cognito import call_idp, secret_hash
 from app.core.config import settings
+from app.core.deps import SupabaseSdkDep
 from app.schemas.auth import RefreshRequest, SignInResponse
 
 router = APIRouter()
 
 
 @router.post("/refresh")
-async def refresh(body: RefreshRequest) -> SignInResponse:
+async def refresh(body: RefreshRequest, client: SupabaseSdkDep) -> SignInResponse:
     try:
         result = await call_idp(
             "initiate_auth",
@@ -42,5 +43,5 @@ async def refresh(body: RefreshRequest) -> SignInResponse:
     # The ID token came straight from Cognito over TLS; it is only read for display email.
     id_claims = jwt.decode(auth["IdToken"], options={"verify_signature": False})
     return await session_response(
-        auth, email=id_claims.get("email"), refresh_token=body.refresh_token
+        auth, client, email=id_claims.get("email"), refresh_token=body.refresh_token
     )

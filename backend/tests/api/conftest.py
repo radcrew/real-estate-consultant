@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.core import deps
 from app.core import intake_admission as intake_admission_module
 from app.core.database import get_session
 from app.core.deps import get_current_user, get_current_user_jwt
@@ -28,6 +29,21 @@ def fresh_intake_admission(monkeypatch):
         "intake_admission",
         IntakeAdmissionControl(ip_per_minute=10_000, session_per_minute=10_000),
     )
+
+
+@pytest.fixture(autouse=True)
+def unmapped_cognito_subs(monkeypatch):
+    """Treat every Cognito sub as unmapped (its own user id), with an empty cache.
+
+    The fake Supabase client cannot answer the cognito_identity_mapping lookup.
+    """
+    async def resolve(_client, sub):
+        return sub
+
+    monkeypatch.setattr(deps, "resolve_user_id", resolve)
+    deps._user_id_by_sub.clear()
+    yield
+    deps._user_id_by_sub.clear()
 
 
 @pytest.fixture

@@ -14,13 +14,16 @@ from app.api.v1.endpoints.auth.exceptions import (
 )
 from app.core.cognito import call_idp, secret_hash, verify_access_token
 from app.core.config import settings
+from app.core.deps import SupabaseSdkDep, user_id_for_sub
 from app.schemas.auth import SignInRequest, SignInResponse, SignInUser
+from supabase import AsyncClient
 
 router = APIRouter()
 
 
 async def session_response(
     auth: dict[str, Any],
+    client: AsyncClient,
     *,
     email: str | None,
     refresh_token: str | None = None,
@@ -30,7 +33,8 @@ async def session_response(
     ``username`` is Cognito's own user name (the ``sub`` for pools that sign in by email,
     ``google_…`` for Google users). Refreshing a token needs it for ``SECRET_HASH``.
     A refresh returns no new refresh token unless rotation is on, so the caller passes
-    the one it used.
+    the one it used. ``user.id`` is the app user id (``sub`` mapped through
+    ``cognito_identity_mapping``), the same id every protected request resolves to.
     """
     claims = await asyncio.to_thread(verify_access_token, auth["AccessToken"])
     return SignInResponse(
@@ -39,12 +43,16 @@ async def session_response(
         refresh_token=auth.get("RefreshToken") or refresh_token,
         expires_in=auth["ExpiresIn"],
         token_type=auth["TokenType"],
-        user=SignInUser(id=claims["sub"], email=email, username=claims["username"]),
+        user=SignInUser(
+            id=await user_id_for_sub(client, claims["sub"]),
+            email=email,
+            username=claims["username"],
+        ),
     )
 
 
 @router.post("/sign-in")
-async def sign_in(body: SignInRequest) -> SignInResponse:
+async def sign_in(body: SignInRequest, client: SupabaseSdkDep) -> SignInResponse:
     email = str(body.email)
     try:
         result = await call_idp(
@@ -74,4 +82,4 @@ async def sign_in(body: SignInRequest) -> SignInResponse:
     if not auth:
         raise_sign_in_challenge_required(result.get("ChallengeName"))
 
-    return await session_response(auth, email=email)
+    return await session_response(auth, client, email=email)
