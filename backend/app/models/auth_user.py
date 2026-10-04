@@ -7,7 +7,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class AuthUser:
-    """``id`` is the Cognito ``sub`` (a UUID string) and keys ``public.profiles``.
+    """``id`` keys every table: the user's Supabase ``uuid`` from
+    ``cognito_identity_mapping`` if they have one, otherwise their Cognito ``sub``.
 
     ``username`` is Cognito's user name, set only for access-token callers (``google_…``
     for Google users). MCP API key callers have none. Auth never loads the profile, so

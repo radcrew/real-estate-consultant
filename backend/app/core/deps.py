@@ -23,6 +23,7 @@ from app.core.rate_limit import SlidingWindowRateLimiter
 from app.core.supabase_sdk import get_supabase_sdk_client
 from app.domain.mcp_api_keys import looks_like_mcp_api_key, mcp_scopes_allow
 from app.models.auth_user import AuthUser
+from app.repositories.identity_mapping import resolve_user_id
 from app.repositories.mcp_api_keys import ResolvedMcpApiKey, resolve_mcp_api_key
 from app.repositories.profiles import get_profile_row
 from app.utils.exceptions import raise_forbidden, raise_service_unavailable, raise_too_many_requests
@@ -83,8 +84,22 @@ async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str
     return AuthUser(id=str(resolved.user_id))
 
 
-async def _user_from_access_token(token: str) -> AuthUser:
-    """Verify a Cognito access token; the caller is its ``sub``. No profile lookup."""
+# Cognito sub -> app user id. The mapping never changes, so each sub costs one read
+# per process.
+_user_id_by_sub: dict[str, str] = {}
+
+
+async def _user_id_for_sub(client: AsyncClient, sub: str) -> str:
+    if sub not in _user_id_by_sub:
+        try:
+            _user_id_by_sub[sub] = await resolve_user_id(client, sub)
+        except SupabaseRequestError as exc:
+            raise_service_unavailable("User lookup unavailable.", cause=exc)
+    return _user_id_by_sub[sub]
+
+
+async def _user_from_access_token(client: AsyncClient, token: str) -> AuthUser:
+    """Verify a Cognito access token; the caller's id is its ``sub`` mapped to the app id."""
     try:
         # PyJWKClient fetches the pool's JWKS with blocking I/O on a cache miss.
         claims = await asyncio.to_thread(verify_access_token, token)
@@ -93,7 +108,8 @@ async def _user_from_access_token(token: str) -> AuthUser:
     except jwt.PyJWTError as exc:
         raise_auth_invalid_access_token(cause=exc)
 
-    return AuthUser(id=claims["sub"], username=claims.get("username"))
+    user_id = await _user_id_for_sub(client, claims["sub"])
+    return AuthUser(id=user_id, username=claims.get("username"))
 
 
 async def get_current_user(
@@ -116,7 +132,7 @@ async def get_current_user(
     if looks_like_mcp_api_key(token):
         return await _user_from_api_key(request, client, token)
 
-    return await _user_from_access_token(token)
+    return await _user_from_access_token(client, token)
 
 
 CurrentUser = Annotated[AuthUser, Depends(get_current_user)]
@@ -148,6 +164,7 @@ SessionAccessToken = Annotated[str, Depends(get_session_access_token)]
 async def get_current_user_jwt(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_http_bearer)],
+    client: Annotated[AsyncClient, Depends(get_supabase_sdk_client)],
 ) -> AuthUser:
     """JWT session only — MCP API keys are rejected.
 
@@ -170,7 +187,7 @@ async def get_current_user_jwt(
             "MCP API key management requires a user session JWT, not an API key.",
         )
 
-    return await _user_from_access_token(token)
+    return await _user_from_access_token(client, token)
 
 
 CurrentUserJwt = Annotated[AuthUser, Depends(get_current_user_jwt)]

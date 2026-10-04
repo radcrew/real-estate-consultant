@@ -1,6 +1,7 @@
 """Auth in ``app.core.deps``: Cognito bearer tokens and MCP API keys.
 
-Identity comes from the token or key alone; auth never reads ``public.profiles``.
+Identity comes from the token or key; a token's ``sub`` is mapped to the app user id
+through ``cognito_identity_mapping``. Auth never reads ``public.profiles``.
 Calls the dependencies directly so these run without building the FastAPI app.
 """
 
@@ -15,10 +16,12 @@ from fastapi import HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app.core import deps
+from app.core.db_safe import SupabaseRequestError
 from app.models.auth_user import AuthUser
 from app.repositories.mcp_api_keys import ResolvedMcpApiKey
 
 _SUB = "6f1c2a9e-0000-4000-8000-000000000001"
+_SUPABASE_UUID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
 
 def _request(headers: dict[str, str] | None = None) -> MagicMock:
@@ -40,6 +43,16 @@ def verify():
 
 
 @pytest.fixture(autouse=True)
+def mapping():
+    """Unmapped by default: the sub is the user id. Each test starts with an empty cache."""
+    deps._user_id_by_sub.clear()
+    with patch.object(deps, "resolve_user_id", new_callable=AsyncMock) as mock:
+        mock.side_effect = lambda _client, sub: sub
+        yield mock
+    deps._user_id_by_sub.clear()
+
+
+@pytest.fixture(autouse=True)
 def profile_row():
     """Auth must not read profiles; any call is a failure."""
     with patch.object(deps, "get_profile_row", new_callable=AsyncMock) as mock:
@@ -51,7 +64,7 @@ async def _current_user(*args):
 
 
 async def _current_user_jwt(*args):
-    return await deps.get_current_user_jwt(*args)
+    return await deps.get_current_user_jwt(*args, MagicMock())
 
 
 @pytest.mark.parametrize("dependency", [_current_user, _current_user_jwt])
@@ -61,6 +74,25 @@ class TestBearerAuth:
         assert user == AuthUser(id=_SUB, username="google_123")
         verify.assert_called_once_with("access-token")
         profile_row.assert_not_called()
+
+    async def test_mapped_sub_becomes_the_supabase_uuid(self, dependency, verify, mapping):
+        mapping.side_effect = None
+        mapping.return_value = _SUPABASE_UUID
+        user = await dependency(_request(), _bearer())
+        assert user == AuthUser(id=_SUPABASE_UUID, username="google_123")
+        assert mapping.call_args.args[1] == _SUB
+
+    async def test_mapping_is_cached_per_sub(self, dependency, verify, mapping):
+        await dependency(_request(), _bearer())
+        await dependency(_request(), _bearer())
+        mapping.assert_called_once()
+
+    async def test_mapping_lookup_failure_is_503(self, dependency, verify, mapping):
+        """Guessing the sub here would hide a migrated user's data, so fail instead."""
+        mapping.side_effect = SupabaseRequestError("down")
+        with pytest.raises(HTTPException) as info:
+            await dependency(_request(), _bearer())
+        assert info.value.status_code == 503
 
     async def test_invalid_token_is_401(self, dependency, verify):
         verify.side_effect = jwt.ExpiredSignatureError("Signature has expired")
@@ -93,12 +125,14 @@ class TestApiKeyAuth:
         ) as mock:
             yield mock
 
-    async def test_key_user_is_the_key_owner(self, resolve, verify, profile_row):
+    async def test_key_user_is_the_key_owner(self, resolve, verify, profile_row, mapping):
         request = _request({"X-API-Key": "rad_abcdefghijklmnop"})
         user = await deps.get_current_user(request, None, MagicMock())
         assert user == AuthUser(id=_SUB)
         verify.assert_not_called()
         profile_row.assert_not_called()
+        # The key already stores the app user id; no mapping lookup.
+        mapping.assert_not_called()
 
     async def test_unknown_key_is_401(self, resolve):
         resolve.return_value = None
