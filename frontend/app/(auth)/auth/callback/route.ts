@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-import { BACKEND_BASE_URL, OAUTH_CALLBACK_PATH } from "@config/env";
+import { BACKEND_BASE_URL, OAUTH_CALLBACK_PATH, OAUTH_START_PATH } from "@config/env";
 import { toStoredSession } from "@lib/auth-session";
-import { OAUTH_STATE_COOKIE, type OAuthState, safeNextPath } from "@lib/cognito-hosted-ui";
+import {
+  OAUTH_ACCOUNT_LINKED,
+  OAUTH_STATE_COOKIE,
+  type OAuthState,
+  safeNextPath,
+} from "@lib/cognito-hosted-ui";
 import type { SignInResponse } from "@services/auth";
 
 const APP_SESSION_COOKIE = "radestate.session";
@@ -80,9 +85,26 @@ export async function GET(request: Request) {
     const res = await fetch(`${BACKEND_BASE_URL}/api/v1/auth/oauth/exchange`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, redirect_uri: `${origin}${OAUTH_CALLBACK_PATH}` }),
+      body: JSON.stringify({
+        code,
+        redirect_uri: `${origin}${OAUTH_CALLBACK_PATH}`,
+        link_accounts: !saved.relink,
+      }),
       cache: "no-store",
     });
+    if (res.status === 409 && !saved.relink) {
+      const { detail } = (await res.json().catch(() => ({}))) as { detail?: unknown };
+      if (detail === OAUTH_ACCOUNT_LINKED) {
+        // Google is now linked to the user's existing account. Sign in once more to get
+        // that account's tokens; Google remembers the user, so this is a quick hop.
+        const restart = new URL(OAUTH_START_PATH, origin);
+        restart.searchParams.set("next", saved.next);
+        restart.searchParams.set("relink", "1");
+        const response = NextResponse.redirect(restart);
+        clearStateCookie(response);
+        return response;
+      }
+    }
     if (!res.ok) {
       return failSignIn(origin, "exchange_failed", `${res.status} ${await res.text()}`);
     }

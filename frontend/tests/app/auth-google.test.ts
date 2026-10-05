@@ -70,4 +70,21 @@ describe("google sign-in start route", () => {
     expect(location.searchParams.get("oauth_reason")).toBe("not_configured");
     expect(stateCookie(res)).toBeUndefined();
   });
+
+  it("marks the second pass after an account link", () => {
+    const res = GET(new Request(`${START}?relink=1&next=%2Faccount`));
+    const saved = JSON.parse(decodeURIComponent((stateCookie(res) ?? "").split(";")[0].split("=")[1]));
+
+    expect(saved).toMatchObject({ next: "/account", relink: true });
+  });
+
+  it("makes the post-link retry skip Cognito's stale hosted session", () => {
+    const relink = GET(new Request(`${START}?relink=1`));
+    const normal = GET(new Request(START));
+    const prompt = (res: Response) =>
+      new URL(res.headers.get("location") ?? "").searchParams.get("prompt");
+
+    expect(prompt(relink)).toBe("login");
+    expect(prompt(normal)).toBeNull();
+  });
 });

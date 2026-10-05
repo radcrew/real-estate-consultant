@@ -21,8 +21,8 @@ const exchangeResponse = {
 
 const fetchMock = vi.fn();
 
-const withState = (state = "s1", next = "/") =>
-  mockCookieStore.get.mockReturnValue({ value: JSON.stringify({ state, next }) });
+const withState = (state = "s1", next = "/", relink = false) =>
+  mockCookieStore.get.mockReturnValue({ value: JSON.stringify({ state, next, relink }) });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -61,7 +61,7 @@ describe("auth callback route", () => {
       expect.stringMatching(/\/api\/v1\/auth\/oauth\/exchange$/),
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ code: "abc", redirect_uri: CALLBACK }),
+        body: JSON.stringify({ code: "abc", redirect_uri: CALLBACK, link_accounts: true }),
       }),
     );
 
@@ -141,6 +141,37 @@ describe("auth callback route", () => {
       error: "Sign-in failed. Please try again.",
     });
     expect(setCookies(res)["radestate.session"]).toBeUndefined();
+  });
+
+  it("signs in once more after Google was linked to an existing account", async () => {
+    withState("s1", "/account");
+    fetchMock.mockResolvedValue(new Response('{"detail":"account_linked"}', { status: 409 }));
+
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
+    const location = new URL(res.headers.get("location") ?? "");
+
+    expect(location.pathname).toBe("/auth/google");
+    expect(location.searchParams.get("relink")).toBe("1");
+    expect(location.searchParams.get("next")).toBe("/account");
+    // The tokens from this pass belong to the deleted Google user: none are stored.
+    expect(setCookies(res)["radestate.session"]).toBeUndefined();
+  });
+
+  it("asks the backend not to link again on the second pass", async () => {
+    withState("s1", "/", true);
+
+    await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ link_accounts: false });
+  });
+
+  it("fails instead of looping if the second pass is answered with a link again", async () => {
+    withState("s1", "/", true);
+    fetchMock.mockResolvedValue(new Response('{"detail":"account_linked"}', { status: 409 }));
+
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
+
+    expect(failure(res)).toMatchObject({ path: "/sign-in", reason: "exchange_failed" });
   });
 
   it("reports an unreachable backend as unexpected", async () => {

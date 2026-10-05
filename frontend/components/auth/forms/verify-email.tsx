@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
 import { ButtonPrimary } from "@components/ui/button-primary";
+import { COGNITO_LOGOUT_PATH } from "@config/env";
 import { useAuth } from "@contexts/auth";
 
 import { AuthFormError } from "./error";
@@ -16,21 +16,20 @@ type VerifyEmailFormProps = {
 };
 
 export const VerifyEmailForm = ({ email, password }: VerifyEmailFormProps) => {
-  const router = useRouter();
   const [code, setCode] = useState("");
   const [info, setInfo] = useState(`We sent a verification code to ${email}.`);
 
   const { confirmSignUp, resendCode, signIn, error, isSubmitting } = useAuth();
 
+  // After sign-up, pass through Cognito's sign-out so no Hosted UI session from an
+  // earlier Google sign-in survives: the sign-up merge may have deleted that user, and a
+  // session for a deleted user makes the next "Continue with Google" fail.
   const handleVerified = async () => {
     if (!password) {
-      router.push("/sign-in?registered=1");
+      window.location.assign(COGNITO_LOGOUT_PATH);
       return;
     }
-    await signIn({ email, password }, () => {
-      router.push("/");
-      router.refresh();
-    });
+    await signIn({ email, password }, () => window.location.assign(COGNITO_LOGOUT_PATH));
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {

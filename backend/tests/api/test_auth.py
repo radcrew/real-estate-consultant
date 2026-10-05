@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import jwt
@@ -170,6 +170,27 @@ class TestConfirmSignUp:
         idp.confirm_sign_up.return_value = {}
         with patch("app.core.cognito.get_idp_client", return_value=idp):
             yield idp
+
+    @pytest.fixture(autouse=True)
+    def merge(self):
+        with patch(
+            "app.api.v1.endpoints.auth.confirm.merge_google_user", new_callable=AsyncMock
+        ) as mock:
+            yield mock
+
+    async def test_valid_code_merges_a_google_user_with_the_same_email(self, client, idp, merge):
+        r = await client.post(
+            "/api/v1/auth/confirm", json={"email": "new@example.com", "code": "123456"}
+        )
+        assert r.status_code == 204
+        assert merge.await_args.args[1] == "new@example.com"
+
+    async def test_wrong_code_never_merges(self, client, idp, merge):
+        idp.confirm_sign_up.side_effect = _client_error("CodeMismatchException", "bad code")
+        await client.post(
+            "/api/v1/auth/confirm", json={"email": "new@example.com", "code": "000000"}
+        )
+        merge.assert_not_called()
 
     async def test_valid_code_returns_204(self, client, idp):
         r = await client.post(
@@ -470,3 +491,64 @@ class TestSignOut:
         idp.global_sign_out.side_effect = EndpointConnectionError(endpoint_url="https://cognito-idp")
         r = await client.post("/api/v1/auth/sign-out", headers=self._AUTH)
         assert r.status_code == 503
+
+
+class TestOAuthAccountLinking:
+    _BODY = {"code": "auth-code", "redirect_uri": "http://localhost:3000/auth/callback"}
+
+    @pytest.fixture(autouse=True)
+    def exchange(self):
+        tokens = {
+            "access_token": "access-tok",
+            "id_token": "id-tok",
+            "refresh_token": "refresh-tok",
+            "expires_in": 3600,
+            "token_type": "Bearer",
+        }
+        with (
+            patch(
+                "app.api.v1.endpoints.auth.oauth._exchange_code",
+                new_callable=AsyncMock,
+                return_value=tokens,
+            ),
+            patch(
+                "app.api.v1.endpoints.auth.oauth.verify_id_token",
+                return_value={"sub": _NEW_SUB, "email": "g@example.com"},
+            ),
+            patch(
+                "app.api.v1.endpoints.auth.sign_in.verify_access_token",
+                return_value={"sub": _NEW_SUB, "username": "google_1"},
+            ),
+        ):
+            yield
+
+    async def test_linked_google_user_gets_409_to_sign_in_again(self, client):
+        with patch(
+            "app.api.v1.endpoints.auth.oauth.link_to_existing_account",
+            new_callable=AsyncMock,
+            return_value=True,
+        ):
+            r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        assert r.status_code == 409
+        assert r.json()["detail"] == "account_linked"
+
+    async def test_nothing_to_link_signs_in_normally(self, client):
+        with patch(
+            "app.api.v1.endpoints.auth.oauth.link_to_existing_account",
+            new_callable=AsyncMock,
+            return_value=False,
+        ):
+            r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        assert r.status_code == 200
+        assert r.json()["access_token"] == "access-tok"
+
+    async def test_retry_pass_never_links(self, client):
+        with patch(
+            "app.api.v1.endpoints.auth.oauth.link_to_existing_account",
+            new_callable=AsyncMock,
+        ) as link:
+            r = await client.post(
+                "/api/v1/auth/oauth/exchange", json={**self._BODY, "link_accounts": False}
+            )
+        assert r.status_code == 200
+        link.assert_not_called()

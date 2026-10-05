@@ -12,13 +12,15 @@ from app.api.v1.endpoints.auth.exceptions import (
 )
 from app.core.cognito import call_idp, secret_hash
 from app.core.config import settings
+from app.core.deps import DbSession
 from app.schemas.auth import ConfirmSignUpRequest, ResendCodeRequest
+from app.services.google_user_merge import merge_google_user
 
 router = APIRouter()
 
 
 @router.post("/confirm", status_code=status.HTTP_204_NO_CONTENT)
-async def confirm_sign_up(body: ConfirmSignUpRequest) -> Response:
+async def confirm_sign_up(body: ConfirmSignUpRequest, session: DbSession) -> Response:
     email = str(body.email)
     try:
         await call_idp(
@@ -40,6 +42,9 @@ async def confirm_sign_up(body: ConfirmSignUpRequest) -> Response:
     except BotoCoreError as exc:
         raise_sign_in_transport_unavailable(cause=exc)
 
+    # The code proved this person owns the email, so a Google-only user with the same
+    # address can now be folded into this account. Failures are logged, never raised.
+    await merge_google_user(session, email)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

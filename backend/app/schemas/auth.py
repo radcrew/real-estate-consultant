@@ -37,6 +37,8 @@ class OAuthExchangeRequest(BaseModel):
     code: str = Field(min_length=1, max_length=2048)
     # Must equal the redirect_uri sent to /oauth2/authorize; Cognito checks both.
     redirect_uri: str = Field(min_length=1, max_length=2048)
+    # False on the second pass after a link, so a failed link can never loop.
+    link_accounts: bool = True
 
 
 class RefreshRequest(BaseModel):

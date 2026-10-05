@@ -21,3 +21,5 @@ export const WEB3FORMS_ACCESS_KEY =
 
 export const OAUTH_START_PATH = "/auth/google";
 export const OAUTH_CALLBACK_PATH = "/auth/callback";
+// Clears Cognito's own Hosted UI session cookie, then returns to "/".
+export const COGNITO_LOGOUT_PATH = "/auth/cognito-logout";

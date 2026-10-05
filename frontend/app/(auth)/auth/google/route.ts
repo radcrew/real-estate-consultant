@@ -13,9 +13,11 @@ import {
 export function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const state = crypto.randomUUID();
+  const relink = requestUrl.searchParams.get("relink") === "1";
   const authorizeUrl = buildGoogleAuthorizeUrl(
     `${requestUrl.origin}${OAUTH_CALLBACK_PATH}`,
     state,
+    { forceLogin: relink },
   );
 
   if (!authorizeUrl) {
@@ -26,7 +28,11 @@ export function GET(request: Request) {
     return NextResponse.redirect(signIn);
   }
 
-  const payload: OAuthState = { state, next: safeNextPath(requestUrl.searchParams.get("next")) };
+  const payload: OAuthState = {
+    state,
+    next: safeNextPath(requestUrl.searchParams.get("next")),
+    relink,
+  };
   const response = NextResponse.redirect(authorizeUrl);
   response.cookies.set(OAUTH_STATE_COOKIE, JSON.stringify(payload), {
     path: OAUTH_CALLBACK_PATH,

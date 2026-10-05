@@ -1,7 +1,9 @@
 """Cognito user pool access: the public auth API client and JWT verification.
 
-Every call here uses public Cognito APIs authorised by ``SECRET_HASH`` or a user's own
-access token, so the boto3 client is unsigned and the backend needs no IAM credentials.
+Almost every call uses public Cognito APIs authorised by ``SECRET_HASH`` or a user's own
+access token, through an unsigned client that needs no IAM credentials. The one exception
+is linking a Google sign-in to an existing account, which uses ``call_admin_idp`` and the
+standard boto3 credential chain (needs ListUsers, AdminDeleteUser, AdminLinkProviderForUser).
 boto3 and ``PyJWKClient`` are synchronous; async callers run them via ``asyncio.to_thread``.
 """
 
@@ -43,6 +45,17 @@ def get_idp_client() -> Any:
 async def call_idp(operation: str, **params: Any) -> dict[str, Any]:
     """Run one ``cognito-idp`` operation off the event loop. botocore errors propagate."""
     return await asyncio.to_thread(getattr(get_idp_client(), operation), **params)
+
+
+@cache
+def _admin_idp_client(region: str) -> Any:
+    return boto3.client("cognito-idp", region_name=region)
+
+
+async def call_admin_idp(operation: str, **params: Any) -> dict[str, Any]:
+    """Run one IAM-signed ``cognito-idp`` admin operation off the event loop."""
+    client = _admin_idp_client(settings.cognito_region)
+    return await asyncio.to_thread(getattr(client, operation), **params)
 
 
 @cache

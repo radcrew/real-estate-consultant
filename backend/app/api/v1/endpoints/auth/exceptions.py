@@ -34,6 +34,15 @@ def raise_oauth_code_rejected(*, cause: BaseException) -> NoReturn:
     )
 
 
+# Detail the frontend's /auth/callback matches to restart Google sign-in once.
+OAUTH_ACCOUNT_LINKED = "account_linked"
+
+
+def raise_oauth_account_linked() -> NoReturn:
+    """The Google identity was just linked to an existing account; sign in again."""
+    raise_conflict(OAUTH_ACCOUNT_LINKED)
+
+
 def raise_sign_in_email_not_confirmed(*, cause: BaseException) -> NoReturn:
     raise_forbidden("Confirm your email address before signing in.", cause=cause)
 

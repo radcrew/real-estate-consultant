@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VerifyEmailForm } from "@components/auth/forms/verify-email";
 import type { AuthContextValue } from "@contexts/auth";
 
@@ -26,20 +26,23 @@ vi.mock("@contexts/auth", () => ({
   useAuth: () => mockAuth,
 }));
 
-const mockPush = vi.fn();
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush, refresh: vi.fn() }),
-}));
+const mockAssign = vi.fn();
 
 beforeEach(() => {
-  mockPush.mockReset();
+  mockAssign.mockReset();
+  vi.spyOn(window, "location", "get").mockReturnValue({
+    assign: mockAssign,
+  } as unknown as Location);
   mockAuth.error = null;
   mockAuth.isSubmitting = false;
   // Each action succeeds immediately by running its success callback.
   mockAuth.confirmSignUp = vi.fn(async (_email, _code, onSuccess) => onSuccess());
   mockAuth.resendCode = vi.fn(async (_email, onSuccess) => onSuccess());
   mockAuth.signIn = vi.fn(async (_creds, onSuccess) => onSuccess());
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 const submitCode = async (code = "123456") => {
@@ -53,10 +56,10 @@ describe("VerifyEmailForm", () => {
     expect(screen.getByRole("status")).toHaveTextContent("jane@example.com");
   });
 
-  it("confirms the code, then signs in when the password is known", async () => {
+  it("confirms the code, signs in, then clears Cognito's session on the way home", async () => {
     render(<VerifyEmailForm email="jane@example.com" password="Secret123!" />);
     await submitCode();
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/"));
+    await waitFor(() => expect(mockAssign).toHaveBeenCalledWith("/auth/cognito-logout"));
     expect(mockAuth.confirmSignUp).toHaveBeenCalledWith(
       "jane@example.com",
       "123456",
@@ -68,10 +71,10 @@ describe("VerifyEmailForm", () => {
     );
   });
 
-  it("sends the user to sign-in when the password is not known", async () => {
+  it("clears Cognito's session even when the password is not known", async () => {
     render(<VerifyEmailForm email="jane@example.com" />);
     await submitCode();
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/sign-in?registered=1"));
+    await waitFor(() => expect(mockAssign).toHaveBeenCalledWith("/auth/cognito-logout"));
     expect(mockAuth.signIn).not.toHaveBeenCalled();
   });
 
