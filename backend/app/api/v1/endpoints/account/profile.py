@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.api.v1.endpoints.account.exceptions import (
+    raise_account_email_change_needs_password_sign_in,
     raise_account_email_in_use,
     raise_account_email_managed_by_google,
     raise_account_no_fields_to_update,
@@ -19,7 +20,8 @@ from app.api.v1.endpoints.auth.exceptions import (
     raise_sign_in_transport_unavailable,
     raise_verification_code_expired,
 )
-from app.core.cognito import call_idp
+from app.core.cognito import call_admin_idp, call_idp
+from app.core.config import settings
 from app.core.deps import CurrentUser, SessionAccessToken, SupabaseSdkDep, session_access_token
 from app.domain.account_profile import account_profile_response
 from app.models.auth_user import AuthUser
@@ -53,6 +55,41 @@ async def _profile_response(
     return response
 
 
+def _lacks_admin_scope(exc: ClientError) -> bool:
+    """Tokens from Google sign-in lack aws.cognito.signin.user.admin, which the
+    self-service calls (GetUser, UpdateUserAttributes) require."""
+    return cognito_error_code(exc) == "NotAuthorizedException" and "scope" in str(exc).lower()
+
+
+def _email_of(user: dict) -> str | None:
+    attributes = user.get("UserAttributes", [])
+    return {a["Name"]: a["Value"] for a in attributes}.get("email")
+
+
+async def _cognito_email(access_token: str, username: str) -> str | None:
+    """The user's current email in Cognito, the source of truth for ``profiles.email``.
+
+    Returns None when it cannot be read; the caller then keeps the stored email.
+    """
+    try:
+        return _email_of(await call_idp("get_user", AccessToken=access_token))
+    except ClientError as exc:
+        if not _lacks_admin_scope(exc):
+            raise_cognito_error(exc)
+    except BotoCoreError as exc:
+        raise_sign_in_transport_unavailable(cause=exc)
+
+    # Google-issued token: read the same user through the IAM-signed admin API instead.
+    try:
+        return _email_of(
+            await call_admin_idp(
+                "admin_get_user", UserPoolId=settings.cognito_user_pool_id, Username=username
+            )
+        )
+    except (ClientError, BotoCoreError):
+        return None
+
+
 async def _request_email_change(access_token: str, new_email: str) -> None:
     """Cognito emails a code to the new address; profiles.email changes on verification."""
     try:
@@ -64,6 +101,8 @@ async def _request_email_change(access_token: str, new_email: str) -> None:
     except ClientError as exc:
         if cognito_error_code(exc) == "AliasExistsException":
             raise_account_email_in_use(cause=exc)
+        if _lacks_admin_scope(exc):
+            raise_account_email_change_needs_password_sign_in(cause=exc)
         raise_cognito_error(exc)
     except BotoCoreError as exc:
         raise_sign_in_transport_unavailable(cause=exc)
@@ -89,17 +128,33 @@ async def update_account_profile(
         raise_account_no_fields_to_update()
 
     new_email = updates.pop("email", None)
+    user_id = UUID(current_user.id)
+
+    # A signed-in user's real email lives in Cognito. MCP API key callers have no access
+    # token, so for them fall back to whatever the profile row already holds.
+    has_session = current_user.username is not None and credentials is not None
+    cognito_email = (
+        await _cognito_email(credentials.credentials.strip(), current_user.username)
+        if has_session
+        else None
+    )
+    if cognito_email is None and new_email is not None:
+        cognito_email = ((await get_profile_row(client, user_id)) or {}).get("email")
+
     email_change_pending = False
-    stored = await get_profile_row(client, UUID(current_user.id)) if new_email else None
-    if new_email is not None and str(new_email) != (stored or {}).get("email"):
+    if new_email is not None and str(new_email).lower() != (cognito_email or "").lower():
         if (current_user.username or "").startswith("google_"):
             raise_account_email_managed_by_google()
         access_token = session_access_token(current_user, credentials)
         await _request_email_change(access_token, str(new_email))
         email_change_pending = True
 
+    # Keep profiles.email equal to the verified Cognito email; a requested change is
+    # written only once POST /account/email/verify succeeds.
+    if has_session and cognito_email:
+        updates["email"] = cognito_email
     if set(updates) & PROFILE_PATCH_DB_COLUMNS:
-        await upsert_profile_patch(client, UUID(current_user.id), AccountProfileUpdate(**updates))
+        await upsert_profile_patch(client, user_id, AccountProfileUpdate(**updates))
 
     return await _profile_response(
         client, current_user, email_change_pending=email_change_pending

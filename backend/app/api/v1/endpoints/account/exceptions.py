@@ -24,6 +24,13 @@ def raise_account_email_managed_by_google() -> NoReturn:
     raise_bad_request("This account signs in with Google; its email comes from Google.")
 
 
+def raise_account_email_change_needs_password_sign_in(*, cause: BaseException) -> NoReturn:
+    raise_bad_request(
+        "To change your email, sign in with your email and password, then try again.",
+        cause=cause,
+    )
+
+
 def raise_account_email_in_use(*, cause: BaseException) -> NoReturn:
     raise_conflict("That email is already in use.", cause=cause)
 

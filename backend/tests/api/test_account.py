@@ -8,6 +8,11 @@ import pytest
 from botocore.exceptions import ClientError
 
 _UID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+_SCOPE_ERROR = ClientError(
+    {"Error": {"Code": "NotAuthorizedException",
+               "Message": "Access Token does not have required scopes"}},
+    "GetUser",
+)
 _PROP_UUID = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
 
 
@@ -46,6 +51,10 @@ class TestUpdateAccountProfile:
     def idp(self):
         idp = MagicMock()
         idp.update_user_attributes.return_value = {}
+        # The user's current, verified email in Cognito.
+        idp.get_user.return_value = {
+            "UserAttributes": [{"Name": "email", "Value": "user@example.com"}]
+        }
         with patch("app.core.cognito.get_idp_client", return_value=idp):
             yield idp
 
@@ -67,6 +76,17 @@ class TestUpdateAccountProfile:
     @pytest.fixture(autouse=True)
     def cognito_user(self, mock_user):
         mock_user.username = _UID
+
+    @pytest.fixture
+    def google_token(self, idp):
+        """A Google sign-in token: Cognito refuses GetUser for lack of the admin scope."""
+        idp.get_user.side_effect = _SCOPE_ERROR
+        with patch(
+            "app.api.v1.endpoints.account.profile.call_admin_idp",
+            new_callable=AsyncMock,
+            return_value={"UserAttributes": [{"Name": "email", "Value": "user@example.com"}]},
+        ) as admin:
+            yield admin
 
     async def test_name_change_writes_profile_only(self, client, idp, profiles):
         r = await client.patch("/api/v1/account/profile", json={"first_name": "Bob"})
@@ -94,7 +114,55 @@ class TestUpdateAccountProfile:
             AccessToken="access-tok",
             UserAttributes=[{"Name": "email", "Value": "new@example.com"}],
         )
-        profiles.assert_not_called()
+        # The profile keeps the verified email until the new one is confirmed.
+        assert profiles.call_args.args[2].email == "user@example.com"
+
+    async def test_saving_with_a_session_fills_in_the_cognito_email(self, client, idp, profiles):
+        """Profiles created after sign-up had no email; any save now writes it."""
+        r = await client.patch(
+            "/api/v1/account/profile", json={"first_name": "Bob"}, headers=self._AUTH
+        )
+        assert r.status_code == 200
+        written = profiles.call_args.args[2].model_dump(exclude_unset=True)
+        assert written == {"first_name": "Bob", "email": "user@example.com"}
+
+    async def test_google_token_reads_the_email_through_the_admin_api(
+        self, client, idp, profiles, google_token
+    ):
+        r = await client.patch(
+            "/api/v1/account/profile", json={"first_name": "Bob"}, headers=self._AUTH
+        )
+        assert r.status_code == 200
+        assert profiles.call_args.args[2].email == "user@example.com"
+        google_token.assert_awaited_once()
+        assert google_token.await_args.kwargs["Username"] == _UID
+
+    async def test_google_token_save_still_works_without_admin_access(
+        self, client, idp, profiles, google_token
+    ):
+        google_token.side_effect = ClientError(
+            {"Error": {"Code": "AccessDeniedException", "Message": "no"}}, "AdminGetUser"
+        )
+        r = await client.patch(
+            "/api/v1/account/profile", json={"first_name": "Bob"}, headers=self._AUTH
+        )
+        assert r.status_code == 200
+        assert profiles.call_args.args[2].model_dump(exclude_unset=True) == {"first_name": "Bob"}
+
+    async def test_google_token_cannot_change_the_email(self, client, idp, profiles, google_token):
+        idp.update_user_attributes.side_effect = _SCOPE_ERROR
+        r = await client.patch(
+            "/api/v1/account/profile", json={"email": "new@example.com"}, headers=self._AUTH
+        )
+        assert r.status_code == 400
+        assert "sign in with your email and password" in r.json()["detail"]
+
+    async def test_email_differing_only_in_case_is_not_a_change(self, client, idp, profiles):
+        r = await client.patch(
+            "/api/v1/account/profile", json={"email": "User@Example.com"}, headers=self._AUTH
+        )
+        assert r.json()["email_change_pending"] is False
+        idp.update_user_attributes.assert_not_called()
 
     async def test_unchanged_email_is_ignored(self, client, idp, profiles):
         r = await client.patch(
