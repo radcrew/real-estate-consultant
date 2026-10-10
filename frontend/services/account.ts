@@ -15,6 +15,8 @@ export type AccountProfileResponse = {
   zip_code: string | null;
   country: string | null;
   avatar_url: string | null;
+  /** True when a new email was sent a code; the email above is still the old one. */
+  email_change_pending?: boolean;
 };
 
 export type AccountProfileUpdateBody = Partial<{
@@ -112,6 +114,16 @@ export class AccountService {
     const { data } = await this.http.patch<AccountProfileResponse>("/account/profile", body, {
       signal: options?.signal,
     });
+    return data;
+  }
+
+  /** Confirm a pending email change with the code Cognito sent to the new address. */
+  async verifyEmail(code: string, options?: { signal?: AbortSignal }): Promise<AccountProfileResponse> {
+    const { data } = await this.http.post<AccountProfileResponse>(
+      "/account/email/verify",
+      { code },
+      { signal: options?.signal },
+    );
     return data;
   }
 

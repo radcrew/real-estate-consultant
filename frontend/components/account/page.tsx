@@ -30,6 +30,7 @@ import { SavedView } from "@components/saved/view";
 
 import { AccountSidebar, type AccountTab } from "./sidebar";
 import { AccountApiKeysSection } from "./sections/api-keys";
+import { AccountEmailVerification } from "./sections/email-verification";
 import { ApiKeyCreatedDialog } from "./sections/api-keys/created-dialog";
 import { AccountPasswordSection } from "./sections/password";
 import { AccountPersonalInfoSection } from "./sections/personal-info";
@@ -75,6 +76,13 @@ export const AccountPage = () => {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
   const [profileNoticeVariant, setProfileNoticeVariant] = useState<"error" | "success">("error");
+
+  // A requested email change waits here for its code; the profile keeps the old email.
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [emailCode, setEmailCode] = useState("");
+  const [emailCodeError, setEmailCodeError] = useState<string | null>(null);
+  const [emailCodeInfo, setEmailCodeInfo] = useState<string | null>(null);
+  const [emailVerifying, setEmailVerifying] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -220,7 +228,15 @@ export const AccountPage = () => {
       persistSessionEmailIfNeeded(data.email);
       setEditingProfile(false);
       setProfileNoticeVariant("success");
-      setProfileNotice("Profile saved.");
+      if (data.email_change_pending && patch.email) {
+        setPendingEmail(patch.email);
+        setEmailCode("");
+        setEmailCodeError(null);
+        setEmailCodeInfo(null);
+        setProfileNotice("Profile saved. Confirm your new email below.");
+      } else {
+        setProfileNotice("Profile saved.");
+      }
     } catch (e) {
       if (isAxiosError(e) && e.response?.status === 409) {
         setProfileNotice(null);
@@ -233,6 +249,46 @@ export const AccountPage = () => {
       setProfileSaving(false);
     }
   }, [draftProfile, mergedSavedProfile, persistSessionEmailIfNeeded]);
+
+  const verifyEmailCode = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setEmailCodeError(null);
+      setEmailCodeInfo(null);
+      setEmailVerifying(true);
+      try {
+        const data = await accountService.verifyEmail(emailCode.trim());
+        const updated = mapProfileResponseToForm(data);
+        setSavedProfile(updated);
+        setDraftProfile(updated);
+        persistSessionEmailIfNeeded(data.email);
+        setPendingEmail(null);
+        setProfileNoticeVariant("success");
+        setProfileNotice("Email updated.");
+      } catch (err) {
+        setEmailCodeError(getApiErrorMessage(err));
+      } finally {
+        setEmailVerifying(false);
+      }
+    },
+    [emailCode, persistSessionEmailIfNeeded],
+  );
+
+  // Asking for the same new email again makes Cognito send a fresh code.
+  const resendEmailCode = useCallback(async () => {
+    if (!pendingEmail) return;
+    setEmailCodeError(null);
+    setEmailCodeInfo(null);
+    setEmailVerifying(true);
+    try {
+      await accountService.updateProfile({ email: pendingEmail });
+      setEmailCodeInfo(`We sent a new code to ${pendingEmail}.`);
+    } catch (err) {
+      setEmailCodeError(getApiErrorMessage(err));
+    } finally {
+      setEmailVerifying(false);
+    }
+  }, [pendingEmail]);
 
   const updateDraft = useCallback((key: ProfileFieldKey, value: string) => {
     setDraftProfile((p) => ({ ...p, [key]: value }));
@@ -490,6 +546,21 @@ export const AccountPage = () => {
               onSave={saveProfile}
               onChangeField={updateDraft}
             />
+          ) : null}
+
+          {activeTab === "profile" && pendingEmail ? (
+            <div className="mt-6">
+              <AccountEmailVerification
+                email={pendingEmail}
+                code={emailCode}
+                error={emailCodeError}
+                info={emailCodeInfo}
+                submitting={emailVerifying}
+                onChangeCode={setEmailCode}
+                onSubmit={verifyEmailCode}
+                onResend={resendEmailCode}
+              />
+            </div>
           ) : null}
 
           {activeTab === "security" ? (

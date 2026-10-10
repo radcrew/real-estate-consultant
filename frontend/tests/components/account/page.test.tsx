@@ -20,10 +20,11 @@ const mockUseAuth = vi.fn();
 vi.mock("@contexts/auth", () => ({ useAuth: () => mockUseAuth() }));
 
 const mockGetProfile = vi.fn();
+const mockBuildBody = vi.fn();
 vi.mock("@services/account", () => ({
-  accountService: { getProfile: (...a: unknown[]) => mockGetProfile(...a), updateProfile: vi.fn(), uploadAvatar: vi.fn(), changePassword: vi.fn() },
-  mapProfileResponseToForm: () => ({ firstName: "Jane", lastName: "Doe", email: "jane@test.com", phone: "", address: "", city: "", state: "", zipCode: "", country: "" }),
-  buildProfileUpdateBody: () => ({}),
+  accountService: { getProfile: (...a: unknown[]) => mockGetProfile(...a), updateProfile: vi.fn(), uploadAvatar: vi.fn(), changePassword: vi.fn(), verifyEmail: vi.fn() },
+  mapProfileResponseToForm: (r: { email?: string | null }) => ({ firstName: "Jane", lastName: "Doe", email: r?.email ?? "jane@test.com", phone: "", address: "", city: "", state: "", zipCode: "", country: "" }),
+  buildProfileUpdateBody: (...a: unknown[]) => mockBuildBody(...a),
 }));
 vi.mock("@lib/auth-session", () => ({
   readSession: () => null,
@@ -42,6 +43,7 @@ vi.mock("@services/listings", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetProfile.mockResolvedValue({ avatar_url: null });
+  mockBuildBody.mockReturnValue({});
 });
 
 describe("AccountPage", () => {
@@ -118,6 +120,69 @@ describe("AccountPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /saved/i }));
 
     expect(await screen.findByRole("heading", { name: /saved properties/i })).toBeInTheDocument();
+  });
+
+  describe("email change", () => {
+    const requestEmailChange = async () => {
+      mockUseAuth.mockReturnValue({ session: { user: { email: "jane@test.com", avatarUrl: null } }, ready: true, refresh: vi.fn() });
+      mockBuildBody.mockReturnValue({ email: "new@test.com" });
+      vi.mocked(accountService.updateProfile).mockResolvedValue({
+        email: "jane@test.com",
+        email_change_pending: true,
+      } as Awaited<ReturnType<typeof accountService.updateProfile>>);
+      render(<AccountPage />);
+      fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      return screen.findByRole("region", { name: /confirm new email/i });
+    };
+
+    it("asks for the code after a new email is saved", async () => {
+      await requestEmailChange();
+      expect(screen.getByText(/We sent a code to new@test.com/)).toBeInTheDocument();
+    });
+
+    it("finishes the change with the code and drops the code form", async () => {
+      await requestEmailChange();
+      vi.mocked(accountService.verifyEmail).mockResolvedValue({
+        email: "new@test.com",
+      } as Awaited<ReturnType<typeof accountService.verifyEmail>>);
+
+      fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: " 123456 " } });
+      fireEvent.click(screen.getByRole("button", { name: /verify email/i }));
+
+      expect(await screen.findByText("Email updated.")).toBeInTheDocument();
+      expect(accountService.verifyEmail).toHaveBeenCalledWith("123456");
+      expect(screen.queryByRole("region", { name: /confirm new email/i })).not.toBeInTheDocument();
+    });
+
+    it("shows a rejected code on the code field", async () => {
+      await requestEmailChange();
+      vi.mocked(accountService.verifyEmail).mockRejectedValue(
+        new AxiosError("failed", "ERR_BAD_REQUEST", undefined, undefined, {
+          status: 400,
+          statusText: "",
+          headers: {},
+          config: { headers: new AxiosHeaders() },
+          data: { detail: "Invalid verification code." },
+        }),
+      );
+
+      fireEvent.change(screen.getByLabelText("Verification code"), { target: { value: "000000" } });
+      fireEvent.click(screen.getByRole("button", { name: /verify email/i }));
+
+      expect(await screen.findByText("Invalid verification code.")).toBeInTheDocument();
+      expect(screen.getByRole("region", { name: /confirm new email/i })).toBeInTheDocument();
+    });
+
+    it("resends by asking for the same email again", async () => {
+      await requestEmailChange();
+      vi.mocked(accountService.updateProfile).mockClear();
+
+      fireEvent.click(screen.getByRole("button", { name: /resend code/i }));
+
+      expect(await screen.findByText("We sent a new code to new@test.com.")).toBeInTheDocument();
+      expect(accountService.updateProfile).toHaveBeenCalledWith({ email: "new@test.com" });
+    });
   });
 
   describe("password change errors", () => {
