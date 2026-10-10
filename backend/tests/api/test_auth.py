@@ -25,13 +25,30 @@ _SIGN_UP = {
 }
 
 
+def _id_token(**claims) -> str:
+    """A stand-in ID token; the session reads it without checking the signature."""
+    return jwt.encode(claims, "x" * 32, algorithm="HS256")
+
+
+_ID_TOKEN = _id_token(email="user@example.com", given_name="Alice", family_name="Smith")
+_GOOGLE_ID_TOKEN = _id_token(email="g@example.com", given_name="Grace", family_name="Hopper")
+
 _AUTH_RESULT = {
     "AccessToken": "access-tok",
-    "IdToken": "id-tok",
+    "IdToken": _ID_TOKEN,
     "RefreshToken": "refresh-tok",
     "ExpiresIn": 3600,
     "TokenType": "Bearer",
 }
+
+
+@pytest.fixture(autouse=True)
+def ensure_profile():
+    """Every session creates the profile row; the fake Supabase client cannot."""
+    with patch(
+        "app.api.v1.endpoints.auth.sign_in.ensure_profile_row", new_callable=AsyncMock
+    ) as mock:
+        yield mock
 
 
 class TestSignIn:
@@ -55,12 +72,31 @@ class TestSignIn:
         assert r.status_code == 200
         assert r.json() == {
             "access_token": "access-tok",
-            "id_token": "id-tok",
+            "id_token": _ID_TOKEN,
             "refresh_token": "refresh-tok",
             "expires_in": 3600,
             "token_type": "Bearer",
             "user": {"id": _NEW_SUB, "email": "user@example.com", "username": _NEW_SUB},
         }
+
+    async def test_first_sign_in_creates_the_profile_from_the_id_token(
+        self, client, idp, ensure_profile
+    ):
+        await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
+        ensure_profile.assert_awaited_once()
+        assert ensure_profile.await_args.args[1] == _NEW_SUB
+        assert ensure_profile.await_args.kwargs == {
+            "email": "user@example.com",
+            "first_name": "Alice",
+            "last_name": "Smith",
+        }
+
+    async def test_profile_failure_does_not_block_sign_in(self, client, idp, ensure_profile):
+        from app.core.db_safe import SupabaseRequestError
+
+        ensure_profile.side_effect = SupabaseRequestError("db down")
+        r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
+        assert r.status_code == 200
 
     async def test_user_id_is_the_mapped_supabase_uuid(self, client, idp, monkeypatch):
         from app.core import deps
@@ -256,7 +292,6 @@ class TestRefresh:
     @pytest.fixture
     def idp(self):
         auth = {k: v for k, v in _AUTH_RESULT.items() if k != "RefreshToken"}
-        auth["IdToken"] = jwt.encode({"email": "user@example.com"}, "x" * 32, algorithm="HS256")
         idp = MagicMock()
         idp.initiate_auth.return_value = {"AuthenticationResult": auth}
         with patch("app.core.cognito.get_idp_client", return_value=idp):
@@ -374,7 +409,7 @@ class TestOAuthExchange:
     _BODY = {"code": "auth-code", "redirect_uri": "http://localhost:3000/auth/callback"}
     _TOKENS = {
         "access_token": "access-tok",
-        "id_token": "id-tok",
+        "id_token": _GOOGLE_ID_TOKEN,
         "refresh_token": "refresh-tok",
         "expires_in": 3600,
         "token_type": "Bearer",
@@ -500,7 +535,7 @@ class TestOAuthAccountLinking:
     def exchange(self):
         tokens = {
             "access_token": "access-tok",
-            "id_token": "id-tok",
+            "id_token": _GOOGLE_ID_TOKEN,
             "refresh_token": "refresh-tok",
             "expires_in": 3600,
             "token_type": "Bearer",

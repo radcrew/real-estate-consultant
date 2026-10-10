@@ -1,6 +1,8 @@
 import asyncio
+import logging
 from typing import Any
 
+import jwt
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter
 
@@ -14,18 +16,20 @@ from app.api.v1.endpoints.auth.exceptions import (
 )
 from app.core.cognito import call_idp, secret_hash, verify_access_token
 from app.core.config import settings
+from app.core.db_safe import SupabaseRequestError
 from app.core.deps import SupabaseSdkDep, user_id_for_sub
+from app.repositories.profiles import ensure_profile_row
 from app.schemas.auth import SignInRequest, SignInResponse, SignInUser
 from supabase import AsyncClient
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 async def session_response(
     auth: dict[str, Any],
     client: AsyncClient,
     *,
-    email: str | None,
     refresh_token: str | None = None,
 ) -> SignInResponse:
     """Build the client session from a Cognito ``AuthenticationResult``.
@@ -35,8 +39,25 @@ async def session_response(
     A refresh returns no new refresh token unless rotation is on, so the caller passes
     the one it used. ``user.id`` is the app user id (``sub`` mapped through
     ``cognito_identity_mapping``), the same id every protected request resolves to.
+
+    A first sign-in also creates the user's ``public.profiles`` row from the ID token.
     """
     claims = await asyncio.to_thread(verify_access_token, auth["AccessToken"])
+    user_id = await user_id_for_sub(client, claims["sub"])
+    # The ID token came straight from Cognito over TLS; it is only read for profile fields.
+    id_claims = jwt.decode(auth["IdToken"], options={"verify_signature": False})
+    email = id_claims.get("email")
+    try:
+        await ensure_profile_row(
+            client,
+            user_id,
+            email=email,
+            first_name=id_claims.get("given_name"),
+            last_name=id_claims.get("family_name"),
+        )
+    except SupabaseRequestError as exc:
+        # Sign-in must not fail over the profile; the next sign-in or refresh retries.
+        logger.warning("profile_create_failed", extra={"error": str(exc)})
     return SignInResponse(
         access_token=auth["AccessToken"],
         id_token=auth["IdToken"],
@@ -44,7 +65,7 @@ async def session_response(
         expires_in=auth["ExpiresIn"],
         token_type=auth["TokenType"],
         user=SignInUser(
-            id=await user_id_for_sub(client, claims["sub"]),
+            id=user_id,
             email=email,
             username=claims["username"],
         ),
@@ -82,4 +103,4 @@ async def sign_in(body: SignInRequest, client: SupabaseSdkDep) -> SignInResponse
     if not auth:
         raise_sign_in_challenge_required(result.get("ChallengeName"))
 
-    return await session_response(auth, client, email=email)
+    return await session_response(auth, client)

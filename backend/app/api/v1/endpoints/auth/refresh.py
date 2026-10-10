@@ -1,4 +1,3 @@
-import jwt
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter
 
@@ -40,8 +39,4 @@ async def refresh(body: RefreshRequest, client: SupabaseSdkDep) -> SignInRespons
         raise_sign_in_transport_unavailable(cause=exc)
 
     auth = result["AuthenticationResult"]
-    # The ID token came straight from Cognito over TLS; it is only read for display email.
-    id_claims = jwt.decode(auth["IdToken"], options={"verify_signature": False})
-    return await session_response(
-        auth, client, email=id_claims.get("email"), refresh_token=body.refresh_token
-    )
+    return await session_response(auth, client, refresh_token=body.refresh_token)

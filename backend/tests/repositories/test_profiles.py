@@ -1,4 +1,5 @@
 from app.repositories.profiles import (
+    ensure_profile_row,
     get_profile_row,
     set_profile_avatar_url,
     upsert_profile_patch,
@@ -29,26 +30,27 @@ class TestUpsertProfilePatch:
         await upsert_profile_patch(client, _USER_ID, body)
         client.table.assert_not_called()
 
-    async def test_inserts_when_no_existing_profile(self):
+    async def test_upserts_only_the_patched_columns_in_one_call(self):
         client = make_supabase_client([])
         body = AccountProfileUpdate(first_name="Alice")
         await upsert_profile_patch(client, _USER_ID, body)
-        client.table.return_value.insert.assert_called_once_with(
-            {"id": _USER_ID, "first_name": "Alice"},
+        client.table.return_value.upsert.assert_called_once_with(
+            {"id": _USER_ID, "first_name": "Alice"}, on_conflict="id"
         )
+        client.table.return_value.select.assert_not_called()
 
-    async def test_updates_when_profile_exists(self):
-        client = make_supabase_client([_PROFILE_ROW])
-        body = AccountProfileUpdate(first_name="Alice")
-        await upsert_profile_patch(client, _USER_ID, body)
-        client.table.return_value.update.assert_called_once_with({"first_name": "Alice"})
 
-    async def test_ignores_fields_outside_patch_columns(self):
+class TestEnsureProfileRow:
+    async def test_inserts_and_never_overwrites_an_existing_row(self):
         client = make_supabase_client([])
-        body = AccountProfileUpdate(first_name="Alice")
-        await upsert_profile_patch(client, _USER_ID, body)
-        payload = client.table.return_value.insert.call_args[0][0]
-        assert "phone" not in payload
+        await ensure_profile_row(
+            client, _USER_ID, email="u@example.com", first_name="Alice", last_name=None
+        )
+        client.table.return_value.upsert.assert_called_once_with(
+            {"id": _USER_ID, "email": "u@example.com", "first_name": "Alice"},
+            on_conflict="id",
+            ignore_duplicates=True,
+        )
 
 
 class TestSetProfileAvatarUrl:

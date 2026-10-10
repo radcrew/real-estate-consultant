@@ -83,4 +83,4 @@ async def oauth_exchange(
         "ExpiresIn": tokens["expires_in"],
         "TokenType": tokens["token_type"],
     }
-    return await session_response(auth, client, email=claims.get("email"))
+    return await session_response(auth, client)

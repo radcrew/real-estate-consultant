@@ -14,6 +14,10 @@ _SCOPE_ERROR = ClientError(
     "GetUser",
 )
 _PROP_UUID = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+_VERIFIED_EMAIL = [
+    {"Name": "email", "Value": "user@example.com"},
+    {"Name": "email_verified", "Value": "true"},
+]
 
 
 class TestGetAccountProfile:
@@ -52,9 +56,7 @@ class TestUpdateAccountProfile:
         idp = MagicMock()
         idp.update_user_attributes.return_value = {}
         # The user's current, verified email in Cognito.
-        idp.get_user.return_value = {
-            "UserAttributes": [{"Name": "email", "Value": "user@example.com"}]
-        }
+        idp.get_user.return_value = {"UserAttributes": _VERIFIED_EMAIL}
         with patch("app.core.cognito.get_idp_client", return_value=idp):
             yield idp
 
@@ -84,7 +86,7 @@ class TestUpdateAccountProfile:
         with patch(
             "app.api.v1.endpoints.account.profile.call_admin_idp",
             new_callable=AsyncMock,
-            return_value={"UserAttributes": [{"Name": "email", "Value": "user@example.com"}]},
+            return_value={"UserAttributes": _VERIFIED_EMAIL},
         ) as admin:
             yield admin
 
@@ -115,25 +117,41 @@ class TestUpdateAccountProfile:
             UserAttributes=[{"Name": "email", "Value": "new@example.com"}],
         )
         # The profile keeps the verified email until the new one is confirmed.
-        assert profiles.call_args.args[2].email == "user@example.com"
+        profiles.assert_not_called()
 
-    async def test_saving_with_a_session_fills_in_the_cognito_email(self, client, idp, profiles):
-        """Profiles created after sign-up had no email; any save now writes it."""
+    async def test_pending_unverified_email_is_not_taken_as_current(self, client, idp, profiles):
+        """Cognito may already hold the new address, unverified, while a change is pending."""
+        idp.get_user.return_value = {
+            "UserAttributes": [
+                {"Name": "email", "Value": "new@example.com"},
+                {"Name": "email_verified", "Value": "false"},
+            ]
+        }
+        r = await client.patch(
+            "/api/v1/account/profile", json={"email": "new@example.com"}, headers=self._AUTH
+        )
+        assert r.status_code == 200
+        assert r.json()["email"] == "user@example.com"
+        assert r.json()["email_change_pending"] is True
+        profiles.assert_not_called()
+
+    async def test_name_change_makes_no_cognito_call(self, client, idp, profiles, google_token):
         r = await client.patch(
             "/api/v1/account/profile", json={"first_name": "Bob"}, headers=self._AUTH
         )
         assert r.status_code == 200
-        written = profiles.call_args.args[2].model_dump(exclude_unset=True)
-        assert written == {"first_name": "Bob", "email": "user@example.com"}
+        assert profiles.call_args.args[2].model_dump(exclude_unset=True) == {"first_name": "Bob"}
+        idp.get_user.assert_not_called()
+        google_token.assert_not_called()
 
     async def test_google_token_reads_the_email_through_the_admin_api(
         self, client, idp, profiles, google_token
     ):
         r = await client.patch(
-            "/api/v1/account/profile", json={"first_name": "Bob"}, headers=self._AUTH
+            "/api/v1/account/profile", json={"email": "user@example.com"}, headers=self._AUTH
         )
         assert r.status_code == 200
-        assert profiles.call_args.args[2].email == "user@example.com"
+        assert r.json()["email_change_pending"] is False
         google_token.assert_awaited_once()
         assert google_token.await_args.kwargs["Username"] == _UID
 
@@ -144,9 +162,12 @@ class TestUpdateAccountProfile:
             {"Error": {"Code": "AccessDeniedException", "Message": "no"}}, "AdminGetUser"
         )
         r = await client.patch(
-            "/api/v1/account/profile", json={"first_name": "Bob"}, headers=self._AUTH
+            "/api/v1/account/profile",
+            json={"email": "user@example.com", "first_name": "Bob"},
+            headers=self._AUTH,
         )
         assert r.status_code == 200
+        assert r.json()["email_change_pending"] is False
         assert profiles.call_args.args[2].model_dump(exclude_unset=True) == {"first_name": "Bob"}
 
     async def test_google_token_cannot_change_the_email(self, client, idp, profiles, google_token):

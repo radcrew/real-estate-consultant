@@ -62,14 +62,16 @@ def _lacks_admin_scope(exc: ClientError) -> bool:
 
 
 def _email_of(user: dict) -> str | None:
-    attributes = user.get("UserAttributes", [])
-    return {a["Name"]: a["Value"] for a in attributes}.get("email")
+    """The verified email only: while a change is pending, Cognito may already hold the
+    new, unconfirmed address."""
+    attributes = {a["Name"]: a["Value"] for a in user.get("UserAttributes", [])}
+    return attributes.get("email") if attributes.get("email_verified") == "true" else None
 
 
 async def _cognito_email(access_token: str, username: str) -> str | None:
-    """The user's current email in Cognito, the source of truth for ``profiles.email``.
+    """The user's current verified email in Cognito.
 
-    Returns None when it cannot be read; the caller then keeps the stored email.
+    Returns None when it cannot be read; the caller then uses the stored email.
     """
     try:
         return _email_of(await call_idp("get_user", AccessToken=access_token))
@@ -127,32 +129,30 @@ async def update_account_profile(
     if not updates:
         raise_account_no_fields_to_update()
 
+    # A requested email goes to Cognito; profiles.email is written only once
+    # POST /account/email/verify succeeds.
     new_email = updates.pop("email", None)
     user_id = UUID(current_user.id)
 
-    # A signed-in user's real email lives in Cognito. MCP API key callers have no access
-    # token, so for them fall back to whatever the profile row already holds.
-    has_session = current_user.username is not None and credentials is not None
-    cognito_email = (
-        await _cognito_email(credentials.credentials.strip(), current_user.username)
-        if has_session
-        else None
-    )
-    if cognito_email is None and new_email is not None:
-        cognito_email = ((await get_profile_row(client, user_id)) or {}).get("email")
-
     email_change_pending = False
-    if new_email is not None and str(new_email).lower() != (cognito_email or "").lower():
-        if (current_user.username or "").startswith("google_"):
-            raise_account_email_managed_by_google()
-        access_token = session_access_token(current_user, credentials)
-        await _request_email_change(access_token, str(new_email))
-        email_change_pending = True
+    if new_email is not None:
+        # A signed-in user's real email lives in Cognito. MCP API key callers have no
+        # access token, so for them fall back to whatever the profile row holds.
+        current_email = (
+            await _cognito_email(credentials.credentials.strip(), current_user.username)
+            if current_user.username is not None and credentials is not None
+            else None
+        )
+        if current_email is None:
+            current_email = ((await get_profile_row(client, user_id)) or {}).get("email")
 
-    # Keep profiles.email equal to the verified Cognito email; a requested change is
-    # written only once POST /account/email/verify succeeds.
-    if has_session and cognito_email:
-        updates["email"] = cognito_email
+        if str(new_email).lower() != (current_email or "").lower():
+            if (current_user.username or "").startswith("google_"):
+                raise_account_email_managed_by_google()
+            access_token = session_access_token(current_user, credentials)
+            await _request_email_change(access_token, str(new_email))
+            email_change_pending = True
+
     if set(updates) & PROFILE_PATCH_DB_COLUMNS:
         await upsert_profile_patch(client, user_id, AccountProfileUpdate(**updates))
 
