@@ -47,7 +47,7 @@ Production deploys use **[Vercel](https://vercel.com)** via `.github/workflows/f
 3. In the Vercel project (or GitHub secrets for CI builds), set env vars from `frontend/.env.example`:
    - `NEXT_PUBLIC_BACKEND_API_URL` — public URL of the FastAPI backend
    - `COGNITO_DOMAIN`, `COGNITO_CLIENT_ID`: Hosted UI base URL and app client id, read by the `/auth/google` route handler. Server-only: no `NEXT_PUBLIC_` prefix. The client secret lives on the backend only.
-4. In the **Cognito app client**, add `https://<your-project>.vercel.app/auth/callback` and `http://localhost:3000/auth/callback` as callback URLs, and the same origins with `/` as sign-out URLs. Cognito does not accept wildcards, so Google sign-in does not work on PR preview URLs; email/password sign-in does.
+4. In the **Cognito app client**, add `https://<your-project>.vercel.app/auth/callback` and `http://localhost:3000/auth/callback` as callback URLs, and the same origins with `/` and `/auth/cognito-logout/done` as sign-out URLs (Cognito's `/logout` bounces to its `/login` page if the return URL is not listed exactly). Cognito does not accept wildcards, so Google sign-in does not work on PR preview URLs; email/password sign-in does.
 
 **URLs:** Production is `https://<project-name>.vercel.app` (shown in the workflow deploy step and Vercel dashboard). Pull requests get their own preview URL, posted to the workflow run summary.
 

@@ -21,30 +21,34 @@ const afterLogoutCookie = (res: Response) =>
     .slice("radestate.after_logout=".length);
 
 describe("cognito logout route", () => {
-  it("sends the browser through Cognito's /logout and back to the done route", () => {
-    const res = logout(new Request("https://app.test/auth/cognito-logout"));
+  const logoutParams = (res: Response) => {
     const location = new URL(res.headers.get("location") ?? "");
-
     expect(location.origin + location.pathname).toBe(
       "https://radestate.auth.us-east-1.amazoncognito.com/logout",
     );
-    expect(Object.fromEntries(location.searchParams)).toEqual({
+    return Object.fromEntries(location.searchParams);
+  };
+
+  it("sends the browser through Cognito's /logout and straight back home", () => {
+    const res = logout(new Request("https://app.test/auth/cognito-logout"));
+    expect(logoutParams(res)).toEqual({
       client_id: "client-123",
-      logout_uri: "https://app.test/auth/cognito-logout/done",
+      logout_uri: "https://app.test/",
     });
-    expect(afterLogoutCookie(res)).toBe(encodeURIComponent("/"));
+    expect(afterLogoutCookie(res)).toBeUndefined();
   });
 
-  it("keeps a same-site next path for after the logout", () => {
+  it("returns through the done route to keep a same-site next path", () => {
     const res = logout(new Request("https://app.test/auth/cognito-logout?next=%2Fsaved"));
+    expect(logoutParams(res).logout_uri).toBe("https://app.test/auth/cognito-logout/done");
     expect(decodeURIComponent(afterLogoutCookie(res) ?? "")).toBe("/saved");
   });
 
-  it("drops a next that points off-site", () => {
+  it("drops a next that points off-site and goes home", () => {
     const res = logout(
       new Request("https://app.test/auth/cognito-logout?next=https%3A%2F%2Fevil.test"),
     );
-    expect(decodeURIComponent(afterLogoutCookie(res) ?? "")).toBe("/");
+    expect(logoutParams(res).logout_uri).toBe("https://app.test/");
   });
 
   it("goes straight to next when Cognito is not configured", () => {

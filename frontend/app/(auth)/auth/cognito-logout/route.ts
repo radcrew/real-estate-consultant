@@ -12,19 +12,26 @@ const AFTER_LOGOUT_MAX_AGE_SECONDS = 300;
 
 /**
  * Send the browser through Cognito's /logout to drop its Hosted UI session, then on to
- * `?next=` (a same-site path) or home. Cognito returns to the fixed done route, so `next`
- * waits in a short-lived cookie.
+ * `?next=` (a same-site path) or home. Going home, Cognito returns straight to `/`.
+ * Otherwise it returns to the fixed done route and `next` waits in a short-lived cookie.
+ * Both return URLs must be in the app client's allowed sign-out URLs.
  */
 export function GET(request: Request) {
   const { origin, searchParams } = new URL(request.url);
   const next = safeNextPath(searchParams.get("next"));
+  const goingHome = next === "/";
 
-  const logoutUrl = buildLogoutUrl(`${origin}${COGNITO_LOGOUT_DONE_PATH}`);
+  const logoutUrl = buildLogoutUrl(
+    goingHome ? `${origin}/` : `${origin}${COGNITO_LOGOUT_DONE_PATH}`,
+  );
   if (!logoutUrl) {
     return NextResponse.redirect(new URL(next, origin));
   }
 
   const response = NextResponse.redirect(logoutUrl);
+  if (goingHome) {
+    return response;
+  }
   response.cookies.set(AFTER_LOGOUT_COOKIE, next, {
     path: COGNITO_LOGOUT_PATH,
     maxAge: AFTER_LOGOUT_MAX_AGE_SECONDS,
