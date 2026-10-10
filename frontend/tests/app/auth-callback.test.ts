@@ -174,6 +174,17 @@ describe("auth callback route", () => {
     expect(failure(res)).toMatchObject({ path: "/sign-in", reason: "exchange_failed" });
   });
 
+  it("reports any other 409 as a failed exchange with its status and body", async () => {
+    fetchMock.mockResolvedValue(new Response('{"detail":"something else"}', { status: 409 }));
+
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
+
+    expect(failure(res)).toMatchObject({ path: "/sign-in", reason: "exchange_failed" });
+    expect(console.error).toHaveBeenCalledWith(
+      '[oauth] callback failed (exchange_failed): 409 {"detail":"something else"}',
+    );
+  });
+
   it("reports an unreachable backend as unexpected", async () => {
     fetchMock.mockRejectedValue(new Error("connect ECONNREFUSED"));
 

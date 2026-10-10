@@ -45,6 +45,15 @@ const failSignIn = (origin: string, reason: FailureReason, detail?: string) => {
   return response;
 };
 
+/** The `detail` of a FastAPI error body, if the body is JSON. */
+const errorDetail = (body: string): unknown => {
+  try {
+    return (JSON.parse(body) as { detail?: unknown }).detail;
+  } catch {
+    return undefined;
+  }
+};
+
 const readState = async (): Promise<OAuthState | null> => {
   const raw = (await cookies()).get(OAUTH_STATE_COOKIE)?.value;
   if (!raw) {
@@ -92,9 +101,10 @@ export async function GET(request: Request) {
       }),
       cache: "no-store",
     });
-    if (res.status === 409 && !saved.relink) {
-      const { detail } = (await res.json().catch(() => ({}))) as { detail?: unknown };
-      if (detail === OAUTH_ACCOUNT_LINKED) {
+    if (!res.ok) {
+      // A body can be read only once, so read it as text and parse from that.
+      const body = await res.text();
+      if (res.status === 409 && !saved.relink && errorDetail(body) === OAUTH_ACCOUNT_LINKED) {
         // Google is now linked to the user's existing account. Sign in once more to get
         // that account's tokens; Google remembers the user, so this is a quick hop.
         const restart = new URL(OAUTH_START_PATH, origin);
@@ -104,9 +114,7 @@ export async function GET(request: Request) {
         clearStateCookie(response);
         return response;
       }
-    }
-    if (!res.ok) {
-      return failSignIn(origin, "exchange_failed", `${res.status} ${await res.text()}`);
+      return failSignIn(origin, "exchange_failed", `${res.status} ${body}`);
     }
 
     const session = toStoredSession((await res.json()) as SignInResponse);

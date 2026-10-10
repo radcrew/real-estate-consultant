@@ -7,7 +7,7 @@ vi.mock("@services/admin", () => ({
 }));
 
 import { adminService, type JobRow } from "@services/admin";
-import { JOB_POLL_INTERVAL_MS, useIngestJob } from "@hooks/use-ingest-job";
+import { JOB_POLL_INTERVAL_MS, JOB_POLL_MAX_FAILURES, useIngestJob } from "@hooks/use-ingest-job";
 
 const enqueueIngest = vi.mocked(adminService.enqueueIngest);
 const getJob = vi.mocked(adminService.getJob);
@@ -76,16 +76,32 @@ describe("useIngestJob", () => {
     expect(result.current.triggering).toBe(false);
   });
 
-  it("surfaces a polling error and stops polling", async () => {
-    getJob.mockResolvedValueOnce(job("running")).mockRejectedValueOnce(new Error("down"));
+  it("keeps polling through a failed read and clears the error once one succeeds", async () => {
+    getJob
+      .mockResolvedValueOnce(job("running"))
+      .mockRejectedValueOnce(new Error("down"))
+      .mockResolvedValueOnce(job("done"));
     const { result } = renderHook(() => useIngestJob());
 
     await act(() => result.current.triggerIngest());
     await advancePoll();
+    expect(result.current.error).toBeTruthy();
+
+    await advancePoll();
+    expect(result.current.job?.status).toBe("done");
+    expect(result.current.error).toBeNull();
+    expect(getJob).toHaveBeenCalledTimes(3);
+  });
+
+  it("stops polling after too many failed reads in a row", async () => {
+    getJob.mockResolvedValueOnce(job("running")).mockRejectedValue(new Error("down"));
+    const { result } = renderHook(() => useIngestJob());
+
+    await act(() => result.current.triggerIngest());
+    for (let i = 0; i < JOB_POLL_MAX_FAILURES + 2; i++) await advancePoll();
 
     expect(result.current.error).toBeTruthy();
-    await advancePoll();
-    expect(getJob).toHaveBeenCalledTimes(2);
+    expect(getJob).toHaveBeenCalledTimes(1 + JOB_POLL_MAX_FAILURES);
   });
 
   it("stops polling on unmount", async () => {
