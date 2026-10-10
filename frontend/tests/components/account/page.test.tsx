@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { AxiosError, AxiosHeaders } from "axios";
 import { AccountPage } from "@components/account/page";
+import { accountService } from "@services/account";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -116,5 +118,46 @@ describe("AccountPage", () => {
     fireEvent.click(screen.getByRole("button", { name: /saved/i }));
 
     expect(await screen.findByRole("heading", { name: /saved properties/i })).toBeInTheDocument();
+  });
+
+  describe("password change errors", () => {
+    const apiError = (status: number, detail: string) =>
+      new AxiosError("failed", "ERR_BAD_REQUEST", undefined, undefined, {
+        status,
+        statusText: "",
+        headers: {},
+        config: { headers: new AxiosHeaders() },
+        data: { detail },
+      });
+
+    const submitPasswordChange = async () => {
+      mockUseAuth.mockReturnValue({ session: { user: { email: "jane@test.com", avatarUrl: null } }, ready: true, refresh: vi.fn() });
+      render(<AccountPage />);
+      await screen.findByRole("navigation", { name: /account navigation/i });
+      fireEvent.click(screen.getByRole("button", { name: /security/i }));
+      fireEvent.change(screen.getByLabelText("Current password"), { target: { value: "oldpass11" } });
+      fireEvent.change(screen.getByLabelText("New password"), { target: { value: "newpass11" } });
+      fireEvent.change(screen.getByLabelText("Confirm new password"), { target: { value: "newpass11" } });
+      fireEvent.click(screen.getByRole("button", { name: /update password/i }));
+    };
+
+    it("shows a wrong current password on that field", async () => {
+      vi.mocked(accountService.changePassword).mockRejectedValue(apiError(400, "Current password is incorrect."));
+      await submitPasswordChange();
+
+      await waitFor(() =>
+        expect(screen.getByLabelText("Current password")).toHaveAttribute("aria-invalid", "true"),
+      );
+      expect(screen.getByText("Current password is incorrect.")).toBeInTheDocument();
+    });
+
+    it("shows any other 400 as a form error", async () => {
+      const detail = "This account signs in with Google and has no password to change.";
+      vi.mocked(accountService.changePassword).mockRejectedValue(apiError(400, detail));
+      await submitPasswordChange();
+
+      expect(await screen.findByText(detail)).toBeInTheDocument();
+      expect(screen.getByLabelText("Current password")).toHaveAttribute("aria-invalid", "false");
+    });
   });
 });

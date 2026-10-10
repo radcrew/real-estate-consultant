@@ -46,6 +46,9 @@ const emptyProfile = (): ProfileFormValues => ({
   country: "",
 });
 
+// Detail of the backend's 400 for a wrong current password (raise_current_password_incorrect).
+const CURRENT_PASSWORD_INCORRECT = "Current password is incorrect.";
+
 export const AccountPage = () => {
   const router = useRouter();
   const { session, ready, refresh } = useAuth();
@@ -264,7 +267,9 @@ export const AccountPage = () => {
         setPasswordSuccess(true);
       } catch (err) {
         const msg = getApiErrorMessage(err);
-        if (isAxiosError(err) && err.response?.status === 401) {
+        // A 400 that names the current password belongs on that field; other 400s
+        // (e.g. a Google-managed account) go to the form. Matches the backend's message.
+        if (isAxiosError(err) && err.response?.status === 400 && msg === CURRENT_PASSWORD_INCORRECT) {
           setPasswordErrors({ currentPassword: msg });
         } else {
           setPasswordErrors({ form: msg });

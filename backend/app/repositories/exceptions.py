@@ -6,13 +6,14 @@ from typing import NoReturn
 
 from app.utils.exceptions import (
     raise_bad_gateway,
+    raise_bad_request,
     raise_not_found,
-    raise_unauthorized,
 )
 
 
 def raise_current_password_incorrect(*, cause: BaseException | None = None) -> NoReturn:
-    raise_unauthorized("Current password is incorrect.", cause=cause)
+    # 400, not 401: the browser treats a 401 as an expired session and signs the user out.
+    raise_bad_request("Current password is incorrect.", cause=cause)
 
 
 def raise_intake_session_not_found() -> NoReturn:

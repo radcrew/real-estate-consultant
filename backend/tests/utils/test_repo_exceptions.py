@@ -9,10 +9,10 @@ from app.repositories.exceptions import (
 
 
 class TestServiceHelpers:
-    def test_current_password_incorrect_raises_401(self):
+    def test_current_password_incorrect_raises_400(self):
         with pytest.raises(HTTPException) as info:
             raise_current_password_incorrect()
-        assert info.value.status_code == 401
+        assert info.value.status_code == 400
 
     def test_intake_session_not_found_raises_404(self):
         with pytest.raises(HTTPException) as info:

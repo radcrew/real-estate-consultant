@@ -313,12 +313,13 @@ class TestChangePassword:
             PreviousPassword="oldpass11", ProposedPassword="newpass11", AccessToken="access-tok"
         )
 
-    async def test_wrong_current_password_returns_401(self, client, idp):
+    async def test_wrong_current_password_returns_400_not_401(self, client, idp):
+        """A 401 would make the browser refresh, retry, then sign the user out."""
         idp.change_password.side_effect = ClientError(
             {"Error": {"Code": "NotAuthorizedException", "Message": "Incorrect"}}, "ChangePassword"
         )
         r = await client.post("/api/v1/account/password", json=self._BODY, headers=self._AUTH)
-        assert r.status_code == 401
+        assert r.status_code == 400
         assert r.json()["detail"] == "Current password is incorrect."
 
     async def test_google_issued_token_asks_for_a_password_sign_in(self, client, idp):

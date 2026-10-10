@@ -13,12 +13,14 @@ import { AuthFormDivider } from "./divider";
 import { EmailField } from "../fields/email";
 import { PasswordField } from "../fields/password";
 import { GoogleAuthButton } from "./button";
+import { VerifyEmailForm } from "./verify-email";
 
 export const SignInForm = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   const { signIn, error, isSubmitting } = useAuth();
 
@@ -30,10 +32,14 @@ export const SignInForm = () => {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    await signIn({ email, password }, handleSuccess, () =>
-      router.push(`/sign-up?confirm=${encodeURIComponent(email.trim())}`),
-    );
+    // Verify right here: the typed password lets the form sign the user in once the code
+    // is accepted, and it must never travel in a URL.
+    await signIn({ email, password }, handleSuccess, () => setNeedsVerification(true));
   };
+
+  if (needsVerification) {
+    return <VerifyEmailForm email={email.trim()} password={password} />;
+  }
 
   return (
     <div className="flex flex-col gap-5">
