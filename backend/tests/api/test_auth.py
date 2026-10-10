@@ -141,6 +141,11 @@ class TestSignIn:
         r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
         assert r.status_code == 503
 
+    async def test_unreachable_jwks_returns_503(self, client, idp, verify):
+        verify.side_effect = jwt.PyJWKClientConnectionError("timed out")
+        r = await client.post("/api/v1/auth/sign-in", json=_SIGN_IN)
+        assert r.status_code == 503
+
     async def test_invalid_body_returns_422(self, client):
         r = await client.post("/api/v1/auth/sign-in", json={"email": "bad"})
         assert r.status_code == 422
@@ -300,8 +305,15 @@ class TestRefresh:
     @pytest.fixture(autouse=True)
     def verify(self):
         claims = {"sub": _NEW_SUB, "username": _NEW_SUB}
-        with patch("app.api.v1.endpoints.auth.sign_in.verify_access_token", return_value=claims):
-            yield
+        with patch(
+            "app.api.v1.endpoints.auth.sign_in.verify_access_token", return_value=claims
+        ) as mock:
+            yield mock
+
+    async def test_unreachable_jwks_returns_503(self, client, idp, verify):
+        verify.side_effect = jwt.PyJWKClientConnectionError("timed out")
+        r = await client.post("/api/v1/auth/refresh", json=self._BODY)
+        assert r.status_code == 503
 
     async def test_returns_new_tokens_and_keeps_the_refresh_token(self, client, idp):
         r = await client.post("/api/v1/auth/refresh", json=self._BODY)
@@ -495,6 +507,13 @@ class TestOAuthExchange:
         verify.side_effect = jwt.InvalidAudienceError("aud")
         r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
         assert r.status_code == 400
+
+    async def test_unreachable_jwks_returns_503_not_a_rejected_code(
+        self, client, token_endpoint, verify
+    ):
+        verify.side_effect = jwt.PyJWKClientConnectionError("timed out")
+        r = await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        assert r.status_code == 503
 
 
 class TestSignOut:

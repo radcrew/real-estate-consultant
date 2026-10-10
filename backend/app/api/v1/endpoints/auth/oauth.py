@@ -21,6 +21,7 @@ from app.api.v1.endpoints.auth.sign_in import session_response
 from app.core.cognito import verify_id_token
 from app.core.config import settings
 from app.core.deps import DbSession, SupabaseSdkDep
+from app.core.exceptions import raise_auth_provider_unavailable
 from app.schemas.auth import OAuthExchangeRequest, SignInResponse
 from app.services.google_account_linking import link_to_existing_account
 
@@ -64,6 +65,9 @@ async def oauth_exchange(
     tokens = await _exchange_code(body.code, body.redirect_uri)
     try:
         claims = await asyncio.to_thread(verify_id_token, tokens["id_token"])
+    except jwt.PyJWKClientConnectionError as exc:
+        # Cognito's signing keys could not be fetched: an outage, not a bad code.
+        raise_auth_provider_unavailable(cause=exc)
     except jwt.PyJWTError as exc:
         logger.warning(
             "google_code_rejected",

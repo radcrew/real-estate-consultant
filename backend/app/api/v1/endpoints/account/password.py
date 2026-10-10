@@ -6,10 +6,12 @@ from fastapi import APIRouter, Response, status
 
 from app.api.v1.endpoints.account.exceptions import (
     raise_account_new_password_same_as_current,
+    raise_account_password_change_needs_password_sign_in,
     raise_account_password_managed_by_google,
 )
 from app.api.v1.endpoints.auth.exceptions import (
     cognito_error_code,
+    lacks_admin_scope,
     raise_cognito_error,
     raise_sign_in_transport_unavailable,
 )
@@ -43,7 +45,11 @@ async def change_account_password(
         )
 
     except ClientError as exc:
-        # The token was verified moments ago, so NotAuthorized means the old password.
+        # A password user whose Google identity is linked can hold a Google-issued token,
+        # which Cognito refuses for lacking the admin scope.
+        if lacks_admin_scope(exc):
+            raise_account_password_change_needs_password_sign_in(cause=exc)
+        # The token was verified moments ago, so any other NotAuthorized is the old password.
         if cognito_error_code(exc) == "NotAuthorizedException":
             raise_current_password_incorrect(cause=exc)
         raise_cognito_error(exc)

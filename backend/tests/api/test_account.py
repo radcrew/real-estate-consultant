@@ -321,6 +321,13 @@ class TestChangePassword:
         assert r.status_code == 401
         assert r.json()["detail"] == "Current password is incorrect."
 
+    async def test_google_issued_token_asks_for_a_password_sign_in(self, client, idp):
+        """A password user whose Google identity is linked may hold a Google token."""
+        idp.change_password.side_effect = _SCOPE_ERROR
+        r = await client.post("/api/v1/account/password", json=self._BODY, headers=self._AUTH)
+        assert r.status_code == 400
+        assert "sign in with your email and password" in r.json()["detail"]
+
     async def test_weak_new_password_returns_422(self, client, idp):
         idp.change_password.side_effect = ClientError(
             {"Error": {"Code": "InvalidPasswordException", "Message": "Needs a number"}},

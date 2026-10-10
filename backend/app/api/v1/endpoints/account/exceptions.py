@@ -31,6 +31,13 @@ def raise_account_email_change_needs_password_sign_in(*, cause: BaseException) -
     )
 
 
+def raise_account_password_change_needs_password_sign_in(*, cause: BaseException) -> NoReturn:
+    raise_bad_request(
+        "To change your password, sign in with your email and password, then try again.",
+        cause=cause,
+    )
+
+
 def raise_account_email_in_use(*, cause: BaseException) -> NoReturn:
     raise_conflict("That email is already in use.", cause=cause)
 

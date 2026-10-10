@@ -79,6 +79,12 @@ def cognito_error_code(exc: ClientError) -> str:
     return exc.response.get("Error", {}).get("Code", "")
 
 
+def lacks_admin_scope(exc: ClientError) -> bool:
+    """Tokens from Google sign-in lack aws.cognito.signin.user.admin, which the
+    self-service calls (GetUser, UpdateUserAttributes, ChangePassword) require."""
+    return cognito_error_code(exc) == "NotAuthorizedException" and "scope" in str(exc).lower()
+
+
 def raise_cognito_error(exc: ClientError) -> NoReturn:
     """Fallback for Cognito errors an endpoint does not map itself."""
     code = cognito_error_code(exc)

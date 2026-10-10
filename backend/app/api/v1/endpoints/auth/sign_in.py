@@ -18,6 +18,7 @@ from app.core.cognito import call_idp, secret_hash, verify_access_token
 from app.core.config import settings
 from app.core.db_safe import SupabaseRequestError
 from app.core.deps import SupabaseSdkDep, user_id_for_sub
+from app.core.exceptions import raise_auth_provider_unavailable
 from app.repositories.profiles import ensure_profile_row
 from app.schemas.auth import SignInRequest, SignInResponse, SignInUser
 from supabase import AsyncClient
@@ -42,7 +43,13 @@ async def session_response(
 
     A first sign-in also creates the user's ``public.profiles`` row from the ID token.
     """
-    claims = await asyncio.to_thread(verify_access_token, auth["AccessToken"])
+    try:
+        claims = await asyncio.to_thread(verify_access_token, auth["AccessToken"])
+    except jwt.PyJWTError as exc:
+        # Cognito issued this token moments ago, so a failure here is ours (JWKS fetch,
+        # config), not the user's.
+        logger.error("session_token_unverifiable", extra={"reason": f"{type(exc).__name__}: {exc}"})
+        raise_auth_provider_unavailable(cause=exc)
     user_id = await user_id_for_sub(client, claims["sub"])
     # The ID token came straight from Cognito over TLS; it is only read for profile fields.
     id_claims = jwt.decode(auth["IdToken"], options={"verify_signature": False})

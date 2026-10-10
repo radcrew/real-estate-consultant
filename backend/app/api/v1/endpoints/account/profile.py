@@ -15,6 +15,7 @@ from app.api.v1.endpoints.account.exceptions import (
 )
 from app.api.v1.endpoints.auth.exceptions import (
     cognito_error_code,
+    lacks_admin_scope,
     raise_cognito_error,
     raise_invalid_verification_code,
     raise_sign_in_transport_unavailable,
@@ -55,12 +56,6 @@ async def _profile_response(
     return response
 
 
-def _lacks_admin_scope(exc: ClientError) -> bool:
-    """Tokens from Google sign-in lack aws.cognito.signin.user.admin, which the
-    self-service calls (GetUser, UpdateUserAttributes) require."""
-    return cognito_error_code(exc) == "NotAuthorizedException" and "scope" in str(exc).lower()
-
-
 def _email_of(user: dict) -> str | None:
     """The verified email only: while a change is pending, Cognito may already hold the
     new, unconfirmed address."""
@@ -76,7 +71,7 @@ async def _cognito_email(access_token: str, username: str) -> str | None:
     try:
         return _email_of(await call_idp("get_user", AccessToken=access_token))
     except ClientError as exc:
-        if not _lacks_admin_scope(exc):
+        if not lacks_admin_scope(exc):
             raise_cognito_error(exc)
     except BotoCoreError as exc:
         raise_sign_in_transport_unavailable(cause=exc)
@@ -103,7 +98,7 @@ async def _request_email_change(access_token: str, new_email: str) -> None:
     except ClientError as exc:
         if cognito_error_code(exc) == "AliasExistsException":
             raise_account_email_in_use(cause=exc)
-        if _lacks_admin_scope(exc):
+        if lacks_admin_scope(exc):
             raise_account_email_change_needs_password_sign_in(cause=exc)
         raise_cognito_error(exc)
     except BotoCoreError as exc:
