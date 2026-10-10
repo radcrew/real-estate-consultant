@@ -7,6 +7,7 @@ Calls the dependencies directly so these run without building the FastAPI app.
 
 from __future__ import annotations
 
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
@@ -83,9 +84,29 @@ class TestBearerAuth:
         assert mapping.call_args.args[1] == _SUB
 
     async def test_mapping_is_cached_per_sub(self, dependency, verify, mapping):
+        mapping.side_effect = None
+        mapping.return_value = _SUPABASE_UUID
+        await dependency(_request(), _bearer())
+        with patch.object(deps.time, "monotonic", return_value=time.monotonic() + 3600):
+            await dependency(_request(), _bearer())
+        mapping.assert_called_once()
+
+    async def test_unmapped_sub_is_cached_briefly(self, dependency, verify, mapping):
         await dependency(_request(), _bearer())
         await dependency(_request(), _bearer())
         mapping.assert_called_once()
+
+    async def test_mapping_row_added_later_is_seen_after_the_expiry(
+        self, dependency, verify, mapping
+    ):
+        """A migrated user who signs in before their row exists must not stay unmapped."""
+        assert (await dependency(_request(), _bearer())).id == _SUB
+        mapping.side_effect = None
+        mapping.return_value = _SUPABASE_UUID
+        later = time.monotonic() + deps._UNMAPPED_TTL_SECONDS + 1
+        with patch.object(deps.time, "monotonic", return_value=later):
+            user = await dependency(_request(), _bearer())
+        assert user.id == _SUPABASE_UUID
 
     async def test_mapping_lookup_failure_is_503(self, dependency, verify, mapping):
         """Guessing the sub here would hide a migrated user's data, so fail instead."""

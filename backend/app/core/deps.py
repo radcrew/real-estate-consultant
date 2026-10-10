@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import math
+import time
 from contextvars import ContextVar
 from typing import Annotated
 from uuid import UUID
@@ -84,18 +86,24 @@ async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str
     return AuthUser(id=str(resolved.user_id))
 
 
-# Cognito sub -> app user id. The mapping never changes, so each sub costs one read
-# per process.
-_user_id_by_sub: dict[str, str] = {}
+# Cognito sub -> (app user id, expiry on the monotonic clock). A mapping row never changes,
+# so a mapped sub costs one read per process. An unmapped sub (its own id) is checked again
+# after a minute, because a row can still be added for it or moved onto it by a merge.
+_UNMAPPED_TTL_SECONDS = 60.0
+_user_id_by_sub: dict[str, tuple[str, float]] = {}
 
 
 async def user_id_for_sub(client: AsyncClient, sub: str) -> str:
-    if sub not in _user_id_by_sub:
-        try:
-            _user_id_by_sub[sub] = await resolve_user_id(client, sub)
-        except SupabaseRequestError as exc:
-            raise_service_unavailable("User lookup unavailable.", cause=exc)
-    return _user_id_by_sub[sub]
+    cached = _user_id_by_sub.get(sub)
+    if cached is not None and cached[1] > time.monotonic():
+        return cached[0]
+    try:
+        user_id = await resolve_user_id(client, sub)
+    except SupabaseRequestError as exc:
+        raise_service_unavailable("User lookup unavailable.", cause=exc)
+    expires = math.inf if user_id != sub else time.monotonic() + _UNMAPPED_TTL_SECONDS
+    _user_id_by_sub[sub] = (user_id, expires)
+    return user_id
 
 
 async def _user_from_access_token(client: AsyncClient, token: str) -> AuthUser:
