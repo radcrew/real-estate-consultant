@@ -41,7 +41,7 @@ class TestUpsertProfilePatch:
 
 
 class TestEnsureProfileRow:
-    async def test_inserts_and_never_overwrites_an_existing_row(self):
+    async def test_inserts_a_missing_row(self):
         client = make_supabase_client([])
         await ensure_profile_row(
             client, _USER_ID, email="u@example.com", first_name="Alice", last_name=None
@@ -51,6 +51,27 @@ class TestEnsureProfileRow:
             on_conflict="id",
             ignore_duplicates=True,
         )
+
+    async def test_fills_only_the_empty_fields_of_an_existing_row(self):
+        """Rows created before sign-in wrote them can lack an email or names."""
+        client = make_supabase_client(
+            [{"id": _USER_ID, "email": None, "first_name": "Edited", "last_name": ""}]
+        )
+        await ensure_profile_row(
+            client, _USER_ID, email="u@example.com", first_name="Alice", last_name="Smith"
+        )
+        client.table.return_value.update.assert_called_once_with(
+            {"email": "u@example.com", "last_name": "Smith"}
+        )
+        client.table.return_value.upsert.assert_not_called()
+
+    async def test_complete_row_is_not_written(self):
+        client = make_supabase_client([_PROFILE_ROW | {"last_name": "Smith"}])
+        await ensure_profile_row(
+            client, _USER_ID, email="new@example.com", first_name="Bob", last_name="Jones"
+        )
+        client.table.return_value.update.assert_not_called()
+        client.table.return_value.upsert.assert_not_called()
 
 
 class TestSetProfileAvatarUrl:

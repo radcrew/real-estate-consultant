@@ -94,17 +94,30 @@ async def ensure_profile_row(
     first_name: str | None,
     last_name: str | None,
 ) -> None:
-    """Create the profile row on first sign-in. An existing row, edits included, is kept."""
-    row = {"id": user_id, "email": email, "first_name": first_name, "last_name": last_name}
-    await execute_db_safe(
-        client.table("profiles")
-        .upsert(
-            {k: v for k, v in row.items() if v is not None},
-            on_conflict="id",
-            ignore_duplicates=True,
+    """Create the profile row on first sign-in, or fill its empty fields.
+
+    A value already on the row, a user's edit included, is never overwritten.
+    """
+    fields = {
+        k: v
+        for k, v in {"email": email, "first_name": first_name, "last_name": last_name}.items()
+        if v
+    }
+    existing = await get_profile_row(client, UUID(user_id))
+    if existing is None:
+        # ignore_duplicates: a concurrent sign-in may have created the row meanwhile.
+        await execute_db_safe(
+            client.table("profiles")
+            .upsert({"id": user_id, **fields}, on_conflict="id", ignore_duplicates=True)
+            .execute(),
         )
-        .execute(),
-    )
+        return
+
+    gaps = {k: v for k, v in fields.items() if not existing.get(k)}
+    if gaps:
+        await execute_db_safe(
+            client.table("profiles").update(gaps).eq("id", user_id).execute(),
+        )
 
 
 async def set_profile_avatar_url(

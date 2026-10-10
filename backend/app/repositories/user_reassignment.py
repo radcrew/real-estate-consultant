@@ -47,7 +47,9 @@ _PROFILE_FILL_COLUMNS: tuple[str, ...] = (
 
 _RESOLVE_SQL = text(
     "select coalesce("
-    "(select uuid::text from public.cognito_identity_mapping where sub = cast(:sub as text)), "
+    # sub::text, so the lookup works whether the column is text or uuid.
+    "(select uuid::text from public.cognito_identity_mapping "
+    "where sub::text = cast(:sub as text)), "
     "cast(:sub as text))"
 )
 
