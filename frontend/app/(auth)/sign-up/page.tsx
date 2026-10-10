@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 
 import { AuthPageFooter } from "@components/auth/main/footer";
 import { AuthPageTitle } from "@components/auth/main/title";
@@ -16,9 +15,7 @@ const SignUpPage = () => (
       title="Create account"
       description="Create an account with your work email. We'll email you a code to confirm it."
     />
-    <Suspense fallback={null}>
-      <SignUpForm />
-    </Suspense>
+    <SignUpForm />
     <AuthPageFooter
       prompt="Already have an account?"
       linkHref="/sign-in"

@@ -31,11 +31,9 @@ vi.mock("@contexts/auth", () => ({
 }));
 
 const mockPush = vi.fn();
-let confirmParam: string | null = null;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, refresh: vi.fn() }),
-  useSearchParams: () => ({ get: (key: string) => (key === "confirm" ? confirmParam : null) }),
 }));
 
 vi.mock("next/image", () => ({
@@ -45,7 +43,6 @@ vi.mock("next/image", () => ({
 beforeEach(() => {
   mockAuth.signUp = vi.fn();
   mockPush.mockReset();
-  confirmParam = null;
   mockAuth.error = null;
   mockAuth.isSubmitting = false;
 });
@@ -177,12 +174,5 @@ describe("SignUpForm", () => {
     await fillForm();
     await userEvent.click(screen.getByRole("button", { name: /create account/i }));
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/sign-in?registered=1"));
-  });
-
-  it("opens straight on the verify step for ?confirm=<email>", () => {
-    confirmParam = "jane@example.com";
-    render(<SignUpForm />);
-    expect(screen.getByLabelText(/verification code/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText(/first name/i)).not.toBeInTheDocument();
   });
 });

@@ -26,13 +26,11 @@ from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cognito import call_admin_idp
+from app.core.cognito import GOOGLE_USERNAME_PREFIX, call_admin_idp
 from app.core.config import settings
 from app.repositories.user_reassignment import reassign_user
 
 logger = logging.getLogger(__name__)
-
-GOOGLE_USERNAME_PREFIX = "google_"
 
 
 def attributes(user: dict[str, Any]) -> dict[str, str]:

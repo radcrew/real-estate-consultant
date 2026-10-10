@@ -63,8 +63,6 @@ def mock_supabase():
 def mock_user():
     user = MagicMock()
     user.id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-    user.email = "user@example.com"
-    user.phone = None
     return user
 
 

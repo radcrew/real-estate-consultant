@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cognito import is_google_username
 from app.services.google_identity import (
-    GOOGLE_USERNAME_PREFIX,
     attributes,
     fold_google_user,
     google_user_id,
@@ -37,7 +37,7 @@ async def merge_google_user(session: AsyncSession, email: str) -> bool:
         u
         for u in same_email
         if u.get("UserStatus") == "EXTERNAL_PROVIDER"
-        and u["Username"].startswith(GOOGLE_USERNAME_PREFIX)
+        and is_google_username(u["Username"])
         and attributes(u).get("email_verified") == "true"
     ]
     if len(password_users) != 1 or len(google_users) != 1:

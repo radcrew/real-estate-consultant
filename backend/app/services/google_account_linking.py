@@ -17,8 +17,8 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cognito import is_google_username
 from app.services.google_identity import (
-    GOOGLE_USERNAME_PREFIX,
     attributes,
     fold_google_user,
     google_user_id,
@@ -57,7 +57,7 @@ async def link_to_existing_account(session: AsyncSession, claims: dict[str, Any]
     """
     username = str(claims.get("cognito:username") or "")
     email = str(claims.get("email") or "").strip().lower()
-    if not username.startswith(GOOGLE_USERNAME_PREFIX) or not email:
+    if not is_google_username(username) or not email:
         return False
     if not _is_true(claims.get("email_verified")):
         return False

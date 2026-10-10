@@ -2,7 +2,7 @@ import axios, { type InternalAxiosRequestConfig } from "axios";
 
 import { clearSession, readSession, saveSession, toStoredSession } from "@lib/auth-session";
 import { BACKEND_BASE_URL } from "@config/env";
-import type { SignInResponse } from "@services/auth";
+import type { RefreshRequestBody, SignInResponse } from "@services/auth";
 
 const API_BASE_URL = `${BACKEND_BASE_URL}/api/v1`;
 
@@ -27,10 +27,11 @@ const refreshSession = (): Promise<boolean> => {
       return false;
     }
     try {
-      const { data } = await axios.post<SignInResponse>(`${API_BASE_URL}/auth/refresh`, {
+      const body: RefreshRequestBody = {
         refresh_token: session.refreshToken,
         username: session.user.username,
-      });
+      };
+      const { data } = await axios.post<SignInResponse>(`${API_BASE_URL}/auth/refresh`, body);
       saveSession(toStoredSession(data, session));
       return true;
     } catch {

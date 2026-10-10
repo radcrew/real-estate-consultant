@@ -8,12 +8,10 @@ from app.schemas.account import AccountProfileResponse
 
 
 def account_profile_response(*, user: AuthUser, profile: Profile | None) -> AccountProfileResponse:
+    # Sign-in creates the row, so a missing one is rare (its write failed and the next
+    # sign-in retries); there is nothing to show until then.
     if profile is None:
-        return AccountProfileResponse(
-            id=user.id,
-            email=user.email,
-            phone=user.phone,
-        )
+        return AccountProfileResponse(id=user.id, email=None)
 
     return AccountProfileResponse(
         id=user.id,

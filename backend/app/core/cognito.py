@@ -25,6 +25,14 @@ from app.core.config import settings
 
 _JWKS_TIMEOUT_S = 5
 
+# Cognito names a user created by Google sign-in google_<Google id>.
+GOOGLE_USERNAME_PREFIX = "google_"
+
+
+def is_google_username(username: str | None) -> bool:
+    """True for a standalone Google user, whose password and email belong to Google."""
+    return bool(username) and username.startswith(GOOGLE_USERNAME_PREFIX)
+
 
 def issuer() -> str:
     return f"https://cognito-idp.{settings.cognito_region}.amazonaws.com/{settings.cognito_user_pool_id}"

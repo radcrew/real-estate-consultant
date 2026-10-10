@@ -17,6 +17,12 @@ export type SignInResponse = {
   user: { id: string; email: string | null; username: string };
 };
 
+/** Body of POST /auth/refresh. The api-client interceptor is its only caller. */
+export type RefreshRequestBody = {
+  refresh_token: string;
+  username: string;
+};
+
 export type SignUpBody = {
   email: string;
   password: string;
@@ -56,14 +62,6 @@ export class AuthService {
 
   async resendCode(email: string): Promise<void> {
     await this.http.post("/auth/resend-code", { email });
-  }
-
-  async refresh(refreshToken: string, username: string): Promise<SignInResponse> {
-    const { data } = await this.http.post<SignInResponse>("/auth/refresh", {
-      refresh_token: refreshToken,
-      username,
-    });
-    return data;
   }
 
   async forgotPassword(email: string): Promise<void> {

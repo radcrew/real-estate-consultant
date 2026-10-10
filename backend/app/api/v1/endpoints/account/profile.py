@@ -21,7 +21,7 @@ from app.api.v1.endpoints.auth.exceptions import (
     raise_sign_in_transport_unavailable,
     raise_verification_code_expired,
 )
-from app.core.cognito import call_admin_idp, call_idp
+from app.core.cognito import call_admin_idp, call_idp, is_google_username
 from app.core.config import settings
 from app.core.deps import CurrentUser, SessionAccessToken, SupabaseSdkDep, session_access_token
 from app.domain.account_profile import account_profile_response
@@ -142,7 +142,7 @@ async def update_account_profile(
             current_email = ((await get_profile_row(client, user_id)) or {}).get("email")
 
         if str(new_email).lower() != (current_email or "").lower():
-            if (current_user.username or "").startswith("google_"):
+            if is_google_username(current_user.username):
                 raise_account_email_managed_by_google()
             access_token = session_access_token(current_user, credentials)
             await _request_email_change(access_token, str(new_email))

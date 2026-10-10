@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useState } from "react";
 
 import { ButtonPrimary } from "@components/ui/button-primary";
@@ -16,8 +16,7 @@ import { VerifyEmailForm } from "./verify-email";
 
 export const SignUpForm = () => {
   const router = useRouter();
-  // Sign-in sends unconfirmed accounts here as ?confirm=<email>.
-  const [pendingEmail, setPendingEmail] = useState(useSearchParams().get("confirm"));
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");

@@ -63,16 +63,6 @@ describe("AuthService", () => {
     expect(http.post).toHaveBeenCalledWith("/auth/resend-code", { email: "jane@example.com" });
   });
 
-  it("refresh posts the refresh token with the Cognito username", async () => {
-    const http = makeHttp(signInResponse);
-    const data = await new AuthService(http).refresh("ref", "u-1");
-    expect(http.post).toHaveBeenCalledWith("/auth/refresh", {
-      refresh_token: "ref",
-      username: "u-1",
-    });
-    expect(data).toEqual(signInResponse);
-  });
-
   it("forgotPassword posts the email", async () => {
     const http = makeHttp(undefined);
     await new AuthService(http).forgotPassword("jane@example.com");

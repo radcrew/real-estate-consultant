@@ -122,3 +122,17 @@ class TestVerifyIdToken:
             cognito.verify_id_token(
                 _id_token(iss="https://cognito-idp.us-east-1.amazonaws.com/other")
             )
+
+
+class TestIsGoogleUsername:
+    @pytest.mark.parametrize(
+        ("username", "expected"),
+        [
+            ("google_1234", True),
+            ("6f1c2a9e-0000-4000-8000-000000000001", False),
+            ("", False),
+            (None, False),
+        ],
+    )
+    def test_only_google_prefixed_names_are_google_users(self, username, expected):
+        assert cognito.is_google_username(username) is expected

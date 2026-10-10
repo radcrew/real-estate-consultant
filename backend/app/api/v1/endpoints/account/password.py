@@ -16,7 +16,7 @@ from app.api.v1.endpoints.auth.exceptions import (
     raise_cognito_error,
     raise_sign_in_transport_unavailable,
 )
-from app.core.cognito import call_idp
+from app.core.cognito import call_idp, is_google_username
 from app.core.deps import CurrentUser, SessionAccessToken
 from app.repositories.exceptions import raise_current_password_incorrect
 from app.schemas.account import AccountPasswordChangeRequest
@@ -31,7 +31,7 @@ async def change_account_password(
     access_token: SessionAccessToken,
 ) -> Response:
     # Federated users have no Cognito password; Google owns their credentials.
-    if (current_user.username or "").startswith("google_"):
+    if is_google_username(current_user.username):
         raise_account_password_managed_by_google()
 
     if body.current_password == body.new_password:

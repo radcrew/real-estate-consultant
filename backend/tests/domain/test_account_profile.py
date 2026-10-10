@@ -7,23 +7,17 @@ from app.models.profile import Profile
 _UUID = str(uuid.uuid4())
 
 
-def _make_user(email: str = "u@example.com", phone: str | None = None) -> AuthUser:
-    return AuthUser(id=_UUID, email=email, phone=phone)
+def _make_user() -> AuthUser:
+    return AuthUser(id=_UUID)
 
 
 class TestAccountProfileResponse:
-    def test_profile_none_returns_minimal(self):
-        user = _make_user()
-        result = account_profile_response(user=user, profile=None)
+    def test_profile_none_returns_only_the_id(self):
+        result = account_profile_response(user=_make_user(), profile=None)
         assert result.id == _UUID
-        assert result.email == "u@example.com"
+        assert result.email is None
+        assert result.phone is None
         assert result.first_name is None
-        assert result.last_name is None
-
-    def test_phone_copied_from_user(self):
-        user = _make_user(phone="+15550001234")
-        result = account_profile_response(user=user, profile=None)
-        assert result.phone == "+15550001234"
 
     def test_profile_fields_merged(self):
         user = _make_user()
@@ -43,7 +37,7 @@ class TestAccountProfileResponse:
         assert result.country == "US"
 
     def test_email_and_phone_come_from_the_profile_row(self):
-        user = _make_user(email="token@example.com")
+        user = _make_user()
         profile = Profile(id=_UUID, email="row@example.com", phone="+15550001234")
         result = account_profile_response(user=user, profile=profile)
         assert result.email == "row@example.com"
