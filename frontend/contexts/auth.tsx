@@ -22,7 +22,7 @@ import {
   toStoredSession,
   type StoredSession,
 } from "@lib/auth-session";
-import { OAUTH_START_PATH } from "@config/env";
+import { COGNITO_LOGOUT_PATH, OAUTH_START_PATH } from "@config/env";
 import { authService } from "@services/auth";
 import { accountService } from "@services/account";
 
@@ -54,7 +54,7 @@ export type AuthContextValue = {
   session: StoredSession | null;
   ready: boolean;
   refresh: () => void;
-  signOut: () => void;
+  signOut: () => Promise<void>;
   signIn: (
     credentials: AuthCredentials,
     onSuccess: () => void,
@@ -78,6 +78,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 // The backend's 403 detail for a sign-in by an account whose email is not confirmed yet.
 const EMAIL_NOT_CONFIRMED_DETAIL = "Confirm your email address before signing in.";
+
+// Longest sign-out waits for token revocation before leaving for Cognito's /logout.
+const SIGN_OUT_REVOKE_WAIT_MS = 2000;
 
 const isEmailNotConfirmed = (err: unknown): boolean =>
   isAxiosError(err) &&
@@ -252,15 +255,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const signInWithGoogle = useCallback(() => startGoogleOAuth(), [startGoogleOAuth]);
 
-  const signOut = useCallback(() => {
-    // Revoke the Cognito tokens in the background; the local session goes either way.
+  const signOut = useCallback(async () => {
     const accessToken = readSession()?.accessToken;
-    if (accessToken) {
-      authService.signOut(accessToken).catch((err) => {
-        console.warn("[auth] token revocation failed:", err);
-      });
-    }
     clearSession();
+    if (accessToken) {
+      // Give the revoke call a moment to land: leaving the page would cancel it.
+      await Promise.race([
+        authService.signOut(accessToken).catch((err) => {
+          console.warn("[auth] token revocation failed:", err);
+        }),
+        new Promise((resolve) => setTimeout(resolve, SIGN_OUT_REVOKE_WAIT_MS)),
+      ]);
+    }
+    // Cognito keeps its own Hosted UI session; without /logout the next "Continue with
+    // Google" in this browser would sign straight back into this account.
+    window.location.assign(COGNITO_LOGOUT_PATH);
   }, []);
 
   const refresh = useCallback(() => {

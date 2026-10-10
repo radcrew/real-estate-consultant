@@ -13,6 +13,10 @@ _SCOPE_ERROR = ClientError(
                "Message": "Access Token does not have required scopes"}},
     "GetUser",
 )
+_REVOKED_TOKEN_ERROR = ClientError(
+    {"Error": {"Code": "NotAuthorizedException", "Message": "Access Token has been revoked"}},
+    "ChangePassword",
+)
 _PROP_UUID = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
 _VERIFIED_EMAIL = [
     {"Name": "email", "Value": "user@example.com"},
@@ -195,6 +199,13 @@ class TestUpdateAccountProfile:
         assert r.json()["email_change_pending"] is False
         idp.update_user_attributes.assert_not_called()
 
+    async def test_revoked_token_on_email_change_is_a_401(self, client, idp, profiles):
+        idp.update_user_attributes.side_effect = _REVOKED_TOKEN_ERROR
+        r = await client.patch(
+            "/api/v1/account/profile", json={"email": "new@example.com"}, headers=self._AUTH
+        )
+        assert r.status_code == 401
+
     async def test_email_taken_returns_409(self, client, idp, profiles):
         idp.update_user_attributes.side_effect = ClientError(
             {"Error": {"Code": "AliasExistsException", "Message": "taken"}},
@@ -321,6 +332,13 @@ class TestChangePassword:
         r = await client.post("/api/v1/account/password", json=self._BODY, headers=self._AUTH)
         assert r.status_code == 400
         assert r.json()["detail"] == "Current password is incorrect."
+
+    async def test_revoked_token_is_a_401_not_a_wrong_password(self, client, idp):
+        """Signed out in another tab: send the user to sign in, not to retype a password."""
+        idp.change_password.side_effect = _REVOKED_TOKEN_ERROR
+        r = await client.post("/api/v1/account/password", json=self._BODY, headers=self._AUTH)
+        assert r.status_code == 401
+        assert r.json()["detail"] != "Current password is incorrect."
 
     async def test_google_issued_token_asks_for_a_password_sign_in(self, client, idp):
         """A password user whose Google identity is linked may hold a Google token."""

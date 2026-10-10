@@ -7,6 +7,10 @@
 export const OAUTH_STATE_COOKIE = "radestate.oauth_state";
 export const OAUTH_STATE_MAX_AGE_SECONDS = 300;
 
+// Holds the `next` path across Cognito's /logout, whose return URL must be a fixed,
+// allow-listed address and so cannot carry it.
+export const AFTER_LOGOUT_COOKIE = "radestate.after_logout";
+
 // Must be a subset of the app client's allowed OpenID Connect scopes, or Cognito rejects
 // the whole request (invalid_scope). aws.cognito.signin.user.admin is left out until the
 // client allows it: without it, sign-out cannot revoke a Google user's tokens server-side

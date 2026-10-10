@@ -71,6 +71,14 @@ describe("VerifyEmailForm", () => {
     );
   });
 
+  it("passes the sign-in page's next path through the logout", async () => {
+    render(<VerifyEmailForm email="jane@example.com" password="Secret123!" next="/saved" />);
+    await submitCode();
+    await waitFor(() =>
+      expect(mockAssign).toHaveBeenCalledWith("/auth/cognito-logout?next=%2Fsaved"),
+    );
+  });
+
   it("clears Cognito's session even when the password is not known", async () => {
     render(<VerifyEmailForm email="jane@example.com" />);
     await submitCode();

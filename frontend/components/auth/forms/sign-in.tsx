@@ -38,7 +38,9 @@ export const SignInForm = () => {
   };
 
   if (needsVerification) {
-    return <VerifyEmailForm email={email.trim()} password={password} />;
+    return (
+      <VerifyEmailForm email={email.trim()} password={password} next={searchParams.get("next")} />
+    );
   }
 
   return (

@@ -13,9 +13,11 @@ type VerifyEmailFormProps = {
   email: string;
   // Set when the user just signed up in this tab; lets us sign them in right after.
   password?: string;
+  // Same-site path to land on once verified (the sign-in page's `next`).
+  next?: string | null;
 };
 
-export const VerifyEmailForm = ({ email, password }: VerifyEmailFormProps) => {
+export const VerifyEmailForm = ({ email, password, next }: VerifyEmailFormProps) => {
   const [code, setCode] = useState("");
   const [info, setInfo] = useState(`We sent a verification code to ${email}.`);
 
@@ -25,11 +27,14 @@ export const VerifyEmailForm = ({ email, password }: VerifyEmailFormProps) => {
   // earlier Google sign-in survives: the sign-up merge may have deleted that user, and a
   // session for a deleted user makes the next "Continue with Google" fail.
   const handleVerified = async () => {
+    const logout = next
+      ? `${COGNITO_LOGOUT_PATH}?next=${encodeURIComponent(next)}`
+      : COGNITO_LOGOUT_PATH;
     if (!password) {
-      window.location.assign(COGNITO_LOGOUT_PATH);
+      window.location.assign(logout);
       return;
     }
-    await signIn({ email, password }, () => window.location.assign(COGNITO_LOGOUT_PATH));
+    await signIn({ email, password }, () => window.location.assign(logout));
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {

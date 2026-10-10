@@ -10,6 +10,7 @@ from app.api.v1.endpoints.account.exceptions import (
     raise_account_password_managed_by_google,
 )
 from app.api.v1.endpoints.auth.exceptions import (
+    access_token_rejected,
     cognito_error_code,
     lacks_admin_scope,
     raise_cognito_error,
@@ -49,8 +50,9 @@ async def change_account_password(
         # which Cognito refuses for lacking the admin scope.
         if lacks_admin_scope(exc):
             raise_account_password_change_needs_password_sign_in(cause=exc)
-        # The token was verified moments ago, so any other NotAuthorized is the old password.
-        if cognito_error_code(exc) == "NotAuthorizedException":
+        # A revoked or expired token (e.g. signed out in another tab) is a 401, not a
+        # wrong password; raise_cognito_error maps it.
+        if cognito_error_code(exc) == "NotAuthorizedException" and not access_token_rejected(exc):
             raise_current_password_incorrect(cause=exc)
         raise_cognito_error(exc)
 

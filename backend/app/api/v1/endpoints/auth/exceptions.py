@@ -7,6 +7,7 @@ from typing import NoReturn
 from botocore.exceptions import ClientError
 from fastapi import status
 
+from app.core.exceptions import raise_auth_invalid_access_token
 from app.utils.exceptions import (
     raise_client_error,
     raise_conflict,
@@ -85,10 +86,25 @@ def lacks_admin_scope(exc: ClientError) -> bool:
     return cognito_error_code(exc) == "NotAuthorizedException" and "scope" in str(exc).lower()
 
 
+def access_token_rejected(exc: ClientError) -> bool:
+    """Cognito refused the access token itself: revoked by a sign-out, expired, or invalid.
+
+    Our own check only verifies the signature and expiry, so a revoked token gets this far.
+    """
+    return (
+        cognito_error_code(exc) == "NotAuthorizedException"
+        and "access token" in str(exc).lower()
+        and not lacks_admin_scope(exc)
+    )
+
+
 def raise_cognito_error(exc: ClientError) -> NoReturn:
     """Fallback for Cognito errors an endpoint does not map itself."""
     code = cognito_error_code(exc)
     message = exc.response.get("Error", {}).get("Message") or "Authentication request failed."
+    if access_token_rejected(exc):
+        # 401, so the browser refreshes the session or sends the user to sign in.
+        raise_auth_invalid_access_token(cause=exc)
     if code == "InvalidPasswordException":
         raise_unprocessable_entity(message, cause=exc)
     if code in ("TooManyRequestsException", "LimitExceededException"):
