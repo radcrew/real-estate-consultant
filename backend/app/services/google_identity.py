@@ -4,13 +4,14 @@ Two paths do this: ``google_user_merge`` when a password sign-up is confirmed, a
 ``google_account_linking`` on a Google sign-in. Each picks the two users its own way; this
 module owns the lookup and the fold itself, so the sequence cannot drift between them.
 
-The fold runs in an order where an early failure loses nothing:
+The fold runs so that a failure part way loses nothing:
 
-1. Move the Google user's data to the password user (one transaction). If this fails,
-   stop: both users are untouched and the next attempt can retry.
-2. Delete the Google user. ``AdminLinkProviderForUser`` refuses to link an identity that
-   still exists as its own user.
-3. Link the Google identity to the password user, so Google sign-in lands there.
+1. In one database transaction, move the Google user's data to the password user, then
+   delete the Google user in Cognito (``AdminLinkProviderForUser`` refuses to link an
+   identity that still exists as its own user). The transaction commits only once the
+   delete has succeeded; if either step fails, it rolls back and both users stay as
+   they were.
+2. Link the Google identity to the password user, so Google sign-in lands there.
 
 Needs IAM credentials (ListUsers, AdminDeleteUser, AdminLinkProviderForUser).
 """
@@ -93,22 +94,24 @@ async def fold_google_user(
     Google sign-in recreates a standalone user and linking runs again. Returns False when
     nothing was deleted. Never raises.
     """
-    try:
-        await reassign_user(session, google_sub, destination_sub)
-    except SQLAlchemyError as exc:
-        logger.error(
-            f"{event}_data_move_failed",
-            extra={"old_sub": google_sub, "new_sub": destination_sub, "error": str(exc)},
-        )
-        return False
-
     pool = settings.cognito_user_pool_id
+    subs = {"old_sub": google_sub, "new_sub": destination_sub}
+    deleted = False
     try:
-        await call_admin_idp("admin_delete_user", UserPoolId=pool, Username=google_username)
+        async with session.begin():
+            await reassign_user(session, google_sub, destination_sub)
+            await call_admin_idp("admin_delete_user", UserPoolId=pool, Username=google_username)
+            deleted = True
     except (ClientError, BotoCoreError) as exc:
-        # The data already sits with the destination; a later attempt finds nothing to move.
+        # The move rolled back with the failed delete: the Google user keeps its data.
         logger.error(f"{event}_delete_failed", extra={"error": str(exc)})
         return False
+    except SQLAlchemyError as exc:
+        if not deleted:
+            logger.error(f"{event}_data_move_failed", extra={**subs, "error": str(exc)})
+            return False
+        # The Google user is gone but its data did not move; it needs a manual move.
+        logger.error(f"{event}_commit_failed", extra={**subs, "error": str(exc)})
 
     try:
         await call_admin_idp(

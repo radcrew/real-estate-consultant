@@ -185,6 +185,14 @@ class TestSignUp:
         assert {"Name": "family_name", "Value": "Smith"} in kwargs["UserAttributes"]
         assert kwargs["SecretHash"]
 
+    async def test_email_is_lowercased_before_it_reaches_cognito(self, client, idp):
+        """Google linking looks users up by lowercased email; the pool must match."""
+        body = {**_SIGN_UP, "email": "Jane.Doe@Example.COM"}
+        await client.post("/api/v1/auth/sign-up", json=body)
+        kwargs = idp.sign_up.call_args.kwargs
+        assert kwargs["Username"] == "jane.doe@example.com"
+        assert {"Name": "email", "Value": "jane.doe@example.com"} in kwargs["UserAttributes"]
+
     async def test_email_already_exists_returns_409(self, client, idp):
         idp.sign_up.side_effect = _client_error("UsernameExistsException", "exists")
         r = await client.post("/api/v1/auth/sign-up", json=_SIGN_UP)

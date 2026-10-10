@@ -109,7 +109,9 @@ class TestReassignUser:
         await reassign_user(session, _OLD, _NEW)
         assert _writes(session) == []
 
-    async def test_runs_in_one_transaction(self):
+    async def test_runs_in_the_callers_transaction(self):
+        """The caller commits, so the move can roll back with a failed Cognito delete."""
         session = _session()
         await reassign_user(session, _OLD, _NEW)
-        session.begin.assert_called_once()
+        session.begin.assert_not_called()
+        session.commit.assert_not_called()

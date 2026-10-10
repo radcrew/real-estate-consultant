@@ -1,4 +1,4 @@
-"""Move everything one user owns onto another user, in one transaction.
+"""Move everything one user owns onto another user, inside the caller's transaction.
 
 Used when a Google-only user is folded into an email/password user: the Google user is
 about to be deleted from Cognito, so its data must move to the account that remains.
@@ -67,45 +67,48 @@ async def _resolve(session: AsyncSession, sub: str) -> str:
 
 
 async def reassign_user(session: AsyncSession, old_sub: str, new_sub: str) -> None:
-    """Move ``old_sub``'s data onto ``new_sub``'s account. Raises ``SQLAlchemyError``."""
-    async with session.begin():
-        old_id = await _resolve(session, old_sub)
-        new_id = await _resolve(session, new_sub)
-        if old_id == new_id:
-            return
-        params = {"old": old_id, "new": new_id}
+    """Move ``old_sub``'s data onto ``new_sub``'s account. Raises ``SQLAlchemyError``.
 
-        fills = ", ".join(f"{c} = coalesce(d.{c}, s.{c})" for c in _PROFILE_FILL_COLUMNS)
-        await session.execute(
-            text(
-                f"update public.profiles d set {fills} from public.profiles s "
-                "where d.id = cast(:new as uuid) and s.id = cast(:old as uuid)"
-            ),
-            params,
-        )
+    Runs in the caller's transaction and does not commit, so the caller can tie the move
+    to another step (the Cognito delete) and roll both back together.
+    """
+    old_id = await _resolve(session, old_sub)
+    new_id = await _resolve(session, new_sub)
+    if old_id == new_id:
+        return
+    params = {"old": old_id, "new": new_id}
 
-        for table, column in _USER_ID_COLUMNS:
-            keys = await session.execute(_UNIQUE_KEYS_SQL, {"table": f"public.{table}"})
-            for (key_columns,) in keys.all():
-                if column not in key_columns:
-                    continue
-                same = "".join(
-                    f' and d."{c}" is not distinct from s."{c}"'
-                    for c in key_columns
-                    if c != column
-                )
-                await session.execute(
-                    text(
-                        f'delete from public.{table} s where s."{column}" = cast(:old as uuid) '
-                        f'and exists (select 1 from public.{table} d '
-                        f'where d."{column}" = cast(:new as uuid){same})'
-                    ),
-                    params,
-                )
+    fills = ", ".join(f"{c} = coalesce(d.{c}, s.{c})" for c in _PROFILE_FILL_COLUMNS)
+    await session.execute(
+        text(
+            f"update public.profiles d set {fills} from public.profiles s "
+            "where d.id = cast(:new as uuid) and s.id = cast(:old as uuid)"
+        ),
+        params,
+    )
+
+    for table, column in _USER_ID_COLUMNS:
+        keys = await session.execute(_UNIQUE_KEYS_SQL, {"table": f"public.{table}"})
+        for (key_columns,) in keys.all():
+            if column not in key_columns:
+                continue
+            same = "".join(
+                f' and d."{c}" is not distinct from s."{c}"'
+                for c in key_columns
+                if c != column
+            )
             await session.execute(
                 text(
-                    f'update public.{table} set "{column}" = cast(:new as uuid) '
-                    f'where "{column}" = cast(:old as uuid)'
+                    f'delete from public.{table} s where s."{column}" = cast(:old as uuid) '
+                    f'and exists (select 1 from public.{table} d '
+                    f'where d."{column}" = cast(:new as uuid){same})'
                 ),
                 params,
             )
+        await session.execute(
+            text(
+                f'update public.{table} set "{column}" = cast(:new as uuid) '
+                f'where "{column}" = cast(:old as uuid)'
+            ),
+            params,
+        )

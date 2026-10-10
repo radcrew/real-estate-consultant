@@ -1,8 +1,14 @@
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from typing import Annotated
+
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
+
+# Cognito sees one spelling of each address: the pool's email lookups (ListUsers, used to
+# link Google sign-ins) may be case-sensitive. EmailStr alone lowercases only the domain.
+AuthEmail = Annotated[EmailStr, AfterValidator(str.lower)]
 
 
 class EmailPasswordRequest(BaseModel):
-    email: EmailStr
+    email: AuthEmail
     password: str = Field(min_length=8, max_length=72)
 
 
@@ -16,7 +22,7 @@ class SignInRequest(EmailPasswordRequest):
 
 
 class ResendCodeRequest(BaseModel):
-    email: EmailStr
+    email: AuthEmail
 
 
 class ConfirmSignUpRequest(ResendCodeRequest):
@@ -24,7 +30,7 @@ class ConfirmSignUpRequest(ResendCodeRequest):
 
 
 class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
+    email: AuthEmail
 
 
 class ResetPasswordRequest(EmailPasswordRequest):
