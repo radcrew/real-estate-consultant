@@ -3,8 +3,10 @@
 By the time the backend sees a Google sign-in, Cognito has already created a standalone
 ``google_…`` user. ``AdminLinkProviderForUser`` refuses to link an identity that exists as
 its own user, so the Google user is deleted first and then linked to the password account.
-The tokens in hand belong to the deleted user; the caller has the browser sign in again,
-and that second pass lands on the existing account.
+Anything the Google user already owned (it may have signed in before, for example when the
+confirm-time merge could not run) moves to the password account. The tokens in hand belong
+to the deleted user; the caller has the browser sign in again, and that second pass lands
+on the existing account.
 
 Linking by email hands that account to whoever controls the Google address, so it only
 happens when both Google and the existing account have the email verified.
@@ -17,9 +19,12 @@ import logging
 from typing import Any
 
 from botocore.exceptions import BotoCoreError, ClientError
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cognito import call_admin_idp
 from app.core.config import settings
+from app.repositories.user_reassignment import reassign_user
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +49,8 @@ def _google_user_id(claims: dict[str, Any]) -> str | None:
     return None
 
 
-def _password_account(users: list[dict[str, Any]], email: str) -> str | None:
-    """Username of the one enabled, verified email/password user with this email."""
+def _password_account(users: list[dict[str, Any]], email: str) -> tuple[str, str] | None:
+    """Username and ``sub`` of the one enabled, verified email/password user with this email."""
     matches = []
     for user in users:
         attrs = {a["Name"]: a["Value"] for a in user.get("Attributes", [])}
@@ -55,12 +60,14 @@ def _password_account(users: list[dict[str, Any]], email: str) -> str | None:
             and attrs.get("email", "").lower() == email
             and _is_true(attrs.get("email_verified"))
         ):
-            matches.append(user["Username"])
+            matches.append((user["Username"], attrs.get("sub")))
     # Two candidates would mean the pool is not keyed by email; do not guess.
-    return matches[0] if len(matches) == 1 else None
+    if len(matches) != 1 or not matches[0][1]:
+        return None
+    return matches[0]
 
 
-async def link_to_existing_account(claims: dict[str, Any]) -> bool:
+async def link_to_existing_account(session: AsyncSession, claims: dict[str, Any]) -> bool:
     """Link a new standalone Google user to a password account with the same email.
 
     Returns True when the Google user was deleted (and linked), meaning the caller's
@@ -77,7 +84,8 @@ async def link_to_existing_account(claims: dict[str, Any]) -> bool:
     if '"' in email or "\\" in email:
         return False
     google_id = _google_user_id(claims)
-    if not google_id:
+    old_sub = str(claims.get("sub") or "")
+    if not google_id or not old_sub:
         return False
 
     pool = settings.cognito_user_pool_id
@@ -92,6 +100,7 @@ async def link_to_existing_account(claims: dict[str, Any]) -> bool:
     destination = _password_account(listed.get("Users", []), email)
     if destination is None:
         return False
+    destination_username, new_sub = destination
 
     try:
         await call_admin_idp("admin_delete_user", UserPoolId=pool, Username=username)
@@ -105,7 +114,10 @@ async def link_to_existing_account(claims: dict[str, Any]) -> bool:
         await call_admin_idp(
             "admin_link_provider_for_user",
             UserPoolId=pool,
-            DestinationUser={"ProviderName": "Cognito", "ProviderAttributeValue": destination},
+            DestinationUser={
+                "ProviderName": "Cognito",
+                "ProviderAttributeValue": destination_username,
+            },
             SourceUser={
                 "ProviderName": "Google",
                 "ProviderAttributeName": "Cognito_Subject",
@@ -115,4 +127,15 @@ async def link_to_existing_account(claims: dict[str, Any]) -> bool:
         logger.info("google_account_linked")
     except (ClientError, BotoCoreError) as exc:
         logger.error("google_link_failed", extra={"error": str(exc)})
+
+    try:
+        path = await reassign_user(session, old_sub, new_sub)
+    except SQLAlchemyError as exc:
+        # The Google user is gone; its data now needs a manual move. Log both ids.
+        logger.error(
+            "google_link_data_move_failed",
+            extra={"old_sub": old_sub, "new_sub": new_sub, "error": str(exc)},
+        )
+        return True
+    logger.info("google_link_data_moved", extra={"data_path": path})
     return True

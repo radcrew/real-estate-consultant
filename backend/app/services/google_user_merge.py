@@ -75,10 +75,14 @@ async def merge_google_user(session: AsyncSession, email: str) -> bool:
 
     same_email = [u for u in users if _attrs(u).get("email", "").lower() == email]
     password_users = [u for u in same_email if u.get("UserStatus") == "CONFIRMED"]
+    # Google must have verified the address too, or anyone could claim it there first and
+    # be handed this account once its owner confirms.
     google_users = [
         u
         for u in same_email
-        if u.get("UserStatus") == "EXTERNAL_PROVIDER" and u["Username"].startswith(_GOOGLE_PREFIX)
+        if u.get("UserStatus") == "EXTERNAL_PROVIDER"
+        and u["Username"].startswith(_GOOGLE_PREFIX)
+        and _attrs(u).get("email_verified") == "true"
     ]
     if len(password_users) != 1 or len(google_users) != 1:
         return False

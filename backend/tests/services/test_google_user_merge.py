@@ -23,15 +23,18 @@ def _password_user(status: str = "CONFIRMED") -> dict:
     }
 
 
-def _google_user() -> dict:
+def _google_user(verified: str | None = "true") -> dict:
+    attributes = [
+        {"Name": "email", "Value": _EMAIL},
+        {"Name": "sub", "Value": _OLD_SUB},
+        {"Name": "identities", "Value": '[{"providerName":"Google","userId":"1234567890"}]'},
+    ]
+    if verified is not None:
+        attributes.append({"Name": "email_verified", "Value": verified})
     return {
         "Username": "google_1234567890",
         "UserStatus": "EXTERNAL_PROVIDER",
-        "Attributes": [
-            {"Name": "email", "Value": _EMAIL},
-            {"Name": "sub", "Value": _OLD_SUB},
-            {"Name": "identities", "Value": '[{"providerName":"Google","userId":"1234567890"}]'},
-        ],
+        "Attributes": attributes,
     }
 
 
@@ -92,6 +95,13 @@ class TestMergeGoogleUser:
         admin.state["users"] = [_password_user(status="UNCONFIRMED"), _google_user()]
         assert await merge.merge_google_user(MagicMock(), _EMAIL) is False
         assert "admin_delete_user" not in _ops(admin)
+
+    @pytest.mark.parametrize("verified", ["false", None])
+    async def test_unverified_google_email_is_never_merged(self, admin, reassign, verified):
+        admin.state["users"] = [_password_user(), _google_user(verified=verified)]
+        assert await merge.merge_google_user(MagicMock(), _EMAIL) is False
+        assert "admin_delete_user" not in _ops(admin)
+        reassign.assert_not_called()
 
     async def test_lookup_failure_changes_nothing(self, admin, reassign):
         admin.fail["list_users"] = _error("AccessDeniedException")

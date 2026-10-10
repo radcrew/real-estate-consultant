@@ -20,7 +20,7 @@ from app.api.v1.endpoints.auth.exceptions import (
 from app.api.v1.endpoints.auth.sign_in import session_response
 from app.core.cognito import verify_id_token
 from app.core.config import settings
-from app.core.deps import SupabaseSdkDep
+from app.core.deps import DbSession, SupabaseSdkDep
 from app.schemas.auth import OAuthExchangeRequest, SignInResponse
 from app.services.google_account_linking import link_to_existing_account
 
@@ -58,7 +58,9 @@ async def _exchange_code(code: str, redirect_uri: str) -> dict[str, Any]:
 
 
 @router.post("/oauth/exchange")
-async def oauth_exchange(body: OAuthExchangeRequest, client: SupabaseSdkDep) -> SignInResponse:
+async def oauth_exchange(
+    body: OAuthExchangeRequest, client: SupabaseSdkDep, session: DbSession
+) -> SignInResponse:
     tokens = await _exchange_code(body.code, body.redirect_uri)
     try:
         claims = await asyncio.to_thread(verify_id_token, tokens["id_token"])
@@ -71,7 +73,7 @@ async def oauth_exchange(body: OAuthExchangeRequest, client: SupabaseSdkDep) -> 
 
     # These tokens belong to a new standalone Google user. If the email already has a
     # password account, the Google user is folded into it and must sign in once more.
-    if body.link_accounts and await link_to_existing_account(claims):
+    if body.link_accounts and await link_to_existing_account(session, claims):
         raise_oauth_account_linked()
 
     auth = {
