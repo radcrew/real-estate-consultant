@@ -89,7 +89,10 @@ async def _user_from_api_key(request: Request, client: AsyncClient, raw_key: str
 # Cognito sub -> (app user id, expiry on the monotonic clock). A mapping row never changes,
 # so a mapped sub costs one read per process. An unmapped sub (its own id) is checked again
 # after a minute, because a row can still be added for it or moved onto it by a merge.
+# Past this size, expired entries are dropped on the next write. Mapped entries never
+# expire, but there is one per migrated user, so the user count bounds them.
 _UNMAPPED_TTL_SECONDS = 60.0
+_CACHE_PRUNE_SIZE = 10_000
 _user_id_by_sub: dict[str, tuple[str, float]] = {}
 
 
@@ -101,7 +104,11 @@ async def user_id_for_sub(client: AsyncClient, sub: str) -> str:
         user_id = await resolve_user_id(client, sub)
     except SupabaseRequestError as exc:
         raise_service_unavailable("User lookup unavailable.", cause=exc)
-    expires = math.inf if user_id != sub else time.monotonic() + _UNMAPPED_TTL_SECONDS
+    now = time.monotonic()
+    if len(_user_id_by_sub) >= _CACHE_PRUNE_SIZE:
+        for stale in [s for s, (_, until) in _user_id_by_sub.items() if until <= now]:
+            del _user_id_by_sub[stale]
+    expires = math.inf if user_id != sub else now + _UNMAPPED_TTL_SECONDS
     _user_id_by_sub[sub] = (user_id, expires)
     return user_id
 

@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+# Left behind when pytest cannot write .pytest_cache (e.g. access denied on Windows).
+pytest-cache-files-*/
 .mypy_cache/
 .ruff_cache/
 .env

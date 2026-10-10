@@ -91,6 +91,15 @@ class TestSignIn:
             "last_name": "Smith",
         }
 
+    async def test_refresh_does_not_touch_the_profile(self, client, idp, ensure_profile):
+        """Refresh runs hourly per user; the profile is only written on sign-in."""
+        idp.initiate_auth.return_value = {"AuthenticationResult": dict(_AUTH_RESULT)}
+        r = await client.post(
+            "/api/v1/auth/refresh", json={"refresh_token": "refresh-tok", "username": _NEW_SUB}
+        )
+        assert r.status_code == 200
+        ensure_profile.assert_not_called()
+
     async def test_profile_failure_does_not_block_sign_in(self, client, idp, ensure_profile):
         from app.core.db_safe import SupabaseRequestError
 
@@ -479,6 +488,16 @@ class TestOAuthExchange:
             "id": self._GOOGLE_SUB,
             "email": "g@example.com",
             "username": "google_1234",
+        }
+
+    async def test_google_sign_in_creates_the_profile(
+        self, client, token_endpoint, ensure_profile
+    ):
+        await client.post("/api/v1/auth/oauth/exchange", json=self._BODY)
+        assert ensure_profile.await_args.kwargs == {
+            "email": "g@example.com",
+            "first_name": "Grace",
+            "last_name": "Hopper",
         }
 
     async def test_posts_code_to_the_token_endpoint_with_client_auth(self, client, token_endpoint):

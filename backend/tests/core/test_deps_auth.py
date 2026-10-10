@@ -108,6 +108,17 @@ class TestBearerAuth:
             user = await dependency(_request(), _bearer())
         assert user.id == _SUPABASE_UUID
 
+    async def test_expired_entries_are_pruned_once_the_cache_is_full(
+        self, dependency, verify, mapping, monkeypatch
+    ):
+        monkeypatch.setattr(deps, "_CACHE_PRUNE_SIZE", 2)
+        deps._user_id_by_sub["expired"] = ("expired", 0.0)
+        deps._user_id_by_sub["mapped"] = (_SUPABASE_UUID, float("inf"))
+
+        await dependency(_request(), _bearer())
+
+        assert set(deps._user_id_by_sub) == {"mapped", _SUB}
+
     async def test_mapping_lookup_failure_is_503(self, dependency, verify, mapping):
         """Guessing the sub here would hide a migrated user's data, so fail instead."""
         mapping.side_effect = SupabaseRequestError("down")

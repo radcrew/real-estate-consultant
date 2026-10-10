@@ -87,4 +87,4 @@ async def oauth_exchange(
         "ExpiresIn": tokens["expires_in"],
         "TokenType": tokens["token_type"],
     }
-    return await session_response(auth, client)
+    return await session_response(auth, client, create_profile=True)
