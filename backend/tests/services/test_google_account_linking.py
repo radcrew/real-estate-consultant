@@ -9,6 +9,7 @@ from botocore.exceptions import ClientError
 from sqlalchemy.exc import OperationalError
 
 from app.services import google_account_linking as linking
+from app.services import google_identity
 
 _EMAIL = "jane@example.com"
 _OLD_SUB = "11111111-1111-4111-8111-111111111111"
@@ -56,14 +57,15 @@ def admin():
             return {"Users": state["users"]}
         return {}
 
-    with patch.object(linking, "call_admin_idp", new=AsyncMock(side_effect=call)):
+    with patch.object(google_identity, "call_admin_idp", new=AsyncMock(side_effect=call)):
         yield type("Admin", (), {"calls": calls, "state": state, "fail": fail})
 
 
 @pytest.fixture
-def reassign():
-    with patch.object(linking, "reassign_user", new_callable=AsyncMock) as mock:
-        mock.return_value = "tables"
+def reassign(admin):
+    """The data move, logged in the same call list so its order is visible."""
+    with patch.object(google_identity, "reassign_user", new_callable=AsyncMock) as mock:
+        mock.side_effect = lambda *args: admin.calls.append(("reassign", {}))
         yield mock
 
 
@@ -75,14 +77,20 @@ class TestLinkToExistingAccount:
     async def test_links_to_the_password_account_with_the_same_email(self, admin, reassign):
         assert await linking.link_to_existing_account(MagicMock(), _CLAIMS) is True
 
-        assert _ops(admin) == ["list_users", "admin_delete_user", "admin_link_provider_for_user"]
+        # Data first: if it cannot move, the Google user must still exist.
+        assert _ops(admin) == [
+            "list_users",
+            "reassign",
+            "admin_delete_user",
+            "admin_link_provider_for_user",
+        ]
         assert admin.calls[0][1]["Filter"] == 'email = "jane@example.com"'
-        assert admin.calls[1][1]["Username"] == "google_1234567890"
-        assert admin.calls[2][1]["DestinationUser"] == {
+        assert admin.calls[2][1]["Username"] == "google_1234567890"
+        assert admin.calls[3][1]["DestinationUser"] == {
             "ProviderName": "Cognito",
             "ProviderAttributeValue": "pw-user",
         }
-        assert admin.calls[2][1]["SourceUser"] == {
+        assert admin.calls[3][1]["SourceUser"] == {
             "ProviderName": "Google",
             "ProviderAttributeName": "Cognito_Subject",
             "ProviderAttributeValue": "1234567890",
@@ -131,7 +139,6 @@ class TestLinkToExistingAccount:
         admin.fail["admin_delete_user"] = _error("AccessDeniedException")
         assert await linking.link_to_existing_account(MagicMock(), _CLAIMS) is False
         assert "admin_link_provider_for_user" not in _ops(admin)
-        reassign.assert_not_called()
 
     async def test_link_failure_after_delete_still_asks_for_a_retry(self, admin, reassign):
         """The tokens belong to the deleted user, so they must not be handed out."""
@@ -139,10 +146,11 @@ class TestLinkToExistingAccount:
         assert await linking.link_to_existing_account(MagicMock(), _CLAIMS) is True
         reassign.assert_awaited_once()
 
-    async def test_data_move_failure_is_logged_not_raised(self, admin, reassign, caplog):
-        """An existing Google user may own rows; a failed move must leave a trail."""
+    async def test_data_move_failure_leaves_the_google_user_alone(self, admin, reassign, caplog):
+        """An existing Google user may own rows; never delete it before they have moved."""
         reassign.side_effect = OperationalError("update", {}, Exception("db down"))
-        assert await linking.link_to_existing_account(MagicMock(), _CLAIMS) is True
+        assert await linking.link_to_existing_account(MagicMock(), _CLAIMS) is False
+        assert "admin_delete_user" not in _ops(admin)
         assert "google_link_data_move_failed" in caplog.text
 
     async def test_password_account_without_a_sub_is_not_linked(self, admin, reassign):
@@ -153,4 +161,4 @@ class TestLinkToExistingAccount:
     async def test_identities_as_a_list_are_read_too(self, admin, reassign):
         claims = {**_CLAIMS, "identities": [{"providerName": "Google", "userId": "999"}]}
         assert await linking.link_to_existing_account(MagicMock(), claims) is True
-        assert admin.calls[2][1]["SourceUser"]["ProviderAttributeValue"] == "999"
+        assert admin.calls[3][1]["SourceUser"]["ProviderAttributeValue"] == "999"

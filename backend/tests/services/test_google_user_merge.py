@@ -8,6 +8,7 @@ import pytest
 from botocore.exceptions import ClientError
 from sqlalchemy.exc import OperationalError
 
+from app.services import google_identity
 from app.services import google_user_merge as merge
 
 _EMAIL = "jane@example.com"
@@ -56,14 +57,15 @@ def admin():
             return {"Users": state["users"]}
         return {}
 
-    with patch.object(merge, "call_admin_idp", new=AsyncMock(side_effect=call)):
+    with patch.object(google_identity, "call_admin_idp", new=AsyncMock(side_effect=call)):
         yield type("Admin", (), {"calls": calls, "state": state, "fail": fail})
 
 
 @pytest.fixture
-def reassign():
-    with patch.object(merge, "reassign_user", new_callable=AsyncMock) as mock:
-        mock.return_value = "tables"
+def reassign(admin):
+    """The data move, logged in the same call list so its order is visible."""
+    with patch.object(google_identity, "reassign_user", new_callable=AsyncMock) as mock:
+        mock.side_effect = lambda *args: admin.calls.append(("reassign", {}))
         yield mock
 
 
@@ -76,13 +78,19 @@ class TestMergeGoogleUser:
         session = MagicMock()
         assert await merge.merge_google_user(session, "Jane@Example.com") is True
 
-        assert _ops(admin) == ["list_users", "admin_delete_user", "admin_link_provider_for_user"]
-        assert admin.calls[1][1]["Username"] == "google_1234567890"
-        assert admin.calls[2][1]["DestinationUser"] == {
+        # Data first: if it cannot move, the Google user must still exist.
+        assert _ops(admin) == [
+            "list_users",
+            "reassign",
+            "admin_delete_user",
+            "admin_link_provider_for_user",
+        ]
+        assert admin.calls[2][1]["Username"] == "google_1234567890"
+        assert admin.calls[3][1]["DestinationUser"] == {
             "ProviderName": "Cognito",
             "ProviderAttributeValue": "pw-user",
         }
-        assert admin.calls[2][1]["SourceUser"]["ProviderAttributeValue"] == "1234567890"
+        assert admin.calls[3][1]["SourceUser"]["ProviderAttributeValue"] == "1234567890"
         reassign.assert_awaited_once_with(session, _OLD_SUB, _NEW_SUB)
 
     async def test_no_google_user_means_nothing_to_do(self, admin, reassign):
@@ -108,21 +116,20 @@ class TestMergeGoogleUser:
         assert await merge.merge_google_user(MagicMock(), _EMAIL) is False
         reassign.assert_not_called()
 
-    async def test_delete_failure_changes_nothing(self, admin, reassign):
+    async def test_delete_failure_keeps_the_moved_data_and_skips_the_link(self, admin, reassign):
         admin.fail["admin_delete_user"] = _error("AccessDeniedException")
         assert await merge.merge_google_user(MagicMock(), _EMAIL) is False
         assert "admin_link_provider_for_user" not in _ops(admin)
-        reassign.assert_not_called()
-
-    async def test_data_still_moves_when_the_link_fails(self, admin, reassign):
-        """The Google user is already gone, so its data must follow the new user."""
-        admin.fail["admin_link_provider_for_user"] = _error("InvalidParameterException")
-        assert await merge.merge_google_user(MagicMock(), _EMAIL) is True
         reassign.assert_awaited_once()
 
-    async def test_data_move_failure_is_logged_not_raised(self, admin, reassign, caplog):
-        reassign.side_effect = OperationalError("update", {}, Exception("db down"))
+    async def test_link_failure_after_the_delete_still_counts_as_merged(self, admin, reassign):
+        admin.fail["admin_link_provider_for_user"] = _error("InvalidParameterException")
         assert await merge.merge_google_user(MagicMock(), _EMAIL) is True
+
+    async def test_data_move_failure_leaves_the_google_user_alone(self, admin, reassign, caplog):
+        reassign.side_effect = OperationalError("update", {}, Exception("db down"))
+        assert await merge.merge_google_user(MagicMock(), _EMAIL) is False
+        assert "admin_delete_user" not in _ops(admin)
         assert "google_merge_data_move_failed" in caplog.text
 
     async def test_email_that_could_break_the_filter_is_refused(self, admin, reassign):
