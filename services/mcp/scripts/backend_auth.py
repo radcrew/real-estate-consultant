@@ -1,28 +1,21 @@
 """Shared by the local MCP scripts: get a user access token through the backend's auth API.
 
-Users live in Cognito, and a new account must confirm its email before it can sign in,
-so use an address you can read. Set MCP_LOCAL_EMAIL / MCP_LOCAL_PASSWORD (or pass
---email to create_mcp_api_key.py); the defaults only work on a pool that auto-confirms.
+The account comes from MCP_LOCAL_EMAIL / MCP_LOCAL_PASSWORD (see app/config.py), or pass
+--email to create_mcp_api_key.py.
 """
 
 from __future__ import annotations
 
-import os
-
 import httpx
 
-DEFAULT_EMAIL = "mcp.local@radestate.dev"
-DEFAULT_PASSWORD = "McpLocalPass123!"
+from app.config import settings
 
 # The backend's 403 detail for an account that has not confirmed its email yet.
 _NOT_CONFIRMED = "Confirm your email address before signing in."
 
 
 def local_credentials(email: str | None = None) -> tuple[str, str]:
-    return (
-        email or os.environ.get("MCP_LOCAL_EMAIL") or DEFAULT_EMAIL,
-        os.environ.get("MCP_LOCAL_PASSWORD") or DEFAULT_PASSWORD,
-    )
+    return (email or settings.mcp_local_email, settings.mcp_local_password)
 
 
 def obtain_access_token(api_base: str, email: str, password: str) -> str | None:

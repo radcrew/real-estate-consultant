@@ -32,5 +32,11 @@ class Settings(BaseSettings):
     max_tool_output_chars: int = Field(default=24_000, ge=1000)
     log_level: str = "INFO"
 
+    # Local scripts only (scripts/backend_auth.py): the account they sign up and sign in as.
+    # A new Cognito account must confirm its email, so use an address you can read; the
+    # defaults only work on a pool that auto-confirms.
+    mcp_local_email: str = "mcp.local@radestate.dev"
+    mcp_local_password: str = "McpLocalPass123!"
+
 
 settings = Settings()
