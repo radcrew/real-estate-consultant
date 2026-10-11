@@ -35,6 +35,8 @@ Only `frontend/` is a pnpm workspace member; the three Python packages each carr
 
 **Text.** In commit messages, PR descriptions, and docs written for this repo: no em-dashes, no filler ("it's worth noting", "essentially"), no LLM tells ("it's not just X, it's Y", "delve"). Reread before finishing and cut anything that doesn't earn its place.
 
+**Replies.** Write chat replies in plain, friendly English that someone new to the project can follow. Use full sentences and short paragraphs, not compressed fragments, chains of arrows, or stacked abbreviations. Say what happened, why it matters, and what the reader should do next, in that order. Explain a technical term the first time it appears (for example, "the access token, the short-lived key the browser sends with each request"). Prefer a few clear sentences over a dense table; use a table or list only when it really is easier to scan. Keep code identifiers and file paths exact, but describe their purpose in words around them.
+
 **Commit messages.** After *every* response in which you change one or more files, not just at the end of a multi-step task and not just when asked, automatically draft and show a Conventional Commits message in a copyable code block. Match this repo's history: lowercase `feat:` / `fix:` / `refactor:` / `ui:` / `test:` / `docs:` / `cleanup:` prefix, imperative mood, usually no scope. This applies to small incremental edits too. Scope it to the actual uncommitted change set (check `git status`) and call out any unrelated modified files so they can be excluded. Do not run `git commit` yourself; the user commits manually unless they explicitly ask you to.
 
 **Pull requests.** Follow [.github/PULL_REQUEST_TEMPLATE.md](./.github/PULL_REQUEST_TEMPLATE.md). Do not tick a test checkbox unless you ran the suite and saw it pass. Remember that opening the PR deploys a preview, backend or frontend depending on which paths the branch touches.
@@ -112,16 +114,16 @@ Path aliases live in `frontend/tsconfig.json` and are resolved by Vitest through
 
 `components/` is organised by feature (`account`, `admin`, `agents`, `auth`, `blog`, `contact`, `landing`, `listings`, `list-property`, `property`, `saved`, `search`) plus a shared `ui/`.
 
-### Two auth systems in one app
+### Auth: AWS Cognito, through the backend
 
-The most common way to get lost in this codebase. Sign-in is split:
+Users live in a Cognito user pool, not Supabase Auth. Every auth call goes through FastAPI `/api/v1/auth/*` (`sign-up`, `confirm`, `resend-code`, `sign-in`, `refresh`, `forgot-password`, `reset-password`, `oauth/exchange`, `sign-out`), which holds the app client secret. `backend/app/core/cognito.py` verifies tokens against the pool's JWKS.
 
-- **Email and password** goes to the FastAPI backend: `services/auth.ts` → `POST /api/v1/auth/sign-in`, and the error surfaces through `getApiErrorMessage`.
-- **Google OAuth, password reset and password update** go to Supabase directly, via `lib/supabase-browser.ts` (browser, PKCE, cookie-backed) and `lib/supabase-server.ts` (the `/auth/callback` Route Handler).
-
-`lib/auth-session.ts` owns the app's own session under the key `radestate.session`, held in `sessionStorage` **and** mirrored to a cookie so a server render can read it. `contexts/auth.tsx` wraps both systems behind one `useAuth()`.
-
-Consequence: a sign-in bug can live in either system, and the same user-facing string can come from either. When tracing one, find which system produces the message before reading any code. `apiClient` also redirects to `/sign-in?next=…` on any 401, so an unrelated failing request can look like an auth bug.
+- **Google** is the one browser redirect: `app/(auth)/auth/google/route.ts` sets a state cookie and sends the user to the Cognito Hosted UI; `app/(auth)/auth/callback/route.ts` checks the state and calls `/auth/oauth/exchange`. Google users have usernames starting `google_` and cannot change their password or email.
+- **Account linking**: a first Google sign-in whose verified email matches a verified email/password user is folded into that user by `services/google_account_linking.py` (delete the new `google_` user, `AdminLinkProviderForUser`). `/auth/oauth/exchange` then answers 409 `account_linked` and the callback restarts Google sign-in once with `relink=1`, which sends `link_accounts: false` so it can never loop. This is the only Cognito call that needs IAM credentials (boto3 default chain: `ListUsers`, `AdminDeleteUser`, `AdminLinkProviderForUser`); if they are missing, linking is skipped and sign-in proceeds as a plain Google user.
+- **Session**: `lib/auth-session.ts` owns `radestate.session`, held in `sessionStorage` **and** mirrored to a cookie. Cognito tokens are large, so the ID token is deliberately not stored: the cookie must stay under ~4 KB.
+- **401s**: `apiClient` tries `/auth/refresh` once (needs `user.username` in the session), then redirects to `/sign-in?next=…`. An unrelated failing request can still look like an auth bug.
+- **User ids**: tables are keyed by the Supabase `uuid`, not the Cognito `sub`. `public.cognito_identity_mapping` (`sub` unique, `uuid`) links the two for users moved over from Supabase Auth; a `sub` with no row is its own id. `user_id_for_sub` in `core/deps.py` does the lookup (cached per process, read-only) for both the per-request token check and the sign-in responses, so `AuthUser.id` and the session's `user.id` always match. MCP API keys already store the `uuid`. A failed lookup is a 503, never a fallback to the `sub`, which would hide a migrated user's data.
+- **Config**: backend needs the five `COGNITO_*` settings; the frontend needs `COGNITO_DOMAIN` and `COGNITO_CLIENT_ID` server-side for the Google redirect.
 
 ### Theme and the Voyager palette
 

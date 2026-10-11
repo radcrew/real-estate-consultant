@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
-
 import pytest
 from pydantic import ValidationError
 
 from app.schemas.auth import (
     EmailPasswordRequest,
+    RefreshRequest,
+    ResetPasswordRequest,
     SignInRequest,
     SignInResponse,
     SignInUser,
@@ -68,9 +68,10 @@ class TestSignInRequest:
 
 class TestSignInResponse:
     def test_valid(self):
-        user = SignInUser(id="u1", email="u@example.com")
+        user = SignInUser(id="u1", email="u@example.com", username="u1")
         obj = SignInResponse(
             access_token="tok",
+            id_token="id",
             refresh_token="ref",
             expires_in=3600,
             token_type="bearer",
@@ -82,11 +83,30 @@ class TestSignInResponse:
 
 class TestSignUpResponse:
     def test_valid(self):
-        now = datetime(2024, 1, 1, tzinfo=timezone.utc)
-        obj = SignUpResponse(id="u1", email="u@example.com", created_at=now)
+        obj = SignUpResponse(id="u1", email="u@example.com", confirmation_required=True)
         assert obj.id == "u1"
+        assert obj.confirmation_required is True
 
     def test_email_can_be_none(self):
-        now = datetime(2024, 1, 1, tzinfo=timezone.utc)
-        obj = SignUpResponse(id="u1", email=None, created_at=now)
+        obj = SignUpResponse(id="u1", email=None, confirmation_required=False)
         assert obj.email is None
+
+
+class TestRefreshRequest:
+    def test_valid(self):
+        obj = RefreshRequest(refresh_token="ref", username="google_123")
+        assert obj.username == "google_123"
+
+    def test_empty_username_raises(self):
+        with pytest.raises(ValidationError):
+            RefreshRequest(refresh_token="ref", username="")
+
+
+class TestResetPasswordRequest:
+    def test_valid(self):
+        obj = ResetPasswordRequest(email="u@example.com", code="123456", password="securepass")
+        assert obj.code == "123456"
+
+    def test_missing_code_raises(self):
+        with pytest.raises(ValidationError):
+            ResetPasswordRequest(email="u@example.com", password="securepass")

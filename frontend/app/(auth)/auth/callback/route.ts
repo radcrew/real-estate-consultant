@@ -1,22 +1,27 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
-import type { StoredSession } from "@lib/auth-session";
-import { syncProfileNamesAfterOAuth } from "@lib/oauth-profile-sync";
-import { getSupabaseServerClient } from "@lib/supabase-server";
+import { BACKEND_BASE_URL, OAUTH_CALLBACK_PATH, OAUTH_START_PATH } from "@config/env";
+import { toStoredSession } from "@lib/auth-session";
+import {
+  OAUTH_ACCOUNT_LINKED,
+  OAUTH_STATE_COOKIE,
+  type OAuthState,
+  safeNextPath,
+} from "@lib/cognito-hosted-ui";
+import type { SignInResponse } from "@services/auth";
 
 const APP_SESSION_COOKIE = "radestate.session";
 const ONE_WEEK_SECONDS = 60 * 60 * 24 * 7;
 
-/**
- * Everything `@supabase/ssr` writes is prefixed `sb-<project-ref>-`: the PKCE
- * `-code-verifier`, the `-auth-token` and its `.0`/`.1` size chunks.
- */
-const SUPABASE_COOKIE_PREFIX = "sb-";
-
 /** Why the callback bailed. Echoed to the URL so a failure can be reported
  *  from the address bar without digging through function logs. */
-type FailureReason = "missing_code" | "exchange_failed" | "no_refresh_token" | "unexpected";
+type FailureReason =
+  | "missing_code"
+  | "provider_error"
+  | "state_mismatch"
+  | "exchange_failed"
+  | "unexpected";
 
 const buildSignInErrorUrl = (origin: string, message: string, reason: FailureReason) => {
   const url = new URL("/sign-in", origin);
@@ -25,84 +30,105 @@ const buildSignInErrorUrl = (origin: string, message: string, reason: FailureRea
   return url;
 };
 
-/**
- * A failed exchange leaves the PKCE verifier — and any half-written session
- * chunks — behind. The next attempt then starts against state that cannot
- * match its freshly minted code, so clear the slate on the way out and let the
- * retry begin from nothing.
- */
-const clearSupabaseAuthCookies = async (response: NextResponse) => {
-  const store = await cookies();
-  for (const { name } of store.getAll()) {
-    if (name.startsWith(SUPABASE_COOKIE_PREFIX)) {
-      response.cookies.set(name, "", { path: "/", maxAge: 0 });
-    }
-  }
+const clearStateCookie = (response: NextResponse) => {
+  response.cookies.set(OAUTH_STATE_COOKIE, "", { path: OAUTH_CALLBACK_PATH, maxAge: 0 });
 };
 
-const failSignIn = async (origin: string, reason: FailureReason, detail?: string) => {
+const failSignIn = (origin: string, reason: FailureReason, detail?: string) => {
   console.error(`[oauth] callback failed (${reason})${detail ? `: ${detail}` : ""}`);
   const message =
     reason === "missing_code"
       ? "Missing OAuth code. Try signing in again."
       : "Sign-in failed. Please try again.";
   const response = NextResponse.redirect(buildSignInErrorUrl(origin, message, reason));
-  await clearSupabaseAuthCookies(response);
+  clearStateCookie(response);
   return response;
 };
 
+/** The `detail` of a FastAPI error body, if the body is JSON. */
+const errorDetail = (body: string): unknown => {
+  try {
+    return (JSON.parse(body) as { detail?: unknown }).detail;
+  } catch {
+    return undefined;
+  }
+};
+
+const readState = async (): Promise<OAuthState | null> => {
+  const raw = (await cookies()).get(OAUTH_STATE_COOKIE)?.value;
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as OAuthState;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Cognito redirects here after Google sign-in. Check the state, then let the backend
+ * trade the code for tokens: it holds the client secret and syncs the profile.
+ */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get("code");
-  const requestedNext = requestUrl.searchParams.get("next");
-  const nextPath =
-    requestedNext && requestedNext.startsWith("/") && !requestedNext.startsWith("//")
-      ? requestedNext
-      : "/";
+  const { searchParams, origin } = requestUrl;
 
+  // e.g. the user cancelled at Google: Cognito sends error/error_description, no code.
+  const providerError = searchParams.get("error");
+  if (providerError) {
+    return failSignIn(origin, "provider_error", searchParams.get("error_description") ?? providerError);
+  }
+
+  const code = searchParams.get("code");
   if (!code) {
-    return failSignIn(requestUrl.origin, "missing_code");
+    return failSignIn(origin, "missing_code");
+  }
+
+  const saved = await readState();
+  if (!saved || saved.state !== searchParams.get("state")) {
+    return failSignIn(origin, "state_mismatch");
   }
 
   try {
-    const supabase = await getSupabaseServerClient();
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (error) {
-      return failSignIn(requestUrl.origin, "exchange_failed", error.message);
+    const res = await fetch(`${BACKEND_BASE_URL}/api/v1/auth/oauth/exchange`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code,
+        redirect_uri: `${origin}${OAUTH_CALLBACK_PATH}`,
+        link_accounts: !saved.relink,
+      }),
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      // A body can be read only once, so read it as text and parse from that.
+      const body = await res.text();
+      if (res.status === 409 && !saved.relink && errorDetail(body) === OAUTH_ACCOUNT_LINKED) {
+        // Google is now linked to the user's existing account. Sign in once more to get
+        // that account's tokens; Google remembers the user, so this is a quick hop.
+        const restart = new URL(OAUTH_START_PATH, origin);
+        restart.searchParams.set("next", saved.next);
+        restart.searchParams.set("relink", "1");
+        const response = NextResponse.redirect(restart);
+        clearStateCookie(response);
+        return response;
+      }
+      return failSignIn(origin, "exchange_failed", `${res.status} ${body}`);
     }
 
-    if (!data.session?.refresh_token) {
-      // Previously silent: the exchange reports success but hands back no
-      // refresh token, and the user saw the same message as a hard failure.
-      return failSignIn(requestUrl.origin, "no_refresh_token");
-    }
-
-    await syncProfileNamesAfterOAuth(supabase, data.session.user);
-
-    const session: StoredSession = {
-      accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
-      expiresIn: 360000,
-      tokenType: data.session.token_type,
-      user: {
-        id: data.session.user.id,
-        email: data.session.user.email ?? null,
-      },
-    };
-
-    const response = NextResponse.redirect(new URL(nextPath, requestUrl.origin));
-    response.cookies.set(APP_SESSION_COOKIE, encodeURIComponent(JSON.stringify(session)), {
+    const session = toStoredSession((await res.json()) as SignInResponse);
+    const response = NextResponse.redirect(new URL(safeNextPath(saved.next), origin));
+    // Plain JSON: Next URL-encodes cookie values itself, and readSessionFromCookie decodes
+    // once. Encoding here as well left the browser a value it could not parse.
+    response.cookies.set(APP_SESSION_COOKIE, JSON.stringify(session), {
       path: "/",
       maxAge: ONE_WEEK_SECONDS,
       sameSite: "lax",
     });
+    clearStateCookie(response);
     return response;
   } catch (err) {
-    return failSignIn(
-      requestUrl.origin,
-      "unexpected",
-      err instanceof Error ? err.message : String(err),
-    );
+    return failSignIn(origin, "unexpected", err instanceof Error ? err.message : String(err));
   }
 }

@@ -10,7 +10,7 @@ auth, tools, and deploy notes are documented in this README.
 - Backend at `BACKEND_API_URL` (default `http://127.0.0.1:8888`)
 - **`MCP_API_KEY`** (`rad_…`) in `services/mcp/.env` for stdio — create via
   `POST /api/v1/account/api-keys` while signed in (JWT). Never the service role key.
-- Legacy fallback: `MCP_USER_ACCESS_TOKEN` (short-lived Supabase user JWT)
+- Legacy fallback: `MCP_USER_ACCESS_TOKEN` (short-lived Cognito user access token)
 
 ## Setup
 

@@ -6,11 +6,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.core import deps
 from app.core import intake_admission as intake_admission_module
 from app.core.database import get_session
 from app.core.deps import get_current_user, get_current_user_jwt
 from app.core.intake_admission import IntakeAdmissionControl
-from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
+from app.core.supabase_sdk import get_supabase_sdk_client
 from app.main import create_app
 
 
@@ -30,6 +31,21 @@ def fresh_intake_admission(monkeypatch):
     )
 
 
+@pytest.fixture(autouse=True)
+def unmapped_cognito_subs(monkeypatch):
+    """Treat every Cognito sub as unmapped (its own user id), with an empty cache.
+
+    The fake Supabase client cannot answer the cognito_identity_mapping lookup.
+    """
+    async def resolve(_client, sub):
+        return sub
+
+    monkeypatch.setattr(deps, "resolve_user_id", resolve)
+    deps._user_id_by_sub.clear()
+    yield
+    deps._user_id_by_sub.clear()
+
+
 @pytest.fixture
 def mock_db():
     session = AsyncMock()
@@ -47,8 +63,6 @@ def mock_supabase():
 def mock_user():
     user = MagicMock()
     user.id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-    user.email = "user@example.com"
-    user.phone = None
     return user
 
 
@@ -57,7 +71,6 @@ async def client(mock_db, mock_supabase, mock_user):
     app = create_app()
     app.dependency_overrides[get_session] = lambda: mock_db
     app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
-    app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
     app.dependency_overrides[get_current_user] = lambda: mock_user
     app.dependency_overrides[get_current_user_jwt] = lambda: mock_user
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:

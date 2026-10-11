@@ -9,6 +9,23 @@ export type EnqueueIngestResponse = {
   idempotency_key: string;
 };
 
+export type JobStatus = "pending" | "running" | "done" | "failed";
+
+export type JobResult = {
+  fetched?: number;
+  normalized?: number;
+  rejected?: number;
+} | null;
+
+export type JobRow = {
+  id: string;
+  source: string;
+  status: JobStatus;
+  attempts: number;
+  result: JobResult;
+  error: string | null;
+};
+
 export class AdminService {
   constructor(private readonly http: AxiosInstance) {}
 
@@ -21,6 +38,11 @@ export class AdminService {
       { source },
       { signal: options?.signal },
     );
+    return data;
+  }
+
+  async getJob(jobId: string): Promise<JobRow> {
+    const { data } = await this.http.get<JobRow>(`/admin/jobs/${encodeURIComponent(jobId)}`);
     return data;
   }
 }

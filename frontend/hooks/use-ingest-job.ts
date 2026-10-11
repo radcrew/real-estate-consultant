@@ -1,38 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { isAxiosError } from "axios";
 
-import { adminService } from "@services/admin";
-import { getSupabaseBrowserClient } from "@lib/supabase-browser";
+import { adminService, type JobRow } from "@services/admin";
 import { getApiErrorMessage } from "@utils/common";
 
-export type JobStatus = "pending" | "running" | "done" | "failed";
+export type { JobResult, JobRow, JobStatus } from "@services/admin";
 
-export type JobResult = {
-  fetched?: number;
-  normalized?: number;
-  rejected?: number;
-} | null;
-
-export type JobRow = {
-  id: string;
-  source: string;
-  status: JobStatus;
-  attempts: number;
-  result: JobResult;
-  error: string | null;
-};
-
-const JOB_COLUMNS = "id, source, status, attempts, result, error";
-
-// Supabase query errors aren't AxiosErrors, so getApiErrorMessage falls back
-// to a generic message for them — surface their .message instead.
-const describeError = (e: unknown): string => {
-  if (isAxiosError(e)) return getApiErrorMessage(e);
-  if (e instanceof Error) return e.message;
-  return "Request failed.";
-};
+// How often to re-read a pending or running job. Ingestion runs take minutes.
+export const JOB_POLL_INTERVAL_MS = 2000;
+// Failed reads in a row before polling gives up and leaves the error on screen.
+export const JOB_POLL_MAX_FAILURES = 5;
 
 type UseIngestJobResult = {
   job: JobRow | null;
@@ -46,48 +24,51 @@ export const useIngestJob = (): UseIngestJobResult => {
   const [job, setJob] = useState<JobRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [triggering, setTriggering] = useState(false);
+  const [failures, setFailures] = useState(0);
 
+  const isBusy = job?.status === "pending" || job?.status === "running";
+
+  // Poll through the backend while the job is active. Each read, ok or failed, schedules
+  // the next one; reaching done/failed or too many failures in a row stops it.
   useEffect(() => {
-    if (!job) return;
+    if (!job || !isBusy || failures >= JOB_POLL_MAX_FAILURES) return;
 
-    const supabase = getSupabaseBrowserClient();
-    const channel = supabase
-      .channel(`jobs-${job.id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "jobs", filter: `id=eq.${job.id}` },
-        (payload) => setJob(payload.new as JobRow),
-      )
-      .subscribe();
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      adminService
+        .getJob(job.id)
+        .then((next) => {
+          if (cancelled) return;
+          setJob(next);
+          setFailures(0);
+          setError(null);
+        })
+        .catch((e) => {
+          if (cancelled) return;
+          setError(getApiErrorMessage(e));
+          setFailures((n) => n + 1);
+        });
+    }, JOB_POLL_INTERVAL_MS);
 
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      clearTimeout(timer);
     };
-    // Re-subscribe only when the job id changes, not on every realtime update.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job?.id]);
+  }, [job, isBusy, failures]);
 
   const triggerIngest = useCallback(async () => {
     setError(null);
+    setFailures(0);
     setTriggering(true);
     try {
       const enqueued = await adminService.enqueueIngest();
-      const supabase = getSupabaseBrowserClient();
-      const { data, error: fetchError } = await supabase
-        .from("jobs")
-        .select(JOB_COLUMNS)
-        .eq("id", enqueued.job_id)
-        .single();
-      if (fetchError) throw fetchError;
-      setJob(data as JobRow);
+      setJob(await adminService.getJob(enqueued.job_id));
     } catch (e) {
-      setError(describeError(e));
+      setError(getApiErrorMessage(e));
     } finally {
       setTriggering(false);
     }
   }, []);
-
-  const isBusy = job?.status === "pending" || job?.status === "running";
 
   return { job, error, triggering, isBusy, triggerIngest };
 };

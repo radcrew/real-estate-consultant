@@ -37,6 +37,19 @@ const baseProfile: AccountProfileResponse = {
 // mapProfileResponseToForm
 // ---------------------------------------------------------------------------
 
+describe("AccountService.verifyEmail", () => {
+  it("posts the code and returns the updated profile", async () => {
+    const http = makeHttp(baseProfile);
+    const result = await new AccountService(http).verifyEmail("123456");
+    expect(http.post).toHaveBeenCalledWith(
+      "/account/email/verify",
+      { code: "123456" },
+      { signal: undefined },
+    );
+    expect(result).toEqual(baseProfile);
+  });
+});
+
 describe("mapProfileResponseToForm", () => {
   it("maps all fields from response to form values", () => {
     const form = mapProfileResponseToForm(baseProfile);

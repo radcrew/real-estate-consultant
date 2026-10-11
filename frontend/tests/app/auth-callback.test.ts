@@ -1,42 +1,39 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET } from "../../app/(auth)/auth/callback/route";
 
-const mockExchange = vi.fn();
-const mockCookieStore = { getAll: vi.fn() };
+const mockCookieStore = { get: vi.fn() };
 
 vi.mock("next/headers", () => ({
   cookies: () => Promise.resolve(mockCookieStore),
 }));
 
-vi.mock("@lib/supabase-server", () => ({
-  getSupabaseServerClient: () =>
-    Promise.resolve({ auth: { exchangeCodeForSession: (code: string) => mockExchange(code) } }),
-}));
-
-vi.mock("@lib/oauth-profile-sync", () => ({
-  syncProfileNamesAfterOAuth: vi.fn().mockResolvedValue(undefined),
-}));
-
 const CALLBACK = "https://app.test/auth/callback";
 
-const session = (overrides: Record<string, unknown> = {}) => ({
+const exchangeResponse = {
   access_token: "at",
+  id_token: "it",
   refresh_token: "rt",
-  token_type: "bearer",
-  user: { id: "u1", email: "jane@test.com" },
-  ...overrides,
-});
+  expires_in: 3600,
+  token_type: "Bearer",
+  user: { id: "u1", email: "jane@test.com", username: "google_123" },
+};
+
+const fetchMock = vi.fn();
+
+const withState = (state = "s1", next = "/", relink = false) =>
+  mockCookieStore.get.mockReturnValue({ value: JSON.stringify({ state, next, relink }) });
 
 beforeEach(() => {
   vi.clearAllMocks();
   console.error = vi.fn();
-  // The stale PKCE verifier a failed attempt would otherwise leave behind.
-  mockCookieStore.getAll.mockReturnValue([
-    { name: "sb-abc-auth-token-code-verifier", value: "v" },
-    { name: "sb-abc-auth-token.0", value: "chunk" },
-    { name: "radestate.session", value: "keep-me" },
-  ]);
+  vi.stubGlobal("fetch", fetchMock);
+  fetchMock.mockResolvedValue(new Response(JSON.stringify(exchangeResponse), { status: 200 }));
+  withState();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 /** Cookie name -> the raw Set-Cookie line, for max-age assertions. */
@@ -46,92 +43,172 @@ const setCookies = (res: Response) =>
     return acc;
   }, {});
 
-describe("auth callback route", () => {
-  it("stores the session and redirects home on success", async () => {
-    mockExchange.mockResolvedValue({ data: { session: session() }, error: null });
+const failure = (res: Response) => {
+  const location = new URL(res.headers.get("location") ?? "");
+  return {
+    path: location.pathname,
+    reason: location.searchParams.get("oauth_reason"),
+    error: location.searchParams.get("oauth_error"),
+  };
+};
 
-    const res = await GET(new Request(`${CALLBACK}?code=abc`));
+describe("auth callback route", () => {
+  it("exchanges the code on the backend, stores the session and redirects home", async () => {
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
 
     expect(res.headers.get("location")).toBe("https://app.test/");
-    expect(setCookies(res)["radestate.session"]).toBeDefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/v1\/auth\/oauth\/exchange$/),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ code: "abc", redirect_uri: CALLBACK, link_accounts: true }),
+      }),
+    );
+
+    const cookies = setCookies(res);
+    // One decode, exactly what readSessionFromCookie does in the browser.
+    const raw = cookies["radestate.session"].split(";")[0].slice("radestate.session=".length);
+    const stored = JSON.parse(decodeURIComponent(raw));
+    expect(stored).toMatchObject({
+      accessToken: "at",
+      refreshToken: "rt",
+      expiresIn: 3600,
+      user: { id: "u1", email: "jane@test.com", username: "google_123" },
+    });
+    expect(stored).not.toHaveProperty("idToken");
+    // The one-time state is spent.
+    expect(cookies["radestate.oauth_state"]).toMatch(/Max-Age=0/i);
   });
 
-  it("honours a relative next path", async () => {
-    mockExchange.mockResolvedValue({ data: { session: session() }, error: null });
+  it("returns to the next path saved when sign-in started", async () => {
+    withState("s1", "/account");
 
-    const res = await GET(new Request(`${CALLBACK}?code=abc&next=%2Faccount`));
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
 
     expect(res.headers.get("location")).toBe("https://app.test/account");
   });
 
-  it("rejects an absolute next path", async () => {
-    mockExchange.mockResolvedValue({ data: { session: session() }, error: null });
+  it("ignores an absolute next path even if one was saved", async () => {
+    withState("s1", "//evil.test");
 
-    const res = await GET(new Request(`${CALLBACK}?code=abc&next=%2F%2Fevil.test`));
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
 
     expect(res.headers.get("location")).toBe("https://app.test/");
   });
 
-  it("reports the reason when the exchange errors", async () => {
-    mockExchange.mockResolvedValue({ data: {}, error: { message: "bad verifier" } });
+  it("rejects a state that does not match the cookie", async () => {
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=forged`));
 
-    const res = await GET(new Request(`${CALLBACK}?code=abc`));
-    const location = new URL(res.headers.get("location") ?? "");
-
-    expect(location.pathname).toBe("/sign-in");
-    expect(location.searchParams.get("oauth_reason")).toBe("exchange_failed");
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("bad verifier"));
+    expect(failure(res)).toMatchObject({ path: "/sign-in", reason: "state_mismatch" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(setCookies(res)["radestate.session"]).toBeUndefined();
   });
 
-  // Previously this branch returned the generic error and logged nothing at all.
-  it("reports a missing refresh token instead of failing silently", async () => {
-    mockExchange.mockResolvedValue({
-      data: { session: session({ refresh_token: undefined }) },
-      error: null,
+  it("rejects a callback with no state cookie", async () => {
+    mockCookieStore.get.mockReturnValue(undefined);
+
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
+
+    expect(failure(res).reason).toBe("state_mismatch");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a provider error, e.g. the user cancelled at Google", async () => {
+    const res = await GET(
+      new Request(`${CALLBACK}?error=access_denied&error_description=User+cancelled`),
+    );
+
+    expect(failure(res)).toMatchObject({ path: "/sign-in", reason: "provider_error" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a missing code", async () => {
+    const res = await GET(new Request(`${CALLBACK}?state=s1`));
+
+    expect(failure(res)).toMatchObject({
+      reason: "missing_code",
+      error: "Missing OAuth code. Try signing in again.",
     });
+  });
 
-    const res = await GET(new Request(`${CALLBACK}?code=abc`));
+  it("reports a rejected exchange without storing a session", async () => {
+    fetchMock.mockResolvedValue(new Response('{"detail":"bad code"}', { status: 400 }));
+
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
+
+    expect(failure(res)).toMatchObject({
+      reason: "exchange_failed",
+      error: "Sign-in failed. Please try again.",
+    });
+    expect(setCookies(res)["radestate.session"]).toBeUndefined();
+  });
+
+  it("signs in once more after Google was linked to an existing account", async () => {
+    withState("s1", "/account");
+    fetchMock.mockResolvedValue(new Response('{"detail":"account_linked"}', { status: 409 }));
+
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
     const location = new URL(res.headers.get("location") ?? "");
 
-    expect(location.searchParams.get("oauth_reason")).toBe("no_refresh_token");
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("no_refresh_token"));
+    expect(location.pathname).toBe("/auth/google");
+    expect(location.searchParams.get("relink")).toBe("1");
+    expect(location.searchParams.get("next")).toBe("/account");
+    // The tokens from this pass belong to the deleted Google user: none are stored.
+    expect(setCookies(res)["radestate.session"]).toBeUndefined();
   });
 
-  it("reports an unexpected throw", async () => {
-    mockExchange.mockRejectedValue(new Error("boom"));
+  it("asks the backend not to link again on the second pass", async () => {
+    withState("s1", "/", true);
 
-    const res = await GET(new Request(`${CALLBACK}?code=abc`));
-    const location = new URL(res.headers.get("location") ?? "");
+    await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
 
-    expect(location.searchParams.get("oauth_reason")).toBe("unexpected");
-    expect(console.error).toHaveBeenCalledWith(expect.stringContaining("boom"));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject({ link_accounts: false });
   });
 
-  it("reports a missing code without calling Supabase", async () => {
-    const res = await GET(new Request(CALLBACK));
-    const location = new URL(res.headers.get("location") ?? "");
+  it("fails instead of looping if the second pass is answered with a link again", async () => {
+    withState("s1", "/", true);
+    fetchMock.mockResolvedValue(new Response('{"detail":"account_linked"}', { status: 409 }));
 
-    expect(location.searchParams.get("oauth_reason")).toBe("missing_code");
-    expect(mockExchange).not.toHaveBeenCalled();
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
+
+    expect(failure(res)).toMatchObject({ path: "/sign-in", reason: "exchange_failed" });
   });
 
-  it("expires stale supabase cookies on failure so the retry starts clean", async () => {
-    mockExchange.mockResolvedValue({ data: {}, error: { message: "bad verifier" } });
+  it("reports any other 409 as a failed exchange with its status and body", async () => {
+    fetchMock.mockResolvedValue(new Response('{"detail":"something else"}', { status: 409 }));
 
-    const res = await GET(new Request(`${CALLBACK}?code=abc`));
-    const cookies = setCookies(res);
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
 
-    expect(cookies["sb-abc-auth-token-code-verifier"]).toContain("Max-Age=0");
-    expect(cookies["sb-abc-auth-token.0"]).toContain("Max-Age=0");
-    // Only Supabase's own cookies are cleared.
-    expect(cookies["radestate.session"]).toBeUndefined();
+    expect(failure(res)).toMatchObject({ path: "/sign-in", reason: "exchange_failed" });
+    expect(console.error).toHaveBeenCalledWith(
+      '[oauth] callback failed (exchange_failed): 409 {"detail":"something else"}',
+    );
   });
 
-  it("leaves supabase cookies alone on success", async () => {
-    mockExchange.mockResolvedValue({ data: { session: session() }, error: null });
+  it("reports an unreachable backend as unexpected", async () => {
+    fetchMock.mockRejectedValue(new Error("connect ECONNREFUSED"));
 
-    const res = await GET(new Request(`${CALLBACK}?code=abc`));
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
 
-    expect(setCookies(res)["sb-abc-auth-token-code-verifier"]).toBeUndefined();
+    expect(failure(res).reason).toBe("unexpected");
+  });
+
+  it("keeps the stored session small enough for one cookie", async () => {
+    // Realistic Cognito sizes: access ~1.1 KB, refresh ~1.8 KB (the ID token is not stored).
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ...exchangeResponse,
+          access_token: "a".repeat(1100),
+          id_token: "i".repeat(1200),
+          refresh_token: "r".repeat(1800),
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const res = await GET(new Request(`${CALLBACK}?code=abc&state=s1`));
+
+    expect(setCookies(res)["radestate.session"].length).toBeLessThan(4096);
   });
 });

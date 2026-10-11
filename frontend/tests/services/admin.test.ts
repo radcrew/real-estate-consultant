@@ -36,3 +36,20 @@ describe("AdminService", () => {
     });
   });
 });
+
+describe("AdminService.getJob", () => {
+  it("calls GET /admin/jobs/{id} and returns the job", async () => {
+    const job = {
+      id: "job-1",
+      source: "loopnet-seed",
+      status: "running",
+      attempts: 1,
+      result: null,
+      error: null,
+    };
+    const http = { get: vi.fn().mockResolvedValue({ data: job }) } as unknown as AxiosInstance;
+    const data = await new AdminService(http).getJob("job-1");
+    expect(http.get).toHaveBeenCalledWith("/admin/jobs/job-1");
+    expect(data).toEqual(job);
+  });
+});

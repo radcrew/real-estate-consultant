@@ -19,6 +19,9 @@ class AccountProfileResponse(BaseModel):
     zip_code: str | None = None
     country: str | None = None
     avatar_url: str | None = None
+    # True after PATCH asked for a new email: a code was sent to it, and the old email
+    # stays until POST /account/email/verify succeeds.
+    email_change_pending: bool = False
 
 
 class AccountProfileUpdate(BaseModel):
@@ -31,6 +34,10 @@ class AccountProfileUpdate(BaseModel):
     state: str | None = Field(default=None, max_length=120)
     zip_code: str | None = Field(default=None, max_length=32)
     country: str | None = Field(default=None, max_length=120)
+
+
+class AccountEmailVerifyRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=20)
 
 
 class AccountPasswordChangeRequest(BaseModel):

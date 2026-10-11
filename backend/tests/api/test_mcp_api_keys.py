@@ -2,32 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 from uuid import UUID
 
 from httpx import ASGITransport, AsyncClient
 
 from app.core.database import get_session
-from app.core.supabase_sdk import get_supabase_auth_client, get_supabase_sdk_client
+from app.core.supabase_sdk import get_supabase_sdk_client
 from app.main import create_app
 from app.repositories.mcp_api_keys import ResolvedMcpApiKey
 
 _UID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 _KID = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
-
-
-def _make_auth_user(email: str = "user@example.com"):
-    from supabase_auth.types import User
-
-    return User(
-        id=_UID,
-        app_metadata={},
-        user_metadata={},
-        aud="authenticated",
-        created_at=datetime(2024, 1, 1, tzinfo=UTC),
-        email=email,
-    )
 
 
 def _resolved(*, scopes: list[str] | None = None) -> ResolvedMcpApiKey:
@@ -125,13 +111,11 @@ class TestMcpApiKeysCrud:
 
 class TestDualAuthApiKey:
     async def test_profile_with_x_api_key(self, mock_db, mock_supabase):
-        """X-API-Key path resolves user without JWT get_user."""
+        """X-API-Key path resolves the user from the profile row, not from a token."""
         app = create_app()
         app.dependency_overrides[get_session] = lambda: mock_db
         app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
-        app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
 
-        auth_user = _make_auth_user()
         with (
             patch(
                 "app.core.deps.resolve_mcp_api_key",
@@ -139,9 +123,9 @@ class TestDualAuthApiKey:
                 return_value=_resolved(),
             ),
             patch(
-                "app.core.deps.get_auth_user",
+                "app.core.deps.get_profile_row",
                 new_callable=AsyncMock,
-                return_value=auth_user,
+                return_value={"id": _UID, "email": "user@example.com"},
             ),
             patch(
                 "app.api.v1.endpoints.account.profile.get_profile_row",
@@ -164,7 +148,6 @@ class TestDualAuthApiKey:
         app = create_app()
         app.dependency_overrides[get_session] = lambda: mock_db
         app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
-        app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
 
         with patch(
             "app.core.deps.resolve_mcp_api_key",
@@ -188,7 +171,6 @@ class TestDualAuthApiKey:
         app = create_app()
         app.dependency_overrides[get_session] = lambda: mock_db
         app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
-        app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
 
         headers = {"Authorization": "Bearer rad_abcdefghijklmnop"}
         with patch(
@@ -219,7 +201,6 @@ class TestDualAuthApiKey:
         app = create_app()
         app.dependency_overrides[get_session] = lambda: mock_db
         app.dependency_overrides[get_supabase_sdk_client] = lambda: mock_supabase
-        app.dependency_overrides[get_supabase_auth_client] = lambda: mock_supabase
 
         with patch(
             "app.core.deps.resolve_mcp_api_key",

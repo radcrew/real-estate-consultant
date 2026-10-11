@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SignInForm } from "@components/auth/forms/sign-in";
@@ -12,6 +12,8 @@ import type { AuthContextValue } from "@contexts/auth";
 const mockAuth: AuthContextValue = {
   signIn: vi.fn(),
   signInWithGoogle: vi.fn(),
+  confirmSignUp: vi.fn(),
+  resendCode: vi.fn(),
   signUp: vi.fn(),
   signOut: vi.fn(),
   refresh: vi.fn(),
@@ -25,9 +27,12 @@ vi.mock("@contexts/auth", () => ({
   useAuth: () => mockAuth,
 }));
 
+const mockPush = vi.fn();
+const mockNext = vi.fn().mockReturnValue(null);
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
-  useSearchParams: () => ({ get: vi.fn().mockReturnValue(null) }),
+  useRouter: () => ({ push: mockPush, refresh: vi.fn() }),
+  useSearchParams: () => ({ get: mockNext }),
 }));
 
 vi.mock("next/image", () => ({
@@ -36,6 +41,8 @@ vi.mock("next/image", () => ({
 
 beforeEach(() => {
   mockAuth.signIn = vi.fn();
+  mockAuth.confirmSignUp = vi.fn();
+  mockNext.mockReturnValue(null);
   mockAuth.error = null;
   mockAuth.isSubmitting = false;
 });
@@ -65,8 +72,59 @@ describe("SignInForm", () => {
       expect(mockAuth.signIn).toHaveBeenCalledWith(
         { email: "jane@example.com", password: "secret123" },
         expect.any(Function),
+        expect.any(Function),
       );
     });
+  });
+
+  it("verifies an unconfirmed account in place and then signs in with the typed password", async () => {
+    render(<SignInForm />);
+    await userEvent.type(screen.getByLabelText(/email/i), "jane@example.com");
+    await userEvent.type(screen.getByLabelText(/password/i), "secret123");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+    await waitFor(() => expect(mockAuth.signIn).toHaveBeenCalled());
+
+    const onUnconfirmed = vi.mocked(mockAuth.signIn).mock.calls[0][2]!;
+    act(() => onUnconfirmed());
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(screen.getByText("We sent a verification code to jane@example.com.")).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/verification code/i), "123456");
+    await userEvent.click(screen.getByRole("button", { name: /verify email/i }));
+    await waitFor(() => expect(mockAuth.confirmSignUp).toHaveBeenCalled());
+
+    const [email, code, onVerified] = vi.mocked(mockAuth.confirmSignUp).mock.calls[0];
+    expect([email, code]).toEqual(["jane@example.com", "123456"]);
+    vi.mocked(mockAuth.signIn).mockClear();
+    await act(() => onVerified());
+    expect(mockAuth.signIn).toHaveBeenCalledWith(
+      { email: "jane@example.com", password: "secret123" },
+      expect.any(Function),
+    );
+  });
+
+  it("keeps the next path when verifying in place", async () => {
+    mockNext.mockReturnValue("/saved");
+    const assign = vi.fn();
+    vi.spyOn(window, "location", "get").mockReturnValue({ assign } as unknown as Location);
+    // First call (the sign-in form) finds the account unconfirmed; the second, after
+    // the code, succeeds.
+    mockAuth.signIn = vi.fn(async (_creds, onSuccess, onUnconfirmed) =>
+      onUnconfirmed ? onUnconfirmed() : onSuccess(),
+    );
+    mockAuth.confirmSignUp = vi.fn(async (_email, _code, onSuccess) => onSuccess());
+    render(<SignInForm />);
+    await userEvent.type(screen.getByLabelText(/email/i), "jane@example.com");
+    await userEvent.type(screen.getByLabelText(/password/i), "secret123");
+    await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+    await userEvent.type(await screen.findByLabelText(/verification code/i), "123456");
+    await userEvent.click(screen.getByRole("button", { name: /verify email/i }));
+
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith("/auth/cognito-logout?next=%2Fsaved"),
+    );
+    vi.restoreAllMocks();
   });
 
   it("shows an error alert when context has an error", () => {

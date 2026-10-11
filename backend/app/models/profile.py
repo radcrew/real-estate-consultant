@@ -9,12 +9,13 @@ from pydantic import BaseModel, ConfigDict, NaiveDatetime
 
 
 class Profile(BaseModel):
-    """User profile row keyed by ``auth.users`` id."""
+    """User profile row keyed by the Cognito ``sub``."""
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
     id: UUID
     email: str | None = None
+    phone: str | None = None
     created_at: NaiveDatetime | None = None
     is_admin: bool | None = None
     first_name: str | None = None

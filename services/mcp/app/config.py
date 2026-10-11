@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     backend_api_url: str = "http://127.0.0.1:8888"
     mcp_api_key: str = ""
-    # Deprecated fallback — prefer mcp_api_key (rad_…).
+    # Deprecated fallback: a short-lived Cognito access token. Prefer mcp_api_key (rad_…).
     mcp_user_access_token: str = ""
     mcp_transport: str = "stdio"  # stdio | streamable-http
     mcp_http_host: str = "127.0.0.1"
@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = Field(default=60, ge=1)
     max_tool_output_chars: int = Field(default=24_000, ge=1000)
     log_level: str = "INFO"
+
+    # Local scripts only (scripts/backend_auth.py): the account they sign up and sign in as.
+    # A new Cognito account must confirm its email, so use an address you can read; the
+    # defaults only work on a pool that auto-confirms.
+    mcp_local_email: str = "mcp.local@radestate.dev"
+    mcp_local_password: str = "McpLocalPass123!"
 
 
 settings = Settings()

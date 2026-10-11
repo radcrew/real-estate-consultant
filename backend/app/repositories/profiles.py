@@ -21,6 +21,7 @@ PROFILE_PATCH_DB_COLUMNS: frozenset[str] = frozenset(
         "city",
         "state",
         "email",
+        "phone",
     },
 )
 
@@ -28,6 +29,7 @@ _PROFILE_SELECT = ",".join(
     (
         "id",
         "email",
+        "phone",
         "created_at",
         "is_admin",
         "first_name",
@@ -70,20 +72,52 @@ async def upsert_profile_patch(
     user_id: UUID,
     body: AccountProfileUpdate,
 ) -> None:
-    """Insert or update ``public.profiles`` columns present in the patch (not ``phone``)."""
+    """Insert or update the ``public.profiles`` columns present in the patch.
+
+    One upsert: on conflict PostgREST updates only the columns sent, so the rest of an
+    existing row is kept.
+    """
     patch = _profile_patch_dict(body)
     if not patch:
         return
 
-    existing = await get_profile_row(client, user_id)
+    await execute_db_safe(
+        client.table("profiles").upsert({"id": str(user_id), **patch}, on_conflict="id").execute(),
+    )
+
+
+async def ensure_profile_row(
+    client: AsyncClient,
+    user_id: str,
+    *,
+    email: str | None,
+    first_name: str | None,
+    last_name: str | None,
+) -> None:
+    """Create the profile row on first sign-in, or fill its empty fields.
+
+    A value already on the row, a user's edit included, is never overwritten.
+    """
+    fields = {
+        k: v
+        for k, v in {"email": email, "first_name": first_name, "last_name": last_name}.items()
+        if v
+    }
+    existing = await get_profile_row(client, UUID(user_id))
     if existing is None:
-        insert_row: dict[str, Any] = {"id": str(user_id), **patch}
-        await execute_db_safe(client.table("profiles").insert(insert_row).execute())
+        # ignore_duplicates: a concurrent sign-in may have created the row meanwhile.
+        await execute_db_safe(
+            client.table("profiles")
+            .upsert({"id": user_id, **fields}, on_conflict="id", ignore_duplicates=True)
+            .execute(),
+        )
         return
 
-    await execute_db_safe(
-        client.table("profiles").update(patch).eq("id", str(user_id)).execute(),
-    )
+    gaps = {k: v for k, v in fields.items() if not existing.get(k)}
+    if gaps:
+        await execute_db_safe(
+            client.table("profiles").update(gaps).eq("id", user_id).execute(),
+        )
 
 
 async def set_profile_avatar_url(

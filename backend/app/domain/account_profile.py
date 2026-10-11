@@ -1,25 +1,22 @@
-"""Build account API payloads from Supabase Auth ``User`` + ``public.profiles`` row."""
+"""Build account API payloads from ``AuthUser`` + ``public.profiles`` row."""
 
 from __future__ import annotations
 
-from supabase_auth.types import User
-
+from app.models.auth_user import AuthUser
 from app.models.profile import Profile
 from app.schemas.account import AccountProfileResponse
 
 
-def account_profile_response(*, user: User, profile: Profile | None) -> AccountProfileResponse:
+def account_profile_response(*, user: AuthUser, profile: Profile | None) -> AccountProfileResponse:
+    # Sign-in creates the row, so a missing one is rare (its write failed and the next
+    # sign-in retries); there is nothing to show until then.
     if profile is None:
-        return AccountProfileResponse(
-            id=user.id,
-            email=user.email,
-            phone=user.phone,
-        )
+        return AccountProfileResponse(id=user.id, email=None)
 
     return AccountProfileResponse(
         id=user.id,
-        email=user.email,
-        phone=user.phone,
+        email=profile.email,
+        phone=profile.phone,
         first_name=profile.first_name,
         last_name=profile.last_name,
         address=profile.address,
